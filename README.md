@@ -4,7 +4,27 @@ Plataforma de estudio para USMLE Step 1 con sesiones, repaso espaciado y progres
 
 El proyecto Supabase `steponemelman` ya tiene las tablas, políticas de acceso y funciones de sincronización configuradas. El despliegue en Cloudflare requiere completar los pasos siguientes; este documento no acredita una publicación en producción.
 
-## Publicar en tu cuenta de Cloudflare
+## Continuar con el Worker ya creado
+
+El proyecto `steponemelman` de Cloudflare está conectado a este repositorio como **Worker**. El archivo `wrangler.jsonc` permite publicar directamente la carpeta `dist` generada por Vite, con estos valores del panel:
+
+| Opción | Valor |
+|---|---|
+| Rama de producción | `main` |
+| Directorio raíz | `/` |
+| Comando de compilación | `npm run build` |
+| Comando de publicación | `npx wrangler deploy` |
+| Versión de Node | `22` |
+
+Después de publicar el cambio en GitHub, abre **Deployments → Back to builds** y comprueba el intento más reciente. Un reintento de una compilación antigua puede seguir utilizando su revisión anterior. El resultado debe ser correcto antes de considerar el sitio publicado; copia la URL real que Cloudflare muestre bajo `workers.dev`.
+
+El despliegue usa la [configuración oficial para aplicaciones de una sola página](https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/). El material y el progreso siguen en Supabase. No hay un Worker de API propio ni se requieren claves de administración en Cloudflare. El fallback lo controla `assets.not_found_handling`; no añadas una regla global `/* /index.html 200`, porque puede sustituir los archivos JavaScript y CSS por HTML en Workers.
+
+Si falla el nuevo intento, conserva las últimas líneas del registro de **Deploying**: distinguen un problema de configuración de un problema con los permisos del token de publicación. El nombre del token por sí solo no determina sus permisos.
+
+Con la URL real, completa **Configurar los enlaces de acceso** más abajo, sustituyendo también el dominio de ejemplo `pages.dev` por el dominio publicado `workers.dev`.
+
+## Alternativa: publicar con Cloudflare Pages
 
 1. Abre [Cloudflare](https://dash.cloudflare.com/), entra en **Workers & Pages** y selecciona **Create application → Pages → Import from an existing Git repository**.
 2. Conecta GitHub y permite el acceso al repositorio **drytorres96-create/steponemelman**. Selecciónalo para crear el proyecto Pages.
