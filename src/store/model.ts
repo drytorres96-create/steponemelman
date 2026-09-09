@@ -58,7 +58,7 @@ const numero = (v: unknown, minimo = 0): v is number =>
 const entero = (v: unknown, minimo = 0): v is number => numero(v, minimo) && Number.isInteger(v)
 const texto = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 10_000
 const idSeguro = (v: unknown): v is string => texto(v) && v.length <= 512
-  && !['__proto__', 'constructor', 'prototype'].includes(v)
+  && v !== 'prototype' && !Object.hasOwn(Object.prototype, v)
 const fechaONull = (v: unknown): v is number | null => v === null || numero(v)
 
 const ESTADOS = new Set(Object.keys(NOMBRE_ESTADO))
@@ -273,10 +273,11 @@ export function migrarConceptIds(estado: EstadoApp, mapa: Record<string, string>
     const candidato = Object.hasOwn(mapa, idAnterior) ? mapa[idAnterior] : idAnterior
     const id = idSeguro(candidato) ? candidato : idAnterior
     const movido = { ...p, concept_id: id }
-    progreso[id] = progreso[id] ? unirProgreso(progreso[id], movido, estado.criterios) : movido
+    progreso[id] = Object.hasOwn(progreso, id) ? unirProgreso(progreso[id], movido, estado.criterios) : movido
   }
   const reanudable = estado.reanudable?.conceptIds
-    ? { ...estado.reanudable, conceptIds: estado.reanudable.conceptIds.map(id => mapa[id] ?? id) }
+    ? { ...estado.reanudable, conceptIds: estado.reanudable.conceptIds.map(id =>
+      Object.hasOwn(mapa, id) && idSeguro(mapa[id]) ? mapa[id] : id) }
     : estado.reanudable
   return { ...estado, corpus_version: CORPUS_VERSION, progreso, reanudable }
 }
