@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-single/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+public/data/
+*.pdf
+*.zip
+*.sql.tmp
+.wrangler/
+playwright-report/
+test-results/
