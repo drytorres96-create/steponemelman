@@ -5,13 +5,18 @@ import type { Modulo } from '../schema/concept'
 import { estaVencido } from '../srs/fsrs'
 import { RUTAS, type RutaId } from '../lib/rutas'
 import { dominioVigente } from '../srs/mastery'
+import { ExploradorConceptos } from './ExploradorConceptos'
 
-export function Modulos({ onAbrir }: { onAbrir: (moduloId: string, ruta: RutaId, limite: number, sesion?: string) => void }) {
+export function Modulos({ onAbrir, onEstudiar }: {
+  onAbrir: (moduloId: string, ruta: RutaId, limite: number, sesion?: string) => void
+  onEstudiar: (ids: string[]) => void
+}) {
   const { indice, estado } = useApp()
   const [disciplina, setDisciplina] = useState('')
   const [sistema, setSistema] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [abierto, setAbierto] = useState<string | null>(null)
+  const [pestana, setPestana] = useState<'modulos' | 'conceptos'>('modulos')
 
   const modulos = indice?.modulos ?? []
   const disciplinas = useMemo(() => [...new Set(modulos.flatMap(m => m.disciplinas))].sort(), [modulos])
@@ -48,6 +53,20 @@ export function Modulos({ onAbrir }: { onAbrir: (moduloId: string, ruta: RutaId,
         <h1>Explorador de módulos</h1>
         <p className="sutil">Explora el material disponible por disciplina y sistema. Puedes comenzar con una sesión pequeña y ampliar después.</p>
       </div>
+
+      <div className="pestanas-explorador" role="tablist" aria-label="Explorar el material">
+        {([{ id: 'modulos', titulo: 'Módulos y rutas' }, { id: 'conceptos', titulo: 'Buscar conceptos' }] as const).map(p =>
+          <button key={p.id} id={`pestana-${p.id}`} role="tab" aria-selected={pestana === p.id} aria-controls={`panel-${p.id}`}
+            tabIndex={pestana === p.id ? 0 : -1} onClick={() => setPestana(p.id)} onKeyDown={e => {
+              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
+              e.preventDefault()
+              const siguiente = e.key === 'Home' ? 'modulos' : e.key === 'End' ? 'conceptos' : pestana === 'modulos' ? 'conceptos' : 'modulos'
+              setPestana(siguiente)
+              document.getElementById(`pestana-${siguiente}`)?.focus()
+            }}>{p.titulo}</button>)}
+      </div>
+
+      <section id="panel-modulos" role="tabpanel" aria-labelledby="pestana-modulos" hidden={pestana !== 'modulos'} className="pila">
 
       <div className="tarjeta fila" style={{ gap: 10 }}>
         <select value={disciplina} onChange={e => setDisciplina(e.target.value)} aria-label="Filtrar por disciplina" style={{ width: 'auto', minWidth: 190 }}>
@@ -147,6 +166,10 @@ export function Modulos({ onAbrir }: { onAbrir: (moduloId: string, ruta: RutaId,
           ))}
         </div>
       </div>
+      </section>
+      <section id="panel-conceptos" role="tabpanel" aria-labelledby="pestana-conceptos" hidden={pestana !== 'conceptos'}>
+        <ExploradorConceptos activo={pestana === 'conceptos'} onEstudiar={onEstudiar} />
+      </section>
     </div>
   )
 }

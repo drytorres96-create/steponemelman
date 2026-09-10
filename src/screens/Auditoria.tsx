@@ -6,6 +6,7 @@ import { NOMBRE_INTERACCION } from '../schema/concept'
 import { Modal, PanelFuente, Vacio } from '../components/comunes'
 import { leer, escribir } from '../store/db'
 import { useDescarga } from '../components/descarga'
+import { referenciaPagina } from '../lib/fuente'
 
 type Correccion = { tema?: string; disciplina_primaria?: string; sistema_primario?: string; nota?: string }
 const CLAVE = 'correcciones-auditoria'
@@ -21,21 +22,27 @@ export function Auditoria() {
   const [abierto, setAbierto] = useState<Concepto | null>(null)
   const [correcciones, setCorrecciones] = useState<Record<string, Correccion>>({})
   const [verCuarentena, setVerCuarentena] = useState(false)
+  const [errorCarga, setErrorCarga] = useState(false)
+  const [reintento, setReintento] = useState(0)
   const { entregar: descargar, dialogo } = useDescarga()
 
   useEffect(() => {
     if (!indice) return
-    cargarTodo(indice.modulos).then(setConceptos)
-    cargarCuarentena().then(d => setCuarentena(d.conceptos ?? []))
-    leer<Record<string, Correccion>>(CLAVE).then(c => c && setCorrecciones(c))
-  }, [indice])
+    let vigente = true
+    setErrorCarga(false)
+    Promise.all([cargarTodo(indice.modulos), cargarCuarentena()]).then(([cs, q]) => {
+      if (vigente) { setConceptos(cs); setCuarentena(q.conceptos ?? []) }
+    }).catch(() => { if (vigente) setErrorCarga(true) })
+    leer<Record<string, Correccion>>(CLAVE).then(c => { if (vigente && c) setCorrecciones(c) }).catch(() => {})
+    return () => { vigente = false }
+  }, [indice, reintento])
 
   const filtrados = useMemo(() => {
     if (!conceptos) return []
     const t = q.trim().toLowerCase()
     return conceptos.filter(c => {
       if (doc && c.source.doc !== doc) return false
-      if (pagina && String(c.source.page) !== pagina.trim()) return false
+      if (pagina && String(c.source.pdf_page ?? c.source.page) !== pagina.trim()) return false
       if (soloAlertas && c.calidad.alertas.length === 0) return false
       if (!t) return true
       return c.concept_id.toLowerCase().includes(t) || c.afirmacion.toLowerCase().includes(t) ||
@@ -48,11 +55,13 @@ export function Auditoria() {
     setCorrecciones(next); escribir(CLAVE, next)
   }
 
-  if (!conceptos) return <div className="vacio">Cargando el corpus…</div>
+  if (errorCarga) return <Vacio titulo="No se pudo cargar la auditoría" texto="Comprueba tu conexión. Si el material acaba de actualizarse, recarga la página."
+    accion={<button className="btn" onClick={() => setReintento(n => n + 1)}>Volver a intentar</button>} />
+  if (!conceptos) return <div className="vacio" role="status">Cargando el corpus…</div>
 
   const exportarCSV = () => {
-    const filas = [['concept_id','doc','page','disciplina','sistema','tipo','interaccion','confianza','alertas','afirmacion','respuesta']]
-    for (const c of filtrados) filas.push([c.concept_id, c.source.doc, String(c.source.page),
+    const filas = [['concept_id','doc','page','pdf_page','disciplina','sistema','tipo','interaccion','confianza','alertas','afirmacion','respuesta']]
+    for (const c of filtrados) filas.push([c.concept_id, c.source.doc, String(c.source.page), c.source.pdf_page ? String(c.source.pdf_page) : '',
       c.clasificacion.disciplina_primaria, c.clasificacion.sistema_primario, c.clasificacion.tipo_conocimiento,
       c.interaccion.recomendada, String(c.calidad.confianza), c.calidad.alertas.join(' | '),
       c.afirmacion, c.respuesta_canonica])
@@ -106,7 +115,7 @@ export function Auditoria() {
               <tr key={c.concept_id}>
                 <td style={{ fontFamily: 'var(--mono)', fontSize: '.75rem' }}>{c.concept_id}
                   <div className="mini" style={{ fontFamily: 'var(--fuente)' }}>{c.afirmacion.slice(0, 64)}…</div></td>
-                <td className="sutil">{c.source.doc}<div className="mini">p. {c.source.page}</div></td>
+                <td className="sutil">{c.source.doc}<div className="mini">{referenciaPagina(c.source)}</div></td>
                 <td className="sutil">{correcciones[c.concept_id]?.disciplina_primaria ?? c.clasificacion.disciplina_primaria}
                   <div className="mini">{c.clasificacion.sistema_primario} · {c.clasificacion.tipo_conocimiento}</div></td>
                 <td className="sutil">{NOMBRE_INTERACCION[c.interaccion.recomendada]}
@@ -164,7 +173,7 @@ export function Auditoria() {
               <tr key={c.concept_id}>
                 <td style={{ fontFamily: 'var(--mono)', fontSize: '.75rem' }}>{c.concept_id}
                   <div className="mini" style={{ fontFamily: 'var(--fuente)' }}>{c.afirmacion}</div></td>
-                <td className="sutil">{c.source?.doc} p. {c.source?.page}</td>
+                <td className="sutil">{c.source?.doc} · {c.source && referenciaPagina(c.source)}</td>
                 <td className="sutil">{c.motivo}</td>
                 <td>{c.confianza != null ? `${(c.confianza * 100).toFixed(0)}%` : '—'}</td>
               </tr>))}</tbody>

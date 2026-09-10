@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react'
 import type { Concepto } from '../schema/concept'
 import type { EstadoDominio } from '../srs/tipos'
 import { NOMBRE_ESTADO } from '../srs/tipos'
+import { referenciaPagina } from '../lib/fuente'
 
 export function Anillo({ valor, total, tam = 108, etiqueta, oro = false }:
   { valor: number; total: number; tam?: number; etiqueta: string; oro?: boolean }) {
@@ -89,9 +90,12 @@ export function PanelFuente({ c }: { c: Concepto }) {
     <div className="pila" style={{ gap: 14 }}>
       <div className="fila" style={{ gap: 8 }}>
         <span className="etq violeta">{c.source.doc_title}</span>
-        <span className="etq">Página {c.source.page}</span>
+        <span className="etq">{referenciaPagina(c.source)}</span>
         <span className="etq">{c.source.item_id}</span>
       </div>
+      {c.source.pdf_page && c.source.pdf_page !== c.source.page && <p className="mini">
+        La página PDF cuenta la portada. El ancla de la extracción es {c.source.page}.
+      </p>}
       <div>
         <div className="rotulo" style={{ marginBottom: 6 }}>Fragmento fuente (verbatim)</div>
         <div className="fragmento">{c.source.fragment}</div>

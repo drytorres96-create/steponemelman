@@ -1,6 +1,6 @@
 # Organización y calidad del aprendizaje
 
-Estado de referencia: 10 de septiembre de 2026, versión de código 1.1.0. Este documento distingue cambios de organización implementados de trabajo editorial todavía pendiente. No certifica revisión médica humana, preparación para aprobar el examen ni el despliegue de esta revisión. Véanse las [notas de cambios y verificación](cambios-1.1.0.md).
+Estado de referencia: 10 de septiembre de 2026, versión de código 1.2.0 y corpus 1.0.3. Este documento distingue cambios de organización implementados de trabajo editorial todavía pendiente. No certifica revisión médica humana, preparación para aprobar el examen ni el despliegue de esta revisión. Véanse las [notas de cambios y verificación](cambios-1.2.0.md).
 
 ## Cambios de organización implementados
 
@@ -13,6 +13,8 @@ Estado de referencia: 10 de septiembre de 2026, versión de código 1.1.0. Este 
 - Los intentos se guardan desde el envío; la autoevaluación actualiza el mismo registro. La cola inicial no crece con los errores. Al pausar y retomar se conserva la evidencia de ayuda, y las métricas distinguen hitos históricos de dominio vigente.
 - La práctica sin ayuda difiere la corrección hasta el final. La corrección libre evita deducir equivalencia médica a partir de una semejanza ortográfica; lo que no puede resolver queda por revisar. Se registran pistas, fuente y explicación previa para distinguir evidencia independiente.
 - El modo de concentración, la reducción de información secundaria en Inicio y la navegación con teclado facilitan el uso. Su eficacia como intervención específica para ADHD o como mejora del resultado del examen no se ha validado.
+- El explorador permite buscar conceptos por texto y filtros de área o estado, seleccionar hasta 20 y conservar la selección al cambiar filtros o páginas. Los resultados muestran objetivos y referencias, sin revelar la respuesta o explicación antes de iniciar la práctica.
+- La aplicación comprueba que cada módulo coincida con el índice y excluye contenido exclusivo de Step 2, cuarentena y confianza editorial insuficiente. Las referencias físicas del PDF se distinguen del ancla de extracción cuando existe una correspondencia comprobada.
 
 El planificador de repaso es una implementación inspirada en FSRS. Sus puntuaciones de prioridad son estimaciones para ordenar el estudio y no están calibradas como pronóstico individual del examen. El período de siete días y la ordenación inicial son decisiones de producto ajustables tras observar el uso.
 
@@ -20,21 +22,24 @@ El planificador de repaso es una implementación inspirada en FSRS. Sus puntuaci
 
 | Elemento | Estado |
 | --- | --- |
-| Lotes transformados | 18 de 50 |
-| Lotes pendientes | 32 |
-| Conceptos publicados | 1.937 |
-| Etiquetados Step 1 | 1.388 |
-| Etiquetados compartidos Step 1 / Step 2 | 549 |
-| Conceptos apartados en cuarentena | 83 |
+| Lotes transformados | 21 de 50 |
+| Lotes pendientes | 29 |
+| Conceptos publicados | 2.149 |
+| Etiquetados Step 1 | 1.566 |
+| Etiquetados compartidos Step 1 / Step 2 | 583 |
+| Exclusivamente Step 2 publicados | 0 |
+| Conceptos apartados en cuarentena | 121 |
+| Documentos con material publicado | 10 de 22 |
+| Módulos publicados | 34 |
 | Revisión clínica humana | Pendiente |
 
-En esta etapa se apartaron nueve conceptos adicionales de los previamente publicados. La clasificación registrada no garantiza la exactitud de todas las preguntas. Un concepto compartido se conserva únicamente cuando su objetivo evaluado corresponde a Step 1. Un mecanismo añadido a la explicación no basta para justificar una pregunta que solo evalúa manejo clínico de Step 2.
+Los lotes B019–B021 están procesados y esta etapa añade 212 conceptos al material de estudio. El corpus 1.0.3 quedó activado en Supabase y su lectura posterior confirmó cantidades e identificadores únicos, sin solapamiento con cuarentena. Se mantiene el apartado de nueve conceptos realizado en la revisión 1.1.0. La clasificación registrada no garantiza la exactitud de todas las preguntas. Un concepto compartido se conserva únicamente cuando su objetivo evaluado corresponde a Step 1. Un mecanismo añadido a la explicación no basta para justificar una pregunta que solo evalúa manejo clínico de Step 2.
 
 ## Trabajo necesario antes de declarar cerrado el contenido
 
 1. **Cobertura oficial.** Vincular objetivos evaluables al temario de USMLE por sistema, disciplina y tarea. Separar áreas cubiertas, parciales y pendientes mediante revisión editorial; no convertir la proporción de lotes o conceptos en porcentaje del examen. Justificar la prioridad de cada objetivo sin inventar frecuencias de aparición.
-2. **Filtro Step 1 y calidad médica.** Revisar los 549 conceptos compartidos publicados y los 83 apartados, con especial atención a preguntas de tratamiento, siguiente paso y decisiones de urgencia. Documentar la decisión, sus fuentes, versión y responsable de revisión. Separar fidelidad al PDF, corrección médica y pertinencia para Step 1. No reincorporar material de cuarentena sin resolver el motivo.
-3. **Extracción documental.** Completar los 32 lotes restantes; recuperar material incompleto de Ethics, revisar anclajes de página pendientes en nueve documentos y 256 fragmentos breves señalados en el relevo anterior. Verificar estos pendientes contra los PDF antes de convertirlos en conceptos.
+2. **Filtro Step 1 y calidad médica.** Revisar los 583 conceptos compartidos publicados y los 121 apartados, con especial atención a preguntas de tratamiento, siguiente paso y decisiones de urgencia. Documentar la decisión, sus fuentes, versión y responsable de revisión. Separar fidelidad al PDF, corrección médica y pertinencia para Step 1. No reincorporar material de cuarentena sin resolver el motivo.
+3. **Extracción documental.** Completar los 29 lotes restantes; recuperar material incompleto de Ethics, revisar anclajes de página pendientes en nueve documentos y 256 fragmentos breves señalados en el relevo anterior. Verificar estos pendientes contra los PDF antes de convertirlos en conceptos. El soporte de páginas físicas en la interfaz no acredita por sí solo que esos pendientes estén resueltos.
 4. **Prerrequisitos y preguntas alternativas.** Reemplazar gradualmente referencias libres por objetivos o IDs verificables, manteniendo la posibilidad de saltar una recomendación. Introducir variantes revisadas de los objetivos prioritarios y distinguir primer intento, repetición y transferencia. Evitar que recordar el texto de una sola pregunta se interprete como dominio general.
 5. **Figuras y tablas.** Recuperar los recursos pertinentes de los PDF con página y procedencia, revisar legibilidad y vincular preguntas que realmente dependan de la imagen. El corpus actual no dispone de interacciones visuales habilitadas; la simple presencia del tipo «Patrón visual» no subsana esa carencia.
 6. **Inglés con apoyo en español.** Añadir viñetas y terminología inglesa con explicación española opcional, preservando equivalencia conceptual, IDs y progreso. Validar que la traducción no cambie la respuesta ni introduzca pistas.
@@ -47,6 +52,8 @@ En esta etapa se apartaron nueve conceptos adicionales de los previamente public
 - Documentar clasificación Step 1, decisiones compartidas y motivos de exclusión. «Aprobado» en la canalización automatizada debe distinguirse de revisión humana.
 - Mantener IDs estables o alias explícitos para preservar el progreso y ejecutar los validadores de integridad y consistencia del corpus antes de actualizar el material publicado.
 - Las pruebas de software verifican estructura y comportamiento; no reemplazan la evaluación médica y pedagógica del contenido.
+
+La comprobación integrada de esta entrega aprobó 116 pruebas con el corpus privado. En CI del repositorio público se ejecutan 115 y se omite la comprobación que necesita los archivos médicos privados. La publicación del código se verifica por separado de la activación del contenido.
 
 ## Referencias de alcance
 

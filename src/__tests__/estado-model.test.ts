@@ -76,6 +76,7 @@ describe('estado persistido compatible', () => {
   it('rechaza importaciones anidadas corruptas y versiones futuras', () => {
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, progreso: null })).toBeNull()
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '1.0.1' })?.corpus_version).toBe(CORPUS_VERSION)
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '1.0.2' })?.corpus_version).toBe(CORPUS_VERSION)
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '9.0.0' })).toBeNull()
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, sesiones: null })).toBeNull()
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, sesiones: [null] })).toBeNull()

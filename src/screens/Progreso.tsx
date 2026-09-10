@@ -8,6 +8,7 @@ import { estaVencido } from '../srs/fsrs'
 import { dominioVigente } from '../srs/mastery'
 import { erroresRecientesPendientes } from '../lib/plan-estudio'
 import { RUTAS } from '../lib/rutas'
+import { referenciaPagina } from '../lib/fuente'
 
 function Barras({ datos }: { datos: { etiqueta: string; n: number; total: number; fraccion?: boolean }[] }) {
   return <div className="barras">{datos.map(d => <div className="b" key={d.etiqueta}>
@@ -105,7 +106,7 @@ export function Progreso({ onEstudiar }: { onEstudiar: (ids: string[]) => void }
         <summary>{c.objetivo}</summary>
         <p style={{ marginTop: 8 }}><b>Tu respuesta:</b> {estado.progreso[c.concept_id]?.intentos.at(-1)?.respuesta_dada || 'No disponible en este registro.'}</p>
         <p><b>Respuesta de referencia:</b> {c.respuesta_canonica}</p><p className="sutil">{c.explicacion}</p>
-        <p className="mini">{c.source.doc_title}, página {c.source.page}. Consulta la fuente si necesitas aclarar una diferencia.</p>
+        <p className="mini">{c.source.doc_title}. {referenciaPagina(c.source)}. Consulta la fuente si necesitas aclarar una diferencia.</p>
       </details>)}
       {pendientes.length > visiblesRevision && <button className="btn pequeno fantasma" style={{ alignSelf: 'flex-start' }}
         onClick={() => setVisiblesRevision(n => n + 20)}>Mostrar 20 más ({pendientes.length - visiblesRevision} restantes)</button>}

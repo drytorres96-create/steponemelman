@@ -27,6 +27,11 @@ export function Cobertura({ conceptos, indice }: { conceptos: Concepto[]; indice
       <h2>Contenido disponible</h2>
       <p className="sutil">{base.length.toLocaleString('es')} conceptos publicados y {indice.cuarentena.toLocaleString('es')} apartados para revisión.
         La presencia de material en un área todavía no acredita que esté completo el temario de Step 1.</p>
+      {indice.cobertura && <p className="sutil">
+        Lotes procesados: {indice.cobertura.lotes_procesados} de {indice.cobertura.lotes_totales}.
+        {' '}Documentos representados: {indice.cobertura.documentos_publicados} de {indice.cobertura.documentos_totales}.
+        {' '}La revisión médica humana sigue pendiente.
+      </p>}
       <p className="mini">Se cuentan las áreas primarias y secundarias: un concepto puede aparecer en varias filas.
         Esta tabla describe el material de la plataforma, no un porcentaje de cobertura del examen.</p>
     </div>

@@ -81,7 +81,7 @@ export default function App() {
       const lista = ids.map(i => mapa.get(i)).filter(Boolean) as Concepto[]
       if (!lista.length) throw new Error('No hay conceptos disponibles para esta sesión.')
       setIndiceInicial(0)
-      setCola({ titulo: 'Repaso espaciado', subtitulo: 'Practica lo que necesita revisión', ruta: 'repaso', modulo: 'repaso', conceptos: lista })
+      setCola({ titulo: 'Mi selección de estudio', subtitulo: 'Practica los conceptos que has elegido', ruta: 'repaso', modulo: 'repaso', conceptos: lista })
       setVista('estudio'); location.hash = 'estudio'
     } catch {
       setError('No se pudo preparar el repaso. Comprueba la conexión y vuelve a intentarlo.')
@@ -153,7 +153,7 @@ export default function App() {
           )}
           {!cargando && vista === 'inicio' && <Inicio onIr={ir} onContinuar={continuar}
             onEmpezar={limite => abrir('', 'guiada', limite)} onDebiles={limite => abrir('', 'debiles', limite)} />}
-          {!cargando && vista === 'modulos' && <Modulos onAbrir={abrir} />}
+          {!cargando && vista === 'modulos' && <Modulos onAbrir={abrir} onEstudiar={estudiarIds} />}
           {!cargando && vista === 'repaso' && <Repaso onEstudiar={estudiarIds} />}
           {!cargando && vista === 'progreso' && <Progreso onEstudiar={estudiarIds} />}
           {!cargando && vista === 'auditoria' && <Auditoria />}

@@ -2,7 +2,7 @@ import { nuevoProgreso, programar } from '../srs/fsrs'
 import { CRITERIOS_POR_DEFECTO, calcularEstado, evaluarDominio, type CriteriosDominio } from '../srs/mastery'
 import { intentoCorrecto, NOMBRE_ERROR, NOMBRE_ESTADO, type Intento, type ProgresoConcepto } from '../srs/tipos'
 
-export const CORPUS_VERSION = '1.0.2' as const
+export const CORPUS_VERSION = '1.0.3' as const
 
 export interface RegistroSesion {
   id: string
@@ -188,7 +188,7 @@ function leerReanudable(v: unknown): Reanudable | null | false {
 /** Lee versiones previas compatibles, sin aceptar estructuras parciales corruptas. */
 export function leerEstadoDesconocido(v: unknown): EstadoApp | null {
   if (!esObjeto(v) || v.version !== 1 || !esObjeto(v.progreso)) return null
-  if (v.corpus_version !== undefined && v.corpus_version !== '1.0.0' && v.corpus_version !== '1.0.1' && v.corpus_version !== CORPUS_VERSION) return null
+  if (v.corpus_version !== undefined && v.corpus_version !== '1.0.0' && v.corpus_version !== '1.0.1' && v.corpus_version !== '1.0.2' && v.corpus_version !== CORPUS_VERSION) return null
 
   const progreso: Record<string, ProgresoConcepto> = {}
   for (const [id, crudo] of Object.entries(v.progreso)) {

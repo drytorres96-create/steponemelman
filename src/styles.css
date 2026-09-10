@@ -258,3 +258,28 @@ label { font-size: .85rem; color: var(--texto-2); }
   .tarjeta select { max-width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---------- búsqueda y selección de conceptos ---------- */
+.pestanas-explorador { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--linea); padding-bottom: 8px; }
+.pestanas-explorador button { min-height: 44px; padding: 9px 16px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--texto-2); cursor: pointer; }
+.pestanas-explorador button[aria-selected="true"] { color: var(--texto); background: var(--violeta-tenue); border-color: var(--violeta-2); }
+[role="tabpanel"][hidden] { display: none; }
+.filtros-conceptos { grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); }
+.lista-conceptos, .lista-seleccion { list-style: none; padding: 0; margin: 0; }
+.lista-conceptos { display: grid; gap: 12px; }
+.concepto-buscado { display: flex; flex-direction: column; gap: 12px; }
+.elegir-concepto { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; cursor: pointer; color: var(--texto); font-size: 1rem; font-weight: 570; }
+.elegir-concepto input { width: 20px; height: 20px; margin: 3px 0 0; flex: none; accent-color: var(--violeta-2); }
+.elegir-concepto:has(input:disabled) { cursor: default; }
+.elegir-concepto input:disabled { opacity: .5; }
+.lista-seleccion li { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--linea-suave); padding: 10px 0; font-size: .9rem; }
+.lista-seleccion li span { min-width: 0; overflow-wrap: anywhere; }
+.paginacion-conceptos { justify-content: center; padding-top: 8px; }
+.explorador-conceptos h3[tabindex="-1"]:focus-visible { outline-offset: 5px; }
+.explorador-conceptos select { max-width: 100%; }
+@media (max-width: 520px) {
+  .pestanas-explorador button { flex: 1; padding: 9px 10px; }
+  .seleccion-conceptos .fila { align-items: stretch; }
+  .seleccion-conceptos .btn.principal { width: 100%; }
+  .concepto-buscado .etq { white-space: normal; }
+}

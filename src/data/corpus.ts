@@ -1,10 +1,11 @@
-import { IndiceZ, ConceptoZ, type Concepto, type Indice, type Modulo } from '../schema/concept'
+import { type Concepto, type Indice, type Modulo } from '../schema/concept'
 import { supabase } from '../lib/supabase'
 import { leer, escribir } from '../store/db'
+import { validarIndicePublicado, validarModuloPublicado } from './integridad'
 
 /**
  * Carga del corpus. Dos modos, misma interfaz:
- *  - build normal: los datos se sirven desde ./data (carga por módulos, bajo demanda)
+ *  - build normal: datos privados desde Supabase, con membresía y sesión
  *  - build de un solo archivo: el corpus viaja incrustado en `window.__CORPUS__`
  */
 declare global {
@@ -30,7 +31,8 @@ async function traer(ruta: string): Promise<unknown> {
   const clave = `corpus:${session.user.id}:${path}`
   const { data, error } = await supabase.from('corpus_assets').select('payload').eq('path', path).maybeSingle()
   if (!error && data) {
-    await escribir(clave, data.payload)
+    // La caché es opcional: una cuota agotada no impide estudiar el material online.
+    try { await escribir(clave, data.payload) } catch { /* Sin copia offline de este activo. */ }
     return data.payload
   }
   if (!navigator.onLine) {
@@ -45,7 +47,7 @@ export async function cargarIndice(): Promise<Indice> {
   if (indiceEnCurso) return indiceEnCurso
   indiceEnCurso = (async () => {
     const crudo = window.__CORPUS__ ? window.__CORPUS__.index : await traer(`${BASE}/index.json`)
-    const cargado = IndiceZ.parse(crudo)
+    const cargado = validarIndicePublicado(crudo)
     cargado.modulos.sort((a, b) => a.orden - b.orden)
     indice = cargado
     return cargado
@@ -59,18 +61,13 @@ export async function cargarModulo(module_id: string): Promise<Concepto[]> {
   const pendiente = cargasEnCurso.get(module_id)
   if (pendiente) return pendiente
   const carga = (async () => {
+    const actual = await cargarIndice()
+    const modulo = actual.modulos.find(m => m.module_id === module_id)
+    if (!modulo) throw new Error('Este módulo no está disponible en la versión actual del material.')
     const crudo: any = window.__CORPUS__
       ? window.__CORPUS__.modules[module_id]
       : await traer(`${BASE}/modules/${module_id}.json`)
-    if (!crudo || typeof crudo !== 'object') throw new Error(`El módulo ${module_id} no está disponible`)
-    const conceptos: Concepto[] = []
-    const rechazados: string[] = []
-    for (const c of crudo.conceptos ?? []) {
-      const res = ConceptoZ.safeParse(c)
-      if (res.success) conceptos.push(res.data)
-      else rechazados.push(c?.concept_id ?? '?')
-    }
-    if (rechazados.length) console.warn(`[corpus] ${module_id}: ${rechazados.length} conceptos no validan el esquema`, rechazados.slice(0, 5))
+    const conceptos = validarModuloPublicado(crudo, modulo, actual.corpus_version)
     cacheModulos.set(module_id, conceptos)
     return conceptos
   })()

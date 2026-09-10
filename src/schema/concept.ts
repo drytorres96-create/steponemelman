@@ -34,6 +34,8 @@ export const ConceptoZ = z.object({
   concept_id: z.string().min(3),
   source: z.object({
     doc: z.string(), doc_title: z.string(), page: z.number().int().positive(),
+    pdf_page: z.number().int().positive().optional(),
+    pdf_page_fin: z.number().int().positive().optional(),
     item_id: z.string(), fragment: z.string().min(1),
   }),
   fuentes_adicionales: z.array(z.object({ doc: z.string(), page: z.number(), item_id: z.string() })).optional(),
@@ -98,5 +100,10 @@ export const IndiceZ = z.object({
   schema_version: z.string(), corpus_version: z.string().default('1.0.0'), n_conceptos: z.number(), modulos: z.array(ModuloZ),
   glosario: z.array(z.object({ sigla: z.string(), termino: z.string(), concept_id: z.string(), disciplina: z.string() })),
   documentos: z.array(z.string()), cuarentena: z.number(),
+  cobertura: z.object({
+    estado: z.string(), lotes_procesados: z.number().int().nonnegative(), lotes_totales: z.number().int().positive(),
+    documentos_publicados: z.number().int().nonnegative(), documentos_totales: z.number().int().positive(),
+    revision: z.string(),
+  }).optional(),
 })
 export type Indice = z.infer<typeof IndiceZ>
