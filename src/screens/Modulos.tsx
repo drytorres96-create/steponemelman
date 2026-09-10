@@ -4,6 +4,7 @@ import { Barra, Vacio } from '../components/comunes'
 import type { Modulo } from '../schema/concept'
 import { estaVencido } from '../srs/fsrs'
 import { RUTAS, type RutaId } from '../lib/rutas'
+import { dominioVigente } from '../srs/mastery'
 
 export function Modulos({ onAbrir }: { onAbrir: (moduloId: string, ruta: RutaId, limite: number, sesion?: string) => void }) {
   const { indice, estado } = useApp()
@@ -22,7 +23,7 @@ export function Modulos({ onAbrir }: { onAbrir: (moduloId: string, ruta: RutaId,
     for (const id of ids) {
       const p = estado.progreso[id]
       if (!p || !p.intentos.length) { nuevos++; continue }
-      if (p.dominado_en) dominados++; else aprendiendo++
+      if (dominioVigente(p, estado.criterios)) dominados++; else aprendiendo++
       if (estaVencido(p)) vencidos++
     }
     return { total: ids.length, nuevos, aprendiendo, dominados, vencidos }
@@ -45,7 +46,7 @@ export function Modulos({ onAbrir }: { onAbrir: (moduloId: string, ruta: RutaId,
     <div className="pila">
       <div>
         <h1>Explorador de módulos</h1>
-        <p className="sutil">Cada módulo es un conjunto coherente de objetivos, con un máximo de 100 conceptos. Las cifras son reales: salen de tu progreso, no de una simulación.</p>
+        <p className="sutil">Explora el material disponible por disciplina y sistema. Puedes comenzar con una sesión pequeña y ampliar después.</p>
       </div>
 
       <div className="tarjeta fila" style={{ gap: 10 }}>
@@ -83,7 +84,7 @@ export function Modulos({ onAbrir }: { onAbrir: (moduloId: string, ruta: RutaId,
                 {s.vencidos > 0 && <span className="etq ambar">{s.vencidos} vencidos</span>}
               </div>
 
-              <Barra valor={s.dominados} total={s.total} oro />
+              <Barra valor={s.dominados} total={s.total} oro etiqueta={`Dominio vigente de ${m.nombre}`} />
               <div className="fila" style={{ gap: 12, marginTop: 8 }}>
                 <span className="mini">{s.total} conceptos</span>
                 <span className="mini">·</span>
@@ -92,21 +93,20 @@ export function Modulos({ onAbrir }: { onAbrir: (moduloId: string, ruta: RutaId,
                 <span className="mini">{s.aprendiendo} en curso</span>
                 <span className="mini">·</span>
                 <span className="mini" style={{ color: 'var(--oro)' }}>{s.dominados} dominados</span>
-                <span className="mini" style={{ marginLeft: 'auto' }}>~{m.minutos_estimados} min</span>
               </div>
 
               <div className="fila" style={{ gap: 6, marginTop: 10 }}>
                 {m.disciplinas.slice(0, 3).map(d => (
                   <span key={d} className={`etq d-${d.replace(/ /g, '\\ ')}`}><i className="punto-d" />{d}</span>
                 ))}
-                {m.prerrequisitos.length > 0 && <span className="etq">requiere: {m.prerrequisitos.join(', ')}</span>}
+                {m.prerrequisitos.length > 0 && <span className="etq">Base sugerida: {m.prerrequisitos.map(id => modulos.find(m => m.module_id === id)?.nombre || id).join(', ')}</span>}
               </div>
 
               <hr className="sep" />
               <div className="fila">
-                <button className="btn principal pequeno" onClick={() => onAbrir(m.module_id, 'guiada', 14)}>Sesión corta (14)</button>
-                <button className="btn pequeno" onClick={() => onAbrir(m.module_id, 'guiada', 30)}>Sesión profunda (30)</button>
-                <button className="btn pequeno fantasma" onClick={() => setAbierto(abiertoEste ? null : m.module_id)}>
+                <button className="btn principal pequeno" onClick={() => onAbrir(m.module_id, 'guiada', 10)}>Hasta 10 conceptos</button>
+                <button className="btn pequeno" onClick={() => onAbrir(m.module_id, 'guiada', 20)}>Hasta 20 conceptos</button>
+                <button className="btn pequeno fantasma" aria-expanded={abiertoEste} onClick={() => setAbierto(abiertoEste ? null : m.module_id)}>
                   {abiertoEste ? 'Ocultar sesiones' : `Ver ${m.sesiones.length} sesiones`}
                 </button>
               </div>
@@ -136,7 +136,7 @@ export function Modulos({ onAbrir }: { onAbrir: (moduloId: string, ruta: RutaId,
 
       <div className="tarjeta">
         <h2 style={{ marginBottom: 4 }}>Rutas de estudio</h2>
-        <p className="sutil">Las rutas se construyen sobre el corpus auditado y sobre tu progreso real, no sobre el nombre de los archivos.</p>
+        <p className="sutil">Elige qué habilidad practicar. La selección considera tu historial y el material disponible.</p>
         <div className="rejilla r3" style={{ marginTop: 12 }}>
           {RUTAS.filter(r => r.id !== 'guiada').map(r => (
             <button key={r.id} className="tarjeta pulsable" style={{ padding: 13 }}

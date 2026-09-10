@@ -1,141 +1,117 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../store/estado'
-import { Anillo, Barra, Vacio } from '../components/comunes'
-import type { Modulo } from '../schema/concept'
-import type { ProgresoConcepto } from '../srs/tipos'
+import { Anillo, Vacio } from '../components/comunes'
+import { cargarTodo } from '../data/corpus'
+import type { Concepto } from '../schema/concept'
 import { estaVencido } from '../srs/fsrs'
-import { NOMBRE_ETAPA, etapa, type Etapa } from '../srs/mastery'
+import { dominioVigente } from '../srs/mastery'
+import { construirPlanDiario, erroresRecientesPendientes } from '../lib/plan-estudio'
+import { Cobertura } from './Cobertura'
 
-const ETAPAS: Etapa[] = ['exposicion','comprension','recuperacion','consolidacion','dominio']
-const COLOR_ETAPA: Record<Etapa, string> = {
-  exposicion: '#6f7c99', comprension: '#48c4d8', recuperacion: '#8b7cf6',
-  consolidacion: '#e05fa8', dominio: '#e3b23c',
-}
-
-export function Inicio({ onIr, onContinuar, onEmpezar }: {
+export function Inicio({ onIr, onContinuar, onEmpezar, onDebiles }: {
   onIr: (v: string) => void
   onContinuar: () => void
-  onEmpezar: (moduloId: string) => void
+  onEmpezar: (limite: number) => void
+  onDebiles: (limite: number) => void
 }) {
   const { indice, estado } = useApp()
-  const modulos = indice?.modulos ?? []
-  const total = indice?.n_conceptos ?? 0
-  const progresos = useMemo(() => Object.values(estado.progreso) as ProgresoConcepto[], [estado.progreso])
+  const [limite, setLimite] = useState<5 | 10 | 20>(10)
+  const [conceptos, setConceptos] = useState<Concepto[] | null>(null)
+  const [error, setError] = useState(false)
+  const [reintento, setReintento] = useState(0)
+  useEffect(() => {
+    if (!indice) return
+    let activo = true
+    setError(false)
+    cargarTodo(indice.modulos).then(cs => { if (activo) setConceptos(cs) })
+      .catch(() => { if (activo) setError(true) })
+    return () => { activo = false }
+  }, [indice, reintento])
 
+  const progresos = useMemo(() => {
+    const publicados = new Set(indice?.modulos.flatMap(m => m.sesiones.flatMap(s => s.conceptos)))
+    return Object.values(estado.progreso).filter(p => publicados.has(p.concept_id))
+  }, [estado.progreso, indice])
+  const total = indice?.n_conceptos ?? 0
   const vistos = progresos.filter(p => p.intentos.length > 0)
-  const dominados = progresos.filter(p => p.dominado_en != null)
+  const dominados = progresos.filter(p => dominioVigente(p, estado.criterios))
   const vencidos = progresos.filter(p => estaVencido(p))
   const recuperados = progresos.filter(p => p.aciertos > 0)
-  const consolidacion = progresos.filter(p => p.aciertos >= 2 && p.dominado_en == null)
-
-  const porEtapa = ETAPAS.map(e => ({ e, n: vistos.filter(p => etapa(p) === e).length }))
-  const debiles = progresos.filter(p => p.fallos > 0).sort((a, b) => (b.fallos - b.aciertos) - (a.fallos - a.aciertos)).slice(0, 5)
-  const recientes = dominados.sort((a, b) => (b.dominado_en! - a.dominado_en!)).slice(0, 5)
-
-  const siguienteModulo: Modulo | undefined =
-    modulos.find(m => {
-      const ids = m.sesiones.flatMap(s => s.conceptos)
-      return ids.some(id => !estado.progreso[id]?.intentos.length)
-    }) ?? modulos[0]
-
-  const metaN = Math.min(20, Math.max(5, Math.round((total - vistos.length) * 0.01) || 10))
-  const horas = estado.msEstudio / 3_600_000
+  const debiles = conceptos ? erroresRecientesPendientes(conceptos, estado.progreso).slice(0, 5) : []
+  const recientes = [...dominados].sort((a, b) => (b.dominado_en ?? 0) - (a.dominado_en ?? 0)).slice(0, 5)
+  const nombres = new Map(conceptos?.map(c => [c.concept_id, c.objetivo || c.clasificacion.tema]))
+  const plan = conceptos ? construirPlanDiario(conceptos, estado.progreso, limite) : null
+  const tiempos = progresos.flatMap(p => p.intentos).sort((a, b) => a.ts - b.ts)
+    .filter(i => i.ms >= 1000 && i.ms <= 600000).slice(-100).map(i => i.ms).sort((a, b) => a - b)
+  const mediana = tiempos.length >= 5 ? tiempos[Math.floor(tiempos.length / 2)] : null
+  const minutos = mediana && plan ? Math.max(1, Math.round(mediana * plan.conceptos.length / 60000)) : null
 
   return (
-    <div className="pila" style={{ gap: 20 }}>
-      <div className="fila" style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
-        <div>
-          <h1>Tu mapa de dominio</h1>
-          <p className="sutil" style={{ margin: 0 }}>
-            {total.toLocaleString('es')} conceptos auditados y trazables hasta la página de su PDF.
-          </p>
-        </div>
-        {estado.reanudable && (
-          <button className="btn principal" onClick={onContinuar}>Continuar donde lo dejaste</button>
-        )}
-      </div>
-
-      <div className="rejilla" style={{ gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: 14 }}>
-        <div className="tarjeta fila" style={{ gap: 18, justifyContent: 'center' }}>
-          <Anillo valor={dominados.length} total={total || 1} etiqueta="dominados" oro tam={124} />
-          <div className="pila" style={{ gap: 10 }}>
-            <div><div className="cifra">{vistos.length}</div><div className="rotulo">vistos</div></div>
-            <div><div className="cifra" style={{ color: 'var(--verde)' }}>{recuperados.length}</div><div className="rotulo">recuperados</div></div>
-            <div><div className="cifra" style={{ color: vencidos.length ? 'var(--ambar)' : undefined }}>{vencidos.length}</div><div className="rotulo">vencidos hoy</div></div>
-          </div>
-        </div>
-
-        <div className="tarjeta">
-          <div className="fila" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-            <h2>Del primer contacto al dominio</h2>
-            <span className="mini">{horas < 1 ? `${Math.round(estado.msEstudio / 60000)} min` : `${horas.toFixed(1)} h`} de estudio</span>
-          </div>
-          <div className="barras">
-            {porEtapa.map(({ e, n }) => (
-              <div className="b" key={e}>
-                <span style={{ color: COLOR_ETAPA[e] }}>{NOMBRE_ETAPA[e]}</span>
-                <div className="pista-b"><span style={{ width: `${vistos.length ? (n / vistos.length) * 100 : 0}%`, background: COLOR_ETAPA[e] }} /></div>
-                <b>{n}</b>
+    <div className="pila" style={{ gap: 22 }}>
+      <div><h1>Tu estudio de hoy</h1><p className="sutil">Elige una carga manejable. Puedes pausar y continuar cuando lo necesites.</p></div>
+      <section className="tarjeta plan-hoy" aria-labelledby="plan-titulo">
+        <div className="pila" style={{ gap: 12 }}>
+          <div className="rotulo">Un siguiente paso claro</div>
+          <h2 id="plan-titulo">{estado.reanudable ? 'Retoma tu sesión' : 'Una sesión a tu medida'}</h2>
+          {estado.reanudable && <>
+            <p className="sutil">{estado.reanudable.titulo || 'Tu sesión guardada'} · vuelve al punto donde la dejaste.</p>
+            <button className="btn principal" style={{ alignSelf: 'flex-start' }} onClick={onContinuar}>Continuar sesión guardada</button>
+            <hr className="sep" />
+          </>}
+          <fieldset className="selector-carga">
+            <legend>{estado.reanudable ? 'O empieza una sesión nueva' : '¿Cuántos conceptos quieres trabajar?'}</legend>
+            <div className="fila" style={{ gap: 8 }}>
+              {([5, 10, 20] as const).map(n => <label key={n} className={`carga-opcion${limite === n ? ' activa' : ''}`}>
+                <input type="radio" name="carga-estudio" value={n} checked={limite === n} onChange={() => setLimite(n)} />
+                <span>{n} conceptos</span>
+              </label>)}
+            </div>
+          </fieldset>
+          {error ? <div className="aviso" role="alert">No se pudo preparar el plan. <button className="btn pequeno" onClick={() => setReintento(v => v + 1)}>Volver a intentar</button></div>
+            : !plan ? <p className="sutil" role="status">Preparando tu plan…</p>
+            : <>
+              <p className="sutil" style={{ margin: 0 }}>{plan.explicacion}</p>
+              <div className="fila" style={{ gap: 8 }}>
+                <span className="etq">{plan.vencidos} de repaso</span>
+                <span className="etq">{plan.errores} para reforzar</span>
+                <span className="etq">{plan.nuevos} nuevos</span>
               </div>
-            ))}
-          </div>
-          <hr className="sep" />
-          <div className="fila" style={{ justifyContent: 'space-between' }}>
-            <span className="sutil">
-              Próxima meta alcanzable: <b style={{ color: 'var(--texto)' }}>{metaN} conceptos nuevos</b> — unos {Math.round(metaN * 0.9)} minutos.
-            </span>
-            <button className="btn principal" onClick={() => siguienteModulo && onEmpezar(siguienteModulo.module_id)}>
-              Empezar sesión corta
-            </button>
-          </div>
+              <p className="mini">{minutos ? `Tiempo orientativo: ${minutos} min, según tus respuestas anteriores. Puedes necesitar más para leer explicaciones.` : 'Sin límite de tiempo. La duración dependerá de las preguntas y de las explicaciones que consultes.'}</p>
+              <button className={`btn ${estado.reanudable ? '' : 'principal'}`} style={{ alignSelf: 'flex-start' }}
+                disabled={!plan.conceptos.length} onClick={() => onEmpezar(limite)}>
+                {plan.conceptos.length ? `Empezar ${plan.conceptos.length} conceptos` : 'Todo al día por ahora'}
+              </button>
+            </>}
         </div>
+        <div className="resumen-hoy">
+          <Anillo valor={dominados.length} total={total || 1} etiqueta="dominio vigente" oro tam={124} />
+          <p className="mini">Dentro del material publicado. Esta cifra no estima tu resultado en Step 1.</p>
+          <button className="btn pequeno fantasma" onClick={() => onIr('progreso')}>Ver mi progreso</button>
+        </div>
+      </section>
+
+      <div className="rejilla r3" aria-label="Resumen del estudio">
+        <div className="tarjeta"><div className="cifra">{vistos.length}</div><div className="rotulo">conceptos trabajados</div><p className="mini">de {total} disponibles</p></div>
+        <div className="tarjeta"><div className="cifra" style={{ color: 'var(--verde)' }}>{recuperados.length}</div><div className="rotulo">recordados alguna vez</div><p className="mini">Seguimos comprobándolos con el tiempo.</p></div>
+        <button className="tarjeta pulsable" onClick={() => onIr('repaso')}><div className="cifra">{vencidos.length}</div><div className="rotulo">para repasar</div><p className="mini">Una sesión corta basta para empezar.</p></button>
       </div>
 
-      <div className="rejilla r3">
-        <button className="tarjeta pulsable" onClick={() => onIr('repaso')}>
-          <h3>Repaso de hoy</h3>
-          <div className="cifra" style={{ color: vencidos.length ? 'var(--ambar)' : 'var(--texto-3)' }}>{vencidos.length}</div>
-          <p className="mini" style={{ margin: 0 }}>{vencidos.length ? 'conceptos vencidos, ordenados por olvido' : 'nada vencido: sigue con material nuevo'}</p>
-        </button>
-        <button className="tarjeta pulsable" onClick={() => onIr('modulos')}>
-          <h3>Siguiente sesión</h3>
-          <div style={{ fontWeight: 620, margin: '6px 0' }}>{siguienteModulo?.nombre ?? '—'}</div>
-          <Barra valor={siguienteModulo ? siguienteModulo.sesiones.flatMap(s => s.conceptos).filter(id => estado.progreso[id]?.intentos.length).length : 0}
-                 total={siguienteModulo?.n_conceptos ?? 1} />
-          <p className="mini" style={{ marginTop: 6 }}>{siguienteModulo?.proposito}</p>
-        </button>
-        <button className="tarjeta pulsable" onClick={() => onIr('progreso')}>
-          <h3>En consolidación</h3>
-          <div className="cifra" style={{ color: 'var(--magenta)' }}>{consolidacion.length}</div>
-          <p className="mini" style={{ margin: 0 }}>ya los recuperas, aún no cumplen los criterios de dominio</p>
-        </button>
-      </div>
-
-      <div className="rejilla r2">
-        <div className="tarjeta">
-          <h2 style={{ marginBottom: 10 }}>Dominados recientemente</h2>
-          {recientes.length === 0
-            ? <Vacio titulo="Todavía ninguno" texto="Un concepto se marca como dominado tras varias recuperaciones correctas en sesiones distintas." />
-            : recientes.map(p => (
-              <div key={p.concept_id} className="fila" style={{ justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--linea-suave)' }}>
-                <span className="sutil" style={{ fontFamily: 'var(--mono)', fontSize: '.78rem' }}>{p.concept_id}</span>
-                <span className="etq oro">Dominado</span>
-              </div>
-            ))}
+      <details className="tarjeta detalles-estudio">
+        <summary>Qué he consolidado y qué puedo reforzar</summary>
+        <div className="rejilla r2" style={{ marginTop: 18 }}>
+          <div><h2>Dominio vigente</h2>
+            {!recientes.length ? <Vacio titulo="Se construye con tiempo" texto="Varias respuestas independientes y separadas en el tiempo aportarán evidencia de dominio." />
+              : recientes.map(p => <div className="fila concepto-resumen" key={p.concept_id}><span>{nombres.get(p.concept_id) || 'Concepto estudiado'}</span><span className="etq oro">Vigente</span></div>)}
+          </div>
+          <div><h2>Para reforzar</h2>
+            {!debiles.length ? <Vacio titulo="Sin errores recientes pendientes" texto="Las dificultades son información para elegir la próxima práctica." />
+              : <>{debiles.map(c => <div className="concepto-resumen" key={c.concept_id}>{c.objetivo || c.clasificacion.tema}</div>)}
+                <button className="btn pequeno" style={{ marginTop: 12 }} onClick={() => onDebiles(limite)}>Practicar objetivos por reforzar</button></>}
+          </div>
         </div>
-        <div className="tarjeta">
-          <h2 style={{ marginBottom: 10 }}>Áreas débiles</h2>
-          {debiles.length === 0
-            ? <Vacio titulo="Sin fallos registrados" texto="Cuando falles algo aparecerá aquí, con el tipo de error que cometiste." />
-            : debiles.map(p => (
-              <div key={p.concept_id} className="fila" style={{ justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--linea-suave)' }}>
-                <span className="sutil" style={{ fontFamily: 'var(--mono)', fontSize: '.78rem' }}>{p.concept_id}</span>
-                <span className="etq rojo">{p.fallos} {p.fallos === 1 ? 'fallo' : 'fallos'}</span>
-              </div>
-            ))}
-          {debiles.length > 0 && <button className="btn pequeno fantasma" style={{ marginTop: 10 }} onClick={() => onIr('repaso')}>Practicar los débiles</button>}
-        </div>
-      </div>
+      </details>
+      {conceptos && indice && <details className="tarjeta detalles-estudio"><summary>Qué cubre el material disponible</summary><div style={{ marginTop: 18 }}><Cobertura conceptos={conceptos} indice={indice} /></div></details>}
+      <button className="btn fantasma" style={{ alignSelf: 'flex-start' }} onClick={() => onIr('modulos')}>Elegir un módulo o una ruta</button>
     </div>
   )
 }

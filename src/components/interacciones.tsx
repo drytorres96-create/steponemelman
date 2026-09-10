@@ -10,7 +10,12 @@ export interface Resultado {
   detalle?: string
   respuestaDada: string
 }
-interface Props { c: Concepto; bloqueado: boolean; resultado: Resultado | null; onResponder: (r: Resultado) => void }
+interface Props {
+  c: Concepto; bloqueado: boolean; resultado: Resultado | null; onResponder: (r: Resultado) => void
+  /** Estable durante el intento, distinta al iniciar otra presentación. */
+  semilla?: string
+  ocultarFeedback?: boolean
+}
 
 const LETRAS = 'ABCDEFGH'
 const mezclar = <T,>(a: T[], semilla: string): T[] => {
@@ -21,8 +26,8 @@ const mezclar = <T,>(a: T[], semilla: string): T[] => {
 }
 
 /* ---------------- opción múltiple / caso clínico / verdadero-falso ---------------- */
-function Opciones({ c, bloqueado, resultado, onResponder }: Props) {
-  const opciones = useMemo(() => mezclar(c.evaluacion.opciones ?? [], c.concept_id), [c])
+function Opciones({ c, bloqueado, resultado, onResponder, semilla, ocultarFeedback = false }: Props) {
+  const opciones = useMemo(() => mezclar(c.evaluacion.opciones ?? [], semilla ?? c.concept_id), [c, semilla])
   const [elegida, setElegida] = useState<number | null>(null)
   const responder = (i: number) => {
     if (bloqueado) return
@@ -41,17 +46,16 @@ function Opciones({ c, bloqueado, resultado, onResponder }: Props) {
     <div role="radiogroup" aria-label="Opciones de respuesta">
       {opciones.map((o, i) => {
         let cls = 'opcion'
-        if (elegida === i) cls += o.correcta ? ' acierto' : ' fallo'
-        else if (bloqueado && o.correcta) cls += ' correcta-oculta'
-        if (elegida === i && !bloqueado) cls += ' elegida'
+        if (elegida === i) cls += bloqueado && !ocultarFeedback ? (o.correcta ? ' acierto' : ' fallo') : ' elegida'
+        else if (bloqueado && !ocultarFeedback && o.correcta) cls += ' correcta-oculta'
         return (
           <button key={i} className={cls} onClick={() => responder(i)} disabled={bloqueado}
                   role="radio" aria-checked={elegida === i}>
             <span className="letra">{LETRAS[i]}</span>
             <span style={{ flex: 1 }}>
               {o.texto}
-              {bloqueado && !o.correcta && o.por_que && <div className="mini" style={{ marginTop: 4 }}>{o.por_que}</div>}
-              {bloqueado && o.correcta && <div className="mini" style={{ marginTop: 4, color: 'var(--verde)' }}>Respuesta correcta</div>}
+              {bloqueado && !ocultarFeedback && !o.correcta && o.por_que && <div className="mini" style={{ marginTop: 4 }}>{o.por_que}</div>}
+              {bloqueado && !ocultarFeedback && o.correcta && <div className="mini" style={{ marginTop: 4, color: 'var(--verde)' }}>Respuesta correcta</div>}
             </span>
           </button>
         )
@@ -72,7 +76,7 @@ function Texto({ c, bloqueado, onResponder }: Props) {
       ve === 'correcta' ? 'ninguno' :
       ve === 'ortografia' ? 'error_ortografico' :
       ve === 'parcial' ? 'recuerdo_incompleto' :
-      normalizar(v).length < 3 ? 'desconocimiento' : 'confusion_conceptos'
+      ve === 'revision' ? 'error_por_revisar' : 'confusion_conceptos'
     onResponder({ veredicto: ve, tipoError: tipo, recuperacionActiva: true, respuestaDada: v })
   }
   return (
@@ -90,12 +94,12 @@ function Numerico({ c, bloqueado, onResponder }: Props) {
   const [v, setV] = useState('')
   const enviar = () => {
     if (bloqueado || !v.trim()) return
-    const ve = evaluarNumero(v, c.respuesta_canonica, c.evaluacion.tolerancia)
+    const ve = evaluarNumero(v, c.respuesta_canonica, c.evaluacion.tolerancia, c.evaluacion.unidad)
     const unidadMal = !!c.evaluacion.unidad && /[a-zA-Z%/]/.test(v) &&
       !normalizar(v).includes(normalizar(c.evaluacion.unidad).split(' ')[0])
     onResponder({
       veredicto: ve,
-      tipoError: ve === 'correcta' ? 'ninguno' : unidadMal ? 'error_unidad' : ve === 'parcial' ? 'error_numerico' : 'error_numerico',
+      tipoError: ve === 'correcta' ? 'ninguno' : ve === 'revision' ? 'error_por_revisar' : unidadMal ? 'error_unidad' : 'error_numerico',
       recuperacionActiva: true, respuestaDada: v,
     })
   }
@@ -114,7 +118,7 @@ function Numerico({ c, bloqueado, onResponder }: Props) {
 
 /* ---------------- predicción direccional ---------------- */
 const SIGNOS = [{ k: 'sube', s: '↑' }, { k: 'baja', s: '↓' }, { k: 'sin_cambio', s: '↔' }] as const
-function Direccional({ c, bloqueado, onResponder }: Props) {
+function Direccional({ c, bloqueado, onResponder, ocultarFeedback = false }: Props) {
   const flechas = c.evaluacion.flechas ?? []
   const [sel, setSel] = useState<Record<number, string>>({})
   const completo = flechas.length > 0 && Object.keys(sel).length === flechas.length
@@ -137,7 +141,7 @@ function Direccional({ c, bloqueado, onResponder }: Props) {
             <div className="flecha-ops" role="radiogroup" aria-label={f.variable}>
               {SIGNOS.map(s => {
                 let cls = ''
-                if (bloqueado) { if (s.k === f.direccion) cls = 'ok'; else if (sel[i] === s.k) cls = 'mal' }
+                if (bloqueado && !ocultarFeedback) { if (s.k === f.direccion) cls = 'ok'; else if (sel[i] === s.k) cls = 'mal' }
                 else if (sel[i] === s.k) cls = 'sel'
                 return <button key={s.k} className={cls} disabled={bloqueado} role="radio" aria-checked={sel[i] === s.k}
                   aria-label={`${f.variable} ${s.k === 'sube' ? 'aumenta' : s.k === 'baja' ? 'disminuye' : 'sin cambio'}`}
@@ -153,9 +157,9 @@ function Direccional({ c, bloqueado, onResponder }: Props) {
 }
 
 /* ---------------- ordenar secuencia ---------------- */
-function Secuencia({ c, bloqueado, onResponder }: Props) {
+function Secuencia({ c, bloqueado, onResponder, semilla, ocultarFeedback = false }: Props) {
   const pasos = c.evaluacion.pasos ?? []
-  const barajados = useMemo(() => mezclar(pasos.map((p, i) => ({ p, i })), c.concept_id), [c])
+  const barajados = useMemo(() => mezclar(pasos.map((p, i) => ({ p, i })), semilla ?? c.concept_id), [c, semilla])
   const [orden, setOrden] = useState<number[]>([])
   const enviar = () => {
     if (bloqueado || orden.length !== pasos.length) return
@@ -174,7 +178,7 @@ function Secuencia({ c, bloqueado, onResponder }: Props) {
         {orden.length === 0 && <span className="mini">Toca los pasos en el orden correcto.</span>}
         <ol style={{ margin: 0, paddingLeft: 20 }}>
           {orden.map((idx, pos) => (
-            <li key={pos} style={{ marginBottom: 4, color: bloqueado ? (idx === pos ? 'var(--verde)' : 'var(--rojo)') : undefined }}>
+            <li key={pos} style={{ marginBottom: 4, color: bloqueado && !ocultarFeedback ? (idx === pos ? 'var(--verde)' : 'var(--rojo)') : undefined }}>
               {pasos[idx]}
             </li>
           ))}
@@ -190,15 +194,15 @@ function Secuencia({ c, bloqueado, onResponder }: Props) {
         <button className="btn principal" onClick={enviar} disabled={bloqueado || orden.length !== pasos.length}>Comprobar orden</button>
         <button className="btn fantasma pequeno" onClick={() => setOrden([])} disabled={bloqueado || !orden.length}>Reiniciar</button>
       </div>
-      {bloqueado && <div className="mini" style={{ marginTop: 10 }}>Orden correcto: {pasos.join(' → ')}</div>}
+      {bloqueado && !ocultarFeedback && <div className="mini" style={{ marginTop: 10 }}>Orden correcto: {pasos.join(' → ')}</div>}
     </div>
   )
 }
 
 /* ---------------- relacionar columnas ---------------- */
-function Relacionar({ c, bloqueado, onResponder }: Props) {
+function Relacionar({ c, bloqueado, onResponder, semilla, ocultarFeedback = false }: Props) {
   const pares = c.evaluacion.pares ?? []
-  const derechas = useMemo(() => mezclar(pares.map((p, i) => ({ t: p.derecha, i })), c.concept_id + 'd'), [c])
+  const derechas = useMemo(() => mezclar(pares.map((p, i) => ({ t: p.derecha, i })), (semilla ?? c.concept_id) + 'd'), [c, semilla])
   const [activo, setActivo] = useState<number | null>(null)
   const [enlaces, setEnlaces] = useState<Record<number, number>>({})
   const enlaceCorrecto = (i: number) => pares[enlaces[i]]?.derecha === pares[i]?.derecha
@@ -222,7 +226,7 @@ function Relacionar({ c, bloqueado, onResponder }: Props) {
           {pares.map((p, i) => {
             let cls = 'ficha'
             if (activo === i) cls += ' sel'
-            if (bloqueado) cls += enlaceCorrecto(i) ? ' ok' : ' mal'
+            if (bloqueado && !ocultarFeedback) cls += enlaceCorrecto(i) ? ' ok' : ' mal'
             return <button key={i} className={cls} disabled={bloqueado} style={{ textAlign: 'left' }}
               onClick={() => setActivo(i)}>{p.izquierda}
               {enlaces[i] != null && <div className="mini">→ {pares[enlaces[i]].derecha}</div>}</button>
@@ -241,16 +245,16 @@ function Relacionar({ c, bloqueado, onResponder }: Props) {
         <button className="btn principal" onClick={enviar} disabled={bloqueado || Object.keys(enlaces).length !== pares.length}>Comprobar parejas</button>
         <button className="btn fantasma pequeno" onClick={() => { setEnlaces({}); setActivo(null) }} disabled={bloqueado}>Reiniciar</button>
       </div>
-      {bloqueado && <div className="mini" style={{ marginTop: 10 }}>{pares.map(p => `${p.izquierda} → ${p.derecha}`).join(' · ')}</div>}
+      {bloqueado && !ocultarFeedback && <div className="mini" style={{ marginTop: 10 }}>{pares.map(p => `${p.izquierda} → ${p.derecha}`).join(' · ')}</div>}
     </div>
   )
 }
 
 /* ---------------- clasificar ---------------- */
-function Clasificar({ c, bloqueado, onResponder }: Props) {
+function Clasificar({ c, bloqueado, onResponder, semilla, ocultarFeedback = false }: Props) {
   const grupos = c.evaluacion.grupos ?? []
   const elementos = useMemo(
-    () => mezclar(grupos.flatMap((g, gi) => g.elementos.map((e, ei) => ({ id: `${gi}:${ei}`, e, gi }))), c.concept_id), [c])
+    () => mezclar(grupos.flatMap((g, gi) => g.elementos.map((e, ei) => ({ id: `${gi}:${ei}`, e, gi }))), semilla ?? c.concept_id), [c, semilla])
   const [asig, setAsig] = useState<Record<string, number>>({})
   const [activo, setActivo] = useState<string | null>(null)
   const total = elementos.length
@@ -283,7 +287,7 @@ function Clasificar({ c, bloqueado, onResponder }: Props) {
                 {Object.entries(asig).filter(([, v]) => v === gi).map(([id]) => {
                   const elemento = elementos.find(x => x.id === id)
                   const correcto = elemento?.gi === gi
-                  return <span key={id} className={`ficha${bloqueado ? (correcto ? ' ok' : ' mal') : ''}`}>{elemento?.e}</span>
+                  return <span key={id} className={`ficha${bloqueado && !ocultarFeedback ? (correcto ? ' ok' : ' mal') : ''}`}>{elemento?.e}</span>
                 })}
                 {!Object.values(asig).includes(gi) && <span className="mini">Selecciona un elemento y toca este grupo.</span>}
               </div>

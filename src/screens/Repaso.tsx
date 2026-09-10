@@ -9,8 +9,19 @@ import { EtiquetaEstado, Vacio } from '../components/comunes'
 export function Repaso({ onEstudiar }: { onEstudiar: (ids: string[]) => void }) {
   const { indice, estado } = useApp()
   const [conceptos, setConceptos] = useState<Concepto[] | null>(null)
+  const [error, setError] = useState(false)
+  const [reintento, setReintento] = useState(0)
+  const [limite, setLimite] = useState(10)
 
-  useEffect(() => { if (indice) cargarTodo(indice.modulos).then(setConceptos) }, [indice])
+  useEffect(() => {
+    if (!indice) return
+    let activo = true
+    setError(false)
+    cargarTodo(indice.modulos).then(cs => { if (activo) setConceptos(cs) }).catch(() => { if (activo) setError(true) })
+    return () => { activo = false }
+  }, [indice, reintento])
+  if (error) return <Vacio titulo="No se pudo cargar el repaso" texto="Comprueba tu conexión y vuelve a intentarlo."
+    accion={<button className="btn" onClick={() => setReintento(v => v + 1)}>Volver a intentar</button>} />
   if (!conceptos) return <div className="vacio">Cargando la cola de repaso…</div>
 
   const ahora = Date.now()
@@ -29,20 +40,29 @@ export function Repaso({ onEstudiar }: { onEstudiar: (ids: string[]) => void }) 
         <div>
           <h1>Repaso espaciado</h1>
           <p className="sutil" style={{ margin: 0 }}>
-            {cola.length ? `${cola.length} conceptos vencidos · unos ${Math.round(cola.length * 0.8)} minutos` : 'Nada vencido por ahora.'}
+            {cola.length ? `${cola.length} conceptos para repasar. Puedes avanzar en sesiones pequeñas.` : 'Todo al día por ahora.'}
           </p>
         </div>
         {cola.length > 0 && (
-          <button className="btn principal" onClick={() => onEstudiar(cola.slice(0, 30).map(c => c.concept_id))}>
-            Repasar ahora ({Math.min(30, cola.length)})
-          </button>
+          <div className="fila">
+            <label htmlFor="limite-repaso">Carga de la sesión</label>
+            <select id="limite-repaso" style={{ width: 'auto' }} value={limite} onChange={e => setLimite(Number(e.target.value))}>
+              {[5, 10, 20].map(n => <option key={n} value={n}>{n} conceptos</option>)}
+            </select>
+            <button className="btn principal" onClick={() => onEstudiar(cola.slice(0, limite).map(c => c.concept_id))}>
+              Repasar ahora ({Math.min(limite, cola.length)})
+            </button>
+          </div>
         )}
       </div>
 
       {cola.length === 0 ? (
-        <Vacio titulo="Sin repasos vencidos" texto="El planificador te avisará cuando la retención estimada baje. Mientras tanto, avanza con material nuevo." />
+        <Vacio titulo="Sin repasos pendientes ahora" texto="Los próximos repasos aparecerán aquí cuando corresponda. Puedes continuar con el plan de Inicio." />
       ) : (
-        <div className="tarjeta scroll-x">
+        <details className="tarjeta detalles-estudio">
+          <summary>Ver conceptos y detalles del planificador</summary>
+          <p className="mini" style={{ marginTop: 12 }}>La retención es una estimación del planificador, no una medición directa de tu memoria. Puedes estudiar sin revisar estos valores.</p>
+          <div className="scroll-x">
           <table className="tabla">
             <thead><tr><th>Concepto</th><th>Interacción</th><th>Estado</th><th>Retención</th><th>Prioridad</th><th>Vencido desde</th></tr></thead>
             <tbody>
@@ -52,7 +72,7 @@ export function Repaso({ onEstudiar }: { onEstudiar: (ids: string[]) => void }) 
                 const atraso = (ahora - p.proxima!) / DIA
                 return (
                   <tr key={c.concept_id}>
-                    <td><b style={{ fontWeight: 560 }}>{c.afirmacion.slice(0, 78)}{c.afirmacion.length > 78 ? '…' : ''}</b>
+                    <td><b style={{ fontWeight: 560 }}>{c.objetivo}</b>
                       <div className="mini">{c.clasificacion.disciplina_primaria} · {c.clasificacion.tema}</div></td>
                     <td className="sutil">{NOMBRE_INTERACCION[c.interaccion.recomendada]}</td>
                     <td><EtiquetaEstado estado={p.estado} /></td>
@@ -64,7 +84,8 @@ export function Repaso({ onEstudiar }: { onEstudiar: (ids: string[]) => void }) 
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+        </details>
       )}
 
       {proximos.length > 0 && (
@@ -75,7 +96,7 @@ export function Repaso({ onEstudiar }: { onEstudiar: (ids: string[]) => void }) 
             const dias = (p.proxima! - ahora) / DIA
             return (
               <div key={c.concept_id} className="fila" style={{ justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--linea-suave)' }}>
-                <span className="sutil">{c.afirmacion.slice(0, 70)}</span>
+                <span className="sutil">{c.objetivo}</span>
                 <span className="etq">{dias < 1 ? `en ${Math.round(dias * 24)} h` : `en ${Math.round(dias)} d`}</span>
               </div>
             )

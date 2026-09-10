@@ -60,6 +60,28 @@ afterEach(async () => {
 })
 
 describe('proveedor de progreso', () => {
+  it('respalda el envío inmediatamente y una autoevaluación posterior actualiza el mismo intento', async () => {
+    await render()
+    let sessionId = ''
+    await act(async () => { sessionId = api.iniciarSesion('M', 'repaso') })
+    const enviado = { attempt_id: 'attempt-a', session_id: sessionId, ts: Date.now(),
+      resultado: 'correcta' as const, calificacion: 3 as const, interaccion: 'recuperacion_libre',
+      recuperacion_activa: true, pistas_usadas: 0, ms: 1234, tipo_error: 'ninguno' as const,
+      confianza_declarada: 2 as const, respuesta_dada: 'Valor', pregunta_id: `${sessionId}:0:A`,
+      fuente_consultada: false, explicacion_previa: false }
+    await act(async () => {
+      api.registrarIntento('A', enviado)
+      const respaldo = JSON.parse(localStorage.getItem('step1-respaldo:cuenta:user-a')!)
+      expect(respaldo.state.progreso.A.intentos[0].respuesta_dada).toBe('Valor')
+    })
+    expect(api.estado.sesiones[0]).toMatchObject({ vistos: 1, correctos: 1, ms: 1234 })
+    await act(async () => { api.registrarIntento('A', { ...enviado, calificacion: 2, calificacion_actualizada_en: enviado.ts + 1 }) })
+    expect(api.estado.progreso.A.intentos).toHaveLength(1)
+    expect(api.estado.progreso.A.intentos[0].calificacion).toBe(2)
+    expect(api.estado.msEstudio).toBe(1234)
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
+    expect(row?.state.progreso.A.intentos).toHaveLength(1)
+  })
   it('crea sólo un motor activo durante el montaje doble de StrictMode', async () => {
     await render(true)
     expect(api.listo).toBe(true)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Concepto } from '../schema/concept'
 import { NOMBRE_INTERACCION } from '../schema/concept'
 import { useApp } from '../store/estado'
@@ -6,225 +6,280 @@ import { Interaccion, EscrituraCorrectiva, type Resultado } from '../components/
 import { Modal, PanelFuente, EtiquetaEstado } from '../components/comunes'
 import { NOMBRE_ERROR, type Intento, type TipoError } from '../srs/tipos'
 import { evaluarDominio } from '../srs/mastery'
-import { calificacionEfectiva, intervalo } from '../srs/fsrs'
 import { crearUUID } from '../store/model'
-import { reinsertarTrasFallo } from '../lib/cola'
+import { EVALUADOR_VERSION } from '../lib/normalize'
+import { buscarIntentoPaso, conAyuda, diasParaCalificacion, identificarPregunta, resumirIntentos, RelojActividad, versionPregunta } from './sesion'
 
 export interface Cola { titulo: string; subtitulo: string; ruta: string; modulo: string; conceptos: Concepto[]; sessionId?: string }
 
-/** Enseñanza previa: se elige por el tipo de conocimiento, no siempre la misma. */
 function modoEnsenanza(c: Concepto): 'mecanismo' | 'comparacion' | 'explicacion' | 'directo' {
   const t = c.clasificacion.tipo_conocimiento
   if (t === 'Diagnóstico' || t === 'Hallazgo clínico' || t === 'Patrón visual') return 'directo'
   if (t === 'Mecanismo' || t === 'Secuencia' || t === 'Relación causa-efecto' || t === 'Algoritmo') return 'mecanismo'
-  if (t === 'Comparación') return 'comparacion'
-  return 'explicacion'
+  return t === 'Comparación' ? 'comparacion' : 'explicacion'
 }
 
-const formatoIntervalo = (dias: number) =>
-  dias < 1 / 24 ? `${Math.round(dias * 1440)} min` : dias < 1 ? `${Math.round(dias * 24)} h`
+const formatoIntervalo = (dias: number | null) => dias === null ? 'Pendiente de revisión'
+  : dias < 1 / 24 ? `${Math.max(1, Math.round(dias * 1440))} min` : dias < 1 ? `${Math.round(dias * 24)} h`
   : dias < 30 ? `${Math.round(dias)} d` : `${(dias / 30).toFixed(1)} meses`
+
+const etiquetaResultado = (r: Intento['resultado']) => r === 'correcta' ? 'Correcto' : r === 'parcial' ? 'Parcialmente correcto'
+  : r === 'ortografia' ? 'Concepto correcto, revisa la escritura' : r === 'revision' ? 'Respuesta por revisar' : 'Incorrecto'
 
 export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
   { cola: Cola; onSalir: () => void; indiceInicial?: number }) {
   const { registrarIntento, progresoDe, estado, guardarReanudable, iniciarSesion, cerrarSesion } = useApp()
-  const [orden, setOrden] = useState<Concepto[]>(cola.conceptos)
-  const [i, setI] = useState(indiceInicial)
+  // La cola no crece con los errores: los próximos repasos corresponden al planificador.
+  const orden = cola.conceptos
+  const [i, setI] = useState(Math.min(Math.max(0, indiceInicial), orden.length))
   const [fase, setFase] = useState<'ensenanza' | 'tarea' | 'retro' | 'ortografia'>('tarea')
   const [pistas, setPistas] = useState(0)
   const [res, setRes] = useState<Resultado | null>(null)
   const [verFuente, setVerFuente] = useState(false)
   const [confianza, setConfianza] = useState<1 | 2 | 3 | null>(null)
-  const t0 = useRef(Date.now())
+  const [fuenteConsultada, setFuenteConsultada] = useState(false)
+  const [explicacionPrevia, setExplicacionPrevia] = useState(false)
+  const [sesionLista, setSesionLista] = useState(false)
   const sesionId = useRef<string | null>(cola.sessionId ?? null)
-  const anterior = estado.sesiones.find(s => s.id === cola.sessionId)
-  const intentosAnteriores = cola.sessionId ? Object.values(estado.progreso).flatMap(p => p.intentos).filter(t => t.session_id === cola.sessionId) : []
-  const acum = useRef({
-    vistos: Math.max(anterior?.vistos ?? 0, intentosAnteriores.length),
-    correctos: Math.max(anterior?.correctos ?? 0, intentosAnteriores.filter(t => t.resultado === 'correcta' || t.resultado === 'ortografia').length),
-    ms: Math.max(anterior?.ms ?? 0, intentosAnteriores.reduce((n, t) => n + t.ms, 0)),
-  })
-
+  const intentoActual = useRef<Intento | null>(null)
+  const ultimaAccion = useRef<string | null>(null)
+  const reloj = useRef(new RelojActividad())
+  const vistaActual = useRef({ fase, verFuente })
+  vistaActual.current = { fase, verFuente }
+  const examen = cola.ruta === 'examen'
+  const modoRegistro = examen ? 'examen' : cola.ruta === 'repaso' ? 'repaso' : 'aprendizaje'
   const c = orden[i]
+  const preguntaId = c && sesionId.current ? identificarPregunta(sesionId.current, i, c.concept_id) : ''
+  const datosSesion = () => {
+    const intentos = Object.values(estado.progreso).flatMap(p => p.intentos).filter(t => t.session_id === sesionId.current)
+    if (intentoActual.current) intentos.push(intentoActual.current)
+    return resumirIntentos(intentos)
+  }
 
-  useEffect(() => { if (!sesionId.current) sesionId.current = iniciarSesion(cola.modulo, cola.ruta) }, [cola, iniciarSesion])
+  const guardarPaso = (cambios: Partial<{ pistas: number; fuenteConsultada: boolean; explicacionPrevia: boolean; confianza: 1 | 2 | 3 | null }> = {}) => {
+    if (!sesionId.current) return
+    guardarReanudable({
+      modulo: cola.modulo, sesion: cola.ruta, indice: i, ts: Date.now(), sessionId: sesionId.current,
+      conceptIds: orden.map(x => x.concept_id), titulo: cola.titulo, subtitulo: cola.subtitulo,
+      ...(c ? { paso: { indice: i, pistas, fuenteConsultada, explicacionPrevia, confianza,
+        msActivo: reloj.current.leer(), ...cambios } } : {}),
+    })
+  }
+  const guardarPasoActual = useRef(guardarPaso)
+  guardarPasoActual.current = guardarPaso
+
   useEffect(() => {
-    if (!c) return
-    const p = progresoDe(c.concept_id)
-    setFase(p.intentos.length === 0 && modoEnsenanza(c) !== 'directo' ? 'ensenanza' : 'tarea')
-    setPistas(0); setRes(null); setConfianza(null); t0.current = Date.now()
-    guardarReanudable({
-      modulo: cola.modulo, sesion: cola.ruta, indice: i, ts: Date.now(),
-      conceptIds: orden.map(x => x.concept_id), titulo: cola.titulo, subtitulo: cola.subtitulo,
-      ...(sesionId.current ? { sessionId: sesionId.current } : {}),
-    })
+    if (!sesionId.current) sesionId.current = iniciarSesion(cola.modulo, cola.ruta)
+    setSesionLista(true)
+    // El identificador vive durante todo el montaje, también con StrictMode.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [i, c?.concept_id, orden])
+  }, [])
 
-  const terminar = useCallback(() => {
-    if (sesionId.current) cerrarSesion(sesionId.current, acum.current)
-    guardarReanudable(null); onSalir()
-  }, [cerrarSesion, guardarReanudable, onSalir])
-
-  const pausar = useCallback(() => {
-    if (sesionId.current) cerrarSesion(sesionId.current, acum.current)
-    guardarReanudable({
-      modulo: cola.modulo, sesion: cola.ruta, indice: i, ts: Date.now(),
+  useEffect(() => {
+    if (!sesionLista || !sesionId.current) return
+    ultimaAccion.current = null
+    intentoActual.current = null
+    setVerFuente(false)
+    setRes(null)
+    if (!c) { reloj.current.activar(false); guardarPasoActual.current(); return }
+    const progreso = progresoDe(c.concept_id)
+    const id = identificarPregunta(sesionId.current, i, c.concept_id)
+    const anterior = buscarIntentoPaso(progreso, sesionId.current, id)
+    const paso = estado.reanudable?.sessionId === sesionId.current && estado.reanudable.paso?.indice === i
+      ? estado.reanudable.paso : null
+    const mostrarEnsenanza = !examen && cola.ruta !== 'repaso' && progreso.intentos.length === 0 && modoEnsenanza(c) !== 'directo'
+    const previa = anterior?.explicacion_previa ?? paso?.explicacionPrevia ?? mostrarEnsenanza
+    const fuente = anterior?.fuente_consultada ?? paso?.fuenteConsultada ?? false
+    const ayudas = anterior?.pistas_usadas ?? paso?.pistas ?? 0
+    const seguridad = anterior?.confianza_declarada ?? paso?.confianza ?? null
+    setExplicacionPrevia(previa); setFuenteConsultada(fuente); setPistas(ayudas); setConfianza(seguridad)
+    reloj.current.reiniciar(anterior ? 0 : paso?.msActivo ?? 0)
+    if (anterior) {
+      intentoActual.current = anterior
+      setRes({ veredicto: anterior.resultado ?? 'revision', tipoError: anterior.tipo_error,
+        recuperacionActiva: anterior.recuperacion_activa, respuestaDada: anterior.respuesta_dada ?? '' })
+      setFase('retro')
+    } else setFase(mostrarEnsenanza && !paso ? 'ensenanza' : 'tarea')
+    guardarReanudable({ modulo: cola.modulo, sesion: cola.ruta, indice: i, ts: Date.now(), sessionId: sesionId.current,
       conceptIds: orden.map(x => x.concept_id), titulo: cola.titulo, subtitulo: cola.subtitulo,
-      ...(sesionId.current ? { sessionId: sesionId.current } : {}),
-    })
+      paso: { indice: i, pistas: ayudas, fuenteConsultada: fuente, explicacionPrevia: previa,
+        confianza: seguridad, msActivo: reloj.current.leer() } })
+    // Se restaura un paso al entrar en él, nunca se reinicia mientras llega la sincronización.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesionLista, i, c?.concept_id])
+
+  useEffect(() => {
+    const actualizar = (guardar = false) => {
+      const visible = document.visibilityState === 'visible'
+      reloj.current.activar(sesionLista && visible && !!c && vistaActual.current.fase === 'tarea' && !vistaActual.current.verFuente)
+      if (guardar && !visible) guardarPasoActual.current()
+    }
+    actualizar()
+    const alCambiarVisibilidad = () => actualizar(true)
+    document.addEventListener('visibilitychange', alCambiarVisibilidad)
+    return () => { reloj.current.activar(false); document.removeEventListener('visibilitychange', alCambiarVisibilidad) }
+  }, [fase, verFuente, i, c, sesionLista])
+
+  const salir = () => {
+    reloj.current.activar(false)
+    if (sesionId.current) cerrarSesion(sesionId.current, datosSesion())
+    guardarReanudable(null)
     onSalir()
-  }, [cerrarSesion, guardarReanudable, onSalir, cola, i, orden])
+  }
+  const pausar = () => {
+    reloj.current.activar(false)
+    if (sesionId.current) cerrarSesion(sesionId.current, datosSesion())
+    guardarPaso()
+    onSalir()
+  }
+  const avanzar = () => {
+    if (ultimaAccion.current === preguntaId) return
+    ultimaAccion.current = preguntaId
+    reloj.current.activar(false)
+    guardarReanudable({ modulo: cola.modulo, sesion: cola.ruta, indice: i + 1, ts: Date.now(), sessionId: sesionId.current ?? undefined,
+      conceptIds: orden.map(x => x.concept_id), titulo: cola.titulo, subtitulo: cola.subtitulo })
+    if (i + 1 >= orden.length && sesionId.current) cerrarSesion(sesionId.current, datosSesion())
+    setI(Math.min(i + 1, orden.length))
+  }
 
   const responder = (r: Resultado) => {
+    if (!c || !sesionId.current || intentoActual.current || fase !== 'tarea') return
+    const anterior = buscarIntentoPaso(progresoDe(c.concept_id), sesionId.current, preguntaId)
+    if (anterior) {
+      intentoActual.current = anterior
+      setRes({ veredicto: anterior.resultado ?? 'revision', tipoError: anterior.tipo_error,
+        recuperacionActiva: anterior.recuperacion_activa, respuestaDada: anterior.respuesta_dada ?? '' })
+      setFase('retro'); return
+    }
+    reloj.current.activar(false)
     let tipo: TipoError = r.tipoError
-    if (r.veredicto === 'correcta' && pistas >= 2) tipo = 'correcta_con_pistas'
+    const ayuda = pistas > 0 || fuenteConsultada || explicacionPrevia
+    if (r.veredicto === 'correcta' && ayuda) tipo = 'correcta_con_pistas'
     else if (r.veredicto === 'correcta' && confianza === 1) tipo = 'correcta_baja_confianza'
     else if (r.veredicto === 'incorrecta' && confianza === 3) tipo = 'incorrecta_exceso_confianza'
+    const intento: Intento = {
+      attempt_id: crearUUID(), session_id: sesionId.current, ts: Date.now(),
+      calificacion: r.veredicto === 'correcta' ? 3 : r.veredicto === 'incorrecta' || r.veredicto === 'revision' ? 1 : 2,
+      resultado: r.veredicto, interaccion: c.interaccion.recomendada,
+      recuperacion_activa: r.recuperacionActiva, pistas_usadas: pistas, ms: reloj.current.leer(),
+      tipo_error: tipo, confianza_declarada: confianza, respuesta_dada: r.respuestaDada,
+      pregunta_id: preguntaId, pregunta_version: versionPregunta(c), evaluador_version: EVALUADOR_VERSION,
+      fuente_consultada: fuenteConsultada, explicacion_previa: explicacionPrevia, modo: modoRegistro,
+      tipo_evidencia: c.interaccion.recomendada === 'caso_clinico' ? 'aplicacion' : r.recuperacionActiva ? 'recuerdo' : 'discriminacion',
+    }
+    intentoActual.current = intento
+    registrarIntento(c.concept_id, intento)
     setRes({ ...r, tipoError: tipo })
     setFase('retro')
-    acum.current.vistos++
-    if (r.veredicto === 'correcta' || r.veredicto === 'ortografia') acum.current.correctos++
   }
 
-  const calificar = (g: 1 | 2 | 3 | 4) => {
-    if (!c || !res) return
-    const ms = Date.now() - t0.current
-    acum.current.ms += ms
-    const intento: Intento = {
-      attempt_id: crearUUID(), session_id: sesionId.current, ts: Date.now(), calificacion: g, resultado: res.veredicto,
-      interaccion: c.interaccion.recomendada,
-      recuperacion_activa: res.recuperacionActiva, pistas_usadas: pistas, ms,
-      tipo_error: res.tipoError, confianza_declarada: confianza,
-    }
-    registrarIntento(c.concept_id, intento)
-
-    // reintroducir el fallo varios ítems después, no de forma mecánica inmediata
-    let longitudSiguiente = orden.length
-    if (res.veredicto === 'incorrecta') {
-      const copia = reinsertarTrasFallo(orden, i, 3 + Math.floor(Math.random() * 3))
-      longitudSiguiente = copia.length; setOrden(copia)
-    }
-    if (res.tipoError === 'error_ortografico' && c.escritura_correctiva.elegible && c.escritura_correctiva.termino) {
+  const calificar = (calificacion: 1 | 2 | 3 | 4) => {
+    const intento = intentoActual.current
+    if (!c || !intento || ultimaAccion.current === preguntaId || intento.resultado === 'revision') return
+    const actualizado = { ...intento, calificacion,
+      calificacion_actualizada_en: Math.max(Date.now(), (intento.calificacion_actualizada_en ?? intento.ts) + 1) }
+    intentoActual.current = actualizado
+    registrarIntento(c.concept_id, actualizado)
+    if (res?.tipoError === 'error_ortografico' && c.escritura_correctiva.elegible && c.escritura_correctiva.termino) {
       setFase('ortografia'); return
     }
-    avanzar(longitudSiguiente)
+    avanzar()
   }
-  const avanzar = (longitud = orden.length) => { if (i + 1 >= longitud) terminar(); else setI(i + 1) }
 
-  if (!c) return null
+  if (!sesionLista) return <p role="status">Preparando tu sesión…</p>
+  if (!c) {
+    const resumen = datosSesion()
+    return <div className="reproductor pila">
+      <div className="tarjeta pila" role="status">
+        <span className="rotulo">Sesión terminada</span><h2>Has completado {resumen.vistos} preguntas</h2>
+        <p>{resumen.correctos} respuestas correctas, de ellas {resumen.independientes} sin ayuda. Usaste apoyo en {resumen.ayudas} preguntas.</p>
+        {resumen.porRevisar > 0 && <p>{resumen.porRevisar} respuestas por revisar. No se contaron como aciertos ni fallos.</p>}
+        <p className="sutil">Los errores y aciertos evaluados ya tienen su próximo repaso. Esta sesión no añade preguntas extra.</p>
+        {examen && <p className="mini">Práctica sin ayuda con preguntas de tu corpus. Este resultado no estima tu probabilidad de aprobar Step 1.</p>}
+        <button className="btn principal" onClick={salir}>Volver a mi plan</button>
+      </div>
+      <div className="pila"><h3>Revisar mis respuestas</h3>
+        {orden.map((concepto, posicion) => {
+          const t = buscarIntentoPaso(progresoDe(concepto.concept_id), sesionId.current!, identificarPregunta(sesionId.current!, posicion, concepto.concept_id))
+          if (!t) return null
+          return <details className="tarjeta" key={`${posicion}:${concepto.concept_id}`}>
+            <summary>{posicion + 1}. {etiquetaResultado(t.resultado)}{conAyuda(t) ? ' · Con ayuda' : ''} · {concepto.objetivo}</summary>
+            {t.pregunta_version && t.pregunta_version !== versionPregunta(concepto) && <p className="mini">El contenido cambió desde tu respuesta. Se muestra la versión actual.</p>}
+            <p style={{ marginTop: 12 }}>{concepto.evaluacion.pregunta}</p>
+            <p>Tu respuesta: <b>{t.respuesta_dada || 'No registrada en esta versión anterior'}</b></p>
+            <p>Respuesta de referencia: <b>{concepto.respuesta_canonica}</b></p><p>{concepto.explicacion}</p>
+            {concepto.evaluacion.opciones?.filter(o => !o.correcta && o.por_que).map(o => <p className="mini" key={o.texto}><b>{o.texto}:</b> {o.por_que}</p>)}
+          </details>
+        })}
+      </div>
+    </div>
+  }
   const p = progresoDe(c.concept_id)
   const ev = evaluarDominio(p, estado.criterios)
   const modo = modoEnsenanza(c)
 
-  return (
-    <div className="reproductor pila">
-      <div className="fila" style={{ justifyContent: 'space-between' }}>
-        <div className="fila" style={{ gap: 8 }}>
-          <span className={`etq d-${c.clasificacion.disciplina_primaria.replace(/ /g, '\\ ')}`}>
-            <i className="punto-d" /> {c.clasificacion.disciplina_primaria}
-          </span>
-          <span className="etq">{c.clasificacion.sistema_primario}</span>
-          <span className="etq violeta">{NOMBRE_INTERACCION[c.interaccion.recomendada]}</span>
-          <EtiquetaEstado estado={p.estado} />
-        </div>
-        <button className="btn pequeno fantasma" onClick={pausar}>Pausar sesión</button>
+  return <div className="reproductor pila">
+    <div className="fila" style={{ justifyContent: 'space-between' }}>
+      <div className="fila" style={{ gap: 8 }}>
+        <span className="etq">{c.clasificacion.disciplina_primaria}</span><span className="etq">{c.clasificacion.sistema_primario}</span>
+        <span className="etq violeta">{NOMBRE_INTERACCION[c.interaccion.recomendada]}</span>
+        {!examen && <EtiquetaEstado estado={p.estado} />}
       </div>
-
-      <div className="avance" aria-label={`Ítem ${i + 1} de ${orden.length}`}>
-        {orden.map((_, k) => <i key={k} className={k < i ? 'hecho' : k === i ? 'actual' : ''} />)}
-      </div>
-
-      <div className="tarea">
-        {fase === 'ensenanza' && (
-          <div>
-            <div className="rotulo" style={{ marginBottom: 10 }}>
-              {modo === 'mecanismo' ? 'Mecanismo paso a paso' : modo === 'comparacion' ? 'Comparación' : 'Antes de recuperar'}
-            </div>
-            <p style={{ fontSize: '1.05rem', lineHeight: 1.55 }}>{c.afirmacion}</p>
-            <p className="sutil">{c.explicacion}</p>
-            {c.patron && <div className="pista" style={{ borderColor: 'var(--oro)', background: 'var(--oro-tenue)' }}><b>Patrón:</b> {c.patron}</div>}
-            {c.confusiones.length > 0 && (
-              <p className="mini">Se confunde con: {c.confusiones.join(' · ')}</p>
-            )}
-            <button className="btn principal" style={{ marginTop: 12 }} onClick={() => { setFase('tarea'); t0.current = Date.now() }}>
-              Ahora recupéralo
-            </button>
-          </div>
-        )}
-
-        {fase !== 'ensenanza' && (
-          <>
-            <div className="pregunta">{c.evaluacion.pregunta}</div>
-            {fase === 'tarea' && confianza === null && (
-              <div className="fila" style={{ gap: 6, marginBottom: 14 }}>
-                <span className="mini">¿Qué tan seguro estás?</span>
-                {([[1, 'Poco'], [2, 'Medio'], [3, 'Mucho']] as const).map(([v, t]) => (
-                  <button key={v} className="btn pequeno fantasma" onClick={() => setConfianza(v as 1 | 2 | 3)}>{t}</button>
-                ))}
-              </div>
-            )}
-            {pistas > 0 && c.pistas.slice(0, pistas).map((t, k) => (
-              <div key={k} className="pista"><b>Pista {k + 1}:</b> {t}</div>
-            ))}
-            <Interaccion key={c.concept_id} c={c} bloqueado={fase !== 'tarea'} resultado={res} onResponder={responder} />
-            {fase === 'tarea' && (
-              <div className="fila" style={{ marginTop: 14 }}>
-                <button className="btn pequeno fantasma" disabled={pistas >= 3} onClick={() => setPistas(pistas + 1)}>
-                  {pistas === 0 ? 'Necesito una pista' : pistas < 3 ? `Otra pista (${pistas}/3)` : 'Sin más pistas'}
-                </button>
-                <button className="btn pequeno fantasma" onClick={() => setVerFuente(true)}>Ver la fuente</button>
-              </div>
-            )}
-          </>
-        )}
-
-        {fase === 'retro' && res && (
-          <div className={`retro ${res.veredicto === 'correcta' ? 'ok' : res.veredicto === 'incorrecta' ? 'no' : 'parcial'}`}>
-            <div className="fila" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
-              <b>{res.veredicto === 'correcta' ? 'Correcto' : res.veredicto === 'parcial' ? 'Parcialmente correcto'
-                 : res.veredicto === 'ortografia' ? 'Concepto correcto, ortografía incorrecta' : 'Incorrecto'}</b>
-              <span className="etq">{NOMBRE_ERROR[res.tipoError]}</span>
-            </div>
-            {res.veredicto !== 'correcta' && (
-              <p style={{ marginBottom: 6 }}>Respuesta correcta: <b>{c.respuesta_canonica}</b></p>
-            )}
-            {res.detalle && <p className="sutil" style={{ marginBottom: 6 }}>{res.detalle}</p>}
-            <p style={{ marginBottom: 6 }}>{c.explicacion}</p>
-            {c.patron && <p style={{ marginBottom: 6 }}><span className="decisiva">Patrón reutilizable</span> · {c.patron}</p>}
-            {c.contexto && <p className="sutil" style={{ marginBottom: 6 }}>{c.contexto}</p>}
-            {c.relacionados.length > 0 && <p className="mini">Conecta con: {c.relacionados.join(' · ')}</p>}
-            <div className="fila" style={{ marginTop: 10 }}>
-              <button className="btn pequeno fantasma" onClick={() => setVerFuente(true)}>Abrir la fuente</button>
-              <span className="mini">{ev.cumple ? 'Cumple los criterios de dominio' : `${ev.detalle.filter(d => d.cumplido).length}/${ev.detalle.length} criterios de dominio`}</span>
-            </div>
-            <hr className="sep" />
-            <div className="rotulo" style={{ marginBottom: 8 }}>¿Cuándo debe volver a aparecer?</div>
-            <div className="escalera">
-              {(res.veredicto === 'incorrecta'
-                ? [[1, 'Otra vez']] as const
-                : res.veredicto === 'parcial' || res.veredicto === 'ortografia'
-                  ? [[1, 'Otra vez'], [2, 'Difícil']] as const
-                  : [[2, 'Difícil'], [3, 'Bien'], [4, 'Fácil']] as const
-              ).map(([g, txt]) => {
-                const efectivo = calificacionEfectiva({ resultado: res.veredicto, calificacion: g })
-                return (
-                  <button key={g} onClick={() => calificar(g)}>
-                    <b>{txt}</b>
-                    <small>{formatoIntervalo(Math.max(efectivo === 1 ? 0.007 : 0.02, intervalo(efectivo === 1 ? 0.4 : p.estabilidad > 0 ? p.estabilidad * (efectivo === 2 ? 1.2 : efectivo === 3 ? 2.2 : 3.4) : (efectivo === 2 ? 1.2 : efectivo === 3 ? 3.2 : 15.7))))}</small>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {fase === 'ortografia' && c.escritura_correctiva.termino && (
-          <EscrituraCorrectiva termino={c.escritura_correctiva.termino} onHecho={avanzar} />
-        )}
-      </div>
-
-      {verFuente && <Modal titulo="Fuente del concepto" onCerrar={() => setVerFuente(false)}><PanelFuente c={c} /></Modal>}
+      <button className="btn pequeno fantasma" onClick={pausar}>Necesito una pausa</button>
     </div>
-  )
+    <div className="fila" style={{ justifyContent: 'space-between' }}><span className="mini">Pregunta {i + 1} de {orden.length} · {orden.length - i - 1} después de esta</span>
+      <span className="mini">{examen ? 'Sin ayuda · Revisión al terminar' : 'Puedes pausar y retomar'}</span></div>
+    <div className="avance" aria-label={`Pregunta ${i + 1} de ${orden.length}`}>
+      {orden.map((_, k) => <i key={k} className={k < i ? 'hecho' : k === i ? 'actual' : ''} />)}
+    </div>
+    <div className="tarea">
+      {fase === 'ensenanza' && !examen && <div>
+        <div className="rotulo" style={{ marginBottom: 10 }}>{modo === 'mecanismo' ? 'Mecanismo paso a paso' : modo === 'comparacion' ? 'Comparación' : 'Antes de recuperar'}</div>
+        <p style={{ fontSize: '1.05rem', lineHeight: 1.55 }}>{c.afirmacion}</p><p className="sutil">{c.explicacion}</p>
+        {c.patron && <div className="pista"><b>Patrón:</b> {c.patron}</div>}
+        {c.confusiones.length > 0 && <p className="mini">Se confunde con: {c.confusiones.join(' · ')}</p>}
+        <p className="mini">Esta primera respuesta contará como práctica con explicación previa.</p>
+        <button className="btn principal" style={{ marginTop: 12 }} onClick={() => setFase('tarea')}>Ahora recupéralo</button>
+      </div>}
+      {fase !== 'ensenanza' && <>
+        <div className="pregunta">{c.evaluacion.pregunta}</div>
+        {fase === 'tarea' && <div className="fila" style={{ gap: 6, marginBottom: 14 }}><span className="mini">Confianza (opcional):</span>
+          {([[1, 'Poca'], [2, 'Media'], [3, 'Mucha']] as const).map(([v, t]) => <button key={v} className={`btn pequeno ${confianza === v ? 'principal' : 'fantasma'}`}
+            aria-pressed={confianza === v} onClick={() => { setConfianza(v); guardarPaso({ confianza: v }) }}>{t}</button>)}
+        </div>}
+        {!examen && pistas > 0 && c.pistas.slice(0, pistas).map((t, k) => <div key={k} className="pista"><b>Pista {k + 1}:</b> {t}</div>)}
+        {(!examen || fase === 'tarea') && <Interaccion key={preguntaId} c={c} semilla={preguntaId} ocultarFeedback={examen}
+          bloqueado={fase !== 'tarea'} resultado={res} onResponder={responder} />}
+        {fase === 'tarea' && !examen && <div className="fila" style={{ marginTop: 14 }}>
+          <button className="btn pequeno fantasma" disabled={pistas >= c.pistas.length} onClick={() => { setPistas(pistas + 1); guardarPaso({ pistas: pistas + 1 }) }}>
+            {pistas === 0 ? 'Necesito una pista' : pistas < c.pistas.length ? `Otra pista (${pistas}/${c.pistas.length})` : 'Sin más pistas'}</button>
+          <button className="btn pequeno fantasma" onClick={() => { setFuenteConsultada(true); setVerFuente(true); guardarPaso({ fuenteConsultada: true }) }}>Ver la fuente</button>
+        </div>}
+      </>}
+      {fase === 'retro' && examen && <div className="tarjeta pila" role="status"><b>Respuesta registrada</b>
+        <p className="sutil">Podrás revisar la respuesta y su explicación al terminar la sesión.</p>
+        <button className="btn principal" onClick={avanzar}>{i + 1 === orden.length ? 'Terminar y revisar' : 'Siguiente pregunta'}</button>
+      </div>}
+      {fase === 'retro' && res && !examen && <div className={`retro ${res.veredicto === 'correcta' ? 'ok' : res.veredicto === 'incorrecta' ? 'no' : 'parcial'}`} role="status">
+        <div className="fila" style={{ justifyContent: 'space-between', marginBottom: 8 }}><b>{etiquetaResultado(res.veredicto)}</b><span className="etq">{NOMBRE_ERROR[res.tipoError]}</span></div>
+        <p className="mini">Tu respuesta ya está registrada.{intentoActual.current && conAyuda(intentoActual.current) ? ' Esta práctica tuvo ayuda.' : ''}</p>
+        <p>Tu respuesta: <b>{res.respuestaDada || 'Respuesta registrada'}</b></p>
+        {res.veredicto !== 'correcta' && <p>Respuesta de referencia: <b>{c.respuesta_canonica}</b></p>}
+        {res.veredicto === 'revision' && <p>El corrector no puede decidir esta respuesta con seguridad. Compárala con la referencia; no se contará como acierto ni fallo.</p>}
+        {res.detalle && <p className="sutil">{res.detalle}</p>}<p>{c.explicacion}</p>
+        {c.patron && <p><span className="decisiva">Patrón reutilizable</span> · {c.patron}</p>}{c.contexto && <p className="sutil">{c.contexto}</p>}
+        {c.relacionados.length > 0 && <p className="mini">Conecta con: {c.relacionados.join(' · ')}</p>}
+        <div className="fila" style={{ marginTop: 10 }}><button className="btn pequeno fantasma" onClick={() => setVerFuente(true)}>Abrir la fuente</button>
+          <span className="mini">{ev.cumple ? 'Cumple los criterios de esta práctica' : `${ev.detalle.filter(d => d.cumplido).length}/${ev.detalle.length} criterios de práctica`}</span></div>
+        {res.veredicto === 'revision' ? <button className="btn principal" style={{ marginTop: 12 }} onClick={avanzar}>Continuar con respuesta pendiente de revisión</button>
+          : <><hr className="sep" /><div className="rotulo" style={{ marginBottom: 8 }}>Ajusta la dificultad · Próximo repaso aproximado</div>
+            <div className="escalera">{(res.veredicto === 'incorrecta' ? [[1, 'Volver a practicar']] as const
+              : res.veredicto === 'parcial' || res.veredicto === 'ortografia' ? [[1, 'Volver a practicar'], [2, 'Difícil']] as const
+              : [[2, 'Difícil'], [3, 'Bien'], [4, 'Fácil']] as const).map(([g, txt]) => <button key={g} onClick={() => calificar(g)}>
+                <b>{txt}</b><small>{intentoActual.current && formatoIntervalo(diasParaCalificacion(p, intentoActual.current, g))}</small></button>)}</div></>}
+      </div>}
+      {fase === 'ortografia' && c.escritura_correctiva.termino && <EscrituraCorrectiva termino={c.escritura_correctiva.termino} onHecho={avanzar} />}
+    </div>
+    {verFuente && !examen && <Modal titulo="Fuente del concepto" onCerrar={() => setVerFuente(false)}><PanelFuente c={c} /></Modal>}
+  </div>
 }

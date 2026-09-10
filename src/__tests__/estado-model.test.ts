@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { nuevoProgreso, programar } from '../srs/fsrs'
 import type { Intento } from '../srs/tipos'
 import {
-  CORPUS_VERSION, ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds,
+  CORPUS_VERSION, ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, reconstruirProgreso, combinarEstados,
   type EstadoApp,
 } from '../store/model'
 
@@ -14,7 +14,54 @@ const intento = (id: string, ts: number): Intento => ({
 
 const estadoCon = (progreso: EstadoApp['progreso']): EstadoApp => ({ ...ESTADO_INICIAL, progreso, vistoAlguna: true })
 
-describe('estado persistido 1.0.1', () => {
+describe('estado persistido compatible', () => {
+  it('preserva el hito histórico al fusionar sin certificar independencia antigua', () => {
+    const p = { ...reconstruirProgreso('A', [intento('legacy', 1000)], ESTADO_INICIAL.criterios), dominado_en: 1000 }
+    const fusion = combinarEstados(estadoCon({ A: p }), estadoCon({}))
+    expect(fusion.progreso.A.dominado_en).toBe(1000)
+    expect(fusion.progreso.A.estado).not.toBe('dominado')
+    expect(reconstruirProgreso('A', p.intentos, ESTADO_INICIAL.criterios, p.dominado_en).dominado_en).toBe(1000)
+  })
+
+  it('guarda evidencia y actualiza la calificación del mismo envío sin duplicar contadores', () => {
+    const enviado: Intento = { ...intento('a', 1000), respuesta_dada: 'Respuesta conservada',
+      pregunta_id: 'session:0:A', pregunta_version: 'v1', evaluador_version: 'v2',
+      fuente_consultada: true, explicacion_previa: false, modo: 'repaso', tipo_evidencia: 'recuerdo' }
+    const actualizado = { ...enviado, calificacion: 2 as const, calificacion_actualizada_en: 2000 }
+    const p = reconstruirProgreso('A', [enviado, actualizado, enviado], ESTADO_INICIAL.criterios)
+    expect(p.intentos).toHaveLength(1)
+    expect(p.aciertos).toBe(1)
+    expect(p.intentos[0].calificacion).toBe(2)
+    expect(leerEstadoDesconocido(estadoCon({ A: p }))?.progreso.A.intentos[0]).toEqual(actualizado)
+  })
+
+  it('fusiona dos dispositivos sin perder la calificación nueva ni la evidencia de ayuda', () => {
+    const a = { ...intento('a', 1000), pregunta_id: 'q1', fuente_consultada: true }
+    const b = { ...intento('b', 1001), pregunta_id: 'q1', fuente_consultada: false, calificacion: 2 as const, calificacion_actualizada_en: 3000 }
+    const ea = estadoCon({ A: reconstruirProgreso('A', [a], ESTADO_INICIAL.criterios) })
+    const eb = estadoCon({ A: reconstruirProgreso('A', [b], ESTADO_INICIAL.criterios) })
+    const ab = combinarEstados(ea, eb)
+    expect(ab).toEqual(combinarEstados(eb, ea))
+    expect(ab.progreso.A.intentos).toHaveLength(1)
+    expect(ab.progreso.A.intentos[0]).toMatchObject({ calificacion: 2, fuente_consultada: true })
+    expect(leerEstadoDesconocido(ab)).not.toBeNull()
+  })
+
+  it('conserva una respuesta por revisar sin convertirla en fallo ni en repaso vencido', () => {
+    const pendiente = { ...intento('r', 1000), resultado: 'revision' as const, tipo_error: 'error_por_revisar' as const }
+    const p = reconstruirProgreso('A', [pendiente], ESTADO_INICIAL.criterios)
+    expect(p.aciertos).toBe(0)
+    expect(p.fallos).toBe(0)
+    expect(p.proxima).toBeNull()
+    expect(leerEstadoDesconocido(estadoCon({ A: p }))?.progreso.A.intentos).toHaveLength(1)
+  })
+
+  it('restaura ayudas del paso y admite el resumen final, rechazando evidencia corrupta', () => {
+    const r = { modulo: 'M', sesion: 'repaso', indice: 1, ts: 1000, conceptIds: ['A'],
+      paso: { indice: 1, pistas: 2, fuenteConsultada: true, explicacionPrevia: false, confianza: null, msActivo: 1234 } }
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, reanudable: r })?.reanudable).toEqual(r)
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, reanudable: { ...r, paso: { ...r.paso, pistas: -1 } } })).toBeNull()
+  })
   it('preserva el orden exacto de la cola, incluso IDs repetidos', () => {
     const crudo = {
       ...ESTADO_INICIAL,
@@ -28,6 +75,7 @@ describe('estado persistido 1.0.1', () => {
 
   it('rechaza importaciones anidadas corruptas y versiones futuras', () => {
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, progreso: null })).toBeNull()
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '1.0.1' })?.corpus_version).toBe(CORPUS_VERSION)
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '9.0.0' })).toBeNull()
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, sesiones: null })).toBeNull()
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, sesiones: [null] })).toBeNull()

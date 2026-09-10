@@ -12,14 +12,15 @@ export const NOMBRE_ESTADO: Record<EstadoDominio, string> = {
 export type TipoError =
   | 'desconocimiento' | 'recuerdo_incompleto' | 'confusion_conceptos' | 'interpretacion_incorrecta'
   | 'error_mecanistico' | 'error_secuencia' | 'error_numerico' | 'error_unidad' | 'error_ortografico'
-  | 'correcta_con_pistas' | 'correcta_baja_confianza' | 'incorrecta_exceso_confianza' | 'ninguno'
+  | 'correcta_con_pistas' | 'correcta_baja_confianza' | 'incorrecta_exceso_confianza' | 'error_por_revisar' | 'ninguno'
 
 export const NOMBRE_ERROR: Record<TipoError, string> = {
   desconocimiento: 'Desconocimiento', recuerdo_incompleto: 'Recuerdo incompleto',
   confusion_conceptos: 'Confusión entre conceptos', interpretacion_incorrecta: 'Interpretación incorrecta',
   error_mecanistico: 'Error mecanístico', error_secuencia: 'Error de secuencia',
   error_numerico: 'Error numérico', error_unidad: 'Error de unidad', error_ortografico: 'Error ortográfico',
-  correcta_con_pistas: 'Correcta con demasiadas pistas', correcta_baja_confianza: 'Correcta con baja confianza',
+  correcta_con_pistas: 'Correcta con ayuda', correcta_baja_confianza: 'Correcta con baja confianza',
+  error_por_revisar: 'Respuesta por revisar',
   incorrecta_exceso_confianza: 'Incorrecta con exceso de confianza', ninguno: 'Sin error',
 }
 
@@ -30,7 +31,17 @@ export interface Intento {
   ts: number
   calificacion: 1 | 2 | 3 | 4          // otra vez / difícil / bien / fácil
   /** El resultado comprobable manda sobre la autoevaluación al programar. */
-  resultado?: 'correcta' | 'parcial' | 'incorrecta' | 'ortografia'
+  resultado?: 'correcta' | 'parcial' | 'incorrecta' | 'ortografia' | 'revision'
+  /** Evidencia guardada desde el envío; la autoevaluación puede actualizar el mismo UUID. */
+  respuesta_dada?: string
+  pregunta_id?: string
+  pregunta_version?: string
+  evaluador_version?: string
+  fuente_consultada?: boolean
+  explicacion_previa?: boolean
+  modo?: 'aprendizaje' | 'repaso' | 'examen'
+  tipo_evidencia?: 'recuerdo' | 'discriminacion' | 'aplicacion'
+  calificacion_actualizada_en?: number
   interaccion: string
   recuperacion_activa: boolean          // recuperación libre / escritura, frente a reconocimiento
   pistas_usadas: number

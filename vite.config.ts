@@ -9,5 +9,5 @@ export default defineConfig({
     assetsInlineLimit: 0,
     rollupOptions: { output: { manualChunks: undefined, inlineDynamicImports: true } },
   },
-  test: { environment: 'jsdom', include: ['src/**/*.test.ts'] },
+  test: { environment: 'jsdom', include: ['src/**/*.test.{ts,tsx}'] },
 })

@@ -1,9 +1,9 @@
 {
   "name": "steponemelman",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.1.0",
   "type": "module",
-  "description": "Plataforma adaptativa de estudio para USMLE Step 1 construida sobre un corpus médico auditado",
+  "description": "Plataforma adaptativa de estudio para USMLE Step 1 construida sobre un corpus médico en revisión",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

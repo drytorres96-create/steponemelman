@@ -1,11 +1,12 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import type { Concepto } from '../schema/concept'
 import type { EstadoDominio } from '../srs/tipos'
 import { NOMBRE_ESTADO } from '../srs/tipos'
 
 export function Anillo({ valor, total, tam = 108, etiqueta, oro = false }:
   { valor: number; total: number; tam?: number; etiqueta: string; oro?: boolean }) {
-  const pct = total ? valor / total : 0
+  const pct = total ? Math.min(1, Math.max(0, valor / total)) : 0
+  const gradiente = useId()
   const r = tam / 2 - 7, circ = 2 * Math.PI * r
   return (
     <div className="anillo" style={{ width: tam, height: tam }}
@@ -13,13 +14,11 @@ export function Anillo({ valor, total, tam = 108, etiqueta, oro = false }:
       <svg width={tam} height={tam} aria-hidden="true">
         <circle cx={tam/2} cy={tam/2} r={r} fill="none" stroke="#ffffff10" strokeWidth="7" />
         <circle cx={tam/2} cy={tam/2} r={r} fill="none" strokeWidth="7" strokeLinecap="round"
-          stroke={oro ? 'url(#gOro)' : 'url(#gVio)'}
+          stroke={`url(#${gradiente})`}
           strokeDasharray={`${circ * pct} ${circ}`} style={{ transition: 'stroke-dasharray .6s cubic-bezier(.2,.8,.2,1)' }} />
         <defs>
-          <linearGradient id="gVio" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#8b7cf6" /><stop offset="100%" stopColor="#e05fa8" /></linearGradient>
-          <linearGradient id="gOro" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#c99a2e" /><stop offset="100%" stopColor="#e3b23c" /></linearGradient>
+          <linearGradient id={gradiente} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={oro ? '#c99a2e' : '#8b7cf6'} /><stop offset="100%" stopColor={oro ? '#e3b23c' : '#e05fa8'} /></linearGradient>
         </defs>
       </svg>
       <div className="centro"><b style={oro ? { color: 'var(--oro)' } : undefined}>{valor}</b><small>{etiqueta}</small></div>
@@ -27,10 +26,10 @@ export function Anillo({ valor, total, tam = 108, etiqueta, oro = false }:
   )
 }
 
-export function Barra({ valor, total, oro = false }: { valor: number; total: number; oro?: boolean }) {
-  const pct = total ? Math.round((valor / total) * 100) : 0
+export function Barra({ valor, total, oro = false, etiqueta = 'Progreso' }: { valor: number; total: number; oro?: boolean; etiqueta?: string }) {
+  const pct = total ? Math.min(100, Math.max(0, Math.round((valor / total) * 100))) : 0
   return <div className={`barra-prog${oro ? ' oro' : ''}`} role="progressbar"
-    aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${pct}%` }} /></div>
+    aria-label={etiqueta} aria-valuetext={`${valor} de ${total}`} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${pct}%` }} /></div>
 }
 
 const CLASE_ESTADO: Record<EstadoDominio, string> = {
@@ -43,14 +42,37 @@ export function EtiquetaEstado({ estado }: { estado: EstadoDominio }) {
 
 export function Modal({ titulo, onCerrar, children, ancho }:
   { titulo: string; onCerrar: () => void; children: ReactNode; ancho?: number }) {
+  const panel = useRef<HTMLDivElement>(null)
+  const cerrar = useRef(onCerrar)
+  cerrar.current = onCerrar
   useEffect(() => {
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar() }
-    document.addEventListener('keydown', esc)
-    return () => document.removeEventListener('keydown', esc)
-  }, [onCerrar])
+    const anterior = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const controles = () => Array.from(panel.current?.querySelectorAll<HTMLElement>(
+      'button:not(:disabled),a[href],input:not(:disabled):not([type="hidden"]),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])') ?? [])
+    ;(controles()[0] ?? panel.current)?.focus()
+    const teclado = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); cerrar.current(); return }
+      if (e.key !== 'Tab') return
+      const lista = controles(), primero = lista[0], ultimo = lista.at(-1)
+      if (!primero || !ultimo) { e.preventDefault(); panel.current?.focus(); return }
+      if (e.shiftKey && (document.activeElement === primero || !panel.current?.contains(document.activeElement))) {
+        e.preventDefault(); ultimo.focus()
+      } else if (!e.shiftKey && (document.activeElement === ultimo || !panel.current?.contains(document.activeElement))) {
+        e.preventDefault(); primero.focus()
+      }
+    }
+    document.addEventListener('keydown', teclado)
+    return () => {
+      document.removeEventListener('keydown', teclado)
+      document.body.style.overflow = overflow
+      if (anterior?.isConnected) anterior.focus()
+    }
+  }, [])
   return (
     <div className="modal-fondo" onClick={onCerrar} role="dialog" aria-modal="true" aria-label={titulo}>
-      <div className="modal" style={ancho ? { maxWidth: ancho } : undefined} onClick={e => e.stopPropagation()}>
+      <div ref={panel} tabIndex={-1} className="modal" style={ancho ? { maxWidth: ancho } : undefined} onClick={e => e.stopPropagation()}>
         <div className="modal-cab">
           <h2 style={{ flex: 1 }}>{titulo}</h2>
           <button className="btn pequeno fantasma" onClick={onCerrar} aria-label="Cerrar">Cerrar</button>

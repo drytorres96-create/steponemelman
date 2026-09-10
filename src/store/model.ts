@@ -2,7 +2,7 @@ import { nuevoProgreso, programar } from '../srs/fsrs'
 import { CRITERIOS_POR_DEFECTO, calcularEstado, evaluarDominio, type CriteriosDominio } from '../srs/mastery'
 import { intentoCorrecto, NOMBRE_ERROR, NOMBRE_ESTADO, type Intento, type ProgresoConcepto } from '../srs/tipos'
 
-export const CORPUS_VERSION = '1.0.1' as const
+export const CORPUS_VERSION = '1.0.2' as const
 
 export interface RegistroSesion {
   id: string
@@ -25,6 +25,14 @@ export interface Reanudable {
   titulo?: string
   subtitulo?: string
   sessionId?: string
+  paso?: {
+    indice: number
+    pistas: number
+    fuenteConsultada: boolean
+    explicacionPrevia: boolean
+    confianza: 1 | 2 | 3 | null
+    msActivo: number
+  }
 }
 
 export interface EstadoApp {
@@ -63,7 +71,7 @@ const fechaONull = (v: unknown): v is number | null => v === null || numero(v)
 
 const ESTADOS = new Set(Object.keys(NOMBRE_ESTADO))
 const ERRORES = new Set(Object.keys(NOMBRE_ERROR))
-const RESULTADOS = new Set(['correcta', 'parcial', 'incorrecta', 'ortografia'])
+const RESULTADOS = new Set(['correcta', 'parcial', 'incorrecta', 'ortografia', 'revision'])
 
 function leerIntento(v: unknown): Intento | null {
   if (!esObjeto(v) || !numero(v.ts) || !entero(v.calificacion, 1) || v.calificacion > 4
@@ -73,7 +81,22 @@ function leerIntento(v: unknown): Intento | null {
   if (v.attempt_id !== undefined && !idSeguro(v.attempt_id)) return null
   if (v.session_id !== undefined && v.session_id !== null && !idSeguro(v.session_id)) return null
   if (v.resultado !== undefined && !RESULTADOS.has(String(v.resultado))) return null
+  if (v.respuesta_dada !== undefined && (typeof v.respuesta_dada !== 'string' || v.respuesta_dada.length > 10000)) return null
+  for (const k of ['pregunta_id', 'pregunta_version', 'evaluador_version']) if (v[k] !== undefined && !idSeguro(v[k])) return null
+  for (const k of ['fuente_consultada', 'explicacion_previa']) if (v[k] !== undefined && typeof v[k] !== 'boolean') return null
+  if (v.modo !== undefined && !['aprendizaje', 'repaso', 'examen'].includes(String(v.modo))) return null
+  if (v.tipo_evidencia !== undefined && !['recuerdo', 'discriminacion', 'aplicacion'].includes(String(v.tipo_evidencia))) return null
+  if (v.calificacion_actualizada_en !== undefined && !numero(v.calificacion_actualizada_en, v.ts)) return null
   return {
+    ...(v.respuesta_dada !== undefined ? { respuesta_dada: v.respuesta_dada as string } : {}),
+    ...(v.pregunta_id !== undefined ? { pregunta_id: v.pregunta_id as string } : {}),
+    ...(v.pregunta_version !== undefined ? { pregunta_version: v.pregunta_version as string } : {}),
+    ...(v.evaluador_version !== undefined ? { evaluador_version: v.evaluador_version as string } : {}),
+    ...(v.fuente_consultada !== undefined ? { fuente_consultada: v.fuente_consultada as boolean } : {}),
+    ...(v.explicacion_previa !== undefined ? { explicacion_previa: v.explicacion_previa as boolean } : {}),
+    ...(v.modo !== undefined ? { modo: v.modo as Intento['modo'] } : {}),
+    ...(v.tipo_evidencia !== undefined ? { tipo_evidencia: v.tipo_evidencia as Intento['tipo_evidencia'] } : {}),
+    ...(v.calificacion_actualizada_en !== undefined ? { calificacion_actualizada_en: v.calificacion_actualizada_en as number } : {}),
     ...(v.attempt_id !== undefined ? { attempt_id: v.attempt_id as string } : {}),
     ...(v.session_id !== undefined ? { session_id: v.session_id as string | null } : {}),
     ts: v.ts,
@@ -97,9 +120,10 @@ function leerProgreso(id: string, v: unknown): ProgresoConcepto | null {
   if (intentos.some(i => i === null)) return null
   const validos = intentos as Intento[]
   const aciertos = validos.filter(intentoCorrecto).length
-  if (v.aciertos !== aciertos || v.fallos !== validos.length - aciertos) return null
+  const evaluados = validos.filter(i => i.resultado !== 'revision')
+  if (v.aciertos !== aciertos || v.fallos !== evaluados.length - aciertos) return null
   if (validos.some((i, n) => n > 0 && i.ts < validos[n - 1].ts)) return null
-  if (v.ultimo !== (validos.at(-1)?.ts ?? null)) return null
+  if (v.ultimo !== (evaluados.at(-1)?.ts ?? null)) return null
   return {
     concept_id: id,
     estado: v.estado as ProgresoConcepto['estado'],
@@ -136,10 +160,14 @@ function leerReanudable(v: unknown): Reanudable | null | false {
   if (v === null || v === undefined) return null
   if (!esObjeto(v) || !texto(v.modulo) || !texto(v.sesion) || !entero(v.indice) || !numero(v.ts)) return false
   if (v.conceptIds !== undefined && (!Array.isArray(v.conceptIds) || !v.conceptIds.length
-    || v.conceptIds.length > 100_000 || !v.conceptIds.every(idSeguro) || v.indice >= v.conceptIds.length)) return false
+    || v.conceptIds.length > 100_000 || !v.conceptIds.every(idSeguro) || v.indice > v.conceptIds.length)) return false
   if (v.titulo !== undefined && typeof v.titulo !== 'string') return false
   if (v.subtitulo !== undefined && typeof v.subtitulo !== 'string') return false
   if (v.sessionId !== undefined && !idSeguro(v.sessionId)) return false
+  if (v.paso !== undefined && (!esObjeto(v.paso) || !entero(v.paso.indice) || v.paso.indice !== v.indice
+    || !entero(v.paso.pistas) || v.paso.pistas > 3 || typeof v.paso.fuenteConsultada !== 'boolean'
+    || typeof v.paso.explicacionPrevia !== 'boolean' || !numero(v.paso.msActivo)
+    || !(v.paso.confianza === null || [1, 2, 3].includes(v.paso.confianza as number)))) return false
   return {
     modulo: v.modulo,
     sesion: v.sesion,
@@ -149,13 +177,18 @@ function leerReanudable(v: unknown): Reanudable | null | false {
     ...(v.titulo !== undefined ? { titulo: v.titulo } : {}),
     ...(v.subtitulo !== undefined ? { subtitulo: v.subtitulo } : {}),
     ...(v.sessionId !== undefined ? { sessionId: v.sessionId } : {}),
+    ...(esObjeto(v.paso) ? { paso: {
+      indice: v.paso.indice as number, pistas: v.paso.pistas as number,
+      fuenteConsultada: v.paso.fuenteConsultada as boolean, explicacionPrevia: v.paso.explicacionPrevia as boolean,
+      confianza: v.paso.confianza as 1 | 2 | 3 | null, msActivo: v.paso.msActivo as number,
+    } } : {}),
   }
 }
 
-/** Lee tanto 1.0.0 como 1.0.1, pero nunca deja entrar estructuras parciales corruptas. */
+/** Lee versiones previas compatibles, sin aceptar estructuras parciales corruptas. */
 export function leerEstadoDesconocido(v: unknown): EstadoApp | null {
   if (!esObjeto(v) || v.version !== 1 || !esObjeto(v.progreso)) return null
-  if (v.corpus_version !== undefined && v.corpus_version !== '1.0.0' && v.corpus_version !== CORPUS_VERSION) return null
+  if (v.corpus_version !== undefined && v.corpus_version !== '1.0.0' && v.corpus_version !== '1.0.1' && v.corpus_version !== CORPUS_VERSION) return null
 
   const progreso: Record<string, ProgresoConcepto> = {}
   for (const [id, crudo] of Object.entries(v.progreso)) {
@@ -202,22 +235,44 @@ export function serializarEstable(v: unknown): string {
 }
 
 function claveIntento(i: Intento): string {
+  // Dos dispositivos que retoman el mismo paso representan la misma oportunidad evaluativa.
+  if (i.pregunta_id && i.session_id) return `paso:${i.session_id}:${i.pregunta_id}`
   return i.attempt_id
     ? `id:${i.attempt_id}`
     : `legacy:${serializarEstable(i)}`
 }
 
+function versionIntento(i: Intento): string {
+  const { pistas_usadas: _p, fuente_consultada: _f, explicacion_previa: _e, ...resto } = i
+  return serializarEstable(resto)
+}
+
 function unirProgreso(a: ProgresoConcepto, b: ProgresoConcepto, criterios: CriteriosDominio): ProgresoConcepto {
+  const hitos = [a.dominado_en, b.dominado_en].filter((t): t is number => t !== null)
+  return reconstruirProgreso(a.concept_id, [...a.intentos, ...b.intentos], criterios, hitos.length ? Math.min(...hitos) : null)
+}
+
+/** Reproduce los envíos y sus actualizaciones sin contar dos veces una respuesta. */
+export function reconstruirProgreso(id: string, registros: Intento[], criterios: CriteriosDominio, hitoHistorico: number | null = null): ProgresoConcepto {
   const porId = new Map<string, Intento>()
-  for (const i of [...a.intentos, ...b.intentos]) {
+  for (const i of registros) {
     const key = claveIntento(i)
     const anterior = porId.get(key)
     // Si un archivo contiene dos versiones de un UUID, ambos dispositivos eligen la misma.
-    if (!anterior || serializarEstable(i) > serializarEstable(anterior)) porId.set(key, i)
+    const marcaNueva = i.calificacion_actualizada_en ?? i.ts
+    const marcaAnterior = anterior?.calificacion_actualizada_en ?? anterior?.ts ?? 0
+    const elegido = !anterior || marcaNueva > marcaAnterior || (marcaNueva === marcaAnterior
+      && versionIntento(i) > versionIntento(anterior)) ? i : anterior
+    porId.set(key, anterior && i.pregunta_id ? {
+      ...elegido,
+      pistas_usadas: Math.max(i.pistas_usadas, anterior.pistas_usadas),
+      fuente_consultada: !!i.fuente_consultada || !!anterior.fuente_consultada,
+      explicacion_previa: !!i.explicacion_previa || !!anterior.explicacion_previa,
+    } : elegido)
   }
   const intentos = [...porId.values()].sort((x, y) => x.ts - y.ts
     || compararTexto(claveIntento(x), claveIntento(y)))
-  let unido = nuevoProgreso(a.concept_id)
+  let unido = { ...nuevoProgreso(id), dominado_en: hitoHistorico }
   for (const intento of intentos) {
     unido = programar(unido, intento, intento.ts)
     if (unido.dominado_en === null && evaluarDominio(unido, criterios, intento.ts).cumple) {

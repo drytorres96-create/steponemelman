@@ -69,4 +69,21 @@ describe('planificador de repetición espaciada', () => {
     expect([parcial.aciertos, parcial.fallos]).toEqual([0, 1])
     expect([ortografia.aciertos, ortografia.fallos]).toEqual([1, 0])
   })
+  it('guarda una respuesta por revisar sin alterar agenda ni evidencia de aciertos/fallos', () => {
+    const t = Date.now()
+    const base = programar(nuevoProgreso('REV'), intento(3), t)
+    const pendiente = intento(1, { resultado: 'revision', tipo_error: 'error_por_revisar' })
+    const actualizado = programar(base, pendiente, t + DIA)
+    expect(actualizado).toEqual({ ...base, intentos: [...base.intentos, pendiente] })
+    const nuevo = programar(nuevoProgreso('NUEVO'), pendiente, t)
+    expect(nuevo.proxima).toBeNull()
+    expect([nuevo.aciertos, nuevo.fallos]).toEqual([0, 0])
+  })
+  it('un acierto con fuente, explicación o una pista no se programa como fácil', () => {
+    for (const ayuda of [{ fuente_consultada: true }, { explicacion_previa: true }, { pistas_usadas: 1 }]) {
+      expect(calificacionEfectiva({ resultado: 'correcta', calificacion: 4, ...ayuda })).toBe(2)
+    }
+    expect(calificacionEfectiva({ resultado: 'correcta', calificacion: 4,
+      fuente_consultada: false, explicacion_previa: false, pistas_usadas: 0 })).toBe(4)
+  })
 })

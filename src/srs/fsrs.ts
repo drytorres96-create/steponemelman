@@ -66,16 +66,21 @@ export function factorPorError(intento: Intento): number {
   }
 }
 
-export function calificacionEfectiva(intento: Pick<Intento, 'resultado' | 'calificacion'>): 1 | 2 | 3 | 4 {
+export function calificacionEfectiva(intento: Pick<Intento, 'resultado' | 'calificacion'>
+  & Partial<Pick<Intento, 'pistas_usadas' | 'fuente_consultada' | 'explicacion_previa'>>): 1 | 2 | 3 | 4 {
+  if (intento.resultado === 'revision') return 2 // Sin agenda; programar conserva la anterior.
   const g = intento.resultado === 'incorrecta' ? 1
     : intento.resultado === 'parcial' ? Math.min(2, intento.calificacion)
     : intento.resultado === 'ortografia' ? Math.min(3, Math.max(2, intento.calificacion))
     : intento.resultado === 'correcta' ? Math.max(2, intento.calificacion)
     : intento.calificacion
-  return g as 1 | 2 | 3 | 4
+  const asistido = (intento.pistas_usadas ?? 0) > 0 || intento.fuente_consultada || intento.explicacion_previa
+  return (asistido && intento.resultado === 'correcta' ? Math.min(2, g) : g) as 1 | 2 | 3 | 4
 }
 
 export function programar(p: ProgresoConcepto, intento: Intento, ahora = Date.now()): ProgresoConcepto {
+  // Una respuesta no reconocida requiere revisión, no es evidencia de olvido.
+  if (intento.resultado === 'revision') return { ...p, intentos: [...p.intentos, intento] }
   // La respuesta comprobada gobierna el planificador. La calificación sólo matiza
   // la dificultad dentro del rango compatible con ese resultado.
   const g = calificacionEfectiva(intento)

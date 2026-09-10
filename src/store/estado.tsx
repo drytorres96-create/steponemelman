@@ -2,12 +2,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import { cargarIndice, cargarMigraciones } from '../data/corpus'
 import type { Indice } from '../schema/concept'
-import type { Intento, ProgresoConcepto } from '../srs/tipos'
-import { nuevoProgreso, programar } from '../srs/fsrs'
+import { intentoCorrecto, type Intento, type ProgresoConcepto } from '../srs/tipos'
+import { nuevoProgreso } from '../srs/fsrs'
 import { calcularEstado, evaluarDominio, type CriteriosDominio } from '../srs/mastery'
 import { supabase } from '../lib/supabase'
 import { leer, escribir } from './db'
-import { ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, combinarEstados, serializarEstable, type EstadoApp, type Reanudable } from './model'
+import { ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, combinarEstados, reconstruirProgreso, serializarEstable, type EstadoApp, type Reanudable } from './model'
 import { StudySyncEngine, leerSnapshot, type CloudSnapshot, type SyncReply } from './sync'
 export type { EstadoApp, RegistroSesion, Reanudable } from './model'
 
@@ -192,11 +192,18 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
   const registrarIntento = useCallback((id: string, intento: Intento) => {
     let resultado = nuevoProgreso(id)
     editar(prev => {
-      let p = programar(prev.progreso[id] ?? nuevoProgreso(id), { ...intento, attempt_id: intento.attempt_id ?? crearUUID() }, intento.ts)
-      const ev = evaluarDominio(p, prev.criterios, intento.ts)
-      if (ev.cumple && !p.dominado_en) p = { ...p, dominado_en: intento.ts }
-      resultado = { ...p, estado: calcularEstado(p, prev.criterios, intento.ts) }
-      return { ...prev, vistoAlguna: true, msEstudio: prev.msEstudio + intento.ms, progreso: { ...prev.progreso, [id]: resultado } }
+      const anterior = prev.progreso[id] ?? nuevoProgreso(id)
+      resultado = reconstruirProgreso(id, [...anterior.intentos, { ...intento, attempt_id: intento.attempt_id ?? crearUUID() }], prev.criterios, anterior.dominado_en)
+      const progreso = { ...prev.progreso, [id]: resultado }
+      const registros = Object.values(progreso).flatMap(p => p.intentos)
+      const sesiones = prev.sesiones.map(s => {
+        if (s.id !== intento.session_id) return s
+        const propios = registros.filter(i => i.session_id === s.id)
+        return { ...s, vistos: propios.length, correctos: propios.filter(intentoCorrecto).length,
+          ms: propios.reduce((n, i) => n + i.ms, 0) }
+      })
+      const deltaMs = resultado.intentos.reduce((n, i) => n + i.ms, 0) - anterior.intentos.reduce((n, i) => n + i.ms, 0)
+      return { ...prev, vistoAlguna: true, msEstudio: Math.max(0, prev.msEstudio + deltaMs), progreso, sesiones }
     })
     return resultado
   }, [editar])
