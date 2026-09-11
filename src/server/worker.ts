@@ -3,6 +3,7 @@ import { ConceptoZ, IndiceZ } from '../schema/concept'
 import { prepararConcepto } from '../lib/formatos'
 import { versionPregunta } from '../screens/sesion'
 import { aplicarVariante } from '../lib/variantes'
+import { handleNbme } from './nbme'
 
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 const DAY = 86400000
@@ -115,6 +116,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request)
+    if (url.pathname.startsWith('/api/nbme/')) return handleNbme(request)
     if (url.pathname !== '/api/explicar') return json({ error: 'No encontrado' }, 404)
     if (request.method !== 'POST') return json({ error: 'Método no permitido' }, 405)
     if (request.headers.get('origin') && request.headers.get('origin') !== url.origin) return json({ error: 'Origen no permitido' }, 403)

@@ -13,8 +13,9 @@ import {
   indexarConceptos, NOMBRES_ESTADOS_BUSQUEDA, type EstadoBusqueda, type FiltrosBusqueda, type OpcionesSesionPersonalizada,
 } from '../lib/busqueda'
 
-export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion }: {
+export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion, filtrosIniciales }: {
   seleccion?: string[]; onSeleccion?: (ids: string[]) => void
+  filtrosIniciales?: Partial<FiltrosBusqueda>
   onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void
 }) {
   const { indice, estado } = useApp()
@@ -44,6 +45,12 @@ export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion }
   const disciplinas = useMemo(() => [...new Set((conceptos ?? []).flatMap(c => [c.clasificacion.disciplina_primaria, ...c.clasificacion.disciplinas_secundarias]))].sort(), [conceptos])
   const sistemas = useMemo(() => [...new Set((conceptos ?? []).flatMap(c => [c.clasificacion.sistema_primario, ...c.clasificacion.sistemas_secundarios]))].sort(), [conceptos])
   const temas = useMemo(() => [...new Set((conceptos ?? []).map(c => c.clasificacion.tema).filter(Boolean))].sort(), [conceptos])
+  useEffect(() => {
+    if (!filtrosIniciales || !conceptos) return
+    setFiltros({ ...FILTROS_BUSQUEDA_INICIALES, ...filtrosIniciales,
+      sistema: sistemas.some(s => s === filtrosIniciales.sistema) ? filtrosIniciales.sistema ?? '' : '',
+      disciplina: disciplinas.some(d => d === filtrosIniciales.disciplina) ? filtrosIniciales.disciplina ?? '' : '' })
+  }, [filtrosIniciales, conceptos, sistemas, disciplinas])
   const resultados = useMemo(() => buscarConceptos(indiceBusqueda, filtros, estado.progreso), [indiceBusqueda, filtros, estado.progreso])
   const idsCoincidentes = useMemo(() => new Set(resultados.map(c => c.concept_id)), [resultados])
   const resumenFiltros = descripcionFiltros(filtros)

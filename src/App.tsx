@@ -16,8 +16,14 @@ import { APP_VERSION } from './release'
 import type { OpcionesSesionPersonalizada } from './lib/busqueda'
 import { alternarFormatos } from './lib/formatos'
 import { aplicarVariante, siguienteVariante } from './lib/variantes'
+import { useNbme } from './nbme/NbmeProvider'
+import { NbmeLibrary } from './nbme/NbmeLibrary'
+import { NbmePlayer } from './nbme/NbmePlayer'
+import { NbmeProgress } from './nbme/NbmeProgress'
+import { deriveNbmeSession } from './nbme/model'
+import type { FiltrosBusqueda } from './lib/busqueda'
 
-type Vista = 'inicio' | 'modulos' | 'repaso' | 'progreso' | 'auditoria' | 'ajustes' | 'estudio'
+type Vista = 'inicio' | 'modulos' | 'repaso' | 'progreso' | 'auditoria' | 'ajustes' | 'estudio' | 'preguntas'
 const NAV: { id: Vista; txt: string }[] = [
   { id: 'inicio', txt: 'Hoy' }, { id: 'modulos', txt: 'Elegir contenido' }, { id: 'progreso', txt: 'Progreso' },
 ]
@@ -34,6 +40,7 @@ function vistaDesdeHash(): Vista {
 export default function App() {
   const { listo, indice, estado, errorCarga, sincronizacion, sincronizarAhora } = useApp()
   const { signOut } = useAuth()
+  const nbme = useNbme()
   const [vista, setVista] = useState<Vista>(vistaDesdeHash)
   const [cola, setCola] = useState<Cola | null>(null)
   const [indiceInicial, setIndiceInicial] = useState(0)
@@ -41,15 +48,37 @@ export default function App() {
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [concentracion, setConcentracion] = useState(true)
+  const [tipoContenido, setTipoContenido] = useState<'conceptos' | 'preguntas'>('conceptos')
+  const [tipoProgreso, setTipoProgreso] = useState<'conceptos' | 'preguntas'>('conceptos')
+  const [filtrosConceptos, setFiltrosConceptos] = useState<Partial<FiltrosBusqueda> | undefined>()
   const contenido = useRef<HTMLElement>(null)
-  const enConcentracion = vista === 'estudio' && concentracion
+  const vistaAnterior = useRef(vista)
+  const estudiando = vista === 'estudio' || vista === 'preguntas'
+  const enConcentracion = estudiando && concentracion
+  const sesionPreguntasPendiente = Object.values(nbme.state.sessions)
+    .filter(s => deriveNbmeSession(nbme.state, s.id)?.phase !== 'complete')
+    .sort((a, b) => b.controlChangedAt - a.controlChangedAt)[0]
+  const sincronizarTodo = async () => {
+    const resultados = await Promise.all([sincronizarAhora(), nbme.catalog ? nbme.syncNow() : Promise.resolve(true)])
+    return resultados.every(Boolean)
+  }
 
   useEffect(() => {
-    const h = () => { if (location.hash.slice(1) !== 'estudio') setVista(vistaDesdeHash()) }
+    const h = () => { if (!['estudio', 'preguntas'].includes(location.hash.slice(1))) setVista(vistaDesdeHash()) }
     window.addEventListener('hashchange', h); return () => window.removeEventListener('hashchange', h)
   }, [])
   useEffect(() => { contenido.current?.focus({ preventScroll: true }) }, [vista])
-  const ir = useCallback((v: string) => { setCola(null); setVista(v as Vista); location.hash = v }, [])
+  useEffect(() => {
+    if (vistaAnterior.current === 'preguntas' && vista !== 'preguntas') nbme.pauseSession()
+    vistaAnterior.current = vista
+  }, [vista, nbme.pauseSession])
+  const ir = useCallback((v: string) => {
+    if (vista === 'preguntas' && v !== 'preguntas') nbme.pauseSession()
+    setCola(null); setVista(v as Vista); location.hash = v
+  }, [vista, nbme.pauseSession])
+  const continuarPreguntas = async () => {
+    if (sesionPreguntasPendiente && await nbme.resumeSession(sesionPreguntasPendiente.id)) ir('preguntas')
+  }
 
   const abrir = useCallback(async (moduloId: string, ruta: RutaId, limite: number, sesionId?: string, desde = 0, presupuestoMinutos?: 10 | 20 | 30) => {
     if (!indice) return
@@ -130,15 +159,16 @@ export default function App() {
           <div className="marca"><span className="punto" /><span>Step 1</span></div>
           {!enConcentracion && <nav className="nav" aria-label="Navegación principal">
             {NAV.map(n => (
-              <button key={n.id} onClick={() => ir(n.id)} aria-current={vista === n.id ? 'page' : undefined}>{n.txt}</button>
+              <button key={n.id} onClick={() => ir(n.id)} aria-current={vista === n.id || vista === 'preguntas' && n.id === 'modulos' ? 'page' : undefined}>{n.txt}</button>
             ))}
           </nav>}
           <div className="barra-fin">
-            {vista === 'estudio' && <button className="btn pequeno fantasma" aria-pressed={concentracion}
+            {estudiando && <button className="btn pequeno fantasma" aria-pressed={concentracion}
               onClick={() => setConcentracion(v => !v)}>{concentracion ? 'Mostrar menú' : 'Concentrarme'}</button>}
-            <button className="btn pequeno fantasma" title="Comprobar y sincronizar el progreso" onClick={() => { void sincronizarAhora() }} aria-live="polite">{sincronizacion.mensaje}</button>
+            <button className="btn pequeno fantasma" title="Comprobar y sincronizar el progreso" onClick={() => { void sincronizarTodo() }} aria-live="polite">{vista === 'preguntas' ? nbme.syncStatus.message : sincronizacion.mensaje}</button>
             {!enConcentracion && <details className="menu-cuenta"><summary>Cuenta y ajustes</summary><div className="menu-cuenta-opciones">{SECUNDARIAS.map(n => <button className="btn pequeno fantasma" key={n.id} onClick={e => { ir(n.id); e.currentTarget.closest('details')?.removeAttribute('open') }}>{n.txt}</button>)}<button className="btn pequeno fantasma" onClick={async () => {
-              const guardado = await sincronizarAhora()
+              if (vista === 'preguntas') nbme.pauseSession()
+              const guardado = await sincronizarTodo()
               if (!guardado && !confirm('Puede haber cambios pendientes. Se conservarán en este navegador para esta cuenta. ¿Cerrar sesión?')) return
               try { await signOut() } catch { setError('No se pudo cerrar la sesión. Vuelve a intentarlo.') }
             }}>Salir</button></div></details>}
@@ -160,11 +190,28 @@ export default function App() {
               <Reproductor cola={cola} indiceInicial={indiceInicial} onSalir={() => ir('inicio')} />
             </>
           )}
-          {!cargando && vista === 'inicio' && <Inicio onIr={ir} onContinuar={continuar}
-            onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} />}
-          {!cargando && vista === 'modulos' && <Modulos onEstudiar={estudiarIds} seleccion={seleccionManual} onSeleccion={setSeleccionManual} />}
+          {!cargando && vista === 'preguntas' && <NbmePlayer onSalir={() => { setTipoContenido('preguntas'); ir('modulos') }}
+            onEstudiar={ids => { nbme.pauseSession(); void estudiarIds(ids) }}
+            onBuscar={q => { nbme.pauseSession(); setFiltrosConceptos({ sistema: q.systems[0] ?? '', disciplina: q.disciplines[0] ?? '' }); setTipoContenido('conceptos'); ir('modulos') }} />}
+          {!cargando && vista === 'inicio' && <>
+            {sesionPreguntasPendiente ? <div className="pila"><section className="tarjeta plan-hoy"><div className="pila">
+              <h1>Continúa tus preguntas</h1><p className="sutil">{sesionPreguntasPendiente.title}</p>
+              <div><button className="btn principal" disabled={nbme.loading || nbme.busy} onClick={() => void continuarPreguntas()}>Continuar sesión de preguntas</button></div>
+              {nbme.error && <p role="alert">{nbme.error}</p>}
+            </div></section><details className="tarjeta"><summary>Mi plan de conceptos</summary><div style={{ marginTop: 16 }}><Inicio onIr={ir} onContinuar={continuar}
+              onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} /></div></details></div>
+              : <Inicio onIr={ir} onContinuar={continuar} onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} />}
+          </>}
+          {!cargando && vista === 'modulos' && <div className="pila"><div className="fila" role="group" aria-label="Tipo de contenido">
+            <button className={`btn${tipoContenido === 'conceptos' ? ' principal' : ' fantasma'}`} aria-pressed={tipoContenido === 'conceptos'} onClick={() => setTipoContenido('conceptos')}>Conceptos</button>
+            <button className={`btn${tipoContenido === 'preguntas' ? ' principal' : ' fantasma'}`} aria-pressed={tipoContenido === 'preguntas'} onClick={() => setTipoContenido('preguntas')}>Preguntas</button>
+          </div>{tipoContenido === 'preguntas' ? <NbmeLibrary onStart={() => ir('preguntas')} />
+            : <Modulos onEstudiar={estudiarIds} seleccion={seleccionManual} onSeleccion={setSeleccionManual} filtrosIniciales={filtrosConceptos} />}</div>}
           {!cargando && vista === 'repaso' && <Repaso onEstudiar={estudiarIds} />}
-          {!cargando && vista === 'progreso' && <Progreso onEstudiar={estudiarIds} onContinuar={continuar} />}
+          {!cargando && vista === 'progreso' && <div className="pila"><div className="fila" role="group" aria-label="Tipo de progreso">
+            <button className={`btn${tipoProgreso === 'conceptos' ? ' principal' : ' fantasma'}`} aria-pressed={tipoProgreso === 'conceptos'} onClick={() => setTipoProgreso('conceptos')}>Conceptos</button>
+            <button className={`btn${tipoProgreso === 'preguntas' ? ' principal' : ' fantasma'}`} aria-pressed={tipoProgreso === 'preguntas'} onClick={() => setTipoProgreso('preguntas')}>Preguntas</button>
+          </div>{tipoProgreso === 'preguntas' ? <NbmeProgress onContinuar={() => { setTipoContenido('preguntas'); ir('modulos') }} /> : <Progreso onEstudiar={estudiarIds} onContinuar={continuar} />}</div>}
           {!cargando && vista === 'auditoria' && <Auditoria />}
           {!cargando && vista === 'ajustes' && <Ajustes />}
         </div>

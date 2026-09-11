@@ -8,6 +8,10 @@ import type { Concepto } from '../schema/concept'
 const mock = vi.hoisted(() => ({ app: vi.fn(), cargarTodo: vi.fn(), cargarConceptos: vi.fn(), reproductor: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ signOut: vi.fn() }) }))
+vi.mock('../nbme/NbmeProvider', () => ({ useNbme: () => ({
+  state: { sessions: {}, attempts: {} }, catalog: null, pauseSession: vi.fn(), syncNow: vi.fn().mockResolvedValue(true),
+  syncStatus: { message: 'Preguntas sincronizadas' },
+}) }))
 vi.mock('../data/corpus', () => ({ cargarTodo: mock.cargarTodo, cargarConceptos: mock.cargarConceptos, cargarModulo: vi.fn() }))
 vi.mock('../screens/Reproductor', () => ({ Reproductor: (props: { indiceInicial: number }) => {
   mock.reproductor(props)
