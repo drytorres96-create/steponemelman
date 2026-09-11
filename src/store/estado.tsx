@@ -222,7 +222,7 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
       const progreso: Record<string, ProgresoConcepto> = {}
       for (const [k, v] of Object.entries(p.progreso)) {
         const ev = evaluarDominio(v, criterios)
-        const conDominio = { ...v, dominado_en: ev.cumple ? (v.dominado_en ?? Date.now()) : null }
+        const conDominio = { ...v, dominado_en: v.dominado_en ?? (ev.cumple ? Date.now() : null) }
         progreso[k] = { ...conDominio, estado: calcularEstado(conDominio, criterios) }
       }
       return { ...p, criterios, progreso, fieldUpdatedAt: { criterios: Math.max(Date.now(), (p.fieldUpdatedAt?.criterios ?? 0) + 1), reanudable: p.fieldUpdatedAt?.reanudable ?? p.reanudable?.ts ?? 0 } }

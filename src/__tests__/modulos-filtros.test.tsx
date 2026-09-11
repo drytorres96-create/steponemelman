@@ -31,7 +31,7 @@ const indice = IndiceZ.parse({ schema_version: '1.0.0', corpus_version: '1.0.3',
   modulos: [{ module_id: 'QA-MOD', nombre: 'Módulo de prueba', proposito: 'Probar intersecciones', prerrequisitos: [], disciplinas: ['Farmacología', 'Fisiología', 'Patología'],
     sistemas: ['Endocrino', 'Cardiovascular', 'Multisistémico'], temas: ['Tema alfa'], n_conceptos: 4, minutos_estimados: 10, cobertura_documental: ['QA'], orden: 1,
     sesiones: [{ session_id: 'QA-S1', titulo: 'Sesión de prueba', objetivo: 'Prueba', conceptos: cs.map(c => c.concept_id) }] }] })
-const onAbrir = vi.fn(), onEstudiar = vi.fn()
+const onEstudiar = vi.fn()
 let root: Root, host: HTMLDivElement
 let progreso: Record<string, ProgresoConcepto>
 const ahora = Date.now()
@@ -51,7 +51,7 @@ beforeEach(() => {
   mock.cargarTodo.mockResolvedValue(cs)
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks() })
-async function render() { await act(async () => root.render(<Modulos onAbrir={onAbrir} onEstudiar={onEstudiar} />)) }
+async function render() { await act(async () => root.render(<Modulos onEstudiar={onEstudiar} />)) }
 function button(label: string) {
   const found = [...host.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.trim() === label)
   if (!found) throw new Error(`No está el botón ${label}`)
@@ -63,65 +63,100 @@ async function filter(label: string, value: string) {
   expect(select).toBeTruthy()
   await act(async () => { select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })) })
 }
+async function modo(valor: string) {
+  const select = host.querySelector<HTMLSelectElement>('#modo-practica')!
+  await act(async () => { select.value = valor; select.dispatchEvent(new Event('change', { bubbles: true })) })
+}
 async function combine() { await filter('Filtrar por disciplina', 'Farmacología'); await filter('Filtrar por sistema', 'Endocrino') }
 
 describe('sesiones personalizadas con filtros reales de conceptos', () => {
   it('lanza la intersección exacta incluso con todos los resultados vistos y al día', async () => {
     await render(); await combine()
     expect(host.textContent).toContain('2 conceptos coincidentes')
-    await click('Practicar filtros (2)')
+    await click('Estudiar estos filtros (2)')
     expect(onEstudiar).toHaveBeenLastCalledWith(['QA-farmaco', 'QA-secundario'], expect.objectContaining({ subtitulo: 'Farmacología · Endocrino' }))
-    expect(onAbrir).not.toHaveBeenCalled()
   })
 
   it('aplica los mismos filtros al módulo y a sus sesiones sin incluir hermanos no coincidentes', async () => {
     await render(); await combine()
-    await click('Hasta 10 conceptos')
+    await click('Estudiar este módulo')
     expect(onEstudiar.mock.calls.at(-1)?.[0]).toEqual(['QA-farmaco', 'QA-secundario'])
     await click('Ver 1 sesiones')
     const sesion = [...host.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.includes('Sesión de prueba'))!
     await act(async () => sesion.click())
     expect(onEstudiar.mock.calls.at(-1)?.[0]).toEqual(['QA-farmaco', 'QA-secundario'])
-    expect(onAbrir).not.toHaveBeenCalled()
   })
 
   it('filtra rutas especializadas, conserva modo examen y explica rutas sin candidatos', async () => {
     await render(); await combine()
-    const examen = [...host.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.startsWith('Práctica sin ayuda'))!
-    await act(async () => examen.click())
+    await modo('examen')
+    await click('Estudiar estos filtros (2)')
     const [ids, meta] = onEstudiar.mock.calls.at(-1)!
     expect([...ids].sort()).toEqual(['QA-farmaco', 'QA-secundario'])
     expect(meta.ruta).toBe('examen')
     onEstudiar.mockClear()
-    const repaso = [...host.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.startsWith('Repaso espaciado'))!
-    await act(async () => repaso.click())
+    await modo('repaso')
+    await click('Estudiar estos filtros (0)')
     expect(onEstudiar).not.toHaveBeenCalled()
     expect(host.textContent).toContain('No hay conceptos elegibles')
-    expect(host.textContent).toContain('Puedes usar «Practicar filtros»')
+    expect(host.textContent).toContain('Práctica general')
   })
 
-  it('comparte los filtros con Buscar conceptos y puede iniciar sin seleccionar casillas', async () => {
-    await render(); await combine(); await click('Buscar conceptos')
-    expect(host.querySelector<HTMLSelectElement>('#busqueda-disciplina')?.value).toBe('Farmacología')
-    expect(host.querySelector<HTMLSelectElement>('#busqueda-sistema')?.value).toBe('Endocrino')
+  it('comparte los filtros con Conceptos y puede iniciar sin seleccionar casillas', async () => {
+    await render(); await combine(); await click('Conceptos')
+    expect(host.querySelector<HTMLSelectElement>('#modulos-disciplina')?.value).toBe('Farmacología')
+    expect(host.querySelector<HTMLSelectElement>('#modulos-sistema')?.value).toBe('Endocrino')
     expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(2)
-    const panel = host.querySelector('#panel-conceptos')!
-    const iniciar = [...panel.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.startsWith('Practicar filtros'))!
-    await act(async () => iniciar.click())
+    expect(host.querySelectorAll('[aria-label="Filtrar por disciplina"]')).toHaveLength(1)
+    await click('Estudiar estos filtros (2)')
     expect(onEstudiar.mock.calls.at(-1)?.[0]).toEqual(['QA-farmaco', 'QA-secundario'])
-    await filter('Filtrar conceptos por sistema', 'Cardiovascular'); await click('Módulos y rutas')
+    await filter('Filtrar por sistema', 'Cardiovascular'); await click('Módulos')
     expect(host.querySelector<HTMLSelectElement>('#modulos-sistema')?.value).toBe('Cardiovascular')
-    await click('Practicar filtros (1)')
+    await click('Estudiar estos filtros (1)')
     expect(onEstudiar.mock.calls.at(-1)?.[0]).toEqual(['QA-solo-disciplina'])
+  })
+
+  it('aplica el límite y el presupuesto comunes desde filtros, módulos, sesiones y selección manual con modo examen', async () => {
+    const extra = [1, 2, 3].map(n => ConceptoZ.parse({ ...base, concept_id: `QA-extra-${n}`, objetivo: `Extra ${n}` }))
+    const todos = [...cs, ...extra]
+    for (const x of extra) progreso[x.concept_id] = { ...progreso[base.concept_id], concept_id: x.concept_id }
+    const ind = { ...indice, n_conceptos: 7, modulos: indice.modulos.map(m => ({ ...m, n_conceptos: 7, sesiones: m.sesiones.map(s => ({ ...s, conceptos: todos.map(c => c.concept_id) })) })) }
+    mock.app.mockImplementation(() => ({ indice: ind, estado: { ...ESTADO_INICIAL, progreso } }))
+    mock.cargarTodo.mockResolvedValue(todos)
+    await render()
+    await click('Por conceptos')
+    const cinco = [...host.querySelectorAll('label')].find(l => l.textContent === '5 conceptos')!.querySelector('input')!
+    await act(async () => cinco.click())
+    await click('Estudiar estos filtros (5)')
+    await click('Estudiar este módulo')
+    await click('Ver 1 sesiones')
+    const editorial = [...host.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.includes('Sesión de prueba'))!
+    await act(async () => editorial.click())
+    for (const [ids, meta] of onEstudiar.mock.calls) {
+      expect(ids).toHaveLength(5)
+      expect(ids.every((id: string) => todos.some(c => c.concept_id === id))).toBe(true)
+      expect(meta.presupuestoMinutos).toBeUndefined()
+    }
+    await modo('examen'); await click('Conceptos'); await click('Agregar esta página')
+    await click('Estudiar 5 de 7 seleccionados')
+    expect(onEstudiar.mock.calls.at(-1)![1]).toMatchObject({ ruta: 'examen' })
+    expect(host.textContent).toContain('7 de 20 seleccionados')
+    await click('Por tiempo')
+    const diez = [...host.querySelectorAll('label')].find(l => l.textContent === '10 minutos')!.querySelector('input')!
+    await act(async () => diez.click())
+    await click('Módulos'); await click('Estudiar este módulo')
+    expect(onEstudiar.mock.calls.at(-1)![1]).toMatchObject({ ruta: 'examen', presupuestoMinutos: 10 })
+    await click('Conceptos')
+    expect(host.textContent).toContain('7 de 20 seleccionados')
   })
 
   it('los errores de carga permiten reintentar sin ofrecer una sesión fuera de los filtros', async () => {
     mock.cargarTodo.mockRejectedValue(new Error('sin conexión'))
     await render()
-    expect(button('Practicar filtros (0)').disabled).toBe(true)
+    expect(button('Estudiar estos filtros (0)').disabled).toBe(true)
     expect(host.textContent).toContain('No se pudieron cargar los conceptos para filtrar')
     mock.cargarTodo.mockResolvedValue(cs)
-    await click('Reintentar filtros'); await combine(); await click('Practicar filtros (2)')
+    await click('Reintentar filtros'); await combine(); await click('Estudiar estos filtros (2)')
     expect(onEstudiar.mock.calls.at(-1)?.[0]).toEqual(['QA-farmaco', 'QA-secundario'])
   })
 })

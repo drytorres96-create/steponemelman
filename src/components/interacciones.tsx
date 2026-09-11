@@ -30,6 +30,7 @@ const mezclar = <T,>(a: T[], semilla: string): T[] => {
 function Opciones({ c, bloqueado, resultado, onResponder, semilla, ocultarFeedback = false }: Props) {
   const opciones = useMemo(() => mezclar(c.evaluacion.opciones ?? [], semilla ?? c.concept_id), [c, semilla])
   const [elegida, setElegida] = useState<number | null>(null)
+  const seleccionada = elegida ?? (resultado ? opciones.findIndex(o => o.texto === resultado.respuestaDada) : null)
   const responder = (i: number) => {
     if (bloqueado) return
     setElegida(i)
@@ -47,15 +48,14 @@ function Opciones({ c, bloqueado, resultado, onResponder, semilla, ocultarFeedba
     <div role="radiogroup" aria-label="Opciones de respuesta">
       {opciones.map((o, i) => {
         let cls = 'opcion'
-        if (elegida === i) cls += bloqueado && !ocultarFeedback ? (o.correcta ? ' acierto' : ' fallo') : ' elegida'
+        if (seleccionada === i) cls += bloqueado && !ocultarFeedback ? (o.correcta ? ' acierto' : ' fallo') : ' elegida'
         else if (bloqueado && !ocultarFeedback && o.correcta) cls += ' correcta-oculta'
         return (
           <button key={i} className={cls} onClick={() => responder(i)} disabled={bloqueado}
-                  role="radio" aria-checked={elegida === i}>
+                  role="radio" aria-checked={seleccionada === i}>
             <span className="letra">{LETRAS[i]}</span>
             <span style={{ flex: 1 }}>
               {o.texto}
-              {bloqueado && !ocultarFeedback && !o.correcta && o.por_que && <div className="mini" style={{ marginTop: 4 }}>{o.por_que}</div>}
               {bloqueado && !ocultarFeedback && o.correcta && <div className="mini" style={{ marginTop: 4, color: 'var(--verde)' }}>Respuesta correcta</div>}
             </span>
           </button>

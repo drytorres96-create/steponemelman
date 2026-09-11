@@ -5,6 +5,7 @@ import type { Concepto, Modulo } from '../schema/concept'
 import { estaVencido } from '../srs/fsrs'
 import { construirCola, RUTAS, type RutaId } from '../lib/rutas'
 import { dominioVigente } from '../srs/mastery'
+import { SelectorCarga, useCargaEstudio } from '../components/SelectorCarga'
 import { ExploradorConceptos } from './ExploradorConceptos'
 import { cargarTodo } from '../data/corpus'
 import {
@@ -12,8 +13,8 @@ import {
   indexarConceptos, NOMBRES_ESTADOS_BUSQUEDA, type EstadoBusqueda, type FiltrosBusqueda, type OpcionesSesionPersonalizada,
 } from '../lib/busqueda'
 
-export function Modulos({ onAbrir, onEstudiar }: {
-  onAbrir: (moduloId: string, ruta: RutaId, limite: number, sesion?: string) => void
+export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion }: {
+  seleccion?: string[]; onSeleccion?: (ids: string[]) => void
   onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void
 }) {
   const { indice, estado } = useApp()
@@ -21,7 +22,11 @@ export function Modulos({ onAbrir, onEstudiar }: {
   const [conceptos, setConceptos] = useState<Concepto[] | null>(null)
   const [errorCarga, setErrorCarga] = useState(false)
   const [reintento, setReintento] = useState(0)
-  const [limite, setLimite] = useState(10)
+  const [seleccionLocal, setSeleccionLocal] = useState<string[]>([])
+  const seleccionManual = seleccionExterna ?? seleccionLocal
+  const cambiarSeleccion = onSeleccion ?? setSeleccionLocal
+  const carga = useCargaEstudio(estado.sesiones)
+  const [ruta, setRuta] = useState<RutaId>('guiada')
   const [aviso, setAviso] = useState('')
   const [abierto, setAbierto] = useState<string | null>(null)
   const [pestana, setPestana] = useState<'modulos' | 'conceptos'>('modulos')
@@ -47,25 +52,19 @@ export function Modulos({ onAbrir, onEstudiar }: {
   const cambiarFiltro = (patch: Partial<FiltrosBusqueda>) => cambiarFiltros({ ...filtros, ...patch })
   const idsModulo = (m: Modulo) => [...new Set(m.sesiones.flatMap(s => s.conceptos))]
   const coincidenciasModulo = (m: Modulo) => idsModulo(m).filter(id => idsCoincidentes.has(id))
-  const practicar = (cs: Concepto[], cantidad: number, titulo = 'Mi sesión personalizada') => {
-    const seleccion = construirSesionPersonalizada(cs, estado.progreso, cantidad)
-    if (!seleccion.length) { setAviso('No hay conceptos que coincidan con esta selección. Prueba otros filtros.'); return }
-    onEstudiar(seleccion.map(c => c.concept_id), { titulo, subtitulo: resumenFiltros || 'Práctica libre con conceptos nuevos y ya estudiados.' })
+  const elegir = (cs: Concepto[], manual = false) => ruta === 'guiada'
+    ? manual ? cs.slice(0, carga.cantidad) : construirSesionPersonalizada(cs, estado.progreso, carga.cantidad)
+    : construirCola(ruta, cs, estado.progreso, carga.cantidad)
+  const candidatos = elegir(resultados)
+  const practicar = (cs: Concepto[], titulo = 'Mi sesión personalizada', modulo = 'personalizada', subtitulo = resumenFiltros) => {
+    const seleccion = elegir(cs)
+    if (!seleccion.length) { setAviso('No hay conceptos elegibles para este modo con tus filtros. Prueba «Práctica general» u otros filtros.'); return }
+    onEstudiar(seleccion.map(c => c.concept_id), { titulo, subtitulo: subtitulo || 'Conceptos nuevos y ya estudiados.', ruta, modulo, presupuestoMinutos: carga.presupuestoMinutos })
   }
-  const abrirModulo = (m: Modulo, cantidad: number, sesionId?: string) => {
-    if (!hayFiltros) { onAbrir(m.module_id, 'guiada', cantidad, sesionId); return }
+  const abrirModulo = (m: Modulo, sesionId?: string) => {
     const sesion = m.sesiones.find(s => s.session_id === sesionId)
     const ids = new Set(sesion?.conceptos ?? idsModulo(m))
-    practicar(resultados.filter(c => ids.has(c.concept_id)), cantidad, `${m.nombre}${sesion ? ` · ${sesion.titulo}` : ''}`)
-  }
-  const abrirRuta = (ruta: RutaId, cantidad: number) => {
-    if (!hayFiltros) { onAbrir('', ruta, cantidad); return }
-    const r = RUTAS.find(x => x.id === ruta)!
-    const seleccion = ruta === 'sistemas' || ruta === 'disciplinas'
-      ? construirSesionPersonalizada(resultados, estado.progreso, cantidad)
-      : construirCola(ruta, resultados, estado.progreso, cantidad)
-    if (!seleccion.length) { setAviso(`No hay conceptos elegibles para «${r.nombre}» con estos filtros. Puedes usar «Practicar filtros» para estudiar cualquier concepto coincidente.`); return }
-    onEstudiar(seleccion.map(c => c.concept_id), { titulo: r.nombre, subtitulo: resumenFiltros, ruta, modulo: ruta })
+    practicar(resultados.filter(c => ids.has(c.concept_id)), `${m.nombre}${sesion ? ` · ${sesion.titulo}` : ''}`, m.module_id, [resumenFiltros, sesion?.objetivo].filter(Boolean).join(' · '))
   }
 
   const stats = (m: Modulo) => {
@@ -89,20 +88,6 @@ export function Modulos({ onAbrir, onEstudiar }: {
         <p className="sutil">Combina disciplina y sistema para crear una sesión a tu medida. Puedes practicar conceptos nuevos o ya estudiados.</p>
       </div>
 
-      <div className="pestanas-explorador" role="tablist" aria-label="Explorar el material">
-        {([{ id: 'modulos', titulo: 'Módulos y rutas' }, { id: 'conceptos', titulo: 'Buscar conceptos' }] as const).map(p =>
-          <button key={p.id} id={`pestana-${p.id}`} role="tab" aria-selected={pestana === p.id} aria-controls={`panel-${p.id}`}
-            tabIndex={pestana === p.id ? 0 : -1} onClick={() => setPestana(p.id)} onKeyDown={e => {
-              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
-              e.preventDefault()
-              const siguiente = e.key === 'Home' ? 'modulos' : e.key === 'End' ? 'conceptos' : pestana === 'modulos' ? 'conceptos' : 'modulos'
-              setPestana(siguiente)
-              document.getElementById(`pestana-${siguiente}`)?.focus()
-            }}>{p.titulo}</button>)}
-      </div>
-
-      <section id="panel-modulos" role="tabpanel" aria-labelledby="pestana-modulos" hidden={pestana !== 'modulos'} className="pila">
-
       <div className="tarjeta pila">
         <div><h2>Sesión personalizada</h2><p className="mini">Ejemplos: Farmacología + Endocrino; Fisiología + Cardiovascular; Patología + Hematológico y oncológico. Cada concepto debe cumplir todos los filtros elegidos.</p></div>
         <div className="rejilla filtros-conceptos">
@@ -114,6 +99,8 @@ export function Modulos({ onAbrir, onEstudiar }: {
           <option value="">Todos los sistemas</option>
           {sistemas.map(s => <option key={s} value={s}>{s}</option>)}
         </select></div>
+        </div>
+        <details><summary>Más filtros y modo de práctica</summary><div className="rejilla filtros-conceptos" style={{ marginTop: 12 }}>
         <div><label htmlFor="modulos-tema">Tema</label><select id="modulos-tema" value={filtros.tema} onChange={e => cambiarFiltro({ tema: e.target.value })} aria-label="Filtrar por tema" disabled={!conceptos}>
           <option value="">Todos los temas</option>{temas.map(t => <option key={t} value={t}>{t}</option>)}
         </select></div>
@@ -124,21 +111,38 @@ export function Modulos({ onAbrir, onEstudiar }: {
         </div>
         <div><label htmlFor="modulos-texto">Palabra o concepto (opcional)</label><input id="modulos-texto" type="search" maxLength={200} value={filtros.texto}
           placeholder="Ej.: tiroides, hemostasia…" onChange={e => cambiarFiltro({ texto: e.target.value })} /></div>
+        <div><label htmlFor="modo-practica">Modo de práctica</label><select id="modo-practica" value={ruta} onChange={e => { setRuta(e.target.value as RutaId); setAviso('') }}>
+          <option value="guiada">Práctica general</option>{RUTAS.filter(r => !['guiada', 'sistemas', 'disciplinas'].includes(r.id)).map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+        </select><p className="mini">{RUTAS.find(r => r.id === ruta)?.descripcion}</p></div>
+        </details>
+        <SelectorCarga carga={carga} />
+        {ruta !== 'guiada' && <p className="mini">Modo activo: {RUTAS.find(r => r.id === ruta)?.nombre}</p>}
         <div className="fila" style={{ gap: 10 }}>
-          <div><label htmlFor="modulos-cantidad">Conceptos por sesión</label><select id="modulos-cantidad" value={limite} onChange={e => setLimite(Number(e.target.value))}>
-            {[5, 10, 20].map(n => <option key={n} value={n}>Hasta {n}</option>)}
-          </select></div>
-          <button className="btn principal" disabled={!conceptos || !resultados.length} onClick={() => practicar(resultados, limite)}>
-            Practicar filtros ({Math.min(limite, resultados.length)})
+          <button className="btn principal" disabled={!conceptos || !resultados.length} onClick={() => practicar(resultados)}>
+            Estudiar estos filtros ({candidatos.length})
           </button>
           <button className="btn pequeno fantasma" disabled={!hayFiltros} onClick={() => cambiarFiltros({ ...FILTROS_BUSQUEDA_INICIALES })}>Limpiar filtros</button>
           <span className="mini" role="status" aria-live="polite">{conceptos ? `${resultados.length} conceptos coincidentes · ${visibles.length} de ${modulos.length} módulos` : 'Preparando filtros…'}</span>
         </div>
-        {hayFiltros && <p className="mini" style={{ margin: 0 }}>Filtros activos: {resumenFiltros}. También se aplican al abrir los módulos, sesiones y rutas de abajo.</p>}
+        {hayFiltros && <p className="mini" style={{ margin: 0 }}>Filtros activos: {resumenFiltros}. También se aplican al abrir los módulos y sesiones. La duración elegida también se conserva.</p>}
         <p className="mini" style={{ margin: 0 }}>Con «Cualquier estado» también puedes repetir conceptos que están al día. Primero se priorizan repasos pendientes y conceptos nuevos.</p>
         {errorCarga && <div role="alert"><p>No se pudieron cargar los conceptos para filtrar.</p><button className="btn" onClick={() => setReintento(n => n + 1)}>Reintentar filtros</button></div>}
         {aviso && <p role="alert" className="aviso">{aviso}</p>}
       </div>
+
+      <div className="pestanas-explorador" role="tablist" aria-label="Explorar el material">
+        {([{ id: 'modulos', titulo: 'Módulos' }, { id: 'conceptos', titulo: 'Conceptos' }] as const).map(p =>
+          <button key={p.id} id={`pestana-${p.id}`} role="tab" aria-selected={pestana === p.id} aria-controls={`panel-${p.id}`}
+            tabIndex={pestana === p.id ? 0 : -1} onClick={() => setPestana(p.id)} onKeyDown={e => {
+              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
+              e.preventDefault()
+              const siguiente = e.key === 'Home' ? 'modulos' : e.key === 'End' ? 'conceptos' : pestana === 'modulos' ? 'conceptos' : 'modulos'
+              setPestana(siguiente)
+              document.getElementById(`pestana-${siguiente}`)?.focus()
+            }}>{p.titulo}</button>)}
+      </div>
+
+      <section id="panel-modulos" role="tabpanel" aria-labelledby="pestana-modulos" hidden={pestana !== 'modulos'} className="pila">
 
       {conceptos && visibles.length === 0 && <Vacio titulo="Ningún concepto coincide" texto="Prueba con otros filtros." />}
 
@@ -177,8 +181,7 @@ export function Modulos({ onAbrir, onEstudiar }: {
 
               <hr className="sep" />
               <div className="fila">
-                <button className="btn principal pequeno" onClick={() => abrirModulo(m, 10)}>Hasta 10 conceptos</button>
-                <button className="btn pequeno" onClick={() => abrirModulo(m, 20)}>Hasta 20 conceptos</button>
+                <button className="btn principal pequeno" disabled={!conceptos} onClick={() => abrirModulo(m)}>Estudiar este módulo</button>
                 <button className="btn pequeno fantasma" aria-expanded={abiertoEste} onClick={() => setAbierto(abiertoEste ? null : m.module_id)}>
                   {abiertoEste ? 'Ocultar sesiones' : `Ver ${m.sesiones.length} sesiones`}
                 </button>
@@ -191,7 +194,7 @@ export function Modulos({ onAbrir, onEstudiar }: {
                     const hechos = ses.conceptos.filter(id => estado.progreso[id]?.intentos.length).length
                     return (
                       <button key={ses.session_id} className="tarjeta pulsable" style={{ padding: 11 }} disabled={hayFiltros && !coincidencias}
-                        onClick={() => abrirModulo(m, 999, ses.session_id)}>
+                        onClick={() => abrirModulo(m, ses.session_id)}>
                         <div className="fila" style={{ justifyContent: 'space-between' }}>
                           <b style={{ fontSize: '.92rem' }}>{ses.titulo}</b>
                           <span className="mini">{hayFiltros ? `${coincidencias} coincidentes` : `${hechos}/${ses.conceptos.length}`}</span>
@@ -208,22 +211,10 @@ export function Modulos({ onAbrir, onEstudiar }: {
         })}
       </div>
 
-      <div className="tarjeta">
-        <h2 style={{ marginBottom: 4 }}>Rutas de estudio</h2>
-        <p className="sutil">Elige qué habilidad practicar. {hayFiltros ? 'Estas rutas respetan tus filtros y mantienen sus condiciones de práctica.' : 'La selección considera tu historial y el material disponible.'}</p>
-        <div className="rejilla r3" style={{ marginTop: 12 }}>
-          {RUTAS.filter(r => r.id !== 'guiada').map(r => (
-            <button key={r.id} className="tarjeta pulsable" style={{ padding: 13 }}
-              onClick={() => abrirRuta(r.id, r.id === 'examen' ? 20 : 14)}>
-              <b style={{ fontSize: '.93rem' }}>{r.nombre}</b>
-              <div className="mini" style={{ marginTop: 3 }}>{r.descripcion}</div>
-            </button>
-          ))}
-        </div>
-      </div>
       </section>
       <section id="panel-conceptos" role="tabpanel" aria-labelledby="pestana-conceptos" hidden={pestana !== 'conceptos'}>
-        <ExploradorConceptos activo={pestana === 'conceptos'} onEstudiar={onEstudiar} filtros={filtros} onCambiarFiltros={cambiarFiltros} />
+        {conceptos ? <ExploradorConceptos activo={pestana === 'conceptos'} conceptos={conceptos} resultados={resultados} seleccion={seleccionManual} onSeleccion={cambiarSeleccion} elegir={cs => elegir(cs, true)}
+          onEstudiar={ids => onEstudiar(ids, { titulo: 'Mi selección de conceptos', subtitulo: 'Selección manual conservada entre filtros y páginas.', ruta, presupuestoMinutos: carga.presupuestoMinutos })} /> : !errorCarga && <p role="status">Preparando conceptos…</p>}
       </section>
     </div>
   )

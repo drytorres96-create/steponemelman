@@ -94,9 +94,9 @@ describe('continuidad y navegación accesible', () => {
       intentos: [{ resultado: 'revision', ts: 1, ms: 1, tipo_error: 'ninguno', respuesta_dada: 'Mi respuesta' }],
     }])) }
     await act(async () => { root.render(<App />) })
-    expect(host.querySelectorAll('details')).toHaveLength(20)
+    expect(host.querySelectorAll('[aria-labelledby="revision-titulo"] details')).toHaveLength(20)
     await act(async () => { boton('Mostrar 20 más').click() })
-    expect(host.querySelectorAll('details')).toHaveLength(21)
+    expect(host.querySelectorAll('[aria-labelledby="revision-titulo"] details')).toHaveLength(21)
     await act(async () => { boton('Volver a practicar estas respuestas').click() })
     expect(mock.cargarConceptos.mock.calls.at(-1)?.[0]).toEqual(conceptos.slice(0, 20).map(c => c.concept_id))
   })

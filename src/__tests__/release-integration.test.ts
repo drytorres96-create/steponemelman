@@ -15,6 +15,7 @@ vi.mock('../lib/supabase', () => ({ supabase: {
 
 import { ProveedorEstado, useApp } from '../store/estado'
 import { Reproductor, type Cola } from '../screens/Reproductor'
+import { versionPregunta } from '../screens/sesion'
 
 // Datos sintéticos: verifican el circuito UI → proveedor → respaldo, sin cuentas ni contenido real.
 const concepto = ConceptoZ.parse({
@@ -110,7 +111,7 @@ describe('integración de estudio antes de publicar', () => {
     expect(first).toHaveLength(1)
     expect(first[0]).toMatchObject({ respuesta_dada: 'alfa', resultado: 'correcta', modo: 'repaso', explicacion_previa: false })
     expect(host.textContent).toContain('Tu respuesta ya está registrada')
-    await click('Bien', true)
+    await click('Siguiente pregunta', true)
     expect(guardado().progreso['QA-001'].intentos).toHaveLength(1)
     expect(guardado().progreso['QA-001'].intentos[0].attempt_id).toBe(first[0].attempt_id)
     expect(host.textContent).toContain('Has completado 1 preguntas')
@@ -144,7 +145,7 @@ describe('integración de estudio antes de publicar', () => {
     expect(host.textContent).toContain('Corrección · 1 pendientes')
     await responder('alfa')
     expect(api.estado.progreso['QA-002'].intentos[1]).toMatchObject({ resultado: 'correcta', modo: 'repaso', explicacion_previa: true })
-    await click('Bien', true)
+    await click('Siguiente pregunta', true)
     expect(host.textContent).toContain('Has completado 2 preguntas')
     expect(host.textContent).toContain('1 de 1 errores iniciales corregidos en 1 reintentos')
     expect(host.textContent).toContain('0 sin ayuda')
@@ -166,13 +167,13 @@ describe('integración de estudio antes de publicar', () => {
     const cola = { ...nuevaCola(), conceptos: [concepto, opciones] }
     await render(cola)
     await responder('beta')
-    await click('Volver a practicar', true)
+    await click('Siguiente pregunta', true)
     expect(api.estado.reanudable?.conceptIds).toEqual(['QA-001', 'QA-002', 'QA-001'])
     await responder('alfa')
-    await click('Bien')
+    await click('Siguiente pregunta')
     expect(host.textContent).toContain('Corrección · 1 pendientes')
     await responder('beta')
-    await click('Volver a practicar', true)
+    await click('Siguiente pregunta', true)
     await click('Necesito una pausa')
     const saved = clone(api.estado.reanudable!)
     expect(saved).toMatchObject({ indice: 3, cantidadInicial: 2, conceptIds: ['QA-001', 'QA-002', 'QA-001', 'QA-001'] })
@@ -186,7 +187,7 @@ describe('integración de estudio antes de publicar', () => {
     await render({ ...cola, conceptos: [concepto, opciones, concepto, concepto], sessionId: saved.sessionId }, saved.indice)
     expect(host.textContent).toContain('Corrección · 1 pendientes')
     await responder('alfa')
-    await click('Bien', true)
+    await click('Siguiente pregunta', true)
     const intentos = api.estado.progreso['QA-001'].intentos
     expect(intentos).toHaveLength(3)
     expect(intentos[2]).toMatchObject({ resultado: 'correcta', explicacion_previa: true })
@@ -212,7 +213,7 @@ describe('integración de estudio antes de publicar', () => {
     await render({ ...cola, sessionId: saved.sessionId }, saved.indice)
     expect(host.textContent).toContain('Tu respuesta ya está registrada')
     expect(host.querySelector<HTMLInputElement>('input[aria-label="Tu respuesta"]')?.disabled).toBe(true)
-    await click('Fácil')
+    await click('Siguiente pregunta')
     expect(api.estado.progreso['QA-001'].intentos).toHaveLength(1)
     expect(api.estado.progreso['QA-001'].intentos[0].attempt_id).toBe(attempt)
   })
@@ -262,13 +263,106 @@ describe('integración de estudio antes de publicar', () => {
     expect(api.estado.progreso['QA-001'].intentos[0]).toMatchObject({ fuente_consultada: true, tipo_error: 'correcta_con_pistas' })
   })
 
-  it('la primera práctica guiada registra explicación previa y una sola sesión con StrictMode', async () => {
+  it('la enseñanza voluntaria registra explicación previa y una sola sesión con StrictMode', async () => {
     await render(nuevaCola('guiada'))
+    expect(host.textContent).not.toContain('EXPLICACIÓN SINTÉTICA')
+    await click('Necesito aprenderlo')
     expect(host.textContent).toContain('EXPLICACIÓN SINTÉTICA')
     expect(api.estado.sesiones).toHaveLength(1)
     await click('Ahora recupéralo')
     await responder('alfa')
     expect(api.estado.progreso['QA-001'].intentos[0]).toMatchObject({ explicacion_previa: true, tipo_error: 'correcta_con_pistas' })
+  })
+
+  it('permite responder una pregunta guiada nueva sin enseñanza ni calificación extra', async () => {
+    await render(nuevaCola('guiada'))
+    expect(host.textContent).not.toContain('EXPLICACIÓN SINTÉTICA')
+    await responder('alfa')
+    const t = clone(api.estado.progreso['QA-001'].intentos[0])
+    expect(t).toMatchObject({ explicacion_previa: false, fuente_consultada: false, calificacion: 3 })
+    await click('Siguiente pregunta', true)
+    expect(api.estado.progreso['QA-001'].intentos).toEqual([t])
+  })
+
+  it('abrir enseñanza conserva el borrador, y reanudar conserva que se utilizó ayuda', async () => {
+    const cola = nuevaCola('guiada')
+    await render(cola)
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="Tu respuesta"]')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'alfa')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click('Necesito aprenderlo')
+    expect(input.isConnected).toBe(true)
+    expect(input.disabled).toBe(true)
+    await click('Ahora recupéralo')
+    expect(input.value).toBe('alfa')
+    await click('Necesito aprenderlo')
+    await click('Necesito una pausa')
+    const saved = clone(api.estado.reanudable!)
+    expect(saved.paso).toMatchObject({ explicacionPrevia: true, ensenanzaAbierta: true })
+    await render(cola, 0, false)
+    await render({ ...cola, sessionId: saved.sessionId }, saved.indice)
+    expect(host.textContent).toContain('EXPLICACIÓN SINTÉTICA')
+    await click('Ahora recupéralo')
+    await responder('alfa')
+    expect(api.estado.progreso['QA-001'].intentos[0].explicacion_previa).toBe(true)
+  })
+
+  it('preserva una presentación V/F respondida en 1.4, incluidos su veredicto y revisión final', async () => {
+    const cola = { ...nuevaCola(), conceptos: [concepto, concepto, opciones] }
+    await render(cola, 0, false)
+    const id = 'legacy-vf-2', questionId = `${id}:2:QA-002`
+    const antigua = ConceptoZ.parse({ ...opciones, interaccion: { ...opciones.interaccion, recomendada: 'verdadero_falso' },
+      evaluacion: { ...opciones.evaluacion, pregunta: `${opciones.evaluacion.pregunta}\n\nPropuesta: «beta»\n¿Esta propuesta responde correctamente a la pregunta?`, opciones: [
+        { texto: 'Verdadero', correcta: false, por_que: 'DISTRACTOR SINTÉTICO: es el segundo.' },
+        { texto: 'Falso', correcta: true, por_que: '' },
+      ] } })
+    await act(async () => {
+      api.registrarIntento('QA-002', { attempt_id: 'legacy-attempt', session_id: id, ts: Date.now(), pregunta_id: questionId, pregunta_version: versionPregunta(antigua), resultado: 'correcta', calificacion: 3,
+        interaccion: 'verdadero_falso', recuperacion_activa: false, respuesta_dada: 'Falso', pistas_usadas: 0, fuente_consultada: false, explicacion_previa: false, ms: 4000, tipo_error: 'ninguno', confianza_declarada: null })
+      api.guardarReanudable({ modulo: 'QA-MOD', sesion: 'repaso', indice: 2, ts: Date.now(), sessionId: id, conceptIds: ['QA-001', 'QA-001', 'QA-002'], cantidadInicial: 3, msVisibles: 4000 })
+    })
+    await render({ ...cola, sessionId: id }, 2)
+    expect(host.textContent).toContain('Propuesta: «beta»')
+    expect(host.textContent).toContain('Tu respuesta: Falso')
+    expect(host.textContent).not.toContain('otra presentación')
+    expect(api.estado.reanudable?.versionFormato).toBe(1)
+    await click('Siguiente pregunta')
+    expect(host.textContent).toContain('Propuesta: «beta»')
+    expect(api.estado.progreso['QA-002'].intentos).toHaveLength(1)
+    expect(api.estado.progreso['QA-002'].intentos[0]).toMatchObject({ attempt_id: 'legacy-attempt', resultado: 'correcta', respuesta_dada: 'Falso' })
+  })
+
+  it.each([false, true])('una errata reconocida histórica permite omitir la transcripción; práctica voluntaria=%s', async practicar => {
+    const c = ConceptoZ.parse({ ...concepto, escritura_correctiva: { elegible: true, termino: 'alfa' } })
+    const cola = { ...nuevaCola(), conceptos: [c] }
+    await render(cola, 0, false)
+    const id = 'legacy-ortografia'
+    await act(async () => {
+      api.registrarIntento(c.concept_id, { attempt_id: 'typo-attempt', session_id: id, ts: Date.now(), pregunta_id: `${id}:0:QA-001`, pregunta_version: versionPregunta(c),
+        resultado: 'ortografia', calificacion: 2, interaccion: 'recuperacion_libre', recuperacion_activa: true, respuesta_dada: 'alfaa', pistas_usadas: 0,
+        fuente_consultada: false, explicacion_previa: false, ms: 4000, tipo_error: 'error_ortografico', confianza_declarada: null })
+      api.guardarReanudable({ modulo: 'QA-MOD', sesion: 'repaso', indice: 0, ts: Date.now(), sessionId: id, conceptIds: ['QA-001'] })
+    })
+    await render({ ...cola, sessionId: id })
+    if (practicar) { await click('Practicar escritura (opcional)'); await click('Continuar sin practicar escritura') }
+    else await click('Siguiente pregunta')
+    expect(host.textContent).toContain('Sesión terminada')
+    expect(api.estado.progreso['QA-001']).toMatchObject({ aciertos: 1, fallos: 0 })
+    expect(api.estado.progreso['QA-001'].intentos).toHaveLength(1)
+  })
+
+  it('endurecer criterios conserva el hito y los intentos aunque retire el dominio vigente', async () => {
+    await render(nuevaCola('guiada'))
+    await responder('alfa')
+    await act(async () => api.actualizarCriterios({ ...api.estado.criterios, recuperaciones: 1, sesiones: 1, separacionHoras: 0 }))
+    const antes = clone(api.estado.progreso['QA-001'])
+    expect(antes.dominado_en).not.toBeNull()
+    await act(async () => api.actualizarCriterios({ ...api.estado.criterios, recuperaciones: 10, sesiones: 6 }))
+    expect(api.estado.progreso['QA-001'].estado).not.toBe('dominado')
+    expect(api.estado.progreso['QA-001'].dominado_en).toBe(antes.dominado_en)
+    expect(api.estado.progreso['QA-001'].intentos).toEqual(antes.intentos)
   })
 
   it('mantiene una respuesta ambigua por revisar sin aumentar aciertos ni fallos', async () => {
@@ -289,7 +383,7 @@ describe('integración de estudio antes de publicar', () => {
     await click('Volver a responder', true)
     expect(api.estado.reanudable?.conceptIds).toEqual(['QA-001', 'QA-001'])
     await responder('alfa')
-    await click('Bien')
+    await click('Siguiente pregunta')
     const p = api.estado.progreso['QA-001']
     expect(p.intentos.map(t => t.resultado)).toEqual(['revision', 'correcta'])
     expect(p.fallos).toBe(0)
@@ -301,7 +395,7 @@ describe('integración de estudio antes de publicar', () => {
     const cola = nuevaCola()
     await render(cola)
     await responder('alfa')
-    await click('Bien')
+    await click('Siguiente pregunta')
     const saved = clone(api.estado.reanudable!)
     expect(saved.indice).toBe(1)
     await render(cola, 0, false)
@@ -320,6 +414,7 @@ describe('presupuesto de tiempo y continuidad', () => {
     vi.useFakeTimers({ toFake: ['Date', 'performance', 'setInterval', 'clearInterval'] })
     const cola: Cola = { ...nuevaCola('guiada'), presupuestoMinutos: 10 }
     await render(cola)
+    await click('Necesito aprenderlo')
     expect(host.textContent).toContain('EXPLICACIÓN SINTÉTICA')
     await act(async () => { vi.advanceTimersByTime(599000) })
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
@@ -330,7 +425,7 @@ describe('presupuesto de tiempo y continuidad', () => {
     await click('Ahora recupéralo')
     await act(async () => { vi.advanceTimersByTime(2000) })
     await responder('beta')
-    await click('Volver a practicar')
+    await click('Siguiente pregunta')
     expect(host.textContent).toContain('Objetivo de tiempo alcanzado')
     const saved = clone(api.estado.reanudable!)
     expect(saved).toMatchObject({ indice: 1, conceptIds: ['QA-001', 'QA-001'], pausaPorTiempoPendiente: true, msVisibles: 601000 })
@@ -343,7 +438,7 @@ describe('presupuesto de tiempo y continuidad', () => {
     await click('Continuar sin límite')
     expect(api.estado.reanudable!.continuarSinLimite).toBe(true)
     await responder('alfa')
-    await click('Bien')
+    await click('Siguiente pregunta')
     expect(host.textContent).toContain('Sesión terminada')
   })
   it('no resucita una reanudación borrada por otra ventana al guardar o desmontar', async () => {

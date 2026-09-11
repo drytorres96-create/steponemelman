@@ -5,8 +5,9 @@ import { versionPregunta } from '../screens/sesion'
 import type { CoachAnswer } from '../server/worker'
 import { referenciaPagina } from '../lib/fuente'
 
-export function AyudaIA({ concepto, respuesta, preguntaId, indice, ruta, reintento }: {
+export function AyudaIA({ concepto, respuesta, preguntaId, indice, ruta, reintento, versionFormato = 2 }: {
   concepto: Concepto; respuesta: string; preguntaId: string; indice: number; ruta: string; reintento: boolean
+  versionFormato?: 1 | 2
 }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -23,7 +24,7 @@ export function AyudaIA({ concepto, respuesta, preguntaId, indice, ruta, reinten
       const response = await fetch('/api/explicar', { method: 'POST', signal: abort.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ conceptId: concepto.concept_id, answer: respuesta.slice(0, 500), questionId: preguntaId,
-          version: versionPregunta(concepto), variantId: concepto.variante_id, index: indice, route: ruta, retry: reintento }) })
+          version: versionPregunta(concepto), formatVersion: versionFormato, variantId: concepto.variante_id, index: indice, route: ruta, retry: reintento }) })
       if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('La ayuda de IA todavía no está disponible en este entorno.')
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'No se pudo abrir la ayuda.')

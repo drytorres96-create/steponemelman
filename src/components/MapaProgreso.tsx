@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { DISCIPLINAS, SISTEMAS, type Concepto } from '../schema/concept'
 import { useApp } from '../store/estado'
-import { construirMapa, METRICAS_MAPA, prioridadesSemana, type MetricaMapa } from '../lib/mapa-progreso'
+import { construirMapa, METRICAS_MAPA, type MetricaMapa } from '../lib/mapa-progreso'
 import { construirSesionPersonalizada, type OpcionesSesionPersonalizada } from '../lib/busqueda'
+import { construirPlanDiario } from '../lib/plan-estudio'
+import { cargaPorTiempo } from '../lib/tiempo'
 import { resumenTransferencia, priorizarVariantes } from '../lib/variantes'
 
-export function MapaProgreso({ conceptos, onEstudiar }: { conceptos: Concepto[]; onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void }) {
+export function MapaProgreso({ conceptos, onEstudiar, onContinuar }: { conceptos: Concepto[]; onContinuar?: () => void; onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void }) {
   const { estado } = useApp()
   const [ahora, setAhora] = useState(Date.now())
   const [metrica, setMetrica] = useState<MetricaMapa>('vencidos')
@@ -14,7 +16,7 @@ export function MapaProgreso({ conceptos, onEstudiar }: { conceptos: Concepto[];
   const [grupo, setGrupo] = useState<MetricaMapa | 'todos'>('todos')
   useEffect(() => { const t = setInterval(() => setAhora(Date.now()), 60000); return () => clearInterval(t) }, [])
   const celdas = useMemo(() => construirMapa(conceptos, estado, ahora), [conceptos, estado.progreso, estado.criterios, ahora])
-  const prioridades = useMemo(() => prioridadesSemana(celdas, tamano), [celdas, tamano])
+  const plan = useMemo(() => construirPlanDiario(conceptos, estado.progreso, cargaPorTiempo(20, estado.sesiones), ahora), [conceptos, estado.progreso, estado.sesiones, ahora])
   const celda = celdas.find(c => c.id === selected)!
   const cs = grupo === 'todos' ? celda.conceptos : celda.grupos[grupo]
   const sesion = construirSesionPersonalizada(cs, estado.progreso, tamano, ahora)
@@ -22,17 +24,17 @@ export function MapaProgreso({ conceptos, onEstudiar }: { conceptos: Concepto[];
   const transfer = resumenTransferencia(piloto, estado.progreso)
   const elegibles = piloto.filter(c => estado.progreso[c.concept_id]?.intentos.length)
   const lanzar = (lista: Concepto[], titulo: string, opciones: OpcionesSesionPersonalizada = {}) => onEstudiar(lista.map(c => c.concept_id), { titulo, subtitulo: 'Practica esta selección y conserva tus respuestas.', ...opciones })
+  const siguiente = <><p>{plan.explicacion}</p><p className="mini">{plan.vencidos} de repaso · {plan.errores} para reforzar · {plan.nuevos} nuevos</p>
+    <button className="btn principal" disabled={!plan.conceptos.length} onClick={() => lanzar(plan.conceptos, 'Tu siguiente sesión', { ruta: 'guiada', presupuestoMinutos: 20 })}>Estudiar 20 minutos</button></>
   return <>
     <section className="tarjeta pila" aria-labelledby="prioridades-titulo">
-      <h2 id="prioridades-titulo">Tres próximos pasos para esta semana</h2>
-      <p className="sutil">Se actualizan con tus respuestas. Los conceptos nuevos son una oportunidad de estudio; no indican una debilidad.</p>
-      <div className="rejilla r3">{prioridades.map((p, i) => <div className="prioridad" key={p.celda.id}>
-        <span className="rotulo">Paso {i + 1}</span><h3>{p.celda.sistema} · {p.celda.disciplina}</h3><p>{p.motivo}</p>
-        <button className="btn pequeno" onClick={() => lanzar(p.conceptos, `${p.celda.sistema} · ${p.celda.disciplina}`)}>Practicar {p.conceptos.length} conceptos</button>
-      </div>)}</div>
-      {!prioridades.length && <p>Sin repasos ni errores recientes pendientes. Puedes elegir una combinación del mapa.</p>}
+      <h2 id="prioridades-titulo">Tu siguiente sesión</h2>
+      {estado.reanudable ? <><p>{estado.reanudable.titulo || 'Tu sesión guardada'}</p>
+        <button className="btn principal" onClick={onContinuar ?? (() => { location.hash = 'inicio' })}>Continuar sesión guardada</button>
+        <details><summary>Empezar una sesión nueva</summary>{siguiente}</details></> : siguiente}
+      <p className="mini">El mismo plan que en Hoy. Puedes elegir otra combinación en el mapa.</p>
     </section>
-    <section className="tarjeta pila" aria-labelledby="mapa-titulo">
+    <details className="tarjeta"><summary>Explorar mapa por sistema y disciplina</summary><section className="pila" style={{ marginTop: 16 }} aria-labelledby="mapa-titulo">
       <div><h2 id="mapa-titulo">Tu mapa por sistema y disciplina</h2><p className="sutil">Elige una casilla para preparar una sesión.</p></div>
       <label className="fila">Mostrar <select value={metrica} onChange={e => setMetrica(e.target.value as MetricaMapa)}>{Object.entries(METRICAS_MAPA).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
       <div className="scroll-x mapa-scroll" tabIndex={0} role="region" aria-label="Mapa de progreso; desplázate horizontalmente para ver todas las disciplinas">
@@ -53,12 +55,12 @@ export function MapaProgreso({ conceptos, onEstudiar }: { conceptos: Concepto[];
           <button className="btn principal" disabled={!sesion.length} onClick={() => lanzar(sesion, `${celda.sistema} · ${celda.disciplina}`)}>Practicar {sesion.length} conceptos</button></div>
         {!sesion.length && <p className="mini">No hay conceptos en este grupo. Puedes seleccionar toda la combinación.</p>}
       </div>
-    </section>
+    </section></details>
     {piloto.length > 0 && <section className="tarjeta pila" aria-labelledby="aplicacion-titulo">
       <span className="rotulo">Piloto · {piloto.length} conceptos</span><h2 id="aplicacion-titulo">¿Puedes aplicarlo en una pregunta nueva?</h2>
-      <p>Trabaja el concepto habitual, distingue mecanismos y después aplícalo en un caso diferente.</p>
-      <div className="fila"><span className="etq">{transfer.correctos} / {transfer.evaluados} primeros intentos sin ayuda correctos</span><span className="etq">{transfer.disponibles - transfer.vistos} casos aún no presentados</span></div>
-      <p className="mini">«Aplicación comprobada» requiere acertar una variante nueva sin pistas ni explicación previa. Se mide aparte del dominio vigente; repetir una pregunta ya vista no aporta una nueva comprobación. No equivale a un resultado NBME.</p>
+
+      <div className="fila"><span className="etq">{transfer.evaluados ? `${transfer.correctos} / ${transfer.evaluados} primeros intentos sin ayuda correctos` : 'Aún no hay primeros intentos sin ayuda'}</span><span className="etq">{transfer.disponibles - transfer.vistos} casos aún no presentados</span></div>
+      <details><summary>Cómo se mide este piloto</summary><p className="mini">«Aplicación comprobada» requiere acertar una variante nueva sin pistas ni explicación previa. Se mide aparte del dominio vigente; repetir una pregunta ya vista no aporta una nueva comprobación. No equivale a un resultado NBME.</p></details>
       <div className="fila"><button className="btn principal" disabled={!elegibles.length} onClick={() => lanzar(priorizarVariantes(elegibles, estado.progreso).slice(0, tamano), 'Aplicar lo aprendido', { ruta: 'aplicacion', nivelVariante: 'aplicacion' })}>Practicar casos</button>
         <button className="btn" disabled={!elegibles.length} onClick={() => lanzar(priorizarVariantes(elegibles, estado.progreso, 'discriminacion').slice(0, tamano), 'Distinguir mecanismos', { ruta: 'aplicacion', nivelVariante: 'discriminacion' })}>Distinguir mecanismos</button>
         <button className="btn fantasma" onClick={() => lanzar(construirSesionPersonalizada(piloto, estado.progreso, tamano), 'Fundamentos del piloto')}>Estudiar los fundamentos</button></div>

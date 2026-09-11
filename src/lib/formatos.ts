@@ -31,7 +31,7 @@ function fraseConHueco(c: Concepto): string | null {
   return c.afirmacion.replace(patron, '______')
 }
 
-export interface ContextoFormato { semilla: string; indice: number; ruta?: string; forzarReconocimiento?: boolean }
+export interface ContextoFormato { semilla: string; indice: number; ruta?: string; forzarReconocimiento?: boolean; version?: 1 | 2 }
 
 /**
  * La variante depende sólo de la presentación guardada, nunca del progreso mutable.
@@ -47,7 +47,8 @@ export function prepararConcepto(original: Concepto, contexto: ContextoFormato):
   const nativa = c.interaccion.recomendada
   if (tieneOpcionesValidas(c) && ['opcion_multiple', 'caso_clinico', ...ESCRITAS].includes(nativa)) {
     // Las preguntas clínicas se conservan completas. El examen usa siempre sus opciones.
-    if (contexto.ruta !== 'examen' && !contexto.forzarReconocimiento && contexto.indice % 3 === 2
+    // Sólo las sesiones antiguas conservan su presentación V/F; las nuevas usan las opciones editoriales.
+    if (contexto.version === 1 && contexto.ruta !== 'examen' && !contexto.forzarReconocimiento && contexto.indice % 3 === 2
         && nativa !== 'caso_clinico' && !c.interaccion.prohibidas.includes('verdadero_falso')) {
       const opciones = c.evaluacion.opciones!
       const h = hash(contexto.semilla)

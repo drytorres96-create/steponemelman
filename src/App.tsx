@@ -19,14 +19,16 @@ import { aplicarVariante, siguienteVariante } from './lib/variantes'
 
 type Vista = 'inicio' | 'modulos' | 'repaso' | 'progreso' | 'auditoria' | 'ajustes' | 'estudio'
 const NAV: { id: Vista; txt: string }[] = [
-  { id: 'inicio', txt: 'Inicio' }, { id: 'modulos', txt: 'Módulos' }, { id: 'repaso', txt: 'Repaso' },
-  { id: 'progreso', txt: 'Progreso' }, { id: 'auditoria', txt: 'Auditoría' }, { id: 'ajustes', txt: 'Ajustes' },
+  { id: 'inicio', txt: 'Hoy' }, { id: 'modulos', txt: 'Elegir contenido' }, { id: 'progreso', txt: 'Progreso' },
+]
+const SECUNDARIAS: { id: Vista; txt: string }[] = [
+  { id: 'repaso', txt: 'Repasos pendientes' }, { id: 'ajustes', txt: 'Ajustes y respaldo' }, { id: 'auditoria', txt: 'Calidad del material' },
 ]
 
 // A session queue is restored from the saved study state, never from the URL alone.
 function vistaDesdeHash(): Vista {
   const value = location.hash.slice(1)
-  return NAV.some(n => n.id === value) ? value as Vista : 'inicio'
+  return [...NAV, ...SECUNDARIAS].some(n => n.id === value) ? value as Vista : 'inicio'
 }
 
 export default function App() {
@@ -35,6 +37,7 @@ export default function App() {
   const [vista, setVista] = useState<Vista>(vistaDesdeHash)
   const [cola, setCola] = useState<Cola | null>(null)
   const [indiceInicial, setIndiceInicial] = useState(0)
+  const [seleccionManual, setSeleccionManual] = useState<string[]>([])
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [concentracion, setConcentracion] = useState(true)
@@ -68,7 +71,7 @@ export default function App() {
         const r = RUTAS.find(x => x.id === ruta)!
         titulo = r.nombre; subtitulo = r.descripcion
       }
-      const seleccion = sesionId ? conceptos : construirCola(ruta, conceptos, estado.progreso, limite)
+      const seleccion = sesionId ? conceptos.slice(0, limite) : construirCola(ruta, conceptos, estado.progreso, limite)
       const lista = alternarFormatos(seleccion.map(c => ruta === 'aplicacion' ? aplicarVariante(c, siguienteVariante(c, estado.progreso[c.concept_id])) : c), ruta)
       if (!lista.length) { setError('No hay conceptos disponibles para esta ruta ahora mismo.'); setCargando(false); return }
       setIndiceInicial(Math.min(desde, lista.length - 1))
@@ -134,11 +137,11 @@ export default function App() {
             {vista === 'estudio' && <button className="btn pequeno fantasma" aria-pressed={concentracion}
               onClick={() => setConcentracion(v => !v)}>{concentracion ? 'Mostrar menú' : 'Concentrarme'}</button>}
             <button className="btn pequeno fantasma" title="Comprobar y sincronizar el progreso" onClick={() => { void sincronizarAhora() }} aria-live="polite">{sincronizacion.mensaje}</button>
-            {!enConcentracion && <button className="btn pequeno fantasma" onClick={async () => {
+            {!enConcentracion && <details className="menu-cuenta"><summary>Cuenta y ajustes</summary><div className="menu-cuenta-opciones">{SECUNDARIAS.map(n => <button className="btn pequeno fantasma" key={n.id} onClick={e => { ir(n.id); e.currentTarget.closest('details')?.removeAttribute('open') }}>{n.txt}</button>)}<button className="btn pequeno fantasma" onClick={async () => {
               const guardado = await sincronizarAhora()
               if (!guardado && !confirm('Puede haber cambios pendientes. Se conservarán en este navegador para esta cuenta. ¿Cerrar sesión?')) return
               try { await signOut() } catch { setError('No se pudo cerrar la sesión. Vuelve a intentarlo.') }
-            }}>Salir</button>}
+            }}>Salir</button></div></details>}
           </div>
         </div>
       </header>
@@ -158,10 +161,10 @@ export default function App() {
             </>
           )}
           {!cargando && vista === 'inicio' && <Inicio onIr={ir} onContinuar={continuar}
-            onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} onDebiles={limite => abrir('', 'debiles', limite)} />}
-          {!cargando && vista === 'modulos' && <Modulos onAbrir={abrir} onEstudiar={estudiarIds} />}
+            onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} />}
+          {!cargando && vista === 'modulos' && <Modulos onEstudiar={estudiarIds} seleccion={seleccionManual} onSeleccion={setSeleccionManual} />}
           {!cargando && vista === 'repaso' && <Repaso onEstudiar={estudiarIds} />}
-          {!cargando && vista === 'progreso' && <Progreso onEstudiar={estudiarIds} />}
+          {!cargando && vista === 'progreso' && <Progreso onEstudiar={estudiarIds} onContinuar={continuar} />}
           {!cargando && vista === 'auditoria' && <Auditoria />}
           {!cargando && vista === 'ajustes' && <Ajustes />}
         </div>

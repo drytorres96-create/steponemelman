@@ -13,22 +13,23 @@ function abrir(): Promise<IDBDatabase | null> {
   })
 }
 
-export async function leer<T>(clave: string): Promise<T | null> {
+export async function leer<T>(clave: string, opciones: { estricto?: boolean } = {}): Promise<T | null> {
   const db = await abrir()
-  if (!db) { try { const v = localStorage.getItem(`${DB}:${clave}`); return v ? JSON.parse(v) as T : null } catch { return null } }
-  return new Promise(resolve => {
+  if (!db) { try { const v = localStorage.getItem(`${DB}:${clave}`); return v ? JSON.parse(v) as T : null } catch (error) { if (opciones.estricto) throw error; return null } }
+  return new Promise((resolve, reject) => {
     const tx = db.transaction(TIENDA, 'readonly').objectStore(TIENDA).get(clave)
     tx.onsuccess = () => resolve((tx.result as T) ?? null)
-    tx.onerror = () => resolve(null)
+    tx.onerror = () => opciones.estricto ? reject(tx.error ?? new Error('No se pudo leer')) : resolve(null)
   })
 }
 
-export async function escribir(clave: string, valor: unknown): Promise<void> {
+export async function escribir(clave: string, valor: unknown, opciones: { estricto?: boolean } = {}): Promise<void> {
   const db = await abrir()
-  if (!db) { try { localStorage.setItem(`${DB}:${clave}`, JSON.stringify(valor)) } catch { /* cuota */ } return }
-  await new Promise<void>(resolve => {
+  if (!db) { try { localStorage.setItem(`${DB}:${clave}`, JSON.stringify(valor)) } catch (error) { if (opciones.estricto) throw error } return }
+  await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(TIENDA, 'readwrite')
     tx.objectStore(TIENDA).put(valor, clave)
-    tx.oncomplete = () => resolve(); tx.onerror = () => resolve(); tx.onabort = () => resolve()
+    tx.oncomplete = () => resolve()
+    tx.onerror = tx.onabort = () => opciones.estricto ? reject(tx.error ?? new Error('No se pudo guardar')) : resolve()
   })
 }

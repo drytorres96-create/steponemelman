@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../store/estado'
 import { cargarCuarentena, cargarTodo } from '../data/corpus'
 import type { Concepto } from '../schema/concept'
@@ -8,7 +8,7 @@ import { leer, escribir } from '../store/db'
 import { useDescarga } from '../components/descarga'
 import { referenciaPagina } from '../lib/fuente'
 
-type Correccion = { tema?: string; disciplina_primaria?: string; sistema_primario?: string; nota?: string }
+import { csvAuditoria, jsonNotas, type Correccion } from '../lib/exportar-auditoria'
 const CLAVE = 'correcciones-auditoria'
 
 export function Auditoria() {
@@ -21,6 +21,10 @@ export function Auditoria() {
   const [soloAlertas, setSoloAlertas] = useState(false)
   const [abierto, setAbierto] = useState<Concepto | null>(null)
   const [correcciones, setCorrecciones] = useState<Record<string, Correccion>>({})
+  const notas = useRef<Record<string, Correccion>>({})
+  const escritura = useRef(Promise.resolve())
+  const [notasListas, setNotasListas] = useState(false)
+  const [errorNotas, setErrorNotas] = useState('')
   const [verCuarentena, setVerCuarentena] = useState(false)
   const [errorCarga, setErrorCarga] = useState(false)
   const [reintento, setReintento] = useState(0)
@@ -29,11 +33,12 @@ export function Auditoria() {
   useEffect(() => {
     if (!indice) return
     let vigente = true
-    setErrorCarga(false)
+    setErrorCarga(false); setNotasListas(false)
     Promise.all([cargarTodo(indice.modulos), cargarCuarentena()]).then(([cs, q]) => {
       if (vigente) { setConceptos(cs); setCuarentena(q.conceptos ?? []) }
     }).catch(() => { if (vigente) setErrorCarga(true) })
-    leer<Record<string, Correccion>>(CLAVE).then(c => { if (vigente && c) setCorrecciones(c) }).catch(() => {})
+    leer<Record<string, Correccion>>(CLAVE, { estricto: true }).then(c => { if (vigente) { notas.current = c ?? {}; setCorrecciones(c ?? {}); setNotasListas(true); setErrorNotas('') } })
+      .catch(() => { if (vigente) setErrorNotas('No se pudieron leer tus notas. Reintenta antes de editar.') })
     return () => { vigente = false }
   }, [indice, reintento])
 
@@ -47,30 +52,26 @@ export function Auditoria() {
       if (!t) return true
       return c.concept_id.toLowerCase().includes(t) || c.afirmacion.toLowerCase().includes(t) ||
              c.respuesta_canonica.toLowerCase().includes(t) || (c.clasificacion.tema ?? '').toLowerCase().includes(t)
-    }).slice(0, 300)
+    })
   }, [conceptos, q, doc, pagina, soloAlertas])
 
   const guardar = (id: string, patch: Correccion) => {
-    const next = { ...correcciones, [id]: { ...correcciones[id], ...patch } }
-    setCorrecciones(next); escribir(CLAVE, next)
+    const next = { ...notas.current, [id]: { ...notas.current[id], ...patch } }
+    notas.current = next; setCorrecciones(next)
+    escritura.current = escritura.current.then(async () => { await escribir(CLAVE, next, { estricto: true }); setErrorNotas('') })
+      .catch(() => setErrorNotas('No se pudo guardar la nota en este dispositivo. Puedes conservarla con «Exportar notas».'))
   }
 
   if (errorCarga) return <Vacio titulo="No se pudo cargar la auditoría" texto="Comprueba tu conexión. Si el material acaba de actualizarse, recarga la página."
     accion={<button className="btn" onClick={() => setReintento(n => n + 1)}>Volver a intentar</button>} />
   if (!conceptos) return <div className="vacio" role="status">Cargando el corpus…</div>
 
-  const exportarCSV = () => {
-    const filas = [['concept_id','doc','page','pdf_page','disciplina','sistema','tipo','interaccion','confianza','alertas','afirmacion','respuesta']]
-    for (const c of filtrados) filas.push([c.concept_id, c.source.doc, String(c.source.page), c.source.pdf_page ? String(c.source.pdf_page) : '',
-      c.clasificacion.disciplina_primaria, c.clasificacion.sistema_primario, c.clasificacion.tipo_conocimiento,
-      c.interaccion.recomendada, String(c.calidad.confianza), c.calidad.alertas.join(' | '),
-      c.afirmacion, c.respuesta_canonica])
-    descargar('corpus-auditoria.csv', filas.map(f => f.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv')
-  }
+  const exportarCSV = () => descargar('corpus-auditoria.csv', csvAuditoria(filtrados, correcciones), 'text/csv')
 
   return (
     <div className="pila">
       {dialogo}
+      {errorNotas && <div className="aviso" role="alert">{errorNotas}{!notasListas && <button className="btn pequeno" onClick={() => setReintento(n => n + 1)}>Reintentar notas</button>}</div>}
       <div className="fila" style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           <h1>Panel de auditoría</h1>
@@ -80,8 +81,9 @@ export function Auditoria() {
         </div>
         <div className="fila">
           <button className="btn pequeno fantasma" onClick={() => setVerCuarentena(true)}>Cuarentena ({cuarentena.length})</button>
-          <button className="btn pequeno" onClick={exportarCSV}>Exportar CSV</button>
-          <button className="btn pequeno" onClick={() => descargar('corpus-filtrado.json', JSON.stringify(filtrados, null, 1), 'application/json')}>Exportar JSON</button>
+          <button className="btn pequeno" disabled={!notasListas} onClick={exportarCSV}>CSV con propuestas</button>
+          <button className="btn pequeno" onClick={() => descargar('corpus-filtrado.json', JSON.stringify(filtrados, null, 1), 'application/json')}>Corpus filtrado (JSON)</button>
+          <button className="btn pequeno" disabled={!notasListas || !Object.keys(correcciones).length} onClick={() => descargar('notas-auditoria.json', jsonNotas(correcciones), 'application/json')}>Exportar notas</button>
         </div>
       </div>
 
@@ -104,14 +106,14 @@ export function Auditoria() {
           <input type="checkbox" checked={soloAlertas} onChange={e => setSoloAlertas(e.target.checked)} style={{ width: 'auto' }} />
           Sólo con alertas
         </label>
-        <span className="mini" style={{ marginLeft: 'auto' }}>{filtrados.length} resultados</span>
+        <span className="mini" style={{ marginLeft: 'auto' }}>{filtrados.length} resultados{filtrados.length > 300 ? ' · se muestran los primeros 300; la exportación incluye todos' : ''}</span>
       </div>
 
       <div className="tarjeta scroll-x" style={{ padding: 0 }}>
         <table className="tabla">
           <thead><tr><th>concept_id</th><th>Fuente</th><th>Clasificación</th><th>Interacción</th><th>Confianza</th><th>Alertas</th><th></th></tr></thead>
           <tbody>
-            {filtrados.map(c => (
+            {filtrados.slice(0, 300).map(c => (
               <tr key={c.concept_id}>
                 <td style={{ fontFamily: 'var(--mono)', fontSize: '.75rem' }}>{c.concept_id}
                   <div className="mini" style={{ fontFamily: 'var(--fuente)' }}>{c.afirmacion.slice(0, 64)}…</div></td>
@@ -151,13 +153,13 @@ export function Auditoria() {
               ) : null}
               <div>
                 <div className="rotulo" style={{ marginBottom: 6 }}>Corregir metadatos</div>
-                <p className="mini">Se guarda en tu dispositivo y se puede exportar; no modifica el componente ni el corpus original.</p>
+                <p className="mini">Las propuestas se guardan en este dispositivo. «Exportar notas» conserva todas, aunque cambies los filtros. El CSV incluye las propuestas junto al contenido original.</p>
                 <label>Tema</label>
-                <input type="text" defaultValue={correcciones[abierto.concept_id]?.tema ?? abierto.clasificacion.tema}
-                  onBlur={e => guardar(abierto.concept_id, { tema: e.target.value })} />
+                <input type="text" aria-label="Tema propuesto" disabled={!notasListas} value={correcciones[abierto.concept_id]?.tema ?? abierto.clasificacion.tema}
+                  onChange={e => guardar(abierto.concept_id, { tema: e.target.value })} />
                 <label style={{ marginTop: 8, display: 'block' }}>Nota de revisión</label>
-                <textarea rows={3} defaultValue={correcciones[abierto.concept_id]?.nota ?? ''}
-                  onBlur={e => guardar(abierto.concept_id, { nota: e.target.value })} />
+                <textarea rows={3} aria-label="Nota de revisión" disabled={!notasListas} value={correcciones[abierto.concept_id]?.nota ?? ''}
+                  onChange={e => guardar(abierto.concept_id, { nota: e.target.value })} />
               </div>
             </div>
           </div>

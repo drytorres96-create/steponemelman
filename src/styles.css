@@ -293,3 +293,9 @@ label { font-size: .85rem; color: var(--texto-2); }
 .mapa{min-width:1400px}.mapa caption{text-align:left;padding:12px;font-size:.9rem}.mapa th{min-width:105px;white-space:normal;font-size:.875rem}.mapa thead{position:sticky;top:0;z-index:2;background:var(--panel)}.mapa th:first-child{position:sticky;left:0;z-index:1;background:var(--panel);min-width:140px}
 .mapa-celda{font:inherit;width:100%;min-height:48px;border:1px solid transparent;border-radius:8px;background:transparent;color:inherit;cursor:pointer}.mapa-celda[aria-pressed=true]{border-color:var(--violeta);background:rgba(139,112,255,.15)}.mapa-celda:hover{background:rgba(139,112,255,.12)}.mapa-celda span{font-size:.85rem;opacity:.75}.detalle-celda{padding:16px;border:1px solid var(--linea);border-radius:12px}
 @media(max-width:640px){.mapa-scroll{max-height:420px}.mapa th:first-child{min-width:115px}.presupuesto-sesion{font-size:.875rem}.detalle-celda .fila{align-items:flex-start}.detalle-celda select{max-width:100%}}
+
+/* Navigation and optional details stay within the existing visual system. */
+.menu-cuenta{position:relative}.menu-cuenta>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;padding:8px 12px;color:var(--texto-2)}
+.menu-cuenta-opciones{position:absolute;right:0;top:100%;z-index:20;display:grid;min-width:210px;max-width:calc(100vw - 32px);gap:6px;padding:10px;border:1px solid var(--linea);border-radius:12px;background:var(--panel);box-shadow:0 10px 30px #0005}
+.menu-cuenta-opciones .btn{text-align:left;white-space:normal}
+.reproductor [hidden]{display:none!important}.retro>details>summary{cursor:pointer;min-height:36px;align-content:center}.retro>details[open]{padding-bottom:8px}

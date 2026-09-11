@@ -44,12 +44,12 @@ describe('variación de formatos sin modificar la evidencia del concepto', () =>
     expect(JSON.stringify(largo)).toBe(antes)
   })
 
-  it('la variante se reproduce al reanudar y alterna propuestas verdaderas y falsas sin inventar opciones', () => {
+  it('reproduce el V/F heredado solo para reanudar sesiones antiguas', () => {
     const antes = JSON.stringify(opcion)
     const propuestas = new Set(opcion.evaluacion.opciones!.map(o => o.texto))
     const veredictos = new Set<boolean>()
     for (let n = 0; n < 12; n++) {
-      const ctx = { ...contexto, semilla: `QA-sesion:${n}`, indice: 2 }
+      const ctx = { ...contexto, semilla: `QA-sesion:${n}`, indice: 2, version: 1 as const }
       const preparada = prepararConcepto(opcion, ctx)
       expect(preparada).toEqual(prepararConcepto(opcion, ctx))
       expect(preparada.interaccion.recomendada).toBe('verdadero_falso')
@@ -63,6 +63,14 @@ describe('variación de formatos sin modificar la evidencia del concepto', () =>
     }
     expect(veredictos).toEqual(new Set([true, false]))
     expect(JSON.stringify(opcion)).toBe(antes)
+  })
+
+  it('las sesiones nuevas conservan todas las opciones editoriales en cualquier posición', () => {
+    for (const indice of [0, 2, 5, 8]) {
+      const c = prepararConcepto(opcion, { ...contexto, indice })
+      expect(c.interaccion.recomendada).toBe('opcion_multiple')
+      expect(c.evaluacion).toEqual(opcion.evaluacion)
+    }
   })
 
   it('conserva opciones completas en examen, correcciones y casos clínicos', () => {

@@ -14,7 +14,7 @@ vi.mock('../lib/supabase', () => ({ supabase: {
 } }))
 
 import { ProveedorEstado, useApp } from '../store/estado'
-import { ExploradorConceptos } from '../screens/ExploradorConceptos'
+import { Modulos } from '../screens/Modulos'
 
 const base = ConceptoZ.parse({
   concept_id: 'QA-001', source: { doc: 'QA', doc_title: 'Documento sintético', page: 1, item_id: 'QA-I1', fragment: 'FRAGMENTO SINTÉTICO OCULTO' },
@@ -41,12 +41,13 @@ const onEstudiar = vi.fn()
 
 function Harness({ activo }: { activo: boolean }) {
   const api = useApp()
-  return api.listo ? createElement(ExploradorConceptos, { activo, onEstudiar }) : null
+  return api.listo ? activo ? createElement(Modulos, { onEstudiar }) : null : null
 }
 async function render(activo = true) {
   await act(async () => root.render(createElement(StrictMode, null, createElement(ProveedorEstado, {
     userId: 'qa-explorador', children: createElement(Harness, { activo }),
   }))))
+  if (activo && host.querySelector('#pestana-conceptos')) await click('Conceptos')
 }
 function button(label: string): HTMLButtonElement {
   const result = [...host.querySelectorAll('button')].find(b => b.textContent?.trim() === label)
@@ -55,7 +56,7 @@ function button(label: string): HTMLButtonElement {
 }
 async function click(label: string) { await act(async () => button(label).click()) }
 async function buscar(value: string) {
-  const label = [...host.querySelectorAll('label')].find(l => l.textContent === 'Buscar conceptos')!
+  const label = [...host.querySelectorAll('label')].find(l => l.textContent === 'Palabra o concepto (opcional)')!
   const input = label ? host.querySelector<HTMLInputElement>(`input[id="${label.htmlFor}"]`)! : null
   expect(input).not.toBeNull()
   await act(async () => {
@@ -111,12 +112,12 @@ describe('explorador integrado con el estado de estudio', () => {
     expect(resultados()).toHaveLength(1)
     expect(host.textContent).toContain('Conectar presión alfa')
     expect(host.textContent).not.toContain('Entender señal beta')
-    await filtrar('Filtrar conceptos por disciplina', 'Patología')
+    await filtrar('Filtrar por disciplina', 'Patología')
     expect(resultados()).toHaveLength(0)
     await buscar('')
     expect(resultados()).toHaveLength(1)
     expect(host.textContent).toContain('Entender señal beta')
-    await filtrar('Filtrar conceptos por sistema', 'Cardiovascular')
+    await filtrar('Filtrar por sistema', 'Cardiovascular')
     expect(resultados()).toHaveLength(0)
   })
 
@@ -128,7 +129,10 @@ describe('explorador integrado con el estado de estudio', () => {
     await click('Siguiente')
     expect(resultados()).toHaveLength(5)
     expect(resultados().every(c => c.disabled)).toBe(true)
-    await click('Practicar selección (20)')
+    await click('Por conceptos')
+    const veinte = [...host.querySelectorAll('label')].find(l => l.textContent === '20 conceptos')!.querySelector('input')!
+    await act(async () => veinte.click())
+    await click('Estudiar 20 de 20 seleccionados')
     const ids = onEstudiar.mock.calls.at(-1)?.[0] as string[]
     expect(ids).toHaveLength(20)
     expect(new Set(ids).size).toBe(20)
@@ -142,7 +146,7 @@ describe('explorador integrado con el estado de estudio', () => {
     await render()
     expect(host.textContent).toContain('No se pudieron cargar los conceptos')
     mocks.conceptos.mockResolvedValue(conceptos)
-    await click('Volver a intentar')
+    await click('Reintentar filtros')
     expect(host.textContent).toContain('Conectar presión alfa')
     expect(resultados()).toHaveLength(20)
   })

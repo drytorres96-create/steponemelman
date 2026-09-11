@@ -17,6 +17,7 @@ export interface RegistroSesion {
 }
 
 export interface Reanudable {
+  versionFormato?: 1 | 2
   modulo: string
   sesion: string
   indice: number
@@ -40,6 +41,7 @@ export interface Reanudable {
     pistas: number
     fuenteConsultada: boolean
     explicacionPrevia: boolean
+    ensenanzaAbierta?: boolean
     confianza: 1 | 2 | 3 | null
     msActivo: number
   }
@@ -180,6 +182,7 @@ function leerReanudable(v: unknown): Reanudable | null | false {
   if (v.cantidadInicial !== undefined && (!entero(v.cantidadInicial, 1)
     || !Array.isArray(v.conceptIds) || v.cantidadInicial > v.conceptIds.length)) return false
   if (v.revisionInicialHecha !== undefined && typeof v.revisionInicialHecha !== 'boolean') return false
+  if (v.versionFormato !== undefined && ![1, 2].includes(v.versionFormato as number)) return false
   if (v.presupuestoMinutos !== undefined && ![10, 20, 30].includes(v.presupuestoMinutos as number)) return false
   if (v.msVisibles !== undefined && !numero(v.msVisibles)) return false
   for (const k of ['continuarSinLimite', 'pausaPorTiempoPendiente']) if (v[k] !== undefined && typeof v[k] !== 'boolean') return false
@@ -187,12 +190,14 @@ function leerReanudable(v: unknown): Reanudable | null | false {
   if (v.paso !== undefined && (!esObjeto(v.paso) || !entero(v.paso.indice) || v.paso.indice !== v.indice
     || !entero(v.paso.pistas) || v.paso.pistas > 3 || typeof v.paso.fuenteConsultada !== 'boolean'
     || typeof v.paso.explicacionPrevia !== 'boolean' || !numero(v.paso.msActivo)
+    || (v.paso.ensenanzaAbierta !== undefined && typeof v.paso.ensenanzaAbierta !== 'boolean')
     || !(v.paso.confianza === null || [1, 2, 3].includes(v.paso.confianza as number)))) return false
   return {
     modulo: v.modulo,
     sesion: v.sesion,
     indice: v.indice,
     ts: v.ts,
+    ...(v.versionFormato !== undefined ? { versionFormato: v.versionFormato as 1 | 2 } : {}),
     ...(v.conceptIds !== undefined ? { conceptIds: [...v.conceptIds] as string[] } : {}),
     ...(v.titulo !== undefined ? { titulo: v.titulo } : {}),
     ...(v.subtitulo !== undefined ? { subtitulo: v.subtitulo } : {}),
@@ -207,6 +212,7 @@ function leerReanudable(v: unknown): Reanudable | null | false {
     ...(esObjeto(v.paso) ? { paso: {
       indice: v.paso.indice as number, pistas: v.paso.pistas as number,
       fuenteConsultada: v.paso.fuenteConsultada as boolean, explicacionPrevia: v.paso.explicacionPrevia as boolean,
+      ...(v.paso.ensenanzaAbierta !== undefined ? { ensenanzaAbierta: v.paso.ensenanzaAbierta as boolean } : {}),
       confianza: v.paso.confianza as 1 | 2 | 3 | null, msActivo: v.paso.msActivo as number,
     } } : {}),
   }
@@ -361,6 +367,7 @@ function unirReanudable(a: EstadoApp, b: EstadoApp): Reanudable | null {
   if (!ganador || !x?.sessionId || x.sessionId !== y?.sessionId) return ganador
   const continuar = x.continuarSinLimite || y.continuarSinLimite
   return { ...ganador,
+    ...(x.versionFormato !== undefined || y.versionFormato !== undefined ? { versionFormato: ganador.versionFormato ?? x.versionFormato ?? y.versionFormato } : {}),
     ...(x.msVisibles !== undefined || y.msVisibles !== undefined ? { msVisibles: Math.max(x.msVisibles ?? 0, y.msVisibles ?? 0) } : {}),
     ...(continuar ? { continuarSinLimite: true, pausaPorTiempoPendiente: false } : {}) }
 }

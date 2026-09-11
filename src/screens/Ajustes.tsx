@@ -4,18 +4,13 @@ import { CRITERIOS_POR_DEFECTO } from '../srs/mastery'
 import { useDescarga } from '../components/descarga'
 import { APP_VERSION } from '../release'
 
-function NumeroCriterio({ id, titulo, valor, min, max, guardar }: {
-  id: string; titulo: string; valor: number; min: number; max: number; guardar: (valor: number) => void
-}) {
-  const [texto, setTexto] = useState(String(valor))
-  useEffect(() => { setTexto(String(valor)) }, [valor])
-  return <div><label htmlFor={id}>{titulo}</label><input id={id} type="number" min={min} max={max}
-    value={texto} onChange={e => setTexto(e.target.value)} onBlur={() => {
-      const n = Number(texto)
-      if (!texto.trim() || !Number.isInteger(n) || n < min || n > max) { setTexto(String(valor)); return }
-      guardar(n)
-    }} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }} /></div>
-}
+const CAMPOS = [
+  { clave: 'recuperaciones', titulo: 'Respuestas independientes correctas mínimas', min: 1, max: 10 },
+  { clave: 'sesiones', titulo: 'Sesiones distintas mínimas', min: 1, max: 6 },
+  { clave: 'separacionHoras', titulo: 'Separación temporal mínima (horas)', min: 0, max: 168 },
+  { clave: 'ventanaConfusionDias', titulo: 'Ventana sin confusiones (días)', min: 0, max: 90 },
+] as const
+const textos = (c: typeof CRITERIOS_POR_DEFECTO) => Object.fromEntries(CAMPOS.map(f => [f.clave, String(c[f.clave])])) as Record<typeof CAMPOS[number]['clave'], string>
 
 export function Ajustes() {
   const { estado, actualizarCriterios, exportar, importar, reiniciar, indice } = useApp()
@@ -24,29 +19,44 @@ export function Ajustes() {
   const { entregar, dialogo } = useDescarga()
   const c = estado.criterios
 
-  const guardar = (patch: Partial<typeof c>) => actualizarCriterios({ ...c, ...patch })
+  const guardados = JSON.stringify(textos(c))
+  const [base, setBase] = useState(guardados)
+  const [borrador, setBorrador] = useState(() => textos(c))
+  const [mensajeCriterios, setMensajeCriterios] = useState('')
+  const sucio = JSON.stringify(borrador) !== base
+  const conflicto = guardados !== base
+  useEffect(() => { if (!sucio) { setBase(guardados); setBorrador(JSON.parse(guardados)) } }, [guardados, sucio])
+  const cancelar = () => { setBorrador(textos(c)); setBase(guardados); setMensajeCriterios('') }
+  const aplicar = () => {
+    if (conflicto) { setMensajeCriterios('Los criterios cambiaron en otra ventana. Recarga los valores antes de aplicar.'); return }
+    const invalido = CAMPOS.find(f => !borrador[f.clave].trim() || !Number.isInteger(Number(borrador[f.clave])) || Number(borrador[f.clave]) < f.min || Number(borrador[f.clave]) > f.max)
+    if (invalido) { setMensajeCriterios(`Revisa «${invalido.titulo}»: usa un entero entre ${invalido.min} y ${invalido.max}.`); return }
+    const nuevos = { ...c }
+    for (const f of CAMPOS) nuevos[f.clave] = Number(borrador[f.clave])
+    actualizarCriterios(nuevos); setBorrador(textos(nuevos)); setBase(JSON.stringify(textos(nuevos))); setMensajeCriterios('Criterios aplicados. Tu historial se conserva.')
+  }
   const descargar = () =>
     entregar(`progreso-step1-${new Date().toISOString().slice(0, 10)}.json`, exportar(), 'application/json')
 
   return (
     <div className="pila" style={{ maxWidth: 760 }}>
       {dialogo}
-      <div><h1>Ajustes</h1><p className="sutil">Los criterios de dominio son configurables: al cambiarlos se recalcula el estado de todos tus conceptos.</p></div>
+      <div><h1>Ajustes</h1><p className="sutil">Respaldo, preferencias y material de consulta.</p></div>
 
-      <div className="tarjeta pila">
-        <h2>Criterios de dominio</h2>
-        <p className="mini">Los valores válidos se guardan al salir de cada campo.</p>
-        <div className="rejilla r2">
-          <NumeroCriterio id="criterio-recuperaciones" titulo="Respuestas independientes correctas mínimas" valor={c.recuperaciones} min={1} max={10} guardar={n => guardar({ recuperaciones: n })} />
-          <NumeroCriterio id="criterio-sesiones" titulo="Sesiones distintas mínimas" valor={c.sesiones} min={1} max={6} guardar={n => guardar({ sesiones: n })} />
-          <NumeroCriterio id="criterio-horas" titulo="Separación temporal mínima (horas)" valor={c.separacionHoras} min={0} max={168} guardar={n => guardar({ separacionHoras: n })} />
-          <NumeroCriterio id="criterio-confusiones" titulo="Ventana sin confusiones (días)" valor={c.ventanaConfusionDias} min={0} max={90} guardar={n => guardar({ ventanaConfusionDias: n })} />
-        </div>
-        <p className="sutil">El dominio requiere respuestas correctas sin pistas, sin consultar la fuente ni ver la explicación antes de responder. Puedes demostrarlo recordando, discriminando opciones o aplicando el conocimiento. Los intentos anteriores se conservan en tu historial.</p>
-        <button className="btn pequeno fantasma" style={{ alignSelf: 'flex-start' }} onClick={() => actualizarCriterios(CRITERIOS_POR_DEFECTO)}>
-          Restaurar valores recomendados
-        </button>
-      </div>
+      <details className="tarjeta"><summary>Criterios de dominio (avanzado)</summary>
+        <form className="pila" style={{ marginTop: 16 }} noValidate onSubmit={e => { e.preventDefault(); aplicar() }}>
+          <p className="mini">Edita los valores y aplícalos juntos. Hasta entonces se conservan tus criterios actuales.</p>
+          <div className="rejilla r2">{CAMPOS.map(f => <div key={f.clave}><label htmlFor={`criterio-${f.clave}`}>{f.titulo}</label>
+            <input id={`criterio-${f.clave}`} type="number" min={f.min} max={f.max} step={1} value={borrador[f.clave]}
+              onChange={e => { setBorrador(b => ({ ...b, [f.clave]: e.target.value })); setMensajeCriterios('') }} /></div>)}</div>
+          <p className="sutil">Cambiar los criterios recalcula el dominio vigente. Tus intentos y los hitos de dominio anteriores se conservan.</p>
+          {conflicto && <p role="alert">Los criterios cambiaron en otra ventana. Pulsa «Recargar valores» para revisar la configuración actual.</p>}
+          <div className="fila"><button className="btn principal" type="submit" disabled={!sucio || conflicto}>Aplicar criterios</button>
+            <button className="btn" type="button" onClick={cancelar}>{conflicto ? 'Recargar valores' : 'Cancelar cambios'}</button>
+            <button className="btn fantasma" type="button" onClick={() => { setBorrador(textos(CRITERIOS_POR_DEFECTO)); setMensajeCriterios('Recomendados preparados. Pulsa Aplicar criterios para guardarlos.') }}>Restaurar valores recomendados</button></div>
+          {mensajeCriterios && <p role="status">{mensajeCriterios}</p>}
+        </form>
+      </details>
 
       <div className="tarjeta pila">
         <h2>Tu progreso</h2>
@@ -72,8 +82,7 @@ export function Ajustes() {
         </button>
       </div>
 
-      <div className="tarjeta">
-        <h2 style={{ marginBottom: 8 }}>Glosario</h2>
+      <details className="tarjeta"><summary>Glosario del material</summary>
         <p className="sutil">Siglas expandidas la primera vez que aparecen, extraídas del propio corpus.</p>
         <div className="scroll-x" style={{ maxHeight: 320 }}>
           <table className="tabla">
@@ -83,7 +92,7 @@ export function Ajustes() {
             ))}</tbody>
           </table>
         </div>
-      </div>
+      </details>
       <p className="mini">Step 1 · Melman · Versión {APP_VERSION}</p>
     </div>
   )

@@ -33,6 +33,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
   { cola: Cola; onSalir: () => void; indiceInicial?: number }) {
   const { registrarIntento, progresoDe, estado, guardarReanudable, iniciarSesion, cerrarSesion } = useApp()
   const guardada = cola.sessionId && estado.reanudable?.sessionId === cola.sessionId ? estado.reanudable : null
+  const [versionFormato] = useState<1 | 2>(guardada ? guardada.versionFormato ?? 1 : 2)
   const [presupuesto] = useState(guardada?.presupuestoMinutos ?? cola.presupuestoMinutos)
   const [relojSesion] = useState(() => { const r = new RelojActividad(); r.reiniciar(guardada?.msVisibles ?? 0); return r })
   const [msVisibles, setMsVisibles] = useState(guardada?.msVisibles ?? 0)
@@ -66,8 +67,8 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
   const modoRegistro = examenSinAyuda ? 'examen' : cola.ruta === 'repaso' || reintento ? 'repaso' : 'aprendizaje'
   const original = orden[i]
   const preguntaId = original && sesionId.current ? identificarPregunta(sesionId.current, i, original.concept_id) : ''
-  const c = useMemo(() => original ? prepararConcepto(original, { semilla: preguntaId, indice: i, ruta: cola.ruta, forzarReconocimiento: reintento }) : undefined,
-    [original, preguntaId, i, cola.ruta, reintento])
+  const c = useMemo(() => original ? prepararConcepto(original, { semilla: preguntaId, indice: i, ruta: cola.ruta, forzarReconocimiento: reintento, version: versionFormato }) : undefined,
+    [original, preguntaId, i, cola.ruta, reintento, versionFormato])
   const datosSesion = () => {
     const intentos = Object.values(estado.progreso).flatMap(p => p.intentos).filter(t => t.session_id === sesionId.current)
     if (intentoActual.current) intentos.push(intentoActual.current)
@@ -75,12 +76,13 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
   }
 
   const metadata = (lista = orden) => ({
+    versionFormato,
     ...(presupuesto ? { presupuestoMinutos: presupuesto } : {}),
     msVisibles: relojSesion.leer(), continuarSinLimite: tiempoRef.current.sinLimite,
     pausaPorTiempoPendiente: tiempoRef.current.pausa,
     ...(lista.some(x => x.variante_id) ? { variantes: lista.map(x => x.variante_id ?? null) } : {}),
   })
-  const guardarPaso = (cambios: Partial<{ pistas: number; fuenteConsultada: boolean; explicacionPrevia: boolean; confianza: 1 | 2 | 3 | null }> = {}) => {
+  const guardarPaso = (cambios: Partial<{ ensenanzaAbierta: boolean; pistas: number; fuenteConsultada: boolean; explicacionPrevia: boolean; confianza: 1 | 2 | 3 | null }> = {}) => {
     if (!sesionLista || !sesionId.current || pasoListo.current !== i || !c) return
     const saved = estado.reanudable
     if (!saved || saved.sessionId !== sesionId.current || saved.indice !== i || saved.conceptIds?.join('|') !== orden.map(x => x.concept_id).join('|')) return
@@ -89,7 +91,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
       conceptIds: orden.map(x => x.concept_id), titulo: cola.titulo, subtitulo: cola.subtitulo,
       cantidadInicial, revisionInicialHecha, ...metadata(),
       ...(c && !tiempoRef.current.pausa ? { paso: { indice: i, pistas, fuenteConsultada, explicacionPrevia, confianza,
-        msActivo: reloj.current.leer(), ...cambios } } : {}),
+        ensenanzaAbierta: fase === 'ensenanza', msActivo: reloj.current.leer(), ...cambios } } : {}),
     })
   }
   const guardarPasoActual = useRef(guardarPaso)
@@ -115,8 +117,8 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
     const anterior = buscarIntentoPaso(progreso, sesionId.current, id)
     const paso = estado.reanudable?.sessionId === sesionId.current && estado.reanudable.paso?.indice === i
       ? estado.reanudable.paso : null
-    const mostrarEnsenanza = !examenSinAyuda && !reintento && cola.ruta !== 'aplicacion' && cola.ruta !== 'repaso' && progreso.intentos.length === 0 && modoEnsenanza(c) !== 'directo'
-    const previa = anterior?.explicacion_previa ?? paso?.explicacionPrevia ?? (reintento || mostrarEnsenanza)
+    const mostrarEnsenanza = !examenSinAyuda && paso?.ensenanzaAbierta === true
+    const previa = anterior?.explicacion_previa ?? paso?.explicacionPrevia ?? reintento
     const fuente = anterior?.fuente_consultada ?? paso?.fuenteConsultada ?? false
     const ayudas = anterior?.pistas_usadas ?? paso?.pistas ?? 0
     const seguridad = anterior?.confianza_declarada ?? paso?.confianza ?? null
@@ -127,12 +129,12 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
       setRes({ veredicto: anterior.resultado ?? 'revision', tipoError: anterior.tipo_error,
         recuperacionActiva: anterior.recuperacion_activa, respuestaDada: anterior.respuesta_dada ?? '' })
       setFase('retro')
-    } else setFase(mostrarEnsenanza && !paso ? 'ensenanza' : 'tarea')
+    } else setFase(mostrarEnsenanza ? 'ensenanza' : 'tarea')
     guardarReanudable({ modulo: cola.modulo, sesion: cola.ruta, indice: i, ts: Date.now(), sessionId: sesionId.current,
       conceptIds: orden.map(x => x.concept_id), titulo: cola.titulo, subtitulo: cola.subtitulo,
       cantidadInicial, revisionInicialHecha, ...metadata(),
       paso: { indice: i, pistas: ayudas, fuenteConsultada: fuente, explicacionPrevia: previa,
-        confianza: seguridad, msActivo: reloj.current.leer() } })
+        ensenanzaAbierta: mostrarEnsenanza, confianza: seguridad, msActivo: reloj.current.leer() } })
     // Se restaura un paso al entrar en él, nunca se reinicia mientras llega la sincronización.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sesionLista, i, c?.concept_id, pausaTiempo])
@@ -241,9 +243,6 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
       calificacion_actualizada_en: Math.max(Date.now(), (intento.calificacion_actualizada_en ?? intento.ts) + 1) }
     intentoActual.current = actualizado
     registrarIntento(c.concept_id, actualizado)
-    if (res?.tipoError === 'error_ortografico' && c.escritura_correctiva.elegible && c.escritura_correctiva.termino) {
-      setFase('ortografia'); return
-    }
     avanzar()
   }
 
@@ -251,7 +250,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
     {orden.slice(0, limite).map((original, posicion) => {
       const id = identificarPregunta(sesionId.current!, posicion, original.concept_id)
       const concepto = prepararConcepto(original, { semilla: id, indice: posicion, ruta: cola.ruta,
-        forzarReconocimiento: posicion >= cantidadInicial })
+        forzarReconocimiento: posicion >= cantidadInicial, version: versionFormato })
       const t = buscarIntentoPaso(progresoDe(concepto.concept_id), sesionId.current!, id)
       if (!t) return null
       return <details className="tarjeta" key={`${posicion}:${concepto.concept_id}`}>
@@ -315,11 +314,12 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
     </div>
   }
   const p = progresoDe(c.concept_id)
+  const presentacionCambio = !!intentoActual.current?.pregunta_version && intentoActual.current.pregunta_version !== versionPregunta(c)
   const dominio = resumenDominio(p, estado.criterios)
   const modo = modoEnsenanza(c)
   const alternativa = res?.veredicto === 'revision' && original ? prepararConcepto(original, {
     semilla: identificarPregunta(sesionId.current!, orden.length, original.concept_id), indice: orden.length,
-    ruta: cola.ruta, forzarReconocimiento: true,
+    ruta: cola.ruta, forzarReconocimiento: true, version: versionFormato,
   }) : null
   const puedeRevisarConOpciones = alternativa && ['opcion_multiple', 'caso_clinico', 'verdadero_falso'].includes(alternativa.interaccion.recomendada)
   const puedeResponderDeNuevo = puedeRevisarConOpciones || (alternativa && esRespuestaBreve(alternativa.respuesta_canonica))
@@ -351,23 +351,24 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
         {c.patron && <div className="pista"><b>Patrón:</b> {c.patron}</div>}
         {c.confusiones.length > 0 && <p className="mini">Se confunde con: {c.confusiones.join(' · ')}</p>}
         <p className="mini">Esta primera respuesta contará como práctica con explicación previa.</p>
-        <button className="btn principal" style={{ marginTop: 12 }} onClick={() => setFase('tarea')}>Ahora recupéralo</button>
+        <button className="btn principal" style={{ marginTop: 12 }} onClick={() => { setFase('tarea'); guardarPaso({ ensenanzaAbierta: false }) }}>Ahora recupéralo</button>
       </div>}
-      {fase !== 'ensenanza' && <>
+      <div hidden={fase === 'ensenanza'}>
         <div className="pregunta">{c.evaluacion.pregunta}</div>
-        {fase === 'tarea' && <div className="fila" style={{ gap: 6, marginBottom: 14 }}><span className="mini">Confianza (opcional):</span>
+        {fase === 'tarea' && <details key={preguntaId} className="mini" style={{ marginBottom: 14 }}><summary>Registrar confianza (opcional)</summary><div className="fila" style={{ gap: 6, marginTop: 8 }}>
           {([[1, 'Poca'], [2, 'Media'], [3, 'Mucha']] as const).map(([v, t]) => <button key={v} className={`btn pequeno ${confianza === v ? 'principal' : 'fantasma'}`}
             aria-pressed={confianza === v} onClick={() => { setConfianza(v); guardarPaso({ confianza: v }) }}>{t}</button>)}
-        </div>}
+        </div></details>}
         {!examenSinAyuda && pistas > 0 && c.pistas.slice(0, pistas).map((t, k) => <div key={k} className="pista"><b>Pista {k + 1}:</b> {t}</div>)}
         {(!examenSinAyuda || fase === 'tarea') && <Interaccion key={preguntaId} c={c} semilla={preguntaId} ocultarFeedback={examenSinAyuda}
           bloqueado={fase !== 'tarea'} resultado={res} onResponder={responder} />}
         {fase === 'tarea' && !examenSinAyuda && <div className="fila" style={{ marginTop: 14 }}>
+          <button className="btn pequeno fantasma" onClick={() => { setExplicacionPrevia(true); setFase('ensenanza'); guardarPaso({ explicacionPrevia: true, ensenanzaAbierta: true }) }}>Necesito aprenderlo</button>
           <button className="btn pequeno fantasma" disabled={pistas >= c.pistas.length} onClick={() => { setPistas(pistas + 1); guardarPaso({ pistas: pistas + 1 }) }}>
             {pistas === 0 ? 'Necesito una pista' : pistas < c.pistas.length ? `Otra pista (${pistas}/${c.pistas.length})` : 'Sin más pistas'}</button>
           <button className="btn pequeno fantasma" onClick={() => { setFuenteConsultada(true); setVerFuente(true); guardarPaso({ fuenteConsultada: true }) }}>Ver la fuente</button>
         </div>}
-      </>}
+      </div>
       {fase === 'retro' && examenSinAyuda && <div className="tarjeta pila" role="status"><b>Respuesta registrada</b>
         <p className="sutil">Podrás revisar la respuesta y su explicación al terminar la primera vuelta.</p>
         <button className="btn principal" onClick={avanzar}>{i + 1 === cantidadInicial ? 'Terminar y revisar' : 'Siguiente pregunta'}</button>
@@ -375,28 +376,35 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
       {fase === 'retro' && res && !examenSinAyuda && <div className={`retro ${res.veredicto === 'correcta' ? 'ok' : res.veredicto === 'incorrecta' ? 'no' : 'parcial'}`} role="status">
         <div className="fila" style={{ justifyContent: 'space-between', marginBottom: 8 }}><b>{etiquetaResultado(res.veredicto)}</b><span className="etq">{NOMBRE_ERROR[res.tipoError]}</span></div>
         <p className="mini">Tu respuesta ya está registrada.{intentoActual.current && conAyuda(intentoActual.current) ? ' Esta práctica tuvo ayuda.' : ''}</p>
+        {presentacionCambio && <p className="aviso">La pregunta guardada pertenece a otra presentación. Tu respuesta y su resultado original se conservan; el texto mostrado es el actual.</p>}
         <p>Tu respuesta: <b>{res.respuestaDada || 'Respuesta registrada'}</b></p>
         {res.veredicto !== 'correcta' && <p>Respuesta de referencia: <b>{c.respuesta_canonica}</b></p>}
         {res.veredicto === 'revision' && <p>El corrector no puede decidir esta respuesta con seguridad. Compárala con la referencia; no se contará como acierto ni fallo.</p>}
         {necesitaReintento(res.veredicto) && <p>Este concepto volverá al final de la cola hasta que lo aciertes.</p>}
-        {res.detalle && <p className="sutil">{res.detalle}</p>}<p>{c.explicacion}</p>
-        {res.veredicto !== 'correcta' && <AyudaIA key={preguntaId} concepto={c} respuesta={res.respuestaDada} preguntaId={preguntaId} indice={i} ruta={cola.ruta} reintento={reintento} />}
-        {c.patron && <p><span className="decisiva">Patrón reutilizable</span> · {c.patron}</p>}{c.contexto && <p className="sutil">{c.contexto}</p>}
-        {c.relacionados.length > 0 && <p className="mini">Conecta con: {c.relacionados.join(' · ')}</p>}
-        <div className="fila" style={{ marginTop: 10 }}><button className="btn pequeno fantasma" onClick={() => setVerFuente(true)}>Abrir la fuente</button>
-          <span className="mini">{dominio.texto}</span></div>
-        {dominio.pendientes.length > 0 && <details className="mini" style={{ marginTop: 8 }}><summary>Qué falta para el dominio</summary>
-          <ul>{dominio.pendientes.map(criterio => <li key={criterio}>{criterio}</li>)}</ul></details>}
+        {(res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que) && <p className="sutil">{res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que}</p>}
+        <p>{c.explicacion}</p>
+        {c.revision_editorial && <p className="aviso">{c.revision_editorial.nota}</p>}
+        {res.veredicto !== 'revision' && <button className="btn principal" onClick={avanzar}>Siguiente pregunta</button>}
+        <details style={{ marginTop: 14 }}><summary>Profundizar</summary>
+          {c.patron && <p><b>Patrón:</b> {c.patron}</p>}{c.contexto && <p>{c.contexto}</p>}
+          {c.evaluacion.opciones?.filter(o => !o.correcta && o.texto !== res.respuestaDada && o.por_que).map(o => <p className="mini" key={o.texto}><b>{o.texto}:</b> {o.por_que}</p>)}
+          {c.relacionados.length > 0 && <p className="mini">Conecta con: {c.relacionados.join(' · ')}</p>}
+          <p className="mini">{dominio.texto}</p>
+          {dominio.pendientes.length > 0 && <ul className="mini">{dominio.pendientes.map(criterio => <li key={criterio}>{criterio}</li>)}</ul>}
+        </details>
+        {res.veredicto !== 'correcta' && !presentacionCambio && <details style={{ marginTop: 12 }}><summary>Sigo sin entender</summary><AyudaIA key={preguntaId} concepto={c} respuesta={res.respuestaDada} preguntaId={preguntaId} indice={i} ruta={cola.ruta} reintento={reintento} versionFormato={versionFormato} /></details>}
+        <button className="btn pequeno fantasma" style={{ marginTop: 10 }} onClick={() => setVerFuente(true)}>Abrir la fuente</button>
+        {res.veredicto === 'ortografia' && c.escritura_correctiva.elegible && c.escritura_correctiva.termino && <button className="btn pequeno fantasma" onClick={() => setFase('ortografia')}>Practicar escritura (opcional)</button>}
         {res.veredicto === 'revision' ? <div className="fila" style={{ marginTop: 12 }}>
           {puedeResponderDeNuevo && <button className="btn principal" onClick={() => avanzarPaso(true)}>{puedeRevisarConOpciones ? 'Practicar de nuevo con opciones' : 'Volver a responder'}</button>}
           <button className={`btn ${puedeResponderDeNuevo ? 'fantasma' : 'principal'}`} onClick={avanzar}>Continuar con respuesta pendiente de revisión</button></div>
-          : <><hr className="sep" /><div className="rotulo" style={{ marginBottom: 8 }}>Ajusta la dificultad · Próximo repaso aproximado</div>
+          : <details style={{ marginTop: 12 }}><summary>Ajustar dificultad (opcional)</summary><p className="mini">El resultado ya programó tu repaso. Puedes ajustar cómo te resultó y avanzar.</p>
             <div className="escalera">{(res.veredicto === 'incorrecta' ? [[1, 'Volver a practicar']] as const
               : res.veredicto === 'parcial' || res.veredicto === 'ortografia' ? [[1, 'Volver a practicar'], [2, 'Difícil']] as const
               : [[2, 'Difícil'], [3, 'Bien'], [4, 'Fácil']] as const).map(([g, txt]) => <button key={g} onClick={() => calificar(g)}>
-                <b>{txt}</b><small>{intentoActual.current && formatoIntervalo(diasParaCalificacion(p, intentoActual.current, g))}</small></button>)}</div></>}
+                <b>{txt}</b><small>{intentoActual.current && formatoIntervalo(diasParaCalificacion(p, intentoActual.current, g))}</small></button>)}</div></details>}
       </div>}
-      {fase === 'ortografia' && c.escritura_correctiva.termino && <EscrituraCorrectiva termino={c.escritura_correctiva.termino} onHecho={avanzar} />}
+      {fase === 'ortografia' && c.escritura_correctiva.termino && <div className="pila"><EscrituraCorrectiva termino={c.escritura_correctiva.termino} onHecho={avanzar} /><button className="btn" onClick={avanzar}>Continuar sin practicar escritura</button></div>}
     </div>
     {verFuente && !examenSinAyuda && <Modal titulo="Fuente del concepto" onCerrar={() => setVerFuente(false)}><PanelFuente c={c} /></Modal>}
   </div>

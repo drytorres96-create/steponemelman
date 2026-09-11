@@ -65,19 +65,8 @@ function comprobarPresentaciones(conceptos: Concepto[], cantidad = 500) {
     if (ESCRITAS.has(preparado.interaccion.recomendada)) {
       expect([...preparado.sinonimos, ...preparado.evaluacion.respuestas_aceptadas].every(esRespuestaBreve)).toBe(true)
     }
-    if (preparado.interaccion.recomendada === 'verdadero_falso' && original.interaccion.recomendada !== 'verdadero_falso') {
-      const prefijo = `${original.evaluacion.pregunta}\n\nPropuesta: «`
-      const sufijo = '»\n¿Esta propuesta responde correctamente a la pregunta?'
-      expect(preparado.evaluacion.pregunta.startsWith(prefijo)).toBe(true)
-      expect(preparado.evaluacion.pregunta.endsWith(sufijo)).toBe(true)
-      const texto = preparado.evaluacion.pregunta.slice(prefijo.length, -sufijo.length)
-      const propuesta = original.evaluacion.opciones!.find(o => o.texto === texto)
-      expect(propuesta, `${original.concept_id}: propuesta no revisada`).toBeDefined()
-      expect(preparado.evaluacion.opciones!.map(o => o.texto)).toEqual(['Verdadero', 'Falso'])
-      expect(preparado.evaluacion.opciones!.find(o => o.texto === 'Verdadero')!.correcta).toBe(propuesta!.correcta)
-      expect(preparado.evaluacion.opciones!.find(o => o.texto === 'Falso')!.correcta).toBe(!propuesta!.correcta)
-      resultadosVF.add(propuesta!.correcta)
-    } else if (CON_OPCIONES.has(preparado.interaccion.recomendada)) {
+    expect(preparado.interaccion.recomendada === 'verdadero_falso' && original.interaccion.recomendada !== 'verdadero_falso').toBe(false)
+    if (CON_OPCIONES.has(preparado.interaccion.recomendada)) {
       expect(preparado.evaluacion.opciones).toEqual(original.evaluacion.opciones)
     }
   }
@@ -152,8 +141,8 @@ describe('integridad del contenido publicado', () => {
     expect(() => comprobarFormatos([{ ...convertido, evaluacion: { ...convertido.evaluacion,
       opciones: convertido.evaluacion.opciones!.map(o => ({ ...o, correcta: true })),
     } }])).toThrow()
-    // Obliga a ejercitar tanto propuestas verdaderas como falsas con entradas sintéticas públicas.
-    expect(comprobarPresentaciones([convertido], 500)).toEqual(new Set([true, false]))
+    // Ninguna presentación nueva sustituye las opciones editoriales por V/F.
+    expect(comprobarPresentaciones([convertido], 500)).toEqual(new Set())
   })
 
   // El material privado se aporta durante el control de publicación; nunca se incluye en GitHub.

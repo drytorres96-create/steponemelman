@@ -128,6 +128,7 @@ export default {
       if (typeof input.conceptId !== 'string' || input.conceptId.length > 200 || typeof input.answer !== 'string' || input.answer.length > 500
         || typeof input.questionId !== 'string' || input.questionId.length > 512 || typeof input.version !== 'string'
         || !Number.isInteger(input.index) || input.index < 0 || input.index > 100000
+        || (input.formatVersion !== undefined && ![1, 2].includes(input.formatVersion))
         || !['guiada', 'sistemas', 'disciplinas', 'repaso', 'debiles', 'confusiones', 'direccional', 'terminos', 'examen', 'mixta', 'aplicacion'].includes(input.route)
         || typeof input.retry !== 'boolean' || (input.variantId !== undefined && (typeof input.variantId !== 'string' || input.variantId.length > 200))) return json({ error: 'Solicitud no válida.' }, 400)
       const headers = { apikey: config.supabasePublishableKey, Authorization: authorization }
@@ -152,7 +153,8 @@ export default {
       const original = ConceptoZ.parse(data.conceptos?.find(c => (c as { concept_id: string }).concept_id === input.conceptId))
       if (original.revision_editorial) return json({ error: 'Este concepto tiene una aclaración editorial. Consulta su explicación y las referencias en «Ver la fuente».' }, 422)
       if (original.calidad.estado !== 'aprobado' || original.calidad.confianza < 0.7 || original.step === 'step2') return json({ error: 'Concepto no disponible.' }, 404)
-      const c = prepararConcepto(aplicarVariante(original, input.variantId), { semilla: input.questionId, indice: input.index, ruta: input.route, forzarReconocimiento: input.retry })
+      // Los clientes 1.4 abiertos antes del despliegue no envían formatVersion.
+      const c = prepararConcepto(aplicarVariante(original, input.variantId), { semilla: input.questionId, indice: input.index, ruta: input.route, forzarReconocimiento: input.retry, version: input.formatVersion ?? 1 })
       if (versionPregunta(c) !== input.version) return json({ error: 'La pregunta ha cambiado. Recarga el material para usar la ayuda.' }, 409)
       const reference = `${original.source.fragment}\n${c.afirmacion}\n${c.respuesta_canonica}\n${c.explicacion}\n${JSON.stringify(c.evaluacion.opciones ?? [])}`
       if (reference.length > 11000 || c.evaluacion.pregunta.length > 1500) return unavailable()
