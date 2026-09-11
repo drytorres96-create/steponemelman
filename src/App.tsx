@@ -13,6 +13,8 @@ import { construirCola, RUTAS, type RutaId } from './lib/rutas'
 import { cargarTodo } from './data/corpus'
 import { useAuth } from './auth/AuthProvider'
 import { APP_VERSION } from './release'
+import type { OpcionesSesionPersonalizada } from './lib/busqueda'
+import { alternarFormatos } from './lib/formatos'
 
 type Vista = 'inicio' | 'modulos' | 'repaso' | 'progreso' | 'auditoria' | 'ajustes' | 'estudio'
 const NAV: { id: Vista; txt: string }[] = [
@@ -65,7 +67,8 @@ export default function App() {
         const r = RUTAS.find(x => x.id === ruta)!
         titulo = r.nombre; subtitulo = r.descripcion
       }
-      const lista = sesionId ? conceptos : construirCola(ruta, conceptos, estado.progreso, limite)
+      const seleccion = sesionId ? conceptos : construirCola(ruta, conceptos, estado.progreso, limite)
+      const lista = alternarFormatos(seleccion, ruta)
       if (!lista.length) { setError('No hay conceptos disponibles para esta ruta ahora mismo.'); setCargando(false); return }
       setIndiceInicial(Math.min(desde, lista.length - 1))
       setCola({ titulo, subtitulo, ruta, modulo: moduloId || ruta, conceptos: lista })
@@ -73,15 +76,16 @@ export default function App() {
     } catch (e) { setError(String(e)) } finally { setCargando(false) }
   }, [indice, estado.progreso])
 
-  const estudiarIds = useCallback(async (ids: string[]) => {
+  const estudiarIds = useCallback(async (ids: string[], opciones: OpcionesSesionPersonalizada = {}) => {
     if (!indice) return
     setCargando(true); setError(null)
     try {
       const mapa = await cargarConceptos(ids, indice.modulos)
-      const lista = ids.map(i => mapa.get(i)).filter(Boolean) as Concepto[]
+      const lista = alternarFormatos([...new Set(ids)].map(i => mapa.get(i)).filter(Boolean) as Concepto[], opciones.ruta ?? 'repaso')
       if (!lista.length) throw new Error('No hay conceptos disponibles para esta sesión.')
       setIndiceInicial(0)
-      setCola({ titulo: 'Mi selección de estudio', subtitulo: 'Practica los conceptos que has elegido', ruta: 'repaso', modulo: 'repaso', conceptos: lista })
+      setCola({ titulo: opciones.titulo ?? 'Mi selección de estudio', subtitulo: opciones.subtitulo ?? 'Practica los conceptos que has elegido',
+        ruta: opciones.ruta ?? 'repaso', modulo: opciones.modulo ?? 'repaso', conceptos: lista })
       setVista('estudio'); location.hash = 'estudio'
     } catch {
       setError('No se pudo preparar el repaso. Comprueba la conexión y vuelve a intentarlo.')

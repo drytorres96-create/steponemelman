@@ -1,11 +1,11 @@
 /** Versión persistida con cada intento para poder revisar su calificación. */
-export const EVALUADOR_VERSION = '2.0.0'
+export const EVALUADOR_VERSION = '2.1.0'
 
 /** Normaliza la presentación sin borrar letras griegas, signos ni cifras clínicas. */
 export function normalizar(s: string): string {
   return (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/µ/g, 'μ').replace(/−/g, '-')
+    .replace(/µ/g, 'μ').replace(/[−‐‑‒–—]/g, '-')
     .replace(/(\d)[.,](\d)/g, '$1\u00b7$2')        // protege el separador decimal
     .replace(/[^\p{L}\p{N}\p{S}+\-/%:\u00b7 ]/gu, ' ')
     .replace(/\u00b7/g, '.')
@@ -30,6 +30,24 @@ export function distancia(a: string, b: string): number {
 export type Veredicto = 'correcta' | 'parcial' | 'ortografia' | 'incorrecta' | 'revision'
 
 /**
+ * Variantes de escritura de un mismo término, sin buscar coincidencias parciales.
+ * Un guion entre palabras no distingue «Shine-Dalgarno» de «Shine Dalgarno»;
+ * los signos de carga, los números, las negaciones y las letras griegas distintas sí.
+ * Las grafías alfa/alpha y el símbolo α designan la misma letra, no un sinónimo
+ * médico inferido. No sustituimos abreviaturas ambiguas como a/b ni quitamos palabras.
+ */
+function claveTexto(s: string): string {
+  const griegas: Record<string, string> = {
+    α: 'alfa', β: 'beta', γ: 'gamma', δ: 'delta', κ: 'kappa', λ: 'lambda',
+  }
+  return normalizar(s)
+    .replace(/[αβγδκλ]/g, letra => griegas[letra])
+    .replace(/\balpha\b/g, 'alfa')
+    .replace(/(?<=\p{L})-(?=\p{L})/gu, ' ')
+    .replace(/\s+/g, ' ').trim()
+}
+
+/**
  * Compara la respuesta del estudiante con la canónica y sus sinónimos.
  * Sólo la respuesta exacta o un sinónimo declarado recibe crédito automático.
  * La similitud de escritura no demuestra equivalencia médica: «IgG/IgM» y
@@ -39,12 +57,12 @@ export type Veredicto = 'correcta' | 'parcial' | 'ortografia' | 'incorrecta' | '
  */
 export function evaluarTexto(entrada: string, canonica: string, sinonimos: string[] = [],
                              incorrectasCercanas: string[] = []): Veredicto {
-  const e = normalizar(entrada)
+  const e = claveTexto(entrada)
   if (!e) return 'revision'
-  const candidatos = [canonica, ...sinonimos].map(normalizar).filter(Boolean)
+  const candidatos = [canonica, ...sinonimos].map(claveTexto).filter(Boolean)
   for (const c of candidatos) if (e === c) return 'correcta'
 
-  if (incorrectasCercanas.map(normalizar).some(t => t && t === e)) return 'incorrecta'
+  if (incorrectasCercanas.map(claveTexto).some(t => t && t === e)) return 'incorrecta'
 
   // Contrastes limitados y explícitos; nunca inferimos equivalencia por longitud.
   const negacion = /^(?:no es |no |not |not a )/

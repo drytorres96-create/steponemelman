@@ -6,16 +6,23 @@ import { Vacio } from '../components/comunes'
 import { referenciaPagina } from '../lib/fuente'
 import {
   agregarSeleccion, alternarSeleccion, buscarConceptos, estadoDeBusqueda, FILTROS_BUSQUEDA_INICIALES,
-  indexarConceptos, MAXIMO_SELECCION_CONCEPTOS, paginarConceptos, type EstadoBusqueda, type FiltrosBusqueda,
+  construirSesionPersonalizada, descripcionFiltros, indexarConceptos, MAXIMO_SELECCION_CONCEPTOS,
+  NOMBRES_ESTADOS_BUSQUEDA, paginarConceptos, type EstadoBusqueda, type FiltrosBusqueda, type OpcionesSesionPersonalizada,
 } from '../lib/busqueda'
 
-const ESTADOS: Record<EstadoBusqueda, string> = { nuevo: 'Nuevo', pendiente: 'Repaso pendiente', por_revisar: 'Respuesta por revisar', al_dia: 'Al día' }
+const ESTADOS = NOMBRES_ESTADOS_BUSQUEDA
 const ordenar = (valores: string[]) => [...new Set(valores.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'))
 
-export function ExploradorConceptos({ onEstudiar, activo = true }: { onEstudiar: (ids: string[]) => void; activo?: boolean }) {
+export function ExploradorConceptos({ onEstudiar, activo = true, filtros: filtrosExternos, onCambiarFiltros }: {
+  onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void; activo?: boolean
+  filtros?: FiltrosBusqueda; onCambiarFiltros?: (filtros: FiltrosBusqueda) => void
+}) {
   const { indice, estado } = useApp()
   const [conceptos, setConceptos] = useState<Concepto[] | null>(null)
-  const [filtros, setFiltros] = useState<FiltrosBusqueda>({ ...FILTROS_BUSQUEDA_INICIALES })
+  const [filtrosLocales, setFiltrosLocales] = useState<FiltrosBusqueda>({ ...FILTROS_BUSQUEDA_INICIALES })
+  const filtros = filtrosExternos ?? filtrosLocales
+  const setFiltros = (nuevos: FiltrosBusqueda) => { setFiltrosLocales(nuevos); onCambiarFiltros?.(nuevos) }
+  const [limite, setLimite] = useState(10)
   const [pagina, setPagina] = useState(1)
   const [seleccion, setSeleccion] = useState<string[]>([])
   const [error, setError] = useState(false)
@@ -44,7 +51,7 @@ export function ExploradorConceptos({ onEstudiar, activo = true }: { onEstudiar:
     const mapa = new Map(conceptos?.map(c => [c.concept_id, c]))
     return seleccion.map(id => mapa.get(id)).filter((c): c is Concepto => !!c)
   }, [conceptos, seleccion])
-  const cambiarFiltro = (patch: Partial<FiltrosBusqueda>) => { setFiltros(actual => ({ ...actual, ...patch })); setPagina(1) }
+  const cambiarFiltro = (patch: Partial<FiltrosBusqueda>) => { setFiltros({ ...filtros, ...patch }); setPagina(1) }
   const cambiarPagina = (n: number) => { setPagina(n); cabeceraResultados.current?.focus() }
 
   if (!activo) return null
@@ -53,7 +60,7 @@ export function ExploradorConceptos({ onEstudiar, activo = true }: { onEstudiar:
   if (!conceptos) return <div className="vacio" role="status" aria-busy="true">Preparando el buscador de conceptos…</div>
 
   return <div className="pila explorador-conceptos">
-    <div><h2>Busca lo que quieres practicar</h2><p className="sutil">Encuentra objetivos por término, pregunta o sinónimo. Elige hasta 20 conceptos para tu sesión.</p></div>
+    <div><h2>Busca lo que quieres practicar</h2><p className="sutil">Combina filtros y comienza una sesión directamente, o elige hasta 20 conceptos a mano.</p></div>
     <div className="tarjeta pila">
       <div><label htmlFor="busqueda-conceptos">Buscar conceptos</label>
         <input ref={buscador} id="busqueda-conceptos" type="search" maxLength={200} autoComplete="off" spellCheck={false}
@@ -76,6 +83,17 @@ export function ExploradorConceptos({ onEstudiar, activo = true }: { onEstudiar:
         </select></div>
       </div>
       <button className="btn pequeno fantasma" style={{ alignSelf: 'flex-start' }} onClick={() => { setFiltros({ ...FILTROS_BUSQUEDA_INICIALES }); setPagina(1); buscador.current?.focus() }}>Limpiar filtros</button>
+      <div className="fila" style={{ gap: 10 }}>
+        <div><label htmlFor="busqueda-cantidad">Conceptos por sesión</label><select id="busqueda-cantidad" value={limite} onChange={e => setLimite(Number(e.target.value))}>
+          {[5, 10, 20].map(n => <option key={n} value={n}>Hasta {n}</option>)}
+        </select></div>
+        <button className="btn principal" disabled={!resultados.length} onClick={() => onEstudiar(
+          construirSesionPersonalizada(resultados, estado.progreso, limite).map(c => c.concept_id),
+          { titulo: 'Mi sesión personalizada', subtitulo: descripcionFiltros(filtros) || 'Práctica libre con conceptos nuevos y ya estudiados.' },
+        )}>Practicar filtros ({Math.min(limite, resultados.length)})</button>
+        <span className="mini" role="status">{resultados.length} conceptos coincidentes</span>
+      </div>
+      <p className="mini" style={{ margin: 0 }}>Esta sesión usa los resultados de todas las páginas y puede incluir conceptos ya estudiados, aunque aún no tengan repaso pendiente.</p>
     </div>
 
     <section className="tarjeta pila seleccion-conceptos" aria-label="Selección para practicar">

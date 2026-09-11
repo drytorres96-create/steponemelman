@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { nuevoProgreso, programar } from '../srs/fsrs'
+import { evidenciaIndependiente } from '../srs/mastery'
 import type { Intento } from '../srs/tipos'
 import {
   CORPUS_VERSION, ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, reconstruirProgreso, combinarEstados,
@@ -47,6 +48,21 @@ describe('estado persistido compatible', () => {
     expect(leerEstadoDesconocido(ab)).not.toBeNull()
   })
 
+  it('fusionar copias de un paso antiguo no inventa que se respondió sin ayuda', () => {
+    const antiguo = { ...intento('a', 1000), pregunta_id: 'q1' }
+    for (const otra of [antiguo, { ...antiguo, fuente_consultada: false, explicacion_previa: false }]) {
+      const ea = estadoCon({ A: reconstruirProgreso('A', [antiguo], ESTADO_INICIAL.criterios) })
+      const eb = estadoCon({ A: reconstruirProgreso('A', [otra], ESTADO_INICIAL.criterios) })
+      const ab = combinarEstados(ea, eb)
+      expect(ab).toEqual(combinarEstados(eb, ea))
+      const unido = ab.progreso.A.intentos[0]
+      expect(unido.fuente_consultada).toBeUndefined()
+      expect(unido.explicacion_previa).toBeUndefined()
+      expect(evidenciaIndependiente(unido)).toBe(false)
+      expect(evidenciaIndependiente(leerEstadoDesconocido(JSON.parse(JSON.stringify(ab)))!.progreso.A.intentos[0])).toBe(false)
+    }
+  })
+
   it('conserva una respuesta por revisar sin convertirla en fallo ni en repaso vencido', () => {
     const pendiente = { ...intento('r', 1000), resultado: 'revision' as const, tipo_error: 'error_por_revisar' as const }
     const p = reconstruirProgreso('A', [pendiente], ESTADO_INICIAL.criterios)
@@ -77,6 +93,7 @@ describe('estado persistido compatible', () => {
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, progreso: null })).toBeNull()
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '1.0.1' })?.corpus_version).toBe(CORPUS_VERSION)
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '1.0.2' })?.corpus_version).toBe(CORPUS_VERSION)
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '1.0.3' })?.corpus_version).toBe(CORPUS_VERSION)
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '9.0.0' })).toBeNull()
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, sesiones: null })).toBeNull()
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, sesiones: [null] })).toBeNull()

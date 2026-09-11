@@ -24,6 +24,31 @@ export function conAyuda(t: Intento): boolean {
   return t.pistas_usadas > 0 || t.fuente_consultada === true || t.explicacion_previa === true
 }
 
+/** Un fallo vuelve al final. La revisión incierta queda pendiente, nunca se da por acertada. */
+export function necesitaReintento(resultado: Intento['resultado']): boolean {
+  return resultado === 'incorrecta' || resultado === 'parcial'
+}
+
+export function siguienteCola<T>(orden: T[], indice: number, resultado: Intento['resultado']): T[] {
+  return orden[indice] !== undefined && necesitaReintento(resultado) ? [...orden, orden[indice]] : orden
+}
+
+/** Separa el rendimiento inicial de los aciertos obtenidos al corregir con feedback. */
+export function resumirCorrecciones(pasos: { conceptId: string; intento?: Intento }[], cantidadInicial: number) {
+  const correcto = (i?: Intento) => i?.resultado === 'correcta' || i?.resultado === 'ortografia'
+  const primeras = pasos.slice(0, cantidadInicial)
+  const ultimas = new Map(pasos.filter(p => p.intento).map(p => [p.conceptId, p.intento!]))
+  const erroresIniciales = primeras.filter(p => necesitaReintento(p.intento?.resultado))
+  return {
+    conceptos: new Set(primeras.map(p => p.conceptId)).size,
+    aciertosIniciales: primeras.filter(p => correcto(p.intento)).length,
+    recuperados: erroresIniciales.filter(p => correcto(ultimas.get(p.conceptId))).length,
+    erroresIniciales: erroresIniciales.length,
+    pendientes: [...ultimas.values()].filter(t => !correcto(t)).length,
+    reintentos: pasos.slice(cantidadInicial).filter(p => p.intento).length,
+  }
+}
+
 export function resumirIntentos(intentos: Intento[]) {
   const unicos = [...new Map(intentos.map((t, i) => [t.session_id && t.pregunta_id
     ? `${t.session_id}:${t.pregunta_id}` : t.attempt_id ?? `legacy:${i}`, t])).values()]

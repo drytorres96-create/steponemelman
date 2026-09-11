@@ -2,7 +2,7 @@
 
 Plataforma de estudio para USMLE Step 1 con sesiones, repaso espaciado y progreso asociado a una cuenta. El sitio existente está en [steponemelman.yoeltorres.workers.dev](https://steponemelman.yoeltorres.workers.dev/). Este repositorio contiene la aplicación React/Vite y el contrato de base de datos; Supabase conserva el material privado y el progreso.
 
-La versión de código **1.2.0** incorpora el buscador y los controles de contenido descritos en [Cambios de la versión](docs/cambios-1.2.0.md), sobre las [mejoras de estudio de 1.1.0](docs/cambios-1.1.0.md). La presencia de esos cambios en el repositorio no acredita por sí sola que Cloudflare haya terminado de publicarlos: comprueba la compilación correspondiente y la versión mostrada en **Ajustes**.
+La versión de código **1.3.0** incorpora preguntas variadas, escritura breve, filtros combinados y corrección de errores dentro de la sesión, descritos en [Cambios de la versión](docs/cambios-1.3.0.md). La presencia de esos cambios en el repositorio no acredita por sí sola que Cloudflare haya terminado de publicarlos: comprueba la compilación correspondiente y la versión mostrada en **Ajustes**.
 
 ## Estudiar y continuar en otro dispositivo
 
@@ -100,7 +100,7 @@ El [contrato de base de datos](database/README.md) describe revisiones, conflict
 
 ## Contenido y alcance
 
-El corpus **1.0.3**, activado y comprobado en Supabase, reúne **2.149 conceptos publicados**, **121 apartados para revisión**, **21 de 50 lotes transformados** y **29 pendientes**. Los lotes **B019–B021** ya están procesados y aportan **212 conceptos nuevos** al material de estudio respecto a la etapa 1.1.0. Los publicados se clasifican en **1.566 Step 1** y **583 compartidos con Step 2**, sin conceptos exclusivos de Step 2. El [plan de calidad](docs/plan-calidad-2026-09-10.md) distingue organización implementada de cobertura oficial, filtrado médico, imágenes, variantes e inglés pendientes.
+El corpus **1.0.4** reúne **2.079 conceptos publicables**, **191 apartados para revisión**, **21 de 50 lotes transformados** y **29 pendientes**. Esta revisión convierte **461 preguntas de escritura extensa** en ejercicios con opciones y aparta **70 conceptos adicionales** por inconsistencias o incertidumbres médicas, conservando sus identificadores e historial. Los lotes **B019–B021** ya están procesados y aportan **212 conceptos nuevos** al material de estudio respecto a la etapa 1.1.0. Los publicados se clasifican en **1.523 Step 1** y **556 compartidos con Step 2**, sin conceptos exclusivos de Step 2. El [plan de calidad](docs/plan-calidad-2026-09-10.md) distingue organización implementada de cobertura oficial, filtrado médico, imágenes, variantes e inglés pendientes.
 
 La validación integrada con el corpus privado aprobó **116 pruebas en 15 archivos**. En CI, el repositorio público ejecuta **115 pruebas** y omite la comprobación que requiere los archivos médicos privados. Esa omisión no se interpreta como una revisión del corpus.
 

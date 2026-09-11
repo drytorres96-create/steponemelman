@@ -1,7 +1,8 @@
 import type { Concepto } from '../schema/concept'
 import type { ProgresoConcepto } from '../srs/tipos'
 import { estaVencido } from '../srs/fsrs'
-import { ultimoIntento } from './plan-estudio'
+import { conceptosUnicos, construirPlanDiario, ultimoIntento } from './plan-estudio'
+import type { RutaId } from './rutas'
 
 export const TAMANO_PAGINA_CONCEPTOS = 20
 export const MAXIMO_SELECCION_CONCEPTOS = 20
@@ -14,6 +15,16 @@ export interface FiltrosBusqueda {
   estado: EstadoBusqueda | ''
 }
 export const FILTROS_BUSQUEDA_INICIALES: FiltrosBusqueda = { texto: '', disciplina: '', sistema: '', tema: '', estado: '' }
+export interface OpcionesSesionPersonalizada { titulo?: string; subtitulo?: string; ruta?: RutaId; modulo?: string }
+
+export const NOMBRES_ESTADOS_BUSQUEDA: Record<EstadoBusqueda, string> = {
+  nuevo: 'Nuevo', pendiente: 'Repaso pendiente', por_revisar: 'Respuesta por revisar', al_dia: 'Al día',
+}
+
+export function descripcionFiltros(filtros: FiltrosBusqueda): string {
+  return [filtros.disciplina, filtros.sistema, filtros.tema, filtros.texto.trim() && `«${filtros.texto.trim()}»`,
+    filtros.estado && NOMBRES_ESTADOS_BUSQUEDA[filtros.estado]].filter(Boolean).join(' · ')
+}
 
 /** La búsqueda no distingue mayúsculas, tildes ni separación por signos. */
 export function normalizarBusqueda(texto: string): string {
@@ -55,6 +66,18 @@ export function buscarConceptos(indice: ConceptoIndexado[], filtros: FiltrosBusq
   // Los objetivos coincidentes aparecen primero; el orden documental desempata.
   if (tokens.length) encontrados.sort((a, b) => tokens.filter(t => b.objetivo.includes(t)).length - tokens.filter(t => a.objetivo.includes(t)).length)
   return encontrados.map(x => x.concepto)
+}
+
+/** La práctica elegida por el estudiante incluye también conceptos vistos que aún no vencen. */
+export function construirSesionPersonalizada(conceptos: Concepto[], progreso: Record<string, ProgresoConcepto>,
+  limite = MAXIMO_SELECCION_CONCEPTOS, ahora = Date.now()): Concepto[] {
+  const maximo = Number.isFinite(limite) ? Math.min(MAXIMO_SELECCION_CONCEPTOS, Math.max(0, Math.floor(limite))) : 0
+  const base = conceptosUnicos(conceptos)
+  const prioritarios = construirPlanDiario(base, progreso, maximo, ahora).conceptos
+  const elegidos = new Set(prioritarios.map(c => c.concept_id))
+  const restantes = base.filter(c => !elegidos.has(c.concept_id)).sort((a, b) =>
+    (ultimoIntento(progreso[a.concept_id])?.ts ?? 0) - (ultimoIntento(progreso[b.concept_id])?.ts ?? 0))
+  return [...prioritarios, ...restantes].slice(0, maximo)
 }
 
 export function paginarConceptos<T>(resultados: T[], pagina: number): { elementos: T[]; pagina: number; paginas: number; inicio: number; fin: number } {

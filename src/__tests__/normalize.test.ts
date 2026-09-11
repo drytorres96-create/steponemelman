@@ -11,6 +11,23 @@ describe('normalización de respuestas', () => {
   it('acepta un sinónimo declarado', () => {
     expect(evaluarTexto('hipoadrenalismo primario', 'enfermedad de Addison', ['hipoadrenalismo primario'])).toBe('correcta')
   })
+  it('acepta presentación equivalente de términos breves sin exigir guiones ni un teclado griego', () => {
+    expect(evaluarTexto('Shine Dalgarno', 'Shine-Dalgarno')).toBe('correcta')
+    expect(evaluarTexto('Shine–Dalgarno', 'Shine-Dalgarno')).toBe('correcta')
+    expect(evaluarTexto('TNF alfa', 'TNF-α')).toBe('correcta')
+    expect(evaluarTexto('TNF-alpha', 'TNF-α')).toBe('correcta')
+    expect(evaluarTexto('IFN gamma', 'IFN-γ')).toBe('correcta')
+    expect(evaluarTexto('beta1', 'β1')).toBe('correcta')
+    expect(evaluarTexto('IL‑12', 'IL-12')).toBe('correcta')
+  })
+  it('las variantes tipográficas no mezclan letras griegas, subtipos, cargas o fármacos', () => {
+    for (const [a, b] of [
+      ['TNF beta', 'TNF-α'], ['kappa', 'λ'], ['beta1', 'β2'],
+      ['CD4-', 'CD4+'], ['IL-1', 'IL-12'], ['L-DOPA', 'D-DOPA'],
+      ['hipertiroidismo', 'hipotiroidismo'], ['no TNF alfa', 'TNF-α'],
+    ]) expect(['correcta', 'ortografia']).not.toContain(evaluarTexto(a, b))
+    expect(evaluarTexto('TNF beta', 'TNF-α', [], ['TNF-β'])).toBe('incorrecta')
+  })
   it('deja palabras no reconocidas por revisar en vez de adivinar su significado', () => {
     expect(evaluarTexto('fenoxibenzamin', 'fenoxibenzamina')).toBe('revision')
     expect(evaluarTexto('propranolol', 'fenoxibenzamina')).toBe('revision')

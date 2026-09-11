@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Intento } from '../srs/tipos'
 import { DIA, nuevoProgreso, programar } from '../srs/fsrs'
-import { buscarIntentoPaso, conAyuda, diasParaCalificacion, identificarPregunta, resumirIntentos, RelojActividad } from './sesion'
+import { ESTADO_INICIAL, leerEstadoDesconocido } from '../store/model'
+import { buscarIntentoPaso, conAyuda, diasParaCalificacion, identificarPregunta, resumirCorrecciones, resumirIntentos, RelojActividad, siguienteCola } from './sesion'
 
 const intento = (datos: Partial<Intento> = {}): Intento => ({
   attempt_id: 'a1', session_id: 'session1', pregunta_id: 'session1:0:concept1',
@@ -11,7 +12,40 @@ const intento = (datos: Partial<Intento> = {}): Intento => ({
   ...datos,
 })
 
-describe('Sesión recuperable y acotada', () => {
+describe('Sesión recuperable con correcciones', () => {
+  it('coloca los fallos y parciales al final, tantas veces como sea necesario hasta acertar', () => {
+    let cola = ['a', 'b']
+    cola = siguienteCola(cola, 0, 'incorrecta')
+    expect(cola).toEqual(['a', 'b', 'a'])
+    cola = siguienteCola(cola, 1, 'correcta')
+    cola = siguienteCola(cola, 2, 'parcial')
+    expect(cola).toEqual(['a', 'b', 'a', 'a'])
+    expect(siguienteCola(cola, 3, 'correcta')).toBe(cola)
+    expect(siguienteCola(cola, 3, 'ortografia')).toBe(cola)
+    expect(siguienteCola(cola, 3, 'revision')).toBe(cola)
+  })
+
+  it('conserva la cola con duplicados y el límite inicial en un respaldo compatible', () => {
+    const reanudable = { modulo: 'm', sesion: 'examen', indice: 2, ts: 1,
+      conceptIds: ['a', 'b', 'a'], cantidadInicial: 2, revisionInicialHecha: false }
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, reanudable })?.reanudable).toEqual(reanudable)
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, reanudable: { ...reanudable, cantidadInicial: 4 } })).toBeNull()
+    const { cantidadInicial: _n, revisionInicialHecha: _r, ...antigua } = reanudable
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, reanudable: antigua })?.reanudable).toEqual(antigua)
+  })
+
+  it('separa aciertos iniciales y errores corregidos, sin esconder un error aún pendiente', () => {
+    const pasos = [
+      { conceptId: 'a', intento: intento({ resultado: 'incorrecta' }) },
+      { conceptId: 'b', intento: intento({ resultado: 'correcta' }) },
+      { conceptId: 'c', intento: intento({ resultado: 'parcial' }) },
+      { conceptId: 'a', intento: intento({ resultado: 'incorrecta' }) },
+      { conceptId: 'c', intento: intento({ resultado: 'correcta', explicacion_previa: true }) },
+      { conceptId: 'a', intento: intento({ resultado: 'revision' }) },
+    ]
+    expect(resumirCorrecciones(pasos, 3)).toEqual({ conceptos: 3, aciertosIniciales: 1, recuperados: 1,
+      erroresIniciales: 2, pendientes: 1, reintentos: 3 })
+  })
   it('recupera la respuesta del paso exacto sin confundir un concepto repetido o una sesión distinta', () => {
     const primero = intento()
     const segundo = intento({ attempt_id: 'a2', pregunta_id: identificarPregunta('session1', 1, 'concept1') })

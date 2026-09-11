@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { nuevoProgreso, programar, DIA } from '../srs/fsrs'
-import { CRITERIOS_POR_DEFECTO, evaluarDominio, calcularEstado, dominioVigente, evidenciaIndependiente, etapa } from '../srs/mastery'
+import { CRITERIOS_POR_DEFECTO, evaluarDominio, calcularEstado, dominioVigente, evidenciaIndependiente, etapa, resumenDominio } from '../srs/mastery'
 import type { Intento } from '../srs/tipos'
 
 const it3 = (ts: number, extra: Partial<Intento> = {}): Intento => ({
@@ -119,5 +119,46 @@ describe('criterios de dominio', () => {
     p = programar(p, it3(t + 5 * DIA + 1000, { resultado: 'revision', tipo_error: 'error_por_revisar' }), t + 5 * DIA + 1000)
     expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA + 1000).cumple).toBe(true)
     expect(calcularEstado(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA + 1000)).toBe('dominado')
+  })
+  it('la etapa visible se reconstruye tras un fallo sin borrar los aciertos históricos', () => {
+    const t = Date.now()
+    let p = nuevoProgreso('ETAPA-VIGENTE')
+    for (const d of [0, 2]) p = programar(p, it3(t + d * DIA), t + d * DIA)
+    expect(etapa(p, CRITERIOS_POR_DEFECTO, t + 2 * DIA)).toBe('consolidacion')
+    p = programar(p, it3(t + 3 * DIA, { resultado: 'incorrecta', tipo_error: 'desconocimiento' }), t + 3 * DIA)
+    expect(etapa(p, CRITERIOS_POR_DEFECTO, t + 3 * DIA)).toBe('comprension')
+    expect(p.aciertos).toBe(2)
+    expect(resumenDominio(p, CRITERIOS_POR_DEFECTO, t + 3 * DIA).texto).toContain('0/3 aciertos independientes')
+  })
+  it('cero aciertos independientes nunca se muestran como próximo dominio', () => {
+    const t = Date.now()
+    const laxos = { ...CRITERIOS_POR_DEFECTO, recuperaciones: 1, sesiones: 1, separacionHoras: 0 }
+    const p = programar(nuevoProgreso('CERO'), it3(t, { explicacion_previa: true }), t)
+    expect(calcularEstado(p, laxos, t)).toBe('en_aprendizaje')
+  })
+  it('los reintentos tras ver la solución no inflan el dominio y el resumen muestra qué falta', () => {
+    const t = Date.now()
+    let p = programar(nuevoProgreso('REINTENTOS'), it3(t, {
+      session_id: 'misma-sesion', resultado: 'incorrecta', tipo_error: 'desconocimiento',
+    }), t)
+    for (const minuto of [1, 2, 3]) p = programar(p, it3(t + minuto * 60_000, {
+      session_id: 'misma-sesion', explicacion_previa: true,
+    }), t + minuto * 60_000)
+    expect(p.aciertos).toBe(3)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 180_000).cumple).toBe(false)
+    const resumen = resumenDominio(p, CRITERIOS_POR_DEFECTO, t + 180_000)
+    expect(resumen.texto).toBe('Dominio: 0/3 aciertos independientes · 0/2 sesiones')
+    expect(resumen.pendientes).toContain('separadas ≥ 20 h')
+  })
+  it('términos breves y selección múltiple pueden acreditar dominio con evidencia independiente', () => {
+    const t = Date.now()
+    let p = nuevoProgreso('FORMATOS')
+    for (const [n, interaccion] of ['completar', 'opcion_multiple', 'recuperacion_libre'].entries()) {
+      const ts = t + n * DIA
+      p = programar(p, it3(ts, { session_id: `sesion-${n}`, interaccion,
+        recuperacion_activa: interaccion !== 'opcion_multiple' }), ts)
+    }
+    expect(resumenDominio(p, CRITERIOS_POR_DEFECTO, t + 2 * DIA)).toEqual({ texto: 'Dominio acreditado', pendientes: [] })
+    expect(resumenDominio(p, CRITERIOS_POR_DEFECTO, p.proxima! + 1).texto).toContain('repaso pendiente')
   })
 })

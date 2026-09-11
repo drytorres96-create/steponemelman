@@ -30,12 +30,16 @@ function ultimoResuelto(p: ProgresoConcepto): Intento | undefined {
   return [...p.intentos].reverse().find(i => i.resultado !== 'revision')
 }
 
-export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): EvidenciaDominio {
+function aciertosVigentes(p: ProgresoConcepto): Intento[] {
   // El historial se conserva. La evidencia vigente se reconstruye tras el último
   // fallo comprobado, evitando certificar de nuevo por aciertos antiguos.
   const ultimoFallo = p.intentos.reduce((ultimo, i, n) =>
     i.resultado !== 'revision' && !intentoCorrecto(i) ? n : ultimo, -1)
-  const correctas = p.intentos.slice(ultimoFallo + 1).filter(evidenciaIndependiente)
+  return p.intentos.slice(ultimoFallo + 1).filter(evidenciaIndependiente)
+}
+
+export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): EvidenciaDominio {
+  const correctas = aciertosVigentes(p)
   const sesiones = new Set(correctas.map(i => i.session_id || `legacy-dia-${Math.floor(i.ts / DIA)}`))
   const separadas = c.separacionHoras === 0 || c.sesiones < 2
     ? true
@@ -57,6 +61,20 @@ export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora =
   return { cumple: detalle.every(d => d.cumplido), detalle }
 }
 
+/** Explica la evidencia que falta sin equiparar acertar un reintento con dominar. */
+export function resumenDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): { texto: string; pendientes: string[] } {
+  const ev = evaluarDominio(p, c, ahora)
+  const pendientes = ev.detalle.filter(d => !d.cumplido).map(d => d.criterio)
+  if (ev.cumple) return {
+    texto: estaVencido(p, ahora) ? 'Criterios de dominio alcanzados · repaso pendiente' : 'Dominio acreditado',
+    pendientes: estaVencido(p, ahora) ? ['Completar el repaso pendiente para mantener el dominio vigente'] : [],
+  }
+  return {
+    texto: `Dominio: ${ev.detalle[0].valor}/${c.recuperaciones} aciertos independientes · ${ev.detalle[1].valor}/${c.sesiones} sesiones`,
+    pendientes,
+  }
+}
+
 export function calcularEstado(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): EstadoDominio {
   if (!p.intentos.length) return 'nuevo'
   const ev = evaluarDominio(p, c, ahora)
@@ -65,7 +83,7 @@ export function calcularEstado(p: ProgresoConcepto, c: CriteriosDominio, ahora =
   if (ev.cumple) return estaVencido(p, ahora) ? 'requiere_repaso' : 'dominado'
   if (estaVencido(p, ahora)) return 'requiere_repaso'
   const correctas = Number(ev.detalle[0].valor)
-  if (correctas >= c.recuperaciones - 1) return 'proximo_dominio'
+  if (correctas > 0 && correctas >= c.recuperaciones - 1) return 'proximo_dominio'
   if (correctas >= 1) return 'en_consolidacion'
   return 'en_aprendizaje'
 }
@@ -80,7 +98,7 @@ export type Etapa = 'exposicion' | 'comprension' | 'recuperacion' | 'consolidaci
 export function etapa(p: ProgresoConcepto, c = CRITERIOS_POR_DEFECTO, ahora = Date.now()): Etapa {
   if (!p.intentos.length) return 'exposicion'
   if (dominioVigente(p, c, ahora)) return 'dominio'
-  const correctas = p.intentos.filter(evidenciaIndependiente).length
+  const correctas = aciertosVigentes(p).length
   if (correctas >= 2) return 'consolidacion'
   if (correctas >= 1) return 'recuperacion'
   return 'comprension'

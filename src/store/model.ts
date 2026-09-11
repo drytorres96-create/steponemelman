@@ -2,7 +2,7 @@ import { nuevoProgreso, programar } from '../srs/fsrs'
 import { CRITERIOS_POR_DEFECTO, calcularEstado, evaluarDominio, type CriteriosDominio } from '../srs/mastery'
 import { intentoCorrecto, NOMBRE_ERROR, NOMBRE_ESTADO, type Intento, type ProgresoConcepto } from '../srs/tipos'
 
-export const CORPUS_VERSION = '1.0.3' as const
+export const CORPUS_VERSION = '1.0.4' as const
 
 export interface RegistroSesion {
   id: string
@@ -25,6 +25,10 @@ export interface Reanudable {
   titulo?: string
   subtitulo?: string
   sessionId?: string
+  /** Tamaño de la primera vuelta; el resto de la cola son reintentos. */
+  cantidadInicial?: number
+  /** La práctica sin ayuda muestra su revisión antes de comenzar a corregir. */
+  revisionInicialHecha?: boolean
   paso?: {
     indice: number
     pistas: number
@@ -164,6 +168,9 @@ function leerReanudable(v: unknown): Reanudable | null | false {
   if (v.titulo !== undefined && typeof v.titulo !== 'string') return false
   if (v.subtitulo !== undefined && typeof v.subtitulo !== 'string') return false
   if (v.sessionId !== undefined && !idSeguro(v.sessionId)) return false
+  if (v.cantidadInicial !== undefined && (!entero(v.cantidadInicial, 1)
+    || !Array.isArray(v.conceptIds) || v.cantidadInicial > v.conceptIds.length)) return false
+  if (v.revisionInicialHecha !== undefined && typeof v.revisionInicialHecha !== 'boolean') return false
   if (v.paso !== undefined && (!esObjeto(v.paso) || !entero(v.paso.indice) || v.paso.indice !== v.indice
     || !entero(v.paso.pistas) || v.paso.pistas > 3 || typeof v.paso.fuenteConsultada !== 'boolean'
     || typeof v.paso.explicacionPrevia !== 'boolean' || !numero(v.paso.msActivo)
@@ -177,6 +184,8 @@ function leerReanudable(v: unknown): Reanudable | null | false {
     ...(v.titulo !== undefined ? { titulo: v.titulo } : {}),
     ...(v.subtitulo !== undefined ? { subtitulo: v.subtitulo } : {}),
     ...(v.sessionId !== undefined ? { sessionId: v.sessionId } : {}),
+    ...(v.cantidadInicial !== undefined ? { cantidadInicial: v.cantidadInicial as number } : {}),
+    ...(v.revisionInicialHecha !== undefined ? { revisionInicialHecha: v.revisionInicialHecha as boolean } : {}),
     ...(esObjeto(v.paso) ? { paso: {
       indice: v.paso.indice as number, pistas: v.paso.pistas as number,
       fuenteConsultada: v.paso.fuenteConsultada as boolean, explicacionPrevia: v.paso.explicacionPrevia as boolean,
@@ -188,7 +197,7 @@ function leerReanudable(v: unknown): Reanudable | null | false {
 /** Lee versiones previas compatibles, sin aceptar estructuras parciales corruptas. */
 export function leerEstadoDesconocido(v: unknown): EstadoApp | null {
   if (!esObjeto(v) || v.version !== 1 || !esObjeto(v.progreso)) return null
-  if (v.corpus_version !== undefined && v.corpus_version !== '1.0.0' && v.corpus_version !== '1.0.1' && v.corpus_version !== '1.0.2' && v.corpus_version !== CORPUS_VERSION) return null
+  if (v.corpus_version !== undefined && v.corpus_version !== '1.0.0' && v.corpus_version !== '1.0.1' && v.corpus_version !== '1.0.2' && v.corpus_version !== '1.0.3' && v.corpus_version !== CORPUS_VERSION) return null
 
   const progreso: Record<string, ProgresoConcepto> = {}
   for (const [id, crudo] of Object.entries(v.progreso)) {
@@ -247,6 +256,12 @@ function versionIntento(i: Intento): string {
   return serializarEstable(resto)
 }
 
+/** Una copia antigua sin evidencia de ayuda no se convierte en evidencia de independencia. */
+function unirAyuda(a: boolean | undefined, b: boolean | undefined): boolean | undefined {
+  if (a === true || b === true) return true
+  return a === false && b === false ? false : undefined
+}
+
 function unirProgreso(a: ProgresoConcepto, b: ProgresoConcepto, criterios: CriteriosDominio): ProgresoConcepto {
   const hitos = [a.dominado_en, b.dominado_en].filter((t): t is number => t !== null)
   return reconstruirProgreso(a.concept_id, [...a.intentos, ...b.intentos], criterios, hitos.length ? Math.min(...hitos) : null)
@@ -266,8 +281,8 @@ export function reconstruirProgreso(id: string, registros: Intento[], criterios:
     porId.set(key, anterior && i.pregunta_id ? {
       ...elegido,
       pistas_usadas: Math.max(i.pistas_usadas, anterior.pistas_usadas),
-      fuente_consultada: !!i.fuente_consultada || !!anterior.fuente_consultada,
-      explicacion_previa: !!i.explicacion_previa || !!anterior.explicacion_previa,
+      fuente_consultada: unirAyuda(i.fuente_consultada, anterior.fuente_consultada),
+      explicacion_previa: unirAyuda(i.explicacion_previa, anterior.explicacion_previa),
     } : elegido)
   }
   const intentos = [...porId.values()].sort((x, y) => x.ts - y.ts

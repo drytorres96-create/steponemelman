@@ -175,7 +175,7 @@ label { font-size: .85rem; color: var(--texto-2); }
 .reproductor .avance i.hecho { background: var(--violeta); }
 .reproductor .avance i.actual { background: var(--magenta); box-shadow: 0 0 10px #e05fa877; }
 .tarea { background: linear-gradient(180deg, var(--panel), #10162480); border: 1px solid var(--linea-suave); border-radius: 18px; padding: 26px; box-shadow: var(--sombra-alta); }
-.pregunta { font-size: 1.14rem; line-height: 1.5; font-weight: 520; margin-bottom: 18px; }
+.pregunta { font-size: 1.14rem; line-height: 1.5; font-weight: 520; margin-bottom: 18px; white-space: pre-line; }
 .opcion {
   display: flex; gap: 11px; align-items: flex-start; width: 100%; text-align: left;
   padding: 12px 14px; border-radius: 11px; border: 1px solid var(--linea-suave);

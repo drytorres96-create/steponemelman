@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Concepto } from '../schema/concept'
 import type { Intento, ProgresoConcepto } from '../srs/tipos'
 import {
-  agregarSeleccion, alternarSeleccion, buscarConceptos, estadoDeBusqueda, FILTROS_BUSQUEDA_INICIALES,
+  agregarSeleccion, alternarSeleccion, buscarConceptos, construirSesionPersonalizada, estadoDeBusqueda, FILTROS_BUSQUEDA_INICIALES,
   indexarConceptos, normalizarBusqueda, paginarConceptos,
 } from './busqueda'
 
@@ -72,5 +72,20 @@ describe('buscador local de conceptos', () => {
     const retirada = alternarSeleccion(primera, 'c5')
     expect(retirada).not.toContain('c5')
     expect(alternarSeleccion(retirada, 'c20')).toHaveLength(20)
+  })
+
+  it('prepara una sesión aunque todos los conceptos filtrados estén vistos y al día', () => {
+    const cs = [crear('a'), crear('b')]
+    const vistos = { a: progreso([intento('correcta', ahora - 10)], ahora + 10000), b: progreso([intento('correcta', ahora - 20)], ahora + 10000) }
+    expect(construirSesionPersonalizada(cs, vistos, 10, ahora).map(c => c.concept_id)).toEqual(['b', 'a'])
+  })
+
+  it('prioriza pendientes sin salir de la selección y luego completa con conceptos al día', () => {
+    const cs = [crear('al_dia'), crear('nuevo'), crear('vencido')]
+    const ps = { al_dia: progreso([intento('correcta')], ahora + 10000), vencido: progreso([intento('correcta')], ahora - 10),
+      fuera_de_filtros: progreso([intento('incorrecta')], ahora - 20) }
+    expect(construirSesionPersonalizada([...cs, ...cs], ps, 20, ahora).map(c => c.concept_id)).toEqual(['vencido', 'nuevo', 'al_dia'])
+    expect(construirSesionPersonalizada(Array.from({ length: 30 }, (_, i) => crear(String(i))), {}, 999, ahora)).toHaveLength(20)
+    expect(construirSesionPersonalizada(cs, ps, 0, ahora)).toEqual([])
   })
 })

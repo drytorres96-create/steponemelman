@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Concepto } from '../schema/concept'
 import type { TipoError } from '../srs/tipos'
 import { evaluarNumero, evaluarTexto, normalizar, type Veredicto } from '../lib/normalize'
+import { esRespuestaBreve } from '../lib/formatos'
 
 export interface Resultado {
   veredicto: Veredicto
@@ -80,11 +81,14 @@ function Texto({ c, bloqueado, onResponder }: Props) {
     onResponder({ veredicto: ve, tipoError: tipo, recuperacionActiva: true, respuestaDada: v })
   }
   return (
-    <div className="fila" style={{ gap: 8, flexWrap: 'nowrap' }}>
+    <div>
+    <p className="mini">Una palabra o frase corta. No necesitas explicar el mecanismo por escrito.</p>
+    <div className="fila" style={{ gap: 8 }}>
       <input type="text" value={v} disabled={bloqueado} autoComplete="off" autoCapitalize="off" spellCheck={false}
-        placeholder="Escribe tu respuesta…" aria-label="Tu respuesta"
+        placeholder="Una palabra o frase corta…" aria-label="Tu respuesta" maxLength={100}
         onChange={e => setV(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') enviar() }} />
       <button className="btn principal" onClick={enviar} disabled={bloqueado || !v.trim()}>Comprobar</button>
+    </div>
     </div>
   )
 }
@@ -311,8 +315,19 @@ export function Interaccion(props: Props) {
     case 'secuencia': return <Secuencia {...props} />
     case 'relacionar': return <Relacionar {...props} />
     case 'clasificar': return <Clasificar {...props} />
-    default: return <Texto {...props} />
+    default: return esRespuestaBreve(props.c.respuesta_canonica) ? <Texto {...props} /> : <RevisionSinEvaluacion {...props} />
   }
+}
+
+/** Protección para material antiguo sin una pregunta breve u opciones verificables. */
+function RevisionSinEvaluacion({ c, bloqueado, onResponder }: Props) {
+  return <div className="pila">
+    <p>Esta pregunta necesita una evaluación más precisa. Puedes consultar la explicación y continuar; no se contará como acierto ni fallo.</p>
+    <button className="btn" disabled={bloqueado} onClick={() => onResponder({
+      veredicto: 'revision', tipoError: 'error_por_revisar', recuperacionActiva: false,
+      respuestaDada: 'Consulta de una pregunta pendiente de evaluación', detalle: c.explicacion,
+    })}>Consultar explicación</button>
+  </div>
 }
 
 /** Escritura correctiva: fijación ortográfica, sólo tras un error de ortografía en un término elegible. */
