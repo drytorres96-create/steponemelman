@@ -100,6 +100,10 @@ export function PanelFuente({ c }: { c: Concepto }) {
         <div className="rotulo" style={{ marginBottom: 6 }}>Fragmento fuente (verbatim)</div>
         <div className="fragmento">{c.source.fragment}</div>
       </div>
+      {c.revision_editorial && <div className="aviso"><div><b>Aclaración editorial</b><p>{c.revision_editorial.nota}</p>
+        {c.revision_editorial.fuentes.map(f => <p key={f.url}><a href={f.url} target="_blank" rel="noreferrer">{f.titulo}</a></p>)}
+      </div></div>}
+      {c.variante_id && <div><b>Referencias de esta variante</b>{c.variantes?.find(v => v.variant_id === c.variante_id)?.fuentes.map(f => <p key={f.url}><a href={f.url} target="_blank" rel="noreferrer">{f.titulo}</a></p>)}</div>}
       {c.fuentes_adicionales?.length ? (
         <div>
           <div className="rotulo" style={{ marginBottom: 6 }}>Otras apariciones del mismo concepto</div>

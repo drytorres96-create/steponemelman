@@ -2,7 +2,7 @@ import { nuevoProgreso, programar } from '../srs/fsrs'
 import { CRITERIOS_POR_DEFECTO, calcularEstado, evaluarDominio, type CriteriosDominio } from '../srs/mastery'
 import { intentoCorrecto, NOMBRE_ERROR, NOMBRE_ESTADO, type Intento, type ProgresoConcepto } from '../srs/tipos'
 
-export const CORPUS_VERSION = '1.0.4' as const
+export const CORPUS_VERSION = '1.0.5' as const
 
 export interface RegistroSesion {
   id: string
@@ -13,6 +13,7 @@ export interface RegistroSesion {
   vistos: number
   correctos: number
   ms: number
+  msVisibles?: number
 }
 
 export interface Reanudable {
@@ -29,6 +30,11 @@ export interface Reanudable {
   cantidadInicial?: number
   /** La práctica sin ayuda muestra su revisión antes de comenzar a corregir. */
   revisionInicialHecha?: boolean
+  presupuestoMinutos?: 10 | 20 | 30
+  msVisibles?: number
+  continuarSinLimite?: boolean
+  pausaPorTiempoPendiente?: boolean
+  variantes?: (string | null)[]
   paso?: {
     indice: number
     pistas: number
@@ -86,8 +92,8 @@ function leerIntento(v: unknown): Intento | null {
   if (v.session_id !== undefined && v.session_id !== null && !idSeguro(v.session_id)) return null
   if (v.resultado !== undefined && !RESULTADOS.has(String(v.resultado))) return null
   if (v.respuesta_dada !== undefined && (typeof v.respuesta_dada !== 'string' || v.respuesta_dada.length > 10000)) return null
-  for (const k of ['pregunta_id', 'pregunta_version', 'evaluador_version']) if (v[k] !== undefined && !idSeguro(v[k])) return null
-  for (const k of ['fuente_consultada', 'explicacion_previa']) if (v[k] !== undefined && typeof v[k] !== 'boolean') return null
+  for (const k of ['pregunta_id', 'pregunta_version', 'evaluador_version', 'variante_id']) if (v[k] !== undefined && !idSeguro(v[k])) return null
+  for (const k of ['fuente_consultada', 'explicacion_previa', 'primera_presentacion']) if (v[k] !== undefined && typeof v[k] !== 'boolean') return null
   if (v.modo !== undefined && !['aprendizaje', 'repaso', 'examen'].includes(String(v.modo))) return null
   if (v.tipo_evidencia !== undefined && !['recuerdo', 'discriminacion', 'aplicacion'].includes(String(v.tipo_evidencia))) return null
   if (v.calificacion_actualizada_en !== undefined && !numero(v.calificacion_actualizada_en, v.ts)) return null
@@ -95,6 +101,8 @@ function leerIntento(v: unknown): Intento | null {
     ...(v.respuesta_dada !== undefined ? { respuesta_dada: v.respuesta_dada as string } : {}),
     ...(v.pregunta_id !== undefined ? { pregunta_id: v.pregunta_id as string } : {}),
     ...(v.pregunta_version !== undefined ? { pregunta_version: v.pregunta_version as string } : {}),
+    ...(v.variante_id !== undefined ? { variante_id: v.variante_id as string } : {}),
+    ...(v.primera_presentacion !== undefined ? { primera_presentacion: v.primera_presentacion as boolean } : {}),
     ...(v.evaluador_version !== undefined ? { evaluador_version: v.evaluador_version as string } : {}),
     ...(v.fuente_consultada !== undefined ? { fuente_consultada: v.fuente_consultada as boolean } : {}),
     ...(v.explicacion_previa !== undefined ? { explicacion_previa: v.explicacion_previa as boolean } : {}),
@@ -147,7 +155,8 @@ function leerSesion(v: unknown): RegistroSesion | null {
       || !texto(v.modulo) || !texto(v.ruta) || !entero(v.vistos)
       || !entero(v.correctos) || v.correctos > v.vistos || !numero(v.ms)
       || (v.fin !== null && v.fin < v.inicio)) return null
-  return { id: v.id, inicio: v.inicio, fin: v.fin, modulo: v.modulo, ruta: v.ruta,
+  if (v.msVisibles !== undefined && !numero(v.msVisibles)) return null
+  return { ...(v.msVisibles !== undefined ? { msVisibles: v.msVisibles as number } : {}), id: v.id, inicio: v.inicio, fin: v.fin, modulo: v.modulo, ruta: v.ruta,
     vistos: v.vistos, correctos: v.correctos, ms: v.ms }
 }
 
@@ -171,6 +180,10 @@ function leerReanudable(v: unknown): Reanudable | null | false {
   if (v.cantidadInicial !== undefined && (!entero(v.cantidadInicial, 1)
     || !Array.isArray(v.conceptIds) || v.cantidadInicial > v.conceptIds.length)) return false
   if (v.revisionInicialHecha !== undefined && typeof v.revisionInicialHecha !== 'boolean') return false
+  if (v.presupuestoMinutos !== undefined && ![10, 20, 30].includes(v.presupuestoMinutos as number)) return false
+  if (v.msVisibles !== undefined && !numero(v.msVisibles)) return false
+  for (const k of ['continuarSinLimite', 'pausaPorTiempoPendiente']) if (v[k] !== undefined && typeof v[k] !== 'boolean') return false
+  if (v.variantes !== undefined && (!Array.isArray(v.variantes) || !Array.isArray(v.conceptIds) || v.variantes.length !== v.conceptIds.length || !v.variantes.every(x => x === null || idSeguro(x)))) return false
   if (v.paso !== undefined && (!esObjeto(v.paso) || !entero(v.paso.indice) || v.paso.indice !== v.indice
     || !entero(v.paso.pistas) || v.paso.pistas > 3 || typeof v.paso.fuenteConsultada !== 'boolean'
     || typeof v.paso.explicacionPrevia !== 'boolean' || !numero(v.paso.msActivo)
@@ -186,6 +199,11 @@ function leerReanudable(v: unknown): Reanudable | null | false {
     ...(v.sessionId !== undefined ? { sessionId: v.sessionId } : {}),
     ...(v.cantidadInicial !== undefined ? { cantidadInicial: v.cantidadInicial as number } : {}),
     ...(v.revisionInicialHecha !== undefined ? { revisionInicialHecha: v.revisionInicialHecha as boolean } : {}),
+    ...(v.presupuestoMinutos !== undefined ? { presupuestoMinutos: v.presupuestoMinutos as 10 | 20 | 30 } : {}),
+    ...(v.msVisibles !== undefined ? { msVisibles: v.msVisibles as number } : {}),
+    ...(v.continuarSinLimite !== undefined ? { continuarSinLimite: v.continuarSinLimite as boolean } : {}),
+    ...(v.pausaPorTiempoPendiente !== undefined ? { pausaPorTiempoPendiente: v.pausaPorTiempoPendiente as boolean } : {}),
+    ...(v.variantes !== undefined ? { variantes: [...v.variantes] as (string | null)[] } : {}),
     ...(esObjeto(v.paso) ? { paso: {
       indice: v.paso.indice as number, pistas: v.paso.pistas as number,
       fuenteConsultada: v.paso.fuenteConsultada as boolean, explicacionPrevia: v.paso.explicacionPrevia as boolean,
@@ -197,7 +215,7 @@ function leerReanudable(v: unknown): Reanudable | null | false {
 /** Lee versiones previas compatibles, sin aceptar estructuras parciales corruptas. */
 export function leerEstadoDesconocido(v: unknown): EstadoApp | null {
   if (!esObjeto(v) || v.version !== 1 || !esObjeto(v.progreso)) return null
-  if (v.corpus_version !== undefined && v.corpus_version !== '1.0.0' && v.corpus_version !== '1.0.1' && v.corpus_version !== '1.0.2' && v.corpus_version !== '1.0.3' && v.corpus_version !== CORPUS_VERSION) return null
+  if (v.corpus_version !== undefined && v.corpus_version !== '1.0.0' && v.corpus_version !== '1.0.1' && v.corpus_version !== '1.0.2' && v.corpus_version !== '1.0.3' && v.corpus_version !== '1.0.4' && v.corpus_version !== CORPUS_VERSION) return null
 
   const progreso: Record<string, ProgresoConcepto> = {}
   for (const [id, crudo] of Object.entries(v.progreso)) {
@@ -325,15 +343,26 @@ export function combinarEstados(a: EstadoApp, b: EstadoApp): EstadoApp {
     porSesion.set(s.id, { ...principal, inicio: Math.min(s.inicio, anterior.inicio),
       fin: s.fin === null && anterior.fin === null ? null : Math.max(s.fin ?? 0, anterior.fin ?? 0),
       vistos: Math.max(s.vistos, anterior.vistos), correctos: Math.max(s.correctos, anterior.correctos),
-      ms: Math.max(s.ms, anterior.ms) })
+      ms: Math.max(s.ms, anterior.ms),
+      ...(s.msVisibles !== undefined || anterior.msVisibles !== undefined ? { msVisibles: Math.max(s.msVisibles ?? 0, anterior.msVisibles ?? 0) } : {}) })
   }
   const msIntentos = Object.values(progreso).reduce((total, p) => total + p.intentos.reduce((n, i) => n + i.ms, 0), 0)
   return { version: 1, corpus_version: CORPUS_VERSION, progreso,
     sesiones: [...porSesion.values()].sort((x, y) => x.inicio - y.inicio || compararTexto(x.id, y.id)),
-    criterios, reanudable: elegirCampo(a, b, 'reanudable'),
+    criterios, reanudable: unirReanudable(a, b),
     fieldUpdatedAt: { criterios: Math.max(marca(a, 'criterios'), marca(b, 'criterios')),
       reanudable: Math.max(marca(a, 'reanudable'), marca(b, 'reanudable')) },
     msEstudio: Math.max(a.msEstudio, b.msEstudio, msIntentos), vistoAlguna: a.vistoAlguna || b.vistoAlguna || ids.length > 0 }
+}
+
+function unirReanudable(a: EstadoApp, b: EstadoApp): Reanudable | null {
+  const ganador = elegirCampo(a, b, 'reanudable')
+  const x = a.reanudable, y = b.reanudable
+  if (!ganador || !x?.sessionId || x.sessionId !== y?.sessionId) return ganador
+  const continuar = x.continuarSinLimite || y.continuarSinLimite
+  return { ...ganador,
+    ...(x.msVisibles !== undefined || y.msVisibles !== undefined ? { msVisibles: Math.max(x.msVisibles ?? 0, y.msVisibles ?? 0) } : {}),
+    ...(continuar ? { continuarSinLimite: true, pausaPorTiempoPendiente: false } : {}) }
 }
 
 /** Migra las claves y referencias de cola; si dos IDs convergen, fusiona su historial sin duplicar intentos. */

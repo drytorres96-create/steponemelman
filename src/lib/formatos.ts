@@ -40,6 +40,7 @@ export interface ContextoFormato { semilla: string; indice: number; ruta?: strin
  */
 export function prepararConcepto(original: Concepto, contexto: ContextoFormato): Concepto {
   const c: Concepto = { ...original, evaluacion: { ...original.evaluacion }, interaccion: { ...original.interaccion } }
+  if (c.variante_id) return c
   if (c.escritura_correctiva.termino && !esRespuestaBreve(c.escritura_correctiva.termino)) {
     c.escritura_correctiva = { elegible: false, termino: null }
   }

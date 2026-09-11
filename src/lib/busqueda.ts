@@ -15,7 +15,7 @@ export interface FiltrosBusqueda {
   estado: EstadoBusqueda | ''
 }
 export const FILTROS_BUSQUEDA_INICIALES: FiltrosBusqueda = { texto: '', disciplina: '', sistema: '', tema: '', estado: '' }
-export interface OpcionesSesionPersonalizada { titulo?: string; subtitulo?: string; ruta?: RutaId; modulo?: string }
+export interface OpcionesSesionPersonalizada { titulo?: string; subtitulo?: string; ruta?: RutaId; modulo?: string; presupuestoMinutos?: 10 | 20 | 30; nivelVariante?: 'discriminacion' | 'aplicacion' }
 
 export const NOMBRES_ESTADOS_BUSQUEDA: Record<EstadoBusqueda, string> = {
   nuevo: 'Nuevo', pendiente: 'Repaso pendiente', por_revisar: 'Respuesta por revisar', al_dia: 'Al día',

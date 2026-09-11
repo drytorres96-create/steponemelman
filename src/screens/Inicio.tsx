@@ -7,15 +7,19 @@ import { estaVencido } from '../srs/fsrs'
 import { dominioVigente } from '../srs/mastery'
 import { construirPlanDiario, erroresRecientesPendientes } from '../lib/plan-estudio'
 import { Cobertura } from './Cobertura'
+import { cargaPorTiempo, contextoReanudacion } from '../lib/tiempo'
 
 export function Inicio({ onIr, onContinuar, onEmpezar, onDebiles }: {
   onIr: (v: string) => void
   onContinuar: () => void
-  onEmpezar: (limite: number) => void
+  onEmpezar: (limite: number, minutos?: 10 | 20 | 30) => void
   onDebiles: (limite: number) => void
 }) {
   const { indice, estado } = useApp()
   const [limite, setLimite] = useState<5 | 10 | 20>(10)
+  const [modoCarga, setModoCarga] = useState<'tiempo' | 'conceptos'>('tiempo')
+  const [presupuesto, setPresupuesto] = useState<10 | 20 | 30>(20)
+  const cantidad = modoCarga === 'tiempo' ? cargaPorTiempo(presupuesto, estado.sesiones) : limite
   const [conceptos, setConceptos] = useState<Concepto[] | null>(null)
   const [error, setError] = useState(false)
   const [reintento, setReintento] = useState(0)
@@ -40,7 +44,7 @@ export function Inicio({ onIr, onContinuar, onEmpezar, onDebiles }: {
   const debiles = conceptos ? erroresRecientesPendientes(conceptos, estado.progreso).slice(0, 5) : []
   const recientes = [...dominados].sort((a, b) => (b.dominado_en ?? 0) - (a.dominado_en ?? 0)).slice(0, 5)
   const nombres = new Map(conceptos?.map(c => [c.concept_id, c.objetivo || c.clasificacion.tema]))
-  const plan = conceptos ? construirPlanDiario(conceptos, estado.progreso, limite) : null
+  const plan = conceptos ? construirPlanDiario(conceptos, estado.progreso, cantidad) : null
   const tiempos = progresos.flatMap(p => p.intentos).sort((a, b) => a.ts - b.ts)
     .filter(i => i.ms >= 1000 && i.ms <= 600000).slice(-100).map(i => i.ms).sort((a, b) => a - b)
   const mediana = tiempos.length >= 5 ? tiempos[Math.floor(tiempos.length / 2)] : null
@@ -55,13 +59,20 @@ export function Inicio({ onIr, onContinuar, onEmpezar, onDebiles }: {
           <h2 id="plan-titulo">{estado.reanudable ? 'Retoma tu sesión' : 'Una sesión a tu medida'}</h2>
           {estado.reanudable && <>
             <p className="sutil">{estado.reanudable.titulo || 'Tu sesión guardada'} · vuelve al punto donde la dejaste.</p>
+            <p>{contextoReanudacion(estado)}</p>
             <button className="btn principal" style={{ alignSelf: 'flex-start' }} onClick={onContinuar}>Continuar sesión guardada</button>
             <hr className="sep" />
           </>}
           <fieldset className="selector-carga">
-            <legend>{estado.reanudable ? 'O empieza una sesión nueva' : '¿Cuántos conceptos quieres trabajar?'}</legend>
+            <legend>{estado.reanudable ? 'O empieza una sesión nueva' : '¿Cuánto tiempo tienes ahora?'}</legend>
+            <div className="fila" style={{ marginBottom: 12 }}>
+              <button className="btn pequeno" aria-pressed={modoCarga === 'tiempo'} onClick={() => setModoCarga('tiempo')}>Por tiempo</button>
+              <button className="btn pequeno fantasma" aria-pressed={modoCarga === 'conceptos'} onClick={() => setModoCarga('conceptos')}>Por conceptos</button>
+            </div>
             <div className="fila" style={{ gap: 8 }}>
-              {([5, 10, 20] as const).map(n => <label key={n} className={`carga-opcion${limite === n ? ' activa' : ''}`}>
+              {modoCarga === 'tiempo' ? ([10, 20, 30] as const).map(n => <label key={n} className={`carga-opcion${presupuesto === n ? ' activa' : ''}`}>
+                <input type="radio" name="tiempo-estudio" checked={presupuesto === n} onChange={() => setPresupuesto(n)} /><span>{n} minutos</span>
+              </label>) : ([5, 10, 20] as const).map(n => <label key={n} className={`carga-opcion${limite === n ? ' activa' : ''}`}>
                 <input type="radio" name="carga-estudio" value={n} checked={limite === n} onChange={() => setLimite(n)} />
                 <span>{n} conceptos</span>
               </label>)}
@@ -76,10 +87,10 @@ export function Inicio({ onIr, onContinuar, onEmpezar, onDebiles }: {
                 <span className="etq">{plan.errores} para reforzar</span>
                 <span className="etq">{plan.nuevos} nuevos</span>
               </div>
-              <p className="mini">{minutos ? `Tiempo orientativo: ${minutos} min, según tus respuestas anteriores. Puedes necesitar más para leer explicaciones.` : 'Sin límite de tiempo. La duración dependerá de las preguntas y de las explicaciones que consultes.'}</p>
+              <p className="mini">{modoCarga === 'tiempo' ? `Objetivo: ${presupuesto} min contando preguntas y explicaciones. Al llegar, podrás terminar la pregunta y pausar o continuar. La cantidad de conceptos es orientativa.` : minutos ? `Tiempo de respuesta orientativo: ${minutos} min. Leer explicaciones añade tiempo.` : 'Sin límite de tiempo. Puedes pausar cuando lo necesites.'}</p>
               <button className={`btn ${estado.reanudable ? '' : 'principal'}`} style={{ alignSelf: 'flex-start' }}
-                disabled={!plan.conceptos.length} onClick={() => onEmpezar(limite)}>
-                {plan.conceptos.length ? `Empezar ${plan.conceptos.length} conceptos` : 'Todo al día por ahora'}
+                disabled={!plan.conceptos.length} onClick={() => onEmpezar(cantidad, modoCarga === 'tiempo' ? presupuesto : undefined)}>
+                {plan.conceptos.length ? modoCarga === 'tiempo' ? `Estudiar ${presupuesto} minutos` : `Empezar ${plan.conceptos.length} conceptos` : 'Todo al día por ahora'}
               </button>
             </>}
         </div>

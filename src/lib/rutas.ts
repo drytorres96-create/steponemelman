@@ -1,12 +1,14 @@
 import type { Concepto, Modulo } from '../schema/concept'
 import type { ProgresoConcepto } from '../srs/tipos'
+import { priorizarVariantes } from './variantes'
 import { conceptosUnicos, conceptosVencidos, construirPlanDiario, erroresRecientesPendientes, limiteValido, ultimoIntentoResuelto } from './plan-estudio'
 
 export type RutaId = 'guiada' | 'sistemas' | 'disciplinas' | 'mixta' | 'repaso' | 'debiles'
-  | 'confusiones' | 'examen' | 'direccional' | 'terminos'
+  | 'confusiones' | 'examen' | 'direccional' | 'terminos' | 'aplicacion'
 
 export interface DefRuta { id: RutaId; nombre: string; descripcion: string }
 export const RUTAS: DefRuta[] = [
+  { id: 'aplicacion', nombre: 'Aplicar lo aprendido', descripcion: 'Casos nuevos del piloto sobre conceptos que ya trabajaste. Medimos el primer intento sin ayuda por separado.' },
   { id: 'guiada', nombre: 'Ruta guiada', descripcion: 'Primero repasos pendientes y errores recientes; después fundamentos nuevos antes de su aplicación. Puedes cambiar de ruta.' },
   { id: 'sistemas', nombre: 'Por sistemas', descripcion: 'Estudia el material disponible de un sistema, empezando por lo que necesita repaso.' },
   { id: 'disciplinas', nombre: 'Por disciplinas', descripcion: 'Trabaja una disciplina a fondo (bioquímica, farmacología, patología…).' },
@@ -52,6 +54,8 @@ export function construirCola(
   const visto = (c: Concepto) => !!p(c)?.intentos.length
 
   switch (ruta) {
+    case 'aplicacion':
+      return priorizarVariantes(conceptos.filter(c => visto(c) && c.variantes?.some(v => v.nivel === 'aplicacion')), progreso).slice(0, limite)
     case 'repaso':
       return conceptosVencidos(conceptos, progreso, ahora).slice(0, limite)
     case 'debiles':

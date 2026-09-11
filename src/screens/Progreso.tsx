@@ -9,6 +9,8 @@ import { dominioVigente } from '../srs/mastery'
 import { erroresRecientesPendientes } from '../lib/plan-estudio'
 import { RUTAS } from '../lib/rutas'
 import { referenciaPagina } from '../lib/fuente'
+import { MapaProgreso } from '../components/MapaProgreso'
+import type { OpcionesSesionPersonalizada } from '../lib/busqueda'
 
 function Barras({ datos }: { datos: { etiqueta: string; n: number; total: number; fraccion?: boolean }[] }) {
   return <div className="barras">{datos.map(d => <div className="b" key={d.etiqueta}>
@@ -18,7 +20,7 @@ function Barras({ datos }: { datos: { etiqueta: string; n: number; total: number
   </div>)}</div>
 }
 
-export function Progreso({ onEstudiar }: { onEstudiar: (ids: string[]) => void }) {
+export function Progreso({ onEstudiar }: { onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void }) {
   const { indice, estado } = useApp()
   const [conceptos, setConceptos] = useState<Concepto[] | null>(null)
   const [error, setError] = useState(false)
@@ -67,6 +69,7 @@ export function Progreso({ onEstudiar }: { onEstudiar: (ids: string[]) => void }
 
   return <div className="pila">
     <div><h1>Progreso</h1><p className="sutil">Evidencia de tu práctica dentro del material publicado. No estima tu probabilidad de aprobar Step 1.</p></div>
+    <MapaProgreso conceptos={conceptos} onEstudiar={onEstudiar} />
     <div className="rejilla r4">
       <div className="tarjeta" style={{ display: 'grid', placeItems: 'center' }}><Anillo valor={dominados} total={total} etiqueta="dominio vigente" oro /></div>
       {[
@@ -114,11 +117,11 @@ export function Progreso({ onEstudiar }: { onEstudiar: (ids: string[]) => void }
     <div className="tarjeta"><h2 style={{ marginBottom: 10 }}>Historial de sesiones</h2>
       {!sesiones.length ? <Vacio titulo="Sin sesiones aún" texto="Verás lo que trabajaste, las respuestas correctas y el tiempo activo registrado." />
         : <div className="scroll-x"><table className="tabla">
-          <thead><tr><th>Fecha</th><th>Ruta</th><th>Trabajados</th><th>Correctos</th><th>Tiempo activo</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Ruta</th><th>Trabajados</th><th>Correctos</th><th>Tiempo de estudio</th></tr></thead>
           <tbody>{sesiones.map(s => <tr key={s.id}>
             <td>{new Date(s.inicio).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' })}</td>
             <td className="sutil">{RUTAS.find(r => r.id === s.ruta)?.nombre || indice?.modulos.flatMap(m => m.sesiones).find(r => r.session_id === s.ruta)?.titulo || 'Sesión de estudio'}</td>
-            <td>{s.vistos}</td><td>{s.correctos}{s.vistos ? ` (${Math.round(s.correctos / s.vistos * 100)} %)` : ''}</td><td className="sutil">{Math.round(s.ms / 60000)} min</td>
+            <td>{s.vistos}</td><td>{s.correctos}{s.vistos ? ` (${Math.round(s.correctos / s.vistos * 100)} %)` : ''}</td><td className="sutil">{Math.round((s.msVisibles ?? s.ms) / 60000)} min{s.msVisibles === undefined ? ' (solo respuestas)' : ''}</td>
           </tr>)}</tbody>
         </table></div>}
     </div>

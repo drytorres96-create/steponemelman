@@ -15,6 +15,7 @@ import { useAuth } from './auth/AuthProvider'
 import { APP_VERSION } from './release'
 import type { OpcionesSesionPersonalizada } from './lib/busqueda'
 import { alternarFormatos } from './lib/formatos'
+import { aplicarVariante, siguienteVariante } from './lib/variantes'
 
 type Vista = 'inicio' | 'modulos' | 'repaso' | 'progreso' | 'auditoria' | 'ajustes' | 'estudio'
 const NAV: { id: Vista; txt: string }[] = [
@@ -47,7 +48,7 @@ export default function App() {
   useEffect(() => { contenido.current?.focus({ preventScroll: true }) }, [vista])
   const ir = useCallback((v: string) => { setCola(null); setVista(v as Vista); location.hash = v }, [])
 
-  const abrir = useCallback(async (moduloId: string, ruta: RutaId, limite: number, sesionId?: string, desde = 0) => {
+  const abrir = useCallback(async (moduloId: string, ruta: RutaId, limite: number, sesionId?: string, desde = 0, presupuestoMinutos?: 10 | 20 | 30) => {
     if (!indice) return
     setCargando(true); setError(null)
     try {
@@ -68,10 +69,10 @@ export default function App() {
         titulo = r.nombre; subtitulo = r.descripcion
       }
       const seleccion = sesionId ? conceptos : construirCola(ruta, conceptos, estado.progreso, limite)
-      const lista = alternarFormatos(seleccion, ruta)
+      const lista = alternarFormatos(seleccion.map(c => ruta === 'aplicacion' ? aplicarVariante(c, siguienteVariante(c, estado.progreso[c.concept_id])) : c), ruta)
       if (!lista.length) { setError('No hay conceptos disponibles para esta ruta ahora mismo.'); setCargando(false); return }
       setIndiceInicial(Math.min(desde, lista.length - 1))
-      setCola({ titulo, subtitulo, ruta, modulo: moduloId || ruta, conceptos: lista })
+      setCola({ titulo, subtitulo, ruta, modulo: moduloId || ruta, conceptos: lista, presupuestoMinutos })
       setVista('estudio'); location.hash = 'estudio'
     } catch (e) { setError(String(e)) } finally { setCargando(false) }
   }, [indice, estado.progreso])
@@ -81,16 +82,17 @@ export default function App() {
     setCargando(true); setError(null)
     try {
       const mapa = await cargarConceptos(ids, indice.modulos)
-      const lista = alternarFormatos([...new Set(ids)].map(i => mapa.get(i)).filter(Boolean) as Concepto[], opciones.ruta ?? 'repaso')
+      const seleccion = [...new Set(ids)].map(i => mapa.get(i)).filter(Boolean) as Concepto[]
+      const lista = alternarFormatos(seleccion.map(c => opciones.ruta === 'aplicacion' ? aplicarVariante(c, siguienteVariante(c, estado.progreso[c.concept_id], opciones.nivelVariante)) : c), opciones.ruta ?? 'repaso')
       if (!lista.length) throw new Error('No hay conceptos disponibles para esta sesión.')
       setIndiceInicial(0)
       setCola({ titulo: opciones.titulo ?? 'Mi selección de estudio', subtitulo: opciones.subtitulo ?? 'Practica los conceptos que has elegido',
-        ruta: opciones.ruta ?? 'repaso', modulo: opciones.modulo ?? 'repaso', conceptos: lista })
+        ruta: opciones.ruta ?? 'repaso', modulo: opciones.modulo ?? 'repaso', conceptos: lista, presupuestoMinutos: opciones.presupuestoMinutos })
       setVista('estudio'); location.hash = 'estudio'
     } catch {
       setError('No se pudo preparar el repaso. Comprueba la conexión y vuelve a intentarlo.')
     } finally { setCargando(false) }
-  }, [indice])
+  }, [indice, estado.progreso])
 
   const continuar = useCallback(async () => {
     const r = estado.reanudable
@@ -101,10 +103,10 @@ export default function App() {
         const mapa = await cargarConceptos(r.conceptIds, indice.modulos)
         const faltantes = [...new Set(r.conceptIds.filter(id => !mapa.has(id)))]
         if (faltantes.length) throw new Error(`No se pudo restaurar la cola exacta: faltan ${faltantes.length} conceptos del corpus actual.`)
-        const conceptos = r.conceptIds.map(id => mapa.get(id) as Concepto)
+        const conceptos = r.conceptIds.map((id, n) => aplicarVariante(mapa.get(id) as Concepto, r.variantes?.[n]))
         setCola({
           titulo: r.titulo ?? 'Sesión reanudada', subtitulo: r.subtitulo ?? 'Continúa exactamente donde la dejaste.',
-          ruta: r.sesion, modulo: r.modulo, conceptos, sessionId: r.sessionId,
+          ruta: r.sesion, modulo: r.modulo, conceptos, sessionId: r.sessionId, presupuestoMinutos: r.presupuestoMinutos,
         })
         setIndiceInicial(Math.min(r.indice, conceptos.length))
         setVista('estudio'); location.hash = 'estudio'
@@ -156,7 +158,7 @@ export default function App() {
             </>
           )}
           {!cargando && vista === 'inicio' && <Inicio onIr={ir} onContinuar={continuar}
-            onEmpezar={limite => abrir('', 'guiada', limite)} onDebiles={limite => abrir('', 'debiles', limite)} />}
+            onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} onDebiles={limite => abrir('', 'debiles', limite)} />}
           {!cargando && vista === 'modulos' && <Modulos onAbrir={abrir} onEstudiar={estudiarIds} />}
           {!cargando && vista === 'repaso' && <Repaso onEstudiar={estudiarIds} />}
           {!cargando && vista === 'progreso' && <Progreso onEstudiar={estudiarIds} />}

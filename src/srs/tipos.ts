@@ -36,6 +36,8 @@ export interface Intento {
   respuesta_dada?: string
   pregunta_id?: string
   pregunta_version?: string
+  variante_id?: string
+  primera_presentacion?: boolean
   evaluador_version?: string
   fuente_consultada?: boolean
   explicacion_previa?: boolean

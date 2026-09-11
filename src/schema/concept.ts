@@ -29,9 +29,19 @@ const OpcionZ = z.object({
   por_que: z.string().nullish().transform(v => v ?? ''),
 })
 const FlechaZ = z.object({ variable: z.string().min(1), direccion: z.enum(['sube','baja','sin_cambio']) })
+export const VarianteZ = z.object({
+  variant_id: z.string().min(3), nivel: z.enum(['discriminacion', 'aplicacion']),
+  pregunta: z.string().min(10).max(900), opciones: z.array(OpcionZ).min(3).max(5),
+  explicacion: z.string().min(10).max(1000),
+  fuentes: z.array(z.object({ titulo: z.string(), url: z.string().url() })).default([]),
+}).refine(v => v.opciones.filter(o => o.correcta).length === 1 && new Set(v.opciones.map(o => o.texto)).size === v.opciones.length)
+export type Variante = z.infer<typeof VarianteZ>
 
 export const ConceptoZ = z.object({
   concept_id: z.string().min(3),
+  variantes: z.array(VarianteZ).optional(),
+  variante_id: z.string().optional(),
+  revision_editorial: z.object({ nota: z.string(), fuentes: z.array(z.object({ titulo: z.string(), url: z.string().url() })) }).optional(),
   source: z.object({
     doc: z.string(), doc_title: z.string(), page: z.number().int().positive(),
     pdf_page: z.number().int().positive().optional(),

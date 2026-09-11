@@ -22,7 +22,7 @@ interface Ctx {
   progresoDe: (id: string) => ProgresoConcepto
   guardarReanudable: (r: Reanudable | null) => void
   iniciarSesion: (modulo: string, ruta: string) => string
-  cerrarSesion: (id: string, datos: { vistos: number; correctos: number; ms: number }) => void
+  cerrarSesion: (id: string, datos: { vistos: number; correctos: number; ms: number; msVisibles?: number }) => void
   actualizarCriterios: (c: CriteriosDominio) => void
   exportar: () => string
   importar: (json: string) => { ok: boolean; mensaje: string }
