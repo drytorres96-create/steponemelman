@@ -29,6 +29,38 @@ const formatoIntervalo = (dias: number | null) => dias === null ? 'Pendiente de 
 const etiquetaResultado = (r: Intento['resultado']) => r === 'correcta' ? 'Correcto' : r === 'parcial' ? 'Parcialmente correcto'
   : r === 'ortografia' ? 'Concepto correcto, revisa la escritura' : r === 'revision' ? 'Respuesta por revisar' : 'Incorrecto'
 
+const PERIMETRO = 2 * Math.PI * 44
+
+/** Reloj de sesión en un anillo lateral: fuera de la columna de lectura, visible sin robar el foco. */
+function Cronometro({ msVisibles, presupuesto, sinLimite }: { msVisibles: number; presupuesto: number; sinLimite: boolean }) {
+  const total = presupuesto * 60000
+  const excedido = msVisibles >= total
+  const fraccion = Math.min(1, total > 0 ? msVisibles / total : 0)
+  const aviso = sinLimite ? 'Has elegido continuar'
+    : excedido ? 'Termina esta pregunta; después puedes pausar o continuar.'
+    : 'Incluye preguntas y explicaciones'
+  return <div className={`cronometro${excedido && !sinLimite ? ' excedido' : ''}`}>
+    <div className="cronometro-anillo" role="timer"
+      aria-label={`${tiempoLegible(msVisibles)} de ${presupuesto} minutos de sesión. ${aviso}`}>
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <defs>
+          <linearGradient id="cronometro-trazo" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="var(--cian)" /><stop offset="55%" stopColor="var(--violeta-2)" />
+            <stop offset="100%" stopColor="var(--magenta)" />
+          </linearGradient>
+        </defs>
+        <circle className="cronometro-pista" cx="50" cy="50" r="44" />
+        <circle className="cronometro-avance" cx="50" cy="50" r="44"
+          strokeDasharray={PERIMETRO} strokeDashoffset={PERIMETRO * (1 - fraccion)} />
+      </svg>
+      <div className="cronometro-lectura" aria-hidden="true">
+        <b>{tiempoLegible(msVisibles)}</b><span>{presupuesto} min</span>
+      </div>
+    </div>
+    {excedido && !sinLimite && <p className="cronometro-aviso">{aviso}</p>}
+  </div>
+}
+
 export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
   { cola: Cola; onSalir: () => void; indiceInicial?: number }) {
   const { registrarIntento, progresoDe, estado, guardarReanudable, iniciarSesion, cerrarSesion } = useApp()
@@ -325,8 +357,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
   const puedeResponderDeNuevo = puedeRevisarConOpciones || (alternativa && esRespuestaBreve(alternativa.respuesta_canonica))
 
   return <div className="reproductor pila">
-    {presupuesto && <div className="presupuesto-sesion"><span>{tiempoLegible(msVisibles)} / {presupuesto} min</span>
-      <span>{sinLimite ? 'Has elegido continuar' : msVisibles >= presupuesto * 60000 ? 'Termina esta pregunta; después puedes pausar o continuar.' : 'Incluye preguntas y explicaciones'}</span></div>}
+    {presupuesto && <Cronometro msVisibles={msVisibles} presupuesto={presupuesto} sinLimite={sinLimite} />}
     {c.variante_id && <p className="mini">{c.interaccion.recomendada === 'caso_clinico' ? 'Aplicación en un caso' : 'Distinguir conceptos'} · {progresoDe(c.concept_id).intentos.some(t => t.variante_id === c.variante_id && t.pregunta_id !== preguntaId) ? 'Variante ya practicada' : 'Primera presentación de esta variante'}</p>}
     <div className="fila" style={{ justifyContent: 'space-between' }}>
       <div className="fila" style={{ gap: 8 }}>
@@ -355,12 +386,12 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
       </div>}
       <div hidden={fase === 'ensenanza'}>
         <div className="pregunta">{c.evaluacion.pregunta}</div>
-        {fase === 'tarea' && <details key={preguntaId} className="mini" style={{ marginBottom: 14 }}><summary>Registrar confianza (opcional)</summary><div className="fila" style={{ gap: 6, marginTop: 8 }}>
+        {fase === 'tarea' && <details key={`confianza-${preguntaId}`} className="mini" style={{ marginBottom: 14 }}><summary>Registrar confianza (opcional)</summary><div className="fila" style={{ gap: 6, marginTop: 8 }}>
           {([[1, 'Poca'], [2, 'Media'], [3, 'Mucha']] as const).map(([v, t]) => <button key={v} className={`btn pequeno ${confianza === v ? 'principal' : 'fantasma'}`}
             aria-pressed={confianza === v} onClick={() => { setConfianza(v); guardarPaso({ confianza: v }) }}>{t}</button>)}
         </div></details>}
         {!examenSinAyuda && pistas > 0 && c.pistas.slice(0, pistas).map((t, k) => <div key={k} className="pista"><b>Pista {k + 1}:</b> {t}</div>)}
-        {(!examenSinAyuda || fase === 'tarea') && <Interaccion key={preguntaId} c={c} semilla={preguntaId} ocultarFeedback={examenSinAyuda}
+        {(!examenSinAyuda || fase === 'tarea') && <Interaccion key={`interaccion-${preguntaId}`} c={c} semilla={preguntaId} ocultarFeedback={examenSinAyuda}
           bloqueado={fase !== 'tarea'} resultado={res} onResponder={responder} />}
         {fase === 'tarea' && !examenSinAyuda && <div className="fila" style={{ marginTop: 14 }}>
           <button className="btn pequeno fantasma" onClick={() => { setExplicacionPrevia(true); setFase('ensenanza'); guardarPaso({ explicacionPrevia: true, ensenanzaAbierta: true }) }}>Necesito aprenderlo</button>
