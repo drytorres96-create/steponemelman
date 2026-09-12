@@ -58,7 +58,9 @@ describe('plan diario y rutas', () => {
     const plan = construirPlanDiario(cs, ps, 5, ahora)
     expect(plan.vencidos).toBe(5)
     expect(plan.nuevos).toBe(0)
-    expect(plan.repasoLimitado).toBe(true)
+    // El tope no actuó: no hay material nuevo al que reservar plazas, así que no se anuncia.
+    expect(plan.repasoLimitado).toBe(false)
+    expect(plan.explicacion).not.toContain('70 %')
   })
 
   it('el repaso recupera las plazas que el material nuevo no llega a llenar', () => {

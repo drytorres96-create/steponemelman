@@ -37,6 +37,8 @@ export interface NbmeCatalog {
   questions: NbmeQuestionMeta[]
 }
 export interface NbmeQuestionRef { id: string; revision: string }
+/** Lápidas de bloques descartados: sessionId → cuándo. Sin ellas, la unión los resucita. */
+export type NbmeDiscarded = Record<string, number>
 export interface NbmeDraft { optionId: string | null; changedAt: number }
 export interface NbmeSession {
   id: string
@@ -78,6 +80,7 @@ export interface NbmeFilters {
 export interface NbmeState {
   version: 1
   bankVersion: string
+  discarded: NbmeDiscarded
   sessions: Record<string, NbmeSession>
   attempts: Record<string, NbmeAttempt>
   activeSessionId: string | null

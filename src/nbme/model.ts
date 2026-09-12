@@ -1,11 +1,18 @@
-import type { NbmeAttempt, NbmeFilters, NbmeQuestion, NbmeQuestionProgress, NbmeQuestionRef, NbmeSession, NbmeSessionView, NbmeState } from './types'
+import type { NbmeAttempt, NbmeDiscarded, NbmeFilters, NbmeQuestion, NbmeQuestionProgress, NbmeQuestionRef, NbmeSession, NbmeSessionView, NbmeState } from './types'
 
 // 20 minutos por defecto: los conceptos ya estaban protegidos con un presupuesto y el banco no,
 // así que una sesión de preguntas podía crecer sin corte natural.
 export const DEFAULT_NBME_FILTERS: NbmeFilters = { form: 'all', system: '', discipline: '', status: 'all', quality: 'ready', size: 10, budgetMinutes: 20 }
 export function emptyNbmeState(bankVersion = '1.0.0'): NbmeState {
-  return { version: 1, bankVersion, sessions: {}, attempts: {}, activeSessionId: null, activeChangedAt: 0,
+  return { version: 1, bankVersion, discarded: {}, sessions: {}, attempts: {}, activeSessionId: null, activeChangedAt: 0,
     filters: { ...DEFAULT_NBME_FILTERS }, filtersChangedAt: 0 }
+}
+/** Cuántas lápidas se conservan: las más recientes bastan para no resucitar nada vivo. */
+export const MAX_LAPIDAS = 200
+function podarLapidas(discarded: NbmeDiscarded): NbmeDiscarded {
+  const entradas = Object.entries(discarded)
+  if (entradas.length <= MAX_LAPIDAS) return discarded
+  return Object.fromEntries(entradas.sort((a, b) => b[1] - a[1]).slice(0, MAX_LAPIDAS))
 }
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= Number.MAX_SAFE_INTEGER
@@ -52,7 +59,16 @@ export function parseNbmeState(value: unknown): NbmeState | null {
   const filters = value.filters === undefined ? DEFAULT_NBME_FILTERS : parseFilters(value.filters)
   if (!filters || (value.filtersChangedAt !== undefined && !num(value.filtersChangedAt))) return null
   out.filters = { ...filters }; out.filtersChangedAt = value.filtersChangedAt as number | undefined ?? 0
+  if (value.discarded !== undefined) {
+    if (!object(value.discarded) || Object.keys(value.discarded).length > MAX_LAPIDAS * 4) return null
+    for (const [sid, cuando] of Object.entries(value.discarded)) {
+      if (!id(sid) || !num(cuando)) return null
+      out.discarded[sid] = cuando
+    }
+  }
   for (const [sid, raw] of Object.entries(value.sessions)) {
+    if (out.discarded[sid]) continue   // una lápida gana sobre la sesión que la acompañe
+
     if (!id(sid)) return null
     const session = parseSession(raw, sid)
     if (!session) return null
@@ -86,7 +102,14 @@ function mergeAttempt(a: NbmeAttempt, b: NbmeAttempt): NbmeAttempt {
 }
 export function mergeNbmeStates(a: NbmeState, b: NbmeState): NbmeState {
   const out = emptyNbmeState(a.bankVersion >= b.bankVersion ? a.bankVersion : b.bankVersion)
+  // Las lápidas se unen ANTES que las sesiones: la unión pura resucitaba lo descartado en el
+  // siguiente sync, así que el botón «Descartar» no descartaba nada de forma duradera.
+  for (const sid of new Set([...Object.keys(a.discarded), ...Object.keys(b.discarded)])) {
+    out.discarded[sid] = Math.max(a.discarded[sid] ?? 0, b.discarded[sid] ?? 0)
+  }
+  out.discarded = podarLapidas(out.discarded)
   for (const sid of [...new Set([...Object.keys(a.sessions), ...Object.keys(b.sessions)])].sort()) {
+    if (out.discarded[sid]) continue
     const x = a.sessions[sid], y = b.sessions[sid]
     if (!x || !y) { out.sessions[sid] = x ?? y; continue }
     if (stable(x.initial) !== stable(y.initial) || x.startedAt !== y.startedAt || x.budgetMinutes !== y.budgetMinutes) throw new Error('Incompatible session identity')
@@ -100,11 +123,14 @@ export function mergeNbmeStates(a: NbmeState, b: NbmeState): NbmeState {
   }
   for (const aid of [...new Set([...Object.keys(a.attempts), ...Object.keys(b.attempts)])].sort()) {
     const x = a.attempts[aid], y = b.attempts[aid]
-    out.attempts[aid] = x && y ? mergeAttempt(x, y) : x ?? y
+    const intento = x && y ? mergeAttempt(x, y) : x ?? y
+    if (out.discarded[intento.sessionId]) continue
+    out.attempts[aid] = intento
   }
   out.activeChangedAt = Math.max(a.activeChangedAt, b.activeChangedAt)
-  out.activeSessionId = a.activeChangedAt === b.activeChangedAt && (a.activeSessionId === null || b.activeSessionId === null)
+  const activo = a.activeChangedAt === b.activeChangedAt && (a.activeSessionId === null || b.activeSessionId === null)
     ? null : choose(a.activeSessionId, b.activeSessionId, a.activeChangedAt, b.activeChangedAt)
+  out.activeSessionId = activo && out.discarded[activo] ? null : activo
   out.filters = choose(a.filters, b.filters, a.filtersChangedAt, b.filtersChangedAt)
   out.filtersChangedAt = Math.max(a.filtersChangedAt, b.filtersChangedAt)
   return out
@@ -196,12 +222,13 @@ export function reviewNbmeAnswer(state: NbmeState, sid: string, position: number
  * posición de su propia sesión, así que dejarlos huérfanos invalidaría el estado completo.
  */
 export function discardNbmeSession(state: NbmeState, sid: string, now = Date.now()): NbmeState {
-  if (!state.sessions[sid]) return state
+  if (!state.sessions[sid]) return state   // nada que descartar: no se deja lápida por nada
   const sessions = { ...state.sessions }
   delete sessions[sid]
   const attempts = Object.fromEntries(Object.entries(state.attempts).filter(([, a]) => a.sessionId !== sid))
   const activo = state.activeSessionId === sid
   return { ...state, sessions, attempts,
+    discarded: podarLapidas({ ...state.discarded, [sid]: now }),
     activeSessionId: activo ? null : state.activeSessionId,
     activeChangedAt: activo ? now : state.activeChangedAt }
 }

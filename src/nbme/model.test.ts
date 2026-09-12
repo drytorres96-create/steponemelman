@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { NbmeQuestion, NbmeState } from './types'
 import { activateNbmeSession, deriveNbmeSession, emptyNbmeState, mergeNbmeStates, parseNbmeState, questionProgress, reviewNbmeAnswer,
   setNbmeDraft, startNbmeSession, submitNbmeAnswer, summarizeNbmeState, updateNbmeFilters, updateNbmeSession,
-  discardNbmeSession, countNbmeSessionAttempts, setNbmeBankVersion } from './model'
+  discardNbmeSession, countNbmeSessionAttempts, setNbmeBankVersion, MAX_LAPIDAS } from './model'
 
 const question = (id = 'NBME27-P0001'): NbmeQuestion => ({ id, revision: 'rev1', form: '27', section: 1, item: 1, page: 1,
   systems: ['Renal'], disciplines: ['Fisiología'], topic: 'QA', objective: null, status: 'ready', reasons: [], figureRequired: false,
@@ -178,5 +178,55 @@ describe('bankVersion como clave de invalidación', () => {
   it('el estado sellado sigue pasando la validación', () => {
     const sellado = setNbmeBankVersion(start(), '1.6.2-corregido')
     expect(parseNbmeState(JSON.parse(JSON.stringify(sellado)))?.bankVersion).toBe('1.6.2-corregido')
+  })
+})
+
+describe('las lápidas impiden que la unión resucite un bloque descartado', () => {
+  it('el bloque descartado no vuelve al mezclar con una copia que todavía lo tiene', () => {
+    let remoto = start([q, q2])
+    remoto = submitNbmeAnswer(remoto, 'S1', 0, q, 'B', 900, 2000)
+    remoto = reviewNbmeAnswer(remoto, 'S1', 0, 3000)
+    expect(countNbmeSessionAttempts(remoto, 'S1')).toBe(1)
+
+    // Este es el caso que hacía inútil el botón: descartar y sincronizar contra el remoto vivo.
+    const local = discardNbmeSession(remoto, 'S1', 9000)
+    const unido = mergeNbmeStates(local, remoto)
+    expect(unido.sessions.S1).toBeUndefined()
+    expect(countNbmeSessionAttempts(unido, 'S1')).toBe(0)
+    expect(unido.activeSessionId).toBeNull()
+    expect(unido.discarded.S1).toBe(9000)
+    expect(parseNbmeState(JSON.parse(JSON.stringify(unido)))?.sessions.S1).toBeUndefined()
+  })
+  it('la lápida sobrevive en los dos sentidos de la mezcla', () => {
+    const remoto = start([q])
+    const local = discardNbmeSession(remoto, 'S1', 9000)
+    expect(mergeNbmeStates(remoto, local).sessions.S1).toBeUndefined()
+    expect(mergeNbmeStates(local, remoto).sessions.S1).toBeUndefined()
+  })
+  it('no entierra los bloques que no se descartaron', () => {
+    let s = start([q])
+    s = startNbmeSession(s, { id: 'S2', title: 'Otro', refs: [{ id: q2.id, revision: q2.revision }] }, 3000)
+    s = submitNbmeAnswer(s, 'S2', 0, q2, 'A', 400, 4000)
+    const unido = mergeNbmeStates(discardNbmeSession(s, 'S1', 9000), s)
+    expect(unido.sessions.S1).toBeUndefined()
+    expect(unido.sessions.S2).toBeDefined()
+    expect(countNbmeSessionAttempts(unido, 'S2')).toBe(1)
+  })
+  it('un estado guardado antes de las lápidas se lee sin ellas', () => {
+    const antiguo = JSON.parse(JSON.stringify(start([q]))) as Record<string, unknown>
+    delete antiguo.discarded
+    const leido = parseNbmeState(antiguo)
+    expect(leido).not.toBeNull()
+    expect(leido!.discarded).toEqual({})
+    expect(leido!.sessions.S1).toBeDefined()
+  })
+  it('poda las lápidas para que no crezcan sin límite', () => {
+    let s = emptyNbmeState()
+    for (let i = 0; i < MAX_LAPIDAS + 30; i++) {
+      s = startNbmeSession(s, { id: `B${i}`, title: 'x', refs: [{ id: q.id, revision: q.revision }] }, 1000 + i)
+      s = discardNbmeSession(s, `B${i}`, 1000 + i)
+    }
+    expect(Object.keys(s.discarded)).toHaveLength(MAX_LAPIDAS)
+    expect(s.discarded[`B${MAX_LAPIDAS + 29}`]).toBeDefined()
   })
 })

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { nuevoProgreso, programar, DIA } from '../srs/fsrs'
-import { CRITERIOS_POR_DEFECTO, evaluarDominio, calcularEstado, dominioVigente, evidenciaIndependiente, etapa, resumenDominio } from '../srs/mastery'
+import { CRITERIOS_POR_DEFECTO, CRITERIOS_HEREDADOS, sonCriteriosHeredados, evaluarDominio, calcularEstado, dominioVigente, evidenciaIndependiente, etapa, resumenDominio } from '../srs/mastery'
 import type { Intento } from '../srs/tipos'
 
 const it3 = (ts: number, extra: Partial<Intento> = {}): Intento => ({
@@ -25,17 +25,17 @@ describe('criterios de dominio', () => {
     expect(ev.cumple).toBe(true)
     expect(ev.detalle.every(d => d.cumplido)).toBe(true)
   })
-  it('el reconocimiento puro exige dos aciertos más que el recuerdo libre', () => {
+  it('el reconocimiento puro exige un acierto más que el recuerdo libre', () => {
     const t = Date.now()
     const mcq = { recuperacion_activa: false, interaccion: 'opcion_multiple' }
     let p = nuevoProgreso('X')
     for (const d of [0, 2, 5]) p = programar(p, it3(t + d * DIA, mcq), t + d * DIA)
-    // Tres aciertos entre tres opciones se consiguen por azar 1 de cada 27 veces.
+    // Tres aciertos entre tres opciones se consiguen por azar 1 de cada 27 veces; cuatro, 1 de 81.
     const tres = evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA)
-    expect(tres.requeridas).toBe(5)
+    expect(tres.requeridas).toBe(4)
     expect(tres.cumple).toBe(false)
-    for (const d of [7, 9]) p = programar(p, it3(t + d * DIA, mcq), t + d * DIA)
-    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 9 * DIA).cumple).toBe(true)
+    p = programar(p, it3(t + 7 * DIA, mcq), t + 7 * DIA)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 7 * DIA).cumple).toBe(true)
   })
   it('un solo recuerdo libre devuelve el umbral normal de tres aciertos', () => {
     const t = Date.now()
@@ -185,5 +185,21 @@ describe('criterios de dominio', () => {
     }
     expect(resumenDominio(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA)).toEqual({ texto: 'Dominio acreditado', pendientes: [] })
     expect(resumenDominio(p, CRITERIOS_POR_DEFECTO, p.proxima! + 1).texto).toContain('repaso pendiente')
+  })
+})
+
+describe('migración de los criterios guardados', () => {
+  it('los criterios heredados se reconocen exactamente', () => {
+    expect(sonCriteriosHeredados(CRITERIOS_HEREDADOS)).toBe(true)
+    expect(sonCriteriosHeredados(CRITERIOS_POR_DEFECTO)).toBe(false)
+    // Un valor tocado a mano ya no es «heredado» y no se debe pisar.
+    expect(sonCriteriosHeredados({ ...CRITERIOS_HEREDADOS, separacionHoras: 48 })).toBe(false)
+    expect(sonCriteriosHeredados({ ...CRITERIOS_HEREDADOS, recuperaciones: 4 })).toBe(false)
+  })
+  it('los criterios endurecidos no son los heredados', () => {
+    expect(CRITERIOS_POR_DEFECTO.separacionHoras).toBe(96)
+    expect(CRITERIOS_POR_DEFECTO.ventanaConfusionDias).toBe(7)
+    expect(CRITERIOS_HEREDADOS.separacionHoras).toBe(20)
+    expect(CRITERIOS_HEREDADOS.ventanaConfusionDias).toBe(14)
   })
 })

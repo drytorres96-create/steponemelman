@@ -1,5 +1,5 @@
 import { nuevoProgreso, programar } from '../srs/fsrs'
-import { CRITERIOS_POR_DEFECTO, calcularEstado, evaluarDominio, type CriteriosDominio } from '../srs/mastery'
+import { CRITERIOS_POR_DEFECTO, calcularEstado, evaluarDominio, type CriteriosDominio, sonCriteriosHeredados } from '../srs/mastery'
 import { intentoCorrecto, NOMBRE_ERROR, NOMBRE_ESTADO, type Intento, type ProgresoConcepto } from '../srs/tipos'
 
 export const CORPUS_VERSION = '1.0.5' as const
@@ -251,7 +251,10 @@ export function leerEstadoDesconocido(v: unknown): EstadoApp | null {
   const sesiones = sesionesCrudas.map(leerSesion)
   if (sesiones.some(s => s === null)) return null
 
-  const criterios = v.criterios === undefined ? CRITERIOS_POR_DEFECTO : leerCriterios(v.criterios)
+  const guardados = v.criterios === undefined ? CRITERIOS_POR_DEFECTO : leerCriterios(v.criterios)
+  // `criterios` se persiste y se sincroniza, así que endurecer la constante no basta: si lo
+  // guardado son exactamente los criterios heredados, es que nunca se tocaron a mano y se migran.
+  const criterios = guardados && sonCriteriosHeredados(guardados) ? CRITERIOS_POR_DEFECTO : guardados
   const reanudable = leerReanudable(v.reanudable)
   if (!criterios || reanudable === false) return null
   if (v.msEstudio !== undefined && !numero(v.msEstudio)) return null

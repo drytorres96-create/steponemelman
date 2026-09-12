@@ -100,8 +100,8 @@ export function construirPlanDiario(conceptos: Concepto[], progreso: Progreso, l
   // Si no hay suficientes conceptos nuevos, el repaso recupera las plazas libres.
   const libres = maximo - elegidos.length
   const lista = libres > 0 ? [...elegidos, ...repaso.slice(plazasRepaso, plazasRepaso + libres)] : elegidos
-  const repasoLimitado = repaso.length > lista.filter(c =>
-    new Set(repaso.map(r => r.concept_id)).has(c.concept_id)).length
+  // Cierto sólo cuando el TOPE dejó vencidos fuera, no cuando simplemente no caben en el límite.
+  const repasoLimitado = nuevos.length > 0 && repaso.length > plazasRepaso
   const idsErrores = new Set(errores.map(c => c.concept_id))
   const nVencidos = lista.filter(c => idsVencidos.has(c.concept_id)).length
   const nErrores = lista.filter(c => idsErrores.has(c.concept_id)).length

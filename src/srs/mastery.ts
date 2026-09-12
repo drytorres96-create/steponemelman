@@ -17,6 +17,20 @@ export const CRITERIOS_POR_DEFECTO: CriteriosDominio = {
   exigirSinPistas: true, exigirRecuperacionActiva: true, ventanaConfusionDias: 7,
 }
 
+/**
+ * Criterios con los que se venía sincronizando antes de endurecerlos. `criterios` es un campo
+ * persistido, así que cambiar CRITERIOS_POR_DEFECTO no llega a una cuenta que ya guardó los
+ * anteriores: la lectura del estado los migra cuando coinciden exactamente con estos.
+ */
+export const CRITERIOS_HEREDADOS: CriteriosDominio = {
+  recuperaciones: 3, sesiones: 2, separacionHoras: 20,
+  exigirSinPistas: true, exigirRecuperacionActiva: true, ventanaConfusionDias: 14,
+}
+export function sonCriteriosHeredados(c: CriteriosDominio): boolean {
+  return (Object.keys(CRITERIOS_HEREDADOS) as (keyof CriteriosDominio)[])
+    .every(k => c[k] === CRITERIOS_HEREDADOS[k])
+}
+
 export interface EvidenciaDominio {
   cumple: boolean
   /** Aciertos exigidos para este concepto: sube cuando toda la evidencia es reconocimiento. */
@@ -28,8 +42,15 @@ export interface EvidenciaDominio {
 export function evidenciaActiva(i: Intento): boolean {
   return i.recuperacion_activa || i.tipo_evidencia === 'aplicacion'
 }
-/** Aciertos extra exigidos cuando no hay ni un recuerdo libre ni una aplicación. */
-export const RECARGO_RECONOCIMIENTO = 2
+/**
+ * Aciertos extra exigidos cuando no hay ni un recuerdo libre ni una aplicación.
+ *
+ * Uno, no dos. Con el techo del horizonte de examen los intervalos se comprimen, y en la práctica
+ * casi todo concepto con opciones válidas se presenta como reconocimiento, así que exigir cinco
+ * aciertos dejaba el umbral fuera de alcance antes del 21-dic. Cuatro aciertos entre tres opciones
+ * son 1 de cada 81 por azar: sigue siendo una barrera real y se puede alcanzar.
+ */
+export const RECARGO_RECONOCIMIENTO = 1
 
 /** Lo no registrado en historiales antiguos no prueba que no se utilizó ayuda. */
 export function evidenciaIndependiente(i: Intento): boolean {
@@ -53,8 +74,9 @@ export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora =
   const correctas = aciertosVigentes(p)
   const activas = correctas.filter(evidenciaActiva)
   // Acertar tres veces entre tres opciones ocurre por azar una vez de cada 27. Cuando toda la
-  // evidencia vigente es reconocimiento, el umbral sube a cinco (1 de cada 243); un solo recuerdo
-  // libre o una aplicación lo devuelven al umbral normal.
+  // evidencia vigente es reconocimiento, el umbral sube uno (1 de cada 81); un solo recuerdo libre
+  // o la aplicación de un caso lo devuelven al umbral normal.
+
   const soloReconocimiento = c.exigirRecuperacionActiva && correctas.length > 0 && activas.length === 0
   const requeridas = soloReconocimiento ? c.recuperaciones + RECARGO_RECONOCIMIENTO : c.recuperaciones
   const sesiones = new Set(correctas.map(i => i.session_id || `legacy-dia-${Math.floor(i.ts / DIA)}`))
