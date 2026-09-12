@@ -104,6 +104,25 @@ describe('NBME study interface', () => {
     expect(Object.keys(context.state.attempts)).toHaveLength(1)
   })
 
+  it('renders explicit tables and all options while keeping formatted feedback hidden before answering', async () => {
+    prepareSession()
+    context.currentQuestion = { ...question, display: {
+      stem: [{ type: 'paragraph', text: 'Synthetic introduction.' },
+        { type: 'table', caption: 'Synthetic data', headers: ['Label', 'Value'], rows: [['Example', '1.25']] },
+        { type: 'prompt', text: 'Choose an option.' }],
+      options: { I: [{ type: 'paragraph', text: 'Formatted option I' }] },
+      objective: [{ type: 'paragraph', text: 'Hidden formatted objective' }],
+      explanation: [{ type: 'paragraph', text: 'Hidden formatted explanation' }],
+    } }
+    await act(async () => root.render(<NbmePlayer onSalir={exit} onEstudiar={study} />))
+    expect(host.querySelectorAll('table')).toHaveLength(1)
+    expect(host.querySelectorAll('input[type="radio"]')).toHaveLength(9)
+    expect(host.textContent).toContain('Formatted option I')
+    expect(host.textContent).not.toContain('Hidden formatted objective')
+    expect(host.textContent).not.toContain('Hidden formatted explanation')
+    expect(host.querySelector('table')?.textContent).toContain('Example1.25')
+  })
+
   it('prevents grading when a required figure is unavailable and exposes storage problems', async () => {
     prepareSession()
     context.currentQuestion = { ...question, figureRequired: true, figures: [] }

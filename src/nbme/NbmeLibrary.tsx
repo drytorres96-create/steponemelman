@@ -9,17 +9,18 @@ export function NbmeLibrary({ onStart }: { onStart: () => void }) {
   const questions = catalog?.questions ?? []
   const systems = useMemo(() => [...new Set(questions.flatMap(q => q.systems))].sort((a, b) => a.localeCompare(b, 'es')), [catalog])
   const disciplines = useMemo(() => [...new Set(questions.flatMap(q => q.disciplines))].sort((a, b) => a.localeCompare(b, 'es')), [catalog])
+  const progress = useMemo(() => new Map(questions.map(q => [q.id, questionProgress(state, q.id)])), [catalog, state])
   const matched = useMemo(() => questions.filter(q =>
     (filters.form === 'all' || q.form === filters.form) &&
     (!filters.system || q.systems.includes(filters.system)) &&
     (!filters.discipline || q.disciplines.includes(filters.discipline)) &&
     (filters.status === 'all' || (filters.status === 'unseen'
-      ? !questionProgress(state, q.id).seen : questionProgress(state, q.id).pendingError))), [catalog, filters, state])
+      ? !progress.get(q.id)!.seen : progress.get(q.id)!.pendingError))), [catalog, filters, progress])
   const ready = useMemo(() => matched.filter(q => q.status === 'ready').sort((a, b) => {
-    const pa = questionProgress(state, a.id), pb = questionProgress(state, b.id)
+    const pa = progress.get(a.id)!, pb = progress.get(b.id)!
     const priority = (p: typeof pa) => p.pendingError ? 0 : !p.seen ? 1 : 2
     return priority(pa) - priority(pb) || (pa.latestSubmittedAt ?? 0) - (pb.latestSubmittedAt ?? 0) || a.id.localeCompare(b.id)
-  }), [matched, state])
+  }), [matched, progress])
   const pending = useMemo(() => Object.values(state.sessions)
     .map(session => ({ session, view: deriveNbmeSession(state, session.id) }))
     .filter(item => item.view && item.view.phase !== 'complete')

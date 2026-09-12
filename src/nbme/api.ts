@@ -3,6 +3,14 @@ import { supabase } from '../lib/supabase'
 import type { NbmeCatalog, NbmeQuestion, NbmeQuestionRef } from './types'
 
 const text = z.string()
+const contentBlock = z.union([
+  z.object({ type: z.enum(['paragraph', 'prompt']), text: text.min(1) }),
+  z.object({ type: z.literal('table'), caption: text.optional(), headers: z.array(text).min(1),
+    rows: z.array(z.array(text)).min(1) }).refine(table => table.rows.every(row => row.length === table.headers.length)),
+])
+const contentBlocks = z.array(contentBlock).min(1)
+const questionDisplay = z.object({ stem: contentBlocks, options: z.record(contentBlocks).optional(),
+  objective: contentBlocks.optional(), explanation: contentBlocks.optional() })
 const conceptLink = z.object({ conceptId: text, relation: z.enum(['tested', 'foundation']),
   confidence: z.number().finite(), review: z.enum(['suggested', 'reviewed']) })
 const meta = z.object({
@@ -17,6 +25,7 @@ const catalogSchema = z.object({ schemaVersion: z.literal(1), bankVersion: text.
   total: z.number().int().nonnegative(), questions: z.array(meta) })
 const questionSchema = meta.extend({ stem: text.min(1), options: z.array(z.object({ id: text.min(1), text: text.min(1) })),
   answer: text.nullable(), explanation: text.nullable(), distractorExplanations: z.record(text).optional(),
+  display: questionDisplay.optional(),
   figures: z.array(z.object({ assetId: text.min(1), alt: text })),
   provenance: z.object({ sourceFile: text, sourceRecordId: text, notes: z.array(text) }).passthrough(),
 })

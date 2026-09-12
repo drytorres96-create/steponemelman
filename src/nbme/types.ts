@@ -21,12 +21,24 @@ export interface NbmeQuestionMeta {
   conceptLinks: NbmeConceptLink[]
   taxonomy?: { method: string; confidence: number; review: 'suggested' | 'reviewed' }
 }
+export type NbmeContentBlock =
+  | { type: 'paragraph' | 'prompt'; text: string }
+  | { type: 'table'; caption?: string; headers: string[]; rows: string[][] }
+
+export interface NbmeQuestionDisplay {
+  stem: NbmeContentBlock[]
+  options?: Record<string, NbmeContentBlock[]>
+  objective?: NbmeContentBlock[]
+  explanation?: NbmeContentBlock[]
+}
+
 export interface NbmeQuestion extends NbmeQuestionMeta {
   stem: string
   options: { id: string; text: string }[]
   answer: string | null
   explanation: string | null
   distractorExplanations?: Record<string, string>
+  display?: NbmeQuestionDisplay
   figures: { assetId: string; alt: string }[]
   provenance: { sourceFile: string; sourceRecordId: string; notes: string[]; [key: string]: unknown }
 }

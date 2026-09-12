@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Modal } from '../components/comunes'
 import { useNbme } from './NbmeProvider'
 import type { NbmeQuestion } from './types'
+import { NbmeContent } from './NbmeContent'
 import './nbme.css'
 
 interface LoadedFigure { assetId: string; alt: string; url: string }
@@ -122,7 +123,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
                 {sessionView.current?.round ? 'Vuelve a intentarlo' : `Pregunta ${(sessionView.current?.position ?? 0) + 1} de ${sessionView.initialCount}`}
               </h1>
               <p className="mini">{source}</p>
-              <div className="nbme-stem" lang="en">{currentQuestion.stem}</div>
+              <div className="nbme-stem" lang="en"><NbmeContent text={currentQuestion.stem} blocks={currentQuestion.display?.stem} /></div>
               {figures.loading && <p role="status" className="sutil">Cargando figura…</p>}
               {figures.error && <div className="nbme-error" role="alert"><p>No se pudo cargar la figura.</p><button className="btn" onClick={figures.retry}>Reintentar figura</button></div>}
               {currentQuestion.figureRequired && !currentQuestion.figures.length && <p role="alert" className="nbme-error">Falta una figura necesaria para responder esta pregunta.</p>}
@@ -139,10 +140,10 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
                     const isIncorrect = !!feedback && !feedback.conflict && isSelected && !feedback.correct
                     return <label key={option.id} className={`nbme-option${isSelected ? ' selected' : ''}${isCorrect ? ' correct' : ''}${isIncorrect ? ' incorrect' : ''}`}>
                       <input type="radio" name={`nbme-answer-${sessionView.current?.position}`} value={option.id} checked={isSelected} onChange={() => selectAnswer(option.id)} />
-                      <span className="nbme-option-letter">{option.id}.</span><span className="nbme-option-text" lang="en">{option.text}
+                      <span className="nbme-option-letter">{option.id}.</span><div className="nbme-option-text" lang="en"><NbmeContent text={option.text} blocks={currentQuestion.display?.options?.[option.id]} />
                         {isCorrect && <span className="nbme-option-state" lang="es">Respuesta correcta</span>}
                         {isIncorrect && <span className="nbme-option-state" lang="es">Tu respuesta</span>}
-                      </span>
+                      </div>
                     </label>
                   })}
                 </fieldset>
@@ -156,9 +157,9 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
                 <p className="sutil" role="status">{feedback.conflict ? 'Se recibieron respuestas distintas desde varios dispositivos. Este intento no cuenta como acierto inicial.'
                   : feedback.correct ? 'Tu respuesta quedó registrada.' : 'Esta pregunta volverá durante la práctica. Puedes pausar cuando lo necesites.'}</p></div>
               {!feedback.conflict && <p><b>Respuesta: {currentQuestion.answer}.</b> <span lang="en">{currentQuestion.options.find(option => option.id === currentQuestion.answer)?.text}</span></p>}
-              {briefExplanation && <div><h3>Fundamento de la respuesta</h3>{explanationSource !== briefExplanation && <p className="mini">Extracto del texto fuente.</p>}<p className="nbme-source-text" lang="en">{briefExplanation}</p></div>}
-              {currentQuestion.objective && explanationSource !== briefExplanation && <details className="nbme-details"><summary>Leer fundamento completo</summary><div className="nbme-source-text" lang="en">{currentQuestion.objective}</div></details>}
-              {currentQuestion.explanation && currentQuestion.explanation !== briefExplanation && <details className="nbme-details"><summary>Leer explicación completa</summary><div className="nbme-source-text" lang="en">{currentQuestion.explanation}</div></details>}
+              {briefExplanation && <div><h3>Fundamento de la respuesta</h3>{explanationSource !== briefExplanation && <p className="mini">Extracto del texto fuente.</p>}<div className="nbme-source-text" lang="en"><NbmeContent text={briefExplanation} blocks={explanationSource === briefExplanation ? (currentQuestion.objective ? currentQuestion.display?.objective : currentQuestion.display?.explanation) : undefined} /></div></div>}
+              {currentQuestion.objective && explanationSource !== briefExplanation && <details className="nbme-details"><summary>Leer fundamento completo</summary><div className="nbme-source-text" lang="en"><NbmeContent text={currentQuestion.objective} blocks={currentQuestion.display?.objective} /></div></details>}
+              {currentQuestion.explanation && currentQuestion.explanation !== briefExplanation && <details className="nbme-details"><summary>Leer explicación completa</summary><div className="nbme-source-text" lang="en"><NbmeContent text={currentQuestion.explanation} blocks={currentQuestion.display?.explanation} /></div></details>}
               {currentQuestion.distractorExplanations && Object.keys(currentQuestion.distractorExplanations).length > 0 && <details className="nbme-details"><summary>Por qué las otras opciones no</summary>
                 <div className="pila">{currentQuestion.options.filter(option => option.id !== currentQuestion.answer && currentQuestion.distractorExplanations?.[option.id]).map(option => <div key={option.id}><b>{option.id}. <span lang="en">{option.text}</span></b><p className="nbme-source-text" lang="en">{currentQuestion.distractorExplanations?.[option.id]}</p></div>)}</div>
               </details>}

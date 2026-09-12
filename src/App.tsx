@@ -1,14 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from './store/estado'
 import { cargarConceptos, cargarModulo } from './data/corpus'
 import type { Concepto } from './schema/concept'
 import { Inicio } from './screens/Inicio'
-import { Modulos } from './screens/Modulos'
-import { Repaso } from './screens/Repaso'
-import { Progreso } from './screens/Progreso'
-import { Auditoria } from './screens/Auditoria'
-import { Ajustes } from './screens/Ajustes'
-import { Reproductor, type Cola } from './screens/Reproductor'
+import type { Cola } from './screens/Reproductor'
 import { construirCola, RUTAS, type RutaId } from './lib/rutas'
 import { cargarTodo } from './data/corpus'
 import { useAuth } from './auth/AuthProvider'
@@ -17,11 +12,18 @@ import type { OpcionesSesionPersonalizada } from './lib/busqueda'
 import { alternarFormatos } from './lib/formatos'
 import { aplicarVariante, siguienteVariante } from './lib/variantes'
 import { useNbme } from './nbme/NbmeProvider'
-import { NbmeLibrary } from './nbme/NbmeLibrary'
-import { NbmePlayer } from './nbme/NbmePlayer'
-import { NbmeProgress } from './nbme/NbmeProgress'
 import { deriveNbmeSession } from './nbme/model'
 import type { FiltrosBusqueda } from './lib/busqueda'
+
+const Modulos = lazy(() => import('./screens/Modulos').then(m => ({ default: m.Modulos })))
+const Repaso = lazy(() => import('./screens/Repaso').then(m => ({ default: m.Repaso })))
+const Progreso = lazy(() => import('./screens/Progreso').then(m => ({ default: m.Progreso })))
+const Auditoria = lazy(() => import('./screens/Auditoria').then(m => ({ default: m.Auditoria })))
+const Ajustes = lazy(() => import('./screens/Ajustes').then(m => ({ default: m.Ajustes })))
+const Reproductor = lazy(() => import('./screens/Reproductor').then(m => ({ default: m.Reproductor })))
+const NbmeLibrary = lazy(() => import('./nbme/NbmeLibrary').then(m => ({ default: m.NbmeLibrary })))
+const NbmePlayer = lazy(() => import('./nbme/NbmePlayer').then(m => ({ default: m.NbmePlayer })))
+const NbmeProgress = lazy(() => import('./nbme/NbmeProgress').then(m => ({ default: m.NbmeProgress })))
 
 type Vista = 'inicio' | 'modulos' | 'repaso' | 'progreso' | 'auditoria' | 'ajustes' | 'estudio' | 'preguntas'
 const NAV: { id: Vista; txt: string }[] = [
@@ -55,9 +57,9 @@ export default function App() {
   const vistaAnterior = useRef(vista)
   const estudiando = vista === 'estudio' || vista === 'preguntas'
   const enConcentracion = estudiando && concentracion
-  const sesionPreguntasPendiente = Object.values(nbme.state.sessions)
+  const sesionPreguntasPendiente = useMemo(() => Object.values(nbme.state.sessions)
     .filter(s => deriveNbmeSession(nbme.state, s.id)?.phase !== 'complete')
-    .sort((a, b) => b.controlChangedAt - a.controlChangedAt)[0]
+    .sort((a, b) => b.controlChangedAt - a.controlChangedAt)[0], [nbme.state])
   const sincronizarTodo = async () => {
     const resultados = await Promise.all([sincronizarAhora(), nbme.catalog ? nbme.syncNow() : Promise.resolve(true)])
     return resultados.every(Boolean)
@@ -181,6 +183,7 @@ export default function App() {
           {error && <div className="aviso" style={{ marginBottom: 16 }}><span>⚠</span><div>{error}</div></div>}
           {cargando && <div className="vacio">Preparando la sesión…</div>}
 
+          <Suspense fallback={<div className="vacio" role="status">Cargando esta sección…</div>}>
           {!cargando && vista === 'estudio' && cola && (
             <>
               <div style={{ maxWidth: 800, margin: '0 auto 14px' }}>
@@ -214,6 +217,7 @@ export default function App() {
           </div>{tipoProgreso === 'preguntas' ? <NbmeProgress onContinuar={() => { setTipoContenido('preguntas'); ir('modulos') }} /> : <Progreso onEstudiar={estudiarIds} onContinuar={continuar} />}</div>}
           {!cargando && vista === 'auditoria' && <Auditoria />}
           {!cargando && vista === 'ajustes' && <Ajustes />}
+          </Suspense>
         </div>
       </main>
     </div>

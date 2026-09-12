@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../store/estado'
 import { cargarTodo } from '../data/corpus'
 import type { Concepto } from '../schema/concept'
@@ -27,7 +27,8 @@ export function Inicio({ onIr, onContinuar, onEmpezar }: {
     return () => { activo = false }
   }, [indice, reintento])
 
-  const plan = conceptos ? construirPlanDiario(conceptos, estado.progreso, carga.cantidad) : null
+  const plan = useMemo(() => conceptos ? construirPlanDiario(conceptos, estado.progreso, carga.cantidad) : null,
+    [conceptos, estado.progreso, carga.cantidad])
   const nuevaSesion = <div className="pila">
     <SelectorCarga carga={carga} />
     {error ? <div className="aviso" role="alert">No se pudo preparar el plan. <button className="btn pequeno" onClick={() => setReintento(v => v + 1)}>Volver a intentar</button></div>

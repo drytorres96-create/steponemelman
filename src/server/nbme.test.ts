@@ -8,8 +8,10 @@ const request = (body: unknown = { refs: [ref] }, headers = auth) => new Request
 function remote(member = true, question: unknown = { ...ref, status: 'ready', stem: 'Pregunta sintética', answer: 'A' }) {
   const mock = vi.fn().mockResolvedValueOnce(Response.json({ id: 'user', email_confirmed_at: '2026-01-01' }))
     .mockResolvedValueOnce(Response.json(member ? [{ user_id: 'user' }] : []))
-    .mockResolvedValueOnce(Response.json([{ payload: { questions: [{ ...ref, status: 'ready' }] } }]))
-    .mockResolvedValueOnce(Response.json(question === null ? [] : [{ payload: question }]))
+    .mockResolvedValueOnce(Response.json([
+      { path: 'catalog.json', payload: { questions: [{ ...ref, status: 'ready' }] } },
+      ...(question === null ? [] : [{ path: `questions/${ref.id}/${ref.revision}.json`, payload: question }]),
+    ]))
   vi.stubGlobal('fetch', mock)
   return mock
 }
@@ -46,14 +48,43 @@ describe('banco privado de preguntas', () => {
     expect(result.status).toBe(200)
     expect(result.headers.get('cache-control')).toBe('private, no-store')
     expect((await result.json()).questions[0]).toMatchObject(ref)
-    expect(String(fetch.mock.calls[3][0])).toContain(encodeURIComponent(`questions/${ref.id}/${ref.revision}.json`))
+    expect(fetch).toHaveBeenCalledTimes(3)
+    expect(String(fetch.mock.calls[2][0])).toContain(encodeURIComponent(`questions/${ref.id}/${ref.revision}.json`))
   })
   it('no entrega una revisión antigua si el catálogo actual bloqueó esa pregunta', async () => {
     const mock = vi.fn().mockResolvedValueOnce(Response.json({ id: 'user', email_confirmed_at: '2026-01-01' }))
       .mockResolvedValueOnce(Response.json([{ user_id: 'user' }]))
-      .mockResolvedValueOnce(Response.json([{ payload: { questions: [{ ...ref, status: 'blocked' }] } }]))
+      .mockResolvedValueOnce(Response.json([{ path: 'catalog.json', payload: { questions: [{ ...ref, status: 'blocked' }] } }]))
     vi.stubGlobal('fetch', mock)
     expect((await handleNbme(request())).status).toBe(422)
     expect(mock).toHaveBeenCalledTimes(3)
+  })
+
+  it('carga veinte preguntas en tres solicitudes y restaura el orden solicitado', async () => {
+    const refs = Array.from({ length: 20 }, (_, i) => ({ ...ref, id: `NBME27-P${String(i + 1).padStart(4, '0')}` }))
+    const rows = refs.map(r => ({ path: `questions/${r.id}/${r.revision}.json`, payload: { ...r, status: 'ready' } }))
+    const fetch = vi.fn().mockResolvedValueOnce(Response.json({ id: 'user', email_confirmed_at: '2026-01-01' }))
+      .mockResolvedValueOnce(Response.json([{ user_id: 'user' }]))
+      .mockResolvedValueOnce(Response.json([
+        ...rows.reverse(),
+        { path: 'catalog.json', payload: { questions: refs.map(r => ({ ...r, status: 'ready' })) } },
+      ]))
+    vi.stubGlobal('fetch', fetch)
+    const result = await handleNbme(request({ refs }))
+    expect(result.status).toBe(200)
+    expect((await result.json()).questions.map((q: typeof ref) => q.id)).toEqual(refs.map(r => r.id))
+    expect(fetch).toHaveBeenCalledTimes(3)
+    const query = new URL(String(fetch.mock.calls[2][0])).searchParams
+    expect(query.get('select')).toBe('path,payload')
+    expect(query.get('path')).toContain('catalog.json')
+    expect(query.get('path')).toContain('NBME27-P0020')
+  })
+
+  it('no entrega un lote parcial cuando falla la consulta agrupada', async () => {
+    const fetch = remote()
+    fetch.mockReset().mockResolvedValueOnce(Response.json({ id: 'user', email_confirmed_at: '2026-01-01' }))
+      .mockResolvedValueOnce(Response.json([{ user_id: 'user' }]))
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+    expect((await handleNbme(request())).status).toBe(503)
   })
 })

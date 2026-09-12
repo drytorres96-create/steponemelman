@@ -83,14 +83,28 @@ export async function handleNbme(request: Request): Promise<Response> {
       return new Response(bytes, { headers: { 'Content-Type': String(value.mimeType),
         'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Vary': 'Authorization' } })
     }
-    const latestCatalog = await asset('catalog.json')
+    // Fetch the current availability and all pinned revisions in one database request.
+    // Keys are constrained above; map by path because PostgREST does not preserve input order.
+    const paths = refs.map(r => `questions/${r.id}/${r.revision}.json`)
+    const query = new URLSearchParams({ select: 'path,payload', path: `in.(${['catalog.json', ...paths].join(',')})` })
+    const result = await get(`/rest/v1/nbme_assets?${query}`)
+    if (!result.ok) return unavailable()
+    const rows: unknown = await result.json()
+    if (!Array.isArray(rows)) return unavailable()
+    const assets = new Map<string, Record<string, unknown>>()
+    for (const row of rows) {
+      if (!row || typeof row.path !== 'string' || !row.payload || typeof row.payload !== 'object'
+        || Array.isArray(row.payload) || assets.has(row.path)) return unavailable()
+      assets.set(row.path, row.payload)
+    }
+    const latestCatalog = assets.get('catalog.json')
     if (!latestCatalog || !Array.isArray(latestCatalog.questions)) return unavailable()
     const latest = new Map(latestCatalog.questions.map((q: { id: string; status: string }) => [q.id, q.status]))
     if (refs.some(ref => latest.get(ref.id) !== 'ready')) {
       return json({ error: 'Una pregunta necesita revisión. Se conserva el historial de tu sesión.' }, 422)
     }
     // A session pins its revision. Never silently replace a saved question with another version.
-    const values = await Promise.all(refs.map(r => asset(`questions/${r.id}/${r.revision}.json`)))
+    const values = paths.map(path => assets.get(path))
     if (values.some((q, i) => !q || q.id !== refs[i].id || q.revision !== refs[i].revision)) {
       return json({ error: 'No está disponible la versión guardada de una pregunta. Tu sesión se conserva para reintentar.' }, 409)
     }
