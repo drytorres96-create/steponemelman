@@ -1,6 +1,8 @@
 import type { NbmeAttempt, NbmeFilters, NbmeQuestion, NbmeQuestionProgress, NbmeQuestionRef, NbmeSession, NbmeSessionView, NbmeState } from './types'
 
-export const DEFAULT_NBME_FILTERS: NbmeFilters = { form: 'all', system: '', discipline: '', status: 'all', quality: 'ready', size: 10, budgetMinutes: null }
+// 20 minutos por defecto: los conceptos ya estaban protegidos con un presupuesto y el banco no,
+// así que una sesión de preguntas podía crecer sin corte natural.
+export const DEFAULT_NBME_FILTERS: NbmeFilters = { form: 'all', system: '', discipline: '', status: 'all', quality: 'ready', size: 10, budgetMinutes: 20 }
 export function emptyNbmeState(bankVersion = '1.0.0'): NbmeState {
   return { version: 1, bankVersion, sessions: {}, attempts: {}, activeSessionId: null, activeChangedAt: 0,
     filters: { ...DEFAULT_NBME_FILTERS }, filtersChangedAt: 0 }

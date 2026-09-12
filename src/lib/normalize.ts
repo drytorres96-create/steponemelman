@@ -1,5 +1,5 @@
 /** Versión persistida con cada intento para poder revisar su calificación. */
-export const EVALUADOR_VERSION = '2.1.0'
+export const EVALUADOR_VERSION = '2.2.0'
 
 /** Normaliza la presentación sin borrar letras griegas, signos ni cifras clínicas. */
 export function normalizar(s: string): string {
@@ -54,7 +54,46 @@ function claveTexto(s: string): string {
  * «hipo/hiper» pueden diferir en una letra. Lo no reconocido queda por revisar,
  * sin inventar un error conceptual ni una errata. `ortografia` se conserva para
  * historiales y para una revisión explícita del resultado.
+ *
+ * Excepción acotada y explícita: una única edición en un término largo, con las cifras intactas y
+ * sin ambigüedad frente a los distractores cercanos, es una errata y no un error conceptual. Sin
+ * esto, `ortografia` era inalcanzable, la cola de «por revisar» no se vaciaba nunca y la fijación
+ * ortográfica no llegaba a mostrarse.
  */
+/** Por debajo de esta longitud, una sola letra ya distingue términos distintos (IgG, alfa, K+). */
+export const LONGITUD_MINIMA_ORTOGRAFIA = 6
+
+/**
+ * Letras que se confunden al ESCRIBIR en español y no cambian el término: s/z/c, b/v, g/j, y/i,
+ * k/q/c, m/n. Una sustitución entre ellas es una errata. Cualquier otra sustitución puede cambiar
+ * la molécula —«L-DOPA» frente a «D-DOPA»— y no se acepta.
+ */
+const PARES_CONFUSOS = [['s', 'z'], ['s', 'c'], ['z', 'c'], ['b', 'v'], ['g', 'j'],
+                        ['y', 'i'], ['k', 'q'], ['k', 'c'], ['m', 'n']] as const
+
+/**
+ * Una errata ortográfica, no una edición cualquiera. Admite una sustitución entre letras
+ * confundibles, o sobrar/faltar una hache, que en español no suena. NO admite truncamientos ni
+ * inserciones de otras letras: «fenoxibenzamin» no es «fenoxibenzamina» escrita mal, es una
+ * respuesta incompleta, y quien la juzgue debe ser la revisión y no el corrector.
+ */
+export function esErrataOrtografica(a: string, b: string): boolean {
+  if (a === b || !a || !b) return false
+  if (a.length === b.length) {
+    let i = 0
+    while (i < a.length && a[i] === b[i]) i++
+    let j = a.length - 1
+    while (j > i && a[j] === b[j]) j--
+    if (i !== j) return false
+    return PARES_CONFUSOS.some(([x, y]) => (a[i] === x && b[i] === y) || (a[i] === y && b[i] === x))
+  }
+  if (Math.abs(a.length - b.length) !== 1) return false
+  const [corto, largo] = a.length < b.length ? [a, b] : [b, a]
+  let k = 0
+  while (k < corto.length && corto[k] === largo[k]) k++
+  return largo[k] === 'h' && corto.slice(k) === largo.slice(k + 1)
+}
+
 export function evaluarTexto(entrada: string, canonica: string, sinonimos: string[] = [],
                              incorrectasCercanas: string[] = []): Veredicto {
   const e = claveTexto(entrada)
@@ -75,6 +114,20 @@ export function evaluarTexto(entrada: string, canonica: string, sinonimos: strin
         || (negacion.test(c) && c.replace(negacion, '') === e)) return 'incorrecta'
     if (/^ig[agmed]$/.test(e) && /^ig[agmed]$/.test(c) && e !== c) return 'incorrecta'
     if (contrastes.some(([a, b]) => (e === a && c === b) || (e === b && c === a))) return 'incorrecta'
+  }
+
+  // Errata, sólo tras descartar todos los contrastes anteriores y con guardarraíles estrictos.
+  const cercanas = incorrectasCercanas.map(claveTexto).filter(Boolean)
+  const letras = (t: string) => t.replace(/[^\p{L} ]/gu, '')
+  const cifras = (t: string) => (t.match(/\d+(?:\.\d+)?/g) ?? []).join('|')
+  for (const c of candidatos) {
+    if (c.length < LONGITUD_MINIMA_ORTOGRAFIA) continue      // términos cortos: una letra ya decide
+    if (cifras(e) !== cifras(c)) continue                    // un dígito cambiado nunca es una errata
+    if (!esErrataOrtografica(e, c)) continue                 // sólo confusiones de escritura
+    if (letras(e) === letras(c)) continue                    // difieren sólo en signo o símbolo
+    if (cercanas.some(t => distancia(e, t) <= 1)) continue   // igual de cerca de un distractor
+    if (candidatos.some(o => o !== c && distancia(e, o) <= 1)) continue
+    return 'ortografia'
   }
   return 'revision'
 }

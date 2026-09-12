@@ -246,6 +246,9 @@ label { font-size: .85rem; color: var(--texto-2); }
 .modal-cab { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--linea-suave); position: sticky; top: 0; background: var(--panel); }
 .modal-cuerpo { padding: 20px; }
 
+/* El patrón reutilizable es lo que él busca en cada fallo: se lee sin desplegar nada. */
+.patron { border-left: 2px solid var(--violeta-2); background: var(--violeta-tenue); padding: 10px 13px; border-radius: 0 10px 10px 0; margin: 10px 0; font-size: .94rem; }
+.patron b { color: var(--violeta-2); }
 .aviso { display: flex; gap: 10px; padding: 11px 14px; border-radius: 11px; background: #f0a63c0e; border: 1px solid #f0a63c30; font-size: .87rem; color: #f5cd93; }
 .vacio { text-align: center; padding: 46px 20px; color: var(--texto-3); }
 

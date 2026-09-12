@@ -374,7 +374,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
         <button className="btn principal" onClick={avanzar}>{i + 1 === cantidadInicial ? 'Terminar y revisar' : 'Siguiente pregunta'}</button>
       </div>}
       {fase === 'retro' && res && !examenSinAyuda && <div className={`retro ${res.veredicto === 'correcta' ? 'ok' : res.veredicto === 'incorrecta' ? 'no' : 'parcial'}`} role="status">
-        <div className="fila" style={{ justifyContent: 'space-between', marginBottom: 8 }}><b>{etiquetaResultado(res.veredicto)}</b><span className="etq">{NOMBRE_ERROR[res.tipoError]}</span></div>
+        <div className="fila" style={{ justifyContent: 'space-between', marginBottom: 8 }}><b>{etiquetaResultado(res.veredicto)}</b></div>
         <p className="mini">Tu respuesta ya está registrada.{intentoActual.current && conAyuda(intentoActual.current) ? ' Esta práctica tuvo ayuda.' : ''}</p>
         {presentacionCambio && <p className="aviso">La pregunta guardada pertenece a otra presentación. Tu respuesta y su resultado original se conservan; el texto mostrado es el actual.</p>}
         <p>Tu respuesta: <b>{res.respuestaDada || 'Respuesta registrada'}</b></p>
@@ -383,10 +383,13 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
         {necesitaReintento(res.veredicto) && <p>Este concepto volverá al final de la cola hasta que lo aciertes.</p>}
         {(res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que) && <p className="sutil">{res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que}</p>}
         <p>{c.explicacion}</p>
+        {c.patron && <p className="patron"><b>Si ves esto → piensa:</b> {c.patron}</p>}
+        {c.confusiones.length > 0 && <p className="mini">No lo confundas con: {c.confusiones.join(' · ')}</p>}
         {c.revision_editorial && <p className="aviso">{c.revision_editorial.nota}</p>}
         {res.veredicto !== 'revision' && <button className="btn principal" onClick={avanzar}>Siguiente pregunta</button>}
         <details style={{ marginTop: 14 }}><summary>Profundizar</summary>
-          {c.patron && <p><b>Patrón:</b> {c.patron}</p>}{c.contexto && <p>{c.contexto}</p>}
+          {c.contexto && <p>{c.contexto}</p>}
+          <p className="mini">Clasificación para el planificador: {NOMBRE_ERROR[res.tipoError]}</p>
           {c.evaluacion.opciones?.filter(o => !o.correcta && o.texto !== res.respuestaDada && o.por_que).map(o => <p className="mini" key={o.texto}><b>{o.texto}:</b> {o.por_que}</p>)}
           {c.relacionados.length > 0 && <p className="mini">Conecta con: {c.relacionados.join(' · ')}</p>}
           <p className="mini">{dominio.texto}</p>

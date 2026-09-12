@@ -37,15 +37,38 @@ describe('plan diario y rutas', () => {
     expect(construirCola('guiada', cs, ps, 5, ahora)).toEqual(plan.conceptos)
   })
 
-  it('la acumulación de repasos ocupa las plazas y evita agregar material nuevo', () => {
+  it('el repaso acumulado reduce el material nuevo pero nunca lo expulsa del plan', () => {
     const cs = Array.from({ length: 10 }, (_, i) => concepto(`c-${i}`))
     const ps = Object.fromEntries(cs.slice(0, 6).map(c => [c.concept_id,
       progreso(c.concept_id, [intento(ahora - DIA, true)], ahora - DIA)]))
     const plan = construirPlanDiario(cs, ps, 5, ahora)
     expect(plan.conceptos).toHaveLength(5)
+    // Con seis vencidos y cinco plazas, el tope del 70 % deja una plaza para algo nuevo.
+    expect(plan.vencidos).toBe(4)
+    expect(plan.nuevos).toBe(1)
+    expect(plan.hayRepasoAcumulado).toBe(true)
+    expect(plan.repasoLimitado).toBe(true)
+    expect(plan.explicacion).toContain('70 %')
+  })
+
+  it('sin material nuevo disponible, el repaso ocupa todas las plazas', () => {
+    const cs = Array.from({ length: 6 }, (_, i) => concepto(`v-${i}`))
+    const ps = Object.fromEntries(cs.map(c => [c.concept_id,
+      progreso(c.concept_id, [intento(ahora - DIA, true)], ahora - DIA)]))
+    const plan = construirPlanDiario(cs, ps, 5, ahora)
     expect(plan.vencidos).toBe(5)
     expect(plan.nuevos).toBe(0)
-    expect(plan.hayRepasoAcumulado).toBe(true)
+    expect(plan.repasoLimitado).toBe(true)
+  })
+
+  it('el repaso recupera las plazas que el material nuevo no llega a llenar', () => {
+    const vencidos = Array.from({ length: 6 }, (_, i) => concepto(`v-${i}`))
+    const nuevo = concepto('n-0')
+    const ps = Object.fromEntries(vencidos.map(c => [c.concept_id,
+      progreso(c.concept_id, [intento(ahora - DIA, true)], ahora - DIA)]))
+    const plan = construirPlanDiario([...vencidos, nuevo], ps, 5, ahora)
+    expect(plan.conceptos).toHaveLength(5)
+    expect([plan.vencidos, plan.nuevos]).toEqual([4, 1])
   })
 
   it('el plan no rellena con conceptos al día cuando se terminaron los nuevos', () => {
