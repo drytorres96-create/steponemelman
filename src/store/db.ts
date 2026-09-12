@@ -33,3 +33,35 @@ export async function escribir(clave: string, valor: unknown, opciones: { estric
     tx.onerror = tx.onabort = () => opciones.estricto ? reject(tx.error ?? new Error('No se pudo guardar')) : resolve()
   })
 }
+
+/** Claves guardadas que empiezan por el prefijo indicado. Nunca falla: devuelve [] si no puede leerlas. */
+export async function clavesConPrefijo(prefijo: string): Promise<string[]> {
+  const db = await abrir()
+  if (!db) {
+    try {
+      return Object.keys(localStorage)
+        .filter(clave => clave.startsWith(`${DB}:${prefijo}`))
+        .map(clave => clave.slice(DB.length + 1))
+    } catch { return [] }
+  }
+  return new Promise(resolve => {
+    const tx = db.transaction(TIENDA, 'readonly').objectStore(TIENDA).getAllKeys()
+    tx.onsuccess = () => resolve((tx.result as IDBValidKey[])
+      .filter((clave): clave is string => typeof clave === 'string' && clave.startsWith(prefijo)))
+    tx.onerror = () => resolve([])
+  })
+}
+
+/** Elimina claves obsoletas. Liberar espacio nunca debe interrumpir el estudio: los errores se ignoran. */
+export async function borrar(claves: string[]): Promise<void> {
+  if (!claves.length) return
+  const db = await abrir()
+  if (!db) { try { for (const clave of claves) localStorage.removeItem(`${DB}:${clave}`) } catch { /* sin limpieza */ } return }
+  await new Promise<void>(resolve => {
+    const tx = db.transaction(TIENDA, 'readwrite')
+    const tienda = tx.objectStore(TIENDA)
+    for (const clave of claves) tienda.delete(clave)
+    tx.oncomplete = () => resolve()
+    tx.onerror = tx.onabort = () => resolve()
+  })
+}

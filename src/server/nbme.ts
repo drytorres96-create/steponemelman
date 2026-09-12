@@ -8,6 +8,31 @@ const ID = /^NBME(?:27|28|29)-P\d{4}$/
 const REVISION = /^[a-zA-Z0-9_.-]{1,80}$/
 type Ref = { id: string; revision: string }
 
+/**
+ * El catálogo es idéntico para toda cuenta con acceso y pesa cientos de
+ * kilobytes, pero cada bloque de preguntas necesita consultarlo para no servir
+ * material retirado. Se guarda brevemente en la caché del borde, que no es
+ * alcanzable desde fuera: la comprobación de sesión y de membresía se hace
+ * igualmente antes de devolver nada.
+ */
+const CLAVE_CATALOGO = 'https://nbme.interno/catalog.json'
+const VIGENCIA_CATALOGO = 60
+
+async function catalogoVigente(
+  descargar: () => Promise<Record<string, unknown> | null>,
+): Promise<Record<string, unknown> | null> {
+  const cache = typeof caches !== 'undefined' ? await caches.open('nbme-catalogo').catch(() => null) : null
+  const guardado = await cache?.match(CLAVE_CATALOGO).catch(() => undefined)
+  if (guardado) return await guardado.json().catch(() => null)
+  const valor = await descargar()
+  if (valor && cache) {
+    await cache.put(CLAVE_CATALOGO, new Response(JSON.stringify(valor), {
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${VIGENCIA_CATALOGO}` },
+    })).catch(() => undefined)
+  }
+  return valor
+}
+
 async function readBody(request: Request): Promise<string | null> {
   const reader = request.body?.getReader()
   if (!reader) return ''
@@ -59,17 +84,19 @@ export async function handleNbme(request: Request): Promise<Response> {
     if (!auth.ok) return json({ error: 'Tu sesión necesita verificarse otra vez.' }, 401)
     const user = await auth.json() as { id?: string; is_anonymous?: boolean; email_confirmed_at?: string }
     if (!user.id || user.is_anonymous || !user.email_confirmed_at) return json({ error: 'Se necesita una cuenta verificada.' }, 403)
-    const member = await get(`/rest/v1/nbme_members?select=user_id&user_id=eq.${encodeURIComponent(user.id)}`)
-    if (!member.ok) return unavailable()
-    if (!(await member.json() as unknown[]).length) return json({ error: 'Tu cuenta no tiene acceso a este banco.' }, 403)
     const asset = async (path: string): Promise<Record<string, unknown> | null> => {
       const result = await get(`/rest/v1/nbme_assets?select=payload&path=eq.${encodeURIComponent(path)}`)
       if (!result.ok) throw new Error('bank_unavailable')
       const value = (await result.json() as { payload: Record<string, unknown> }[])[0]?.payload
       return value && typeof value === 'object' ? value : null
     }
+    // Una cuenta sin permiso no debe provocar ninguna lectura del banco: la
+    // membresía se comprueba antes de pedir el catálogo o cualquier pregunta.
+    const member = await get(`/rest/v1/nbme_members?select=user_id&user_id=eq.${encodeURIComponent(user.id)}`)
+    if (!member.ok) return unavailable()
+    if (!(await member.json() as unknown[]).length) return json({ error: 'Tu cuenta no tiene acceso a este banco.' }, 403)
     if (catalog) {
-      const value = await asset('catalog.json')
+      const value = await catalogoVigente(() => asset('catalog.json'))
       if (!value || value.schemaVersion !== 1 || !Array.isArray(value.questions)) return unavailable()
       return json(value)
     }
@@ -83,9 +110,10 @@ export async function handleNbme(request: Request): Promise<Response> {
       return new Response(bytes, { headers: { 'Content-Type': String(value.mimeType),
         'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Vary': 'Authorization' } })
     }
-    const latestCatalog = await asset('catalog.json')
+    const latestCatalog = await catalogoVigente(() => asset('catalog.json'))
     if (!latestCatalog || !Array.isArray(latestCatalog.questions)) return unavailable()
     const latest = new Map(latestCatalog.questions.map((q: { id: string; status: string }) => [q.id, q.status]))
+    // Una pregunta retirada no llega a descargarse.
     if (refs.some(ref => latest.get(ref.id) !== 'ready')) {
       return json({ error: 'Una pregunta necesita revisión. Se conserva el historial de tu sesión.' }, 422)
     }
