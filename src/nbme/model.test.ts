@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { NbmeQuestion, NbmeState } from './types'
 import { activateNbmeSession, deriveNbmeSession, emptyNbmeState, mergeNbmeStates, parseNbmeState, questionProgress, reviewNbmeAnswer,
-  setNbmeDraft, startNbmeSession, submitNbmeAnswer, summarizeNbmeState, updateNbmeFilters, updateNbmeSession } from './model'
+  setNbmeDraft, startNbmeSession, submitNbmeAnswer, summarizeNbmeState, updateNbmeFilters, updateNbmeSession,
+  discardNbmeSession, countNbmeSessionAttempts, setNbmeBankVersion } from './model'
 
 const question = (id = 'NBME27-P0001'): NbmeQuestion => ({ id, revision: 'rev1', form: '27', section: 1, item: 1, page: 1,
   systems: ['Renal'], disciplines: ['Fisiología'], topic: 'QA', objective: null, status: 'ready', reasons: [], figureRequired: false,
@@ -129,5 +130,53 @@ describe('independent private-question state', () => {
     expect(parseNbmeState({ ...good, activeSessionId: 'missing' })).toBeNull()
     expect(parseNbmeState({ ...good, sessions: JSON.parse('{"__proto__":{}}') })).toBeNull()
     expect(parseNbmeState({ version: 1, progreso: {}, sesiones: [] })).toBeNull()
+  })
+})
+
+describe('descartar un bloque que ya no puede terminarse', () => {
+  it('borra la sesión y sus intentos, y el estado resultante sigue siendo válido', () => {
+    let s = start([q, q2])
+    s = submitNbmeAnswer(s, 'S1', 0, q, 'B', 900, 2000)
+    s = reviewNbmeAnswer(s, 'S1', 0, 3000)
+    expect(countNbmeSessionAttempts(s, 'S1')).toBe(1)
+
+    const limpio = discardNbmeSession(s, 'S1', 9000)
+    expect(limpio.sessions.S1).toBeUndefined()
+    expect(countNbmeSessionAttempts(limpio, 'S1')).toBe(0)
+    expect(Object.keys(limpio.attempts)).toHaveLength(0)
+    expect(limpio.activeSessionId).toBeNull()
+    // Un intento huérfano invalidaría el estado completo: se comprueba que siga siendo legible.
+    expect(parseNbmeState(JSON.parse(JSON.stringify(limpio)))).not.toBeNull()
+  })
+  it('no toca los intentos de los demás bloques', () => {
+    let s = start([q, q2])
+    s = submitNbmeAnswer(s, 'S1', 0, q, 'A', 500, 2000)
+    s = reviewNbmeAnswer(s, 'S1', 0, 2500)
+    s = startNbmeSession(s, { id: 'S2', title: 'Otro', refs: [{ id: q3.id, revision: q3.revision }] }, 3000)
+    s = submitNbmeAnswer(s, 'S2', 0, q3, 'A', 400, 4000)
+    expect(countNbmeSessionAttempts(s, 'S2')).toBe(1)
+
+    const limpio = discardNbmeSession(s, 'S2', 9000)
+    expect(limpio.sessions.S1).toBeDefined()
+    expect(countNbmeSessionAttempts(limpio, 'S1')).toBe(1)
+    expect(limpio.sessions.S2).toBeUndefined()
+    expect(parseNbmeState(JSON.parse(JSON.stringify(limpio)))).not.toBeNull()
+  })
+  it('descartar un bloque inexistente no cambia nada', () => {
+    const s = start()
+    expect(discardNbmeSession(s, 'NO-EXISTE')).toBe(s)
+  })
+})
+
+describe('bankVersion como clave de invalidación', () => {
+  it('sella la versión del banco y conserva la identidad del estado si no cambió', () => {
+    const s = emptyNbmeState('1.0.0')
+    const sellado = setNbmeBankVersion(s, '1.0.0-392d86977641-safety162')
+    expect(sellado.bankVersion).toBe('1.0.0-392d86977641-safety162')
+    expect(setNbmeBankVersion(sellado, '1.0.0-392d86977641-safety162')).toBe(sellado)
+  })
+  it('el estado sellado sigue pasando la validación', () => {
+    const sellado = setNbmeBankVersion(start(), '1.6.2-corregido')
+    expect(parseNbmeState(JSON.parse(JSON.stringify(sellado)))?.bankVersion).toBe('1.6.2-corregido')
   })
 })

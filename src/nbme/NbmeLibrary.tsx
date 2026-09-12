@@ -1,11 +1,13 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNbme } from './NbmeProvider'
 import { deriveNbmeSession, questionProgress } from './model'
 import type { NbmeQuestionMeta } from './types'
 import './nbme.css'
 
 export function NbmeLibrary({ onStart }: { onStart: () => void }) {
-  const { catalog, state, filters, setFilters, loading, busy, error, startSession, resumeSession, reloadCatalog } = useNbme()
+  const { catalog, state, filters, setFilters, loading, busy, error, startSession, resumeSession,
+    discardSession, attemptsInSession, reloadCatalog } = useNbme()
+  const [confirmarDescarte, setConfirmarDescarte] = useState<string | null>(null)
   const questions = catalog?.questions ?? []
   const systems = useMemo(() => [...new Set(questions.flatMap(q => q.systems))].sort((a, b) => a.localeCompare(b, 'es')), [catalog])
   const disciplines = useMemo(() => [...new Set(questions.flatMap(q => q.disciplines))].sort((a, b) => a.localeCompare(b, 'es')), [catalog])
@@ -48,7 +50,18 @@ export function NbmeLibrary({ onStart }: { onStart: () => void }) {
       <div><h2>Retoma donde lo dejaste</h2><p className="sutil">{next.session.title}</p>
         <p className="mini">{next.view!.firstAnswered} de {next.view!.initialCount} respondidas en la primera vuelta · {next.view!.pendingErrors} correcciones pendientes</p>
       </div>
-      <button className="btn principal" disabled={busy || loading} onClick={() => void resume(next.session.id)}>Continuar sesión</button>
+      <div className="fila">
+        <button className="btn principal" disabled={busy || loading} onClick={() => void resume(next.session.id)}>Continuar sesión</button>
+        {confirmarDescarte === next.session.id
+          ? <>
+              <button className="btn pequeno" disabled={busy} onClick={() => { discardSession(next.session.id); setConfirmarDescarte(null) }}>
+                Sí, descartar {attemptsInSession(next.session.id) || 'el'} {attemptsInSession(next.session.id) === 1 ? 'respuesta' : 'respuestas'}
+              </button>
+              <button className="btn pequeno fantasma" onClick={() => setConfirmarDescarte(null)}>Mejor no</button>
+            </>
+          : <button className="btn pequeno fantasma" disabled={busy} onClick={() => setConfirmarDescarte(next.session.id)}>Descartar bloque</button>}
+      </div>
+      {confirmarDescarte === next.session.id && <p className="mini">Se borra el bloque y sus respuestas. El resto de tu progreso no se toca.</p>}
     </section>}
 
     {error && <div className="nbme-error" role="alert"><p>{error}</p>

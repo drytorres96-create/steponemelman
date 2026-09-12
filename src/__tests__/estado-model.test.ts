@@ -94,7 +94,13 @@ describe('estado persistido compatible', () => {
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '1.0.1' })?.corpus_version).toBe(CORPUS_VERSION)
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '1.0.2' })?.corpus_version).toBe(CORPUS_VERSION)
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '1.0.3' })?.corpus_version).toBe(CORPUS_VERSION)
+    // Cualquier versión ya publicada se lee, sin lista literal que haya que mantener a mano.
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '1.0.4' })?.corpus_version).toBe(CORPUS_VERSION)
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: CORPUS_VERSION })?.corpus_version).toBe(CORPUS_VERSION)
+    // Una versión futura la escribió una aplicación más nueva: no se degrada a ciegas.
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '9.0.0' })).toBeNull()
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '1.1.0' })).toBeNull()
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, corpus_version: '1.0' })).toBeNull()
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, sesiones: null })).toBeNull()
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, sesiones: [null] })).toBeNull()
     expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, progreso: { A: { ...nuevoProgreso('B') } } })).toBeNull()

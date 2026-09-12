@@ -34,6 +34,7 @@ beforeEach(() => {
     busy: false, error: null, storageWarning: null, elapsedMs: 0, budgetReached: false,
     syncStatus: { state: 'synced', message: '', lastSyncedAt: 1 },
     startSession: vi.fn().mockResolvedValue(true), selectAnswer: vi.fn(), checkAnswer: vi.fn(), nextQuestion: vi.fn(),
+    discardSession: vi.fn().mockReturnValue(true), attemptsInSession: vi.fn().mockReturnValue(0),
     pauseSession: vi.fn(), resumeSession: vi.fn().mockResolvedValue(true), continueSession: vi.fn(), continueWithoutBudget: vi.fn(),
     setFilters: vi.fn(), syncNow: vi.fn().mockResolvedValue(true), reloadCatalog: vi.fn().mockResolvedValue(undefined),
     retryQuestionLoad: vi.fn().mockResolvedValue(undefined), loadFigure: vi.fn().mockResolvedValue(new Blob()),

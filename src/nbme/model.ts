@@ -187,6 +187,39 @@ export function reviewNbmeAnswer(state: NbmeState, sid: string, position: number
     return { ...next, activeSessionId: null, activeChangedAt: Math.max(now, next.activeChangedAt) }
   return next
 }
+/**
+ * Descarta un bloque y sus intentos.
+ *
+ * Sin esto, una sesión fijada a una pregunta retirada del banco quedaba irreanudable y también
+ * imborrable: pasaba a ser la tarjeta «Retoma donde lo dejaste» y su botón fallaba siempre. Los
+ * intentos se borran con ella a propósito: `parseNbmeState` exige que cada intento mapee a la
+ * posición de su propia sesión, así que dejarlos huérfanos invalidaría el estado completo.
+ */
+export function discardNbmeSession(state: NbmeState, sid: string, now = Date.now()): NbmeState {
+  if (!state.sessions[sid]) return state
+  const sessions = { ...state.sessions }
+  delete sessions[sid]
+  const attempts = Object.fromEntries(Object.entries(state.attempts).filter(([, a]) => a.sessionId !== sid))
+  const activo = state.activeSessionId === sid
+  return { ...state, sessions, attempts,
+    activeSessionId: activo ? null : state.activeSessionId,
+    activeChangedAt: activo ? now : state.activeChangedAt }
+}
+
+/** Cuántos intentos se perderían al descartar: la interfaz lo dice antes de preguntar. */
+export function countNbmeSessionAttempts(state: NbmeState, sid: string): number {
+  return Object.values(state.attempts).filter(a => a.sessionId === sid).length
+}
+
+/**
+ * Sella la versión del banco en el estado. Era un campo decorativo: se guardaba y se mezclaba por
+ * máximo lexicográfico, pero nunca se comparaba con el catálogo, así que no servía de clave de
+ * invalidación para nada.
+ */
+export function setNbmeBankVersion(state: NbmeState, bankVersion: string): NbmeState {
+  return state.bankVersion === bankVersion ? state : { ...state, bankVersion }
+}
+
 export function updateNbmeFilters(state: NbmeState, patch: Partial<NbmeFilters>, now = Date.now()): NbmeState {
   const filters = parseFilters({ ...state.filters, ...patch })
   if (!filters || !num(now)) throw new Error('Filtros no válidos.')
