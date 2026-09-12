@@ -69,6 +69,8 @@ describe('continuidad y navegación accesible', () => {
     expect(host.querySelector('.menu-cuenta')).toBeNull()
     expect(host.textContent).not.toContain('Mostrar menú')
     expect(host.textContent).not.toContain('Concentrarme')
+    expect(host.querySelector('.study-focus')).not.toBeNull()
+    expect(host.querySelectorAll('img.medical-image')).toHaveLength(0)
   })
 
   it('el estado de sincronización solo aparece cuando hay un problema que atender', async () => {

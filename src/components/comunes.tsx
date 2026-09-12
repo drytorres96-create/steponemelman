@@ -13,13 +13,13 @@ export function Anillo({ valor, total, tam = 108, etiqueta, oro = false }:
     <div className="anillo" style={{ width: tam, height: tam }}
          role="img" aria-label={`${etiqueta}: ${valor} de ${total}`}>
       <svg width={tam} height={tam} aria-hidden="true">
-        <circle cx={tam/2} cy={tam/2} r={r} fill="none" stroke="#ffffff10" strokeWidth="7" />
+        <circle cx={tam/2} cy={tam/2} r={r} fill="none" stroke="var(--linea)" strokeWidth="7" />
         <circle cx={tam/2} cy={tam/2} r={r} fill="none" strokeWidth="7" strokeLinecap="round"
           stroke={`url(#${gradiente})`}
           strokeDasharray={`${circ * pct} ${circ}`} style={{ transition: 'stroke-dasharray .6s cubic-bezier(.2,.8,.2,1)' }} />
         <defs>
           <linearGradient id={gradiente} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={oro ? '#c99a2e' : '#8b7cf6'} /><stop offset="100%" stopColor={oro ? '#e3b23c' : '#e05fa8'} /></linearGradient>
+            <stop offset="0%" stopColor={oro ? 'var(--oro)' : 'var(--violeta)'} /><stop offset="100%" stopColor={oro ? 'var(--oro)' : 'var(--magenta)'} /></linearGradient>
         </defs>
       </svg>
       <div className="centro"><b style={oro ? { color: 'var(--oro)' } : undefined}>{valor}</b><small>{etiqueta}</small></div>

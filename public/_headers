@@ -9,6 +9,10 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Original decorative artwork, versioned so a future design cannot reuse stale files.
+/images/v170/*
+  Cache-Control: public, max-age=31536000, immutable
+
 /icon-192.png
   Cache-Control: public, max-age=604800
 /icon-512.png

@@ -8,6 +8,7 @@ import { dominioVigente } from '../srs/mastery'
 import { SelectorCarga, useCargaEstudio } from '../components/SelectorCarga'
 import { ExploradorConceptos } from './ExploradorConceptos'
 import { cargarTodo } from '../data/corpus'
+import { ScreenHeading } from '../components/Editorial'
 import {
   buscarConceptos, construirSesionPersonalizada, descripcionFiltros, FILTROS_BUSQUEDA_INICIALES,
   indexarConceptos, NOMBRES_ESTADOS_BUSQUEDA, type EstadoBusqueda, type FiltrosBusqueda, type OpcionesSesionPersonalizada,
@@ -90,10 +91,7 @@ export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion, 
 
   return (
     <div className="pila">
-      <div>
-        <h1>Elige qué estudiar</h1>
-        <p className="sutil">Combina disciplina y sistema para crear una sesión a tu medida. Puedes practicar conceptos nuevos o ya estudiados.</p>
-      </div>
+      <ScreenHeading eyebrow="Biblioteca de conceptos" title="Elige qué estudiar" description="Combina disciplina y sistema para crear una sesión a tu medida. Puedes practicar conceptos nuevos o ya estudiados." />
 
       <div className="tarjeta pila">
         <div><h2>Sesión personalizada</h2><p className="mini">Ejemplos: Farmacología + Endocrino; Fisiología + Cardiovascular; Patología + Hematológico y oncológico. Cada concepto debe cumplir todos los filtros elegidos.</p></div>

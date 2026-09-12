@@ -2,20 +2,23 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { authErrorMessage, useAuth } from './AuthProvider'
+import { Brand, MedicalImage } from '../components/Editorial'
+import { APP_VERSION } from '../release'
 import './auth.css'
 
 function AuthFrame({ children }: { children: ReactNode }) {
-  return <main className="auth-page">
+  return <main className="auth-page" data-app-version={APP_VERSION}>
     <section className="auth-intro" aria-label="Step 1 Melman">
-      <div className="marca"><span className="punto" aria-hidden="true" />Step 1 · Melman</div>
-      <div>
-        <span className="etq violeta">Tu espacio de estudio</span>
-        <h1>Un concepto a la vez.<br /><span>Tu progreso, contigo.</span></h1>
+      <MedicalImage scene="membrane" priority sizes="(max-width: 760px) 100vw, 54vw" />
+      <Brand />
+      <div className="auth-editorial-copy">
+        <span className="editorial-eyebrow">Medicina. Comprensión. Constancia.</span>
+        <h1>Un concepto{' '}<br />a la vez.<br /><span>Un paso más cerca.</span></h1>
         <p>Practica, repasa y retoma tus sesiones con la misma cuenta en cada dispositivo.</p>
       </div>
-      <p className="auth-footnote">Razonamiento activo · Repaso espaciado · Progreso personal</p>
+      <p className="auth-footnote">USMLE STEP 1 <span>Un espacio para aprender con intención.</span></p>
     </section>
-    <section className="auth-card tarjeta" aria-label="Acceso a tu cuenta">{children}</section>
+    <section className="auth-card tarjeta" aria-label="Acceso a tu cuenta"><p className="editorial-eyebrow">Tu espacio de estudio</p>{children}</section>
   </main>
 }
 
