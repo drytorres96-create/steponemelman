@@ -1,10 +1,43 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from '../components/comunes'
 import { useNbme } from './NbmeProvider'
+import { analizarEnunciado, detectarLecturasDudosas, normalizarTexto } from './texto'
 import type { NbmeQuestion } from './types'
 import './nbme.css'
 
 interface LoadedFigure { assetId: string; alt: string; url: string }
+
+/**
+ * Presenta el enunciado importado: prosa en párrafos y, cuando la extracción
+ * permite reconstruirla sin ambigüedad, la tabla de laboratorio en dos columnas.
+ */
+function Enunciado({ texto }: { texto: string }) {
+  const bloques = useMemo(() => analizarEnunciado(texto), [texto])
+  return <div className="nbme-stem" lang="en">
+    {bloques.map((bloque, indice) => bloque.tipo === 'parrafo'
+      ? <p key={indice} className="nbme-stem-parrafo">{bloque.texto}</p>
+      : <figure key={indice} className="nbme-lab">
+        <figcaption className="nbme-lab-encabezado">{bloque.encabezado}</figcaption>
+        <div className="nbme-lab-scroll">
+          <table className="nbme-lab-tabla">
+            <tbody>
+              {bloque.filas.map(fila => <tr key={fila.etiqueta}>
+                <th scope="row">{fila.etiqueta}</th>
+                <td>{fila.valor}{fila.dudoso && <abbr className="nbme-dudoso" title="Lectura dudosa en la fuente: contrasta este valor con el PDF">?</abbr>}</td>
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
+      </figure>)}
+  </div>
+}
+
+/** Texto de apoyo (explicaciones y objetivos) con la misma tipografía corregida. */
+function TextoFuente({ texto, className = 'nbme-source-text' }: { texto: string; className?: string }) {
+  const limpio = useMemo(() => normalizarTexto(texto), [texto])
+  return <div className={className} lang="en">{limpio.split('\n').map((parrafo, indice) =>
+    <p key={indice} className="nbme-parrafo-fuente">{parrafo}</p>)}</div>
+}
 
 function useQuestionFigures(question: NbmeQuestion | null) {
   const { loadFigure } = useNbme()
@@ -93,6 +126,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
   </section>
 
   const source = currentQuestion ? `NBME ${currentQuestion.form} · sección ${currentQuestion.section} · pregunta ${currentQuestion.item} · página ${currentQuestion.page}` : 'Pregunta de aplicación'
+  const lecturasDudosas = currentQuestion ? detectarLecturasDudosas(currentQuestion.stem) : []
   const explanationSource = currentQuestion?.objective || currentQuestion?.explanation
   const briefExplanation = explanationSource && explanationSource.length > 900 ? `${explanationSource.slice(0, 900).trimEnd()}…` : explanationSource
   const reviewedLinks = (currentQuestion?.conceptLinks ?? []).filter(link => link.review === 'reviewed')
@@ -122,7 +156,11 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
                 {sessionView.current?.round ? 'Vuelve a intentarlo' : `Pregunta ${(sessionView.current?.position ?? 0) + 1} de ${sessionView.initialCount}`}
               </h1>
               <p className="mini">{source}</p>
-              <div className="nbme-stem" lang="en">{currentQuestion.stem}</div>
+              <Enunciado texto={currentQuestion.stem} />
+              {lecturasDudosas.length > 0 && <p className="nbme-aviso-fuente">
+                Esta pregunta conserva lecturas dudosas de la extracción ({lecturasDudosas.join(', ')}).
+                Contrasta las cifras con el PDF antes de darlas por buenas.
+              </p>}
               {figures.loading && <p role="status" className="sutil">Cargando figura…</p>}
               {figures.error && <div className="nbme-error" role="alert"><p>No se pudo cargar la figura.</p><button className="btn" onClick={figures.retry}>Reintentar figura</button></div>}
               {currentQuestion.figureRequired && !currentQuestion.figures.length && <p role="alert" className="nbme-error">Falta una figura necesaria para responder esta pregunta.</p>}
@@ -139,7 +177,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
                     const isIncorrect = !!feedback && !feedback.conflict && isSelected && !feedback.correct
                     return <label key={option.id} className={`nbme-option${isSelected ? ' selected' : ''}${isCorrect ? ' correct' : ''}${isIncorrect ? ' incorrect' : ''}`}>
                       <input type="radio" name={`nbme-answer-${sessionView.current?.position}`} value={option.id} checked={isSelected} onChange={() => selectAnswer(option.id)} />
-                      <span className="nbme-option-letter">{option.id}.</span><span className="nbme-option-text" lang="en">{option.text}
+                      <span className="nbme-option-letter">{option.id}.</span><span className="nbme-option-text" lang="en">{normalizarTexto(option.text)}
                         {isCorrect && <span className="nbme-option-state" lang="es">Respuesta correcta</span>}
                         {isIncorrect && <span className="nbme-option-state" lang="es">Tu respuesta</span>}
                       </span>
@@ -155,12 +193,12 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
               <div><h2 ref={feedbackRef} tabIndex={-1} id="nbme-feedback-title">{feedback.conflict ? 'Respuesta por revisar' : feedback.correct ? 'Respuesta correcta' : 'Vamos a repasarla'}</h2>
                 <p className="sutil" role="status">{feedback.conflict ? 'Se recibieron respuestas distintas desde varios dispositivos. Este intento no cuenta como acierto inicial.'
                   : feedback.correct ? 'Tu respuesta quedó registrada.' : 'Esta pregunta volverá durante la práctica. Puedes pausar cuando lo necesites.'}</p></div>
-              {!feedback.conflict && <p><b>Respuesta: {currentQuestion.answer}.</b> <span lang="en">{currentQuestion.options.find(option => option.id === currentQuestion.answer)?.text}</span></p>}
-              {briefExplanation && <div><h3>Fundamento de la respuesta</h3>{explanationSource !== briefExplanation && <p className="mini">Extracto del texto fuente.</p>}<p className="nbme-source-text" lang="en">{briefExplanation}</p></div>}
-              {currentQuestion.objective && explanationSource !== briefExplanation && <details className="nbme-details"><summary>Leer fundamento completo</summary><div className="nbme-source-text" lang="en">{currentQuestion.objective}</div></details>}
-              {currentQuestion.explanation && currentQuestion.explanation !== briefExplanation && <details className="nbme-details"><summary>Leer explicación completa</summary><div className="nbme-source-text" lang="en">{currentQuestion.explanation}</div></details>}
+              {!feedback.conflict && <p className="nbme-respuesta"><b>Respuesta: {currentQuestion.answer}.</b> <span lang="en">{normalizarTexto(currentQuestion.options.find(option => option.id === currentQuestion.answer)?.text ?? '')}</span></p>}
+              {briefExplanation && <div><h3>Fundamento de la respuesta</h3>{explanationSource !== briefExplanation && <p className="mini">Extracto del texto fuente.</p>}<TextoFuente texto={briefExplanation} /></div>}
+              {currentQuestion.objective && explanationSource !== briefExplanation && <details className="nbme-details"><summary>Leer fundamento completo</summary><TextoFuente texto={currentQuestion.objective} /></details>}
+              {currentQuestion.explanation && currentQuestion.explanation !== briefExplanation && <details className="nbme-details"><summary>Leer explicación completa</summary><TextoFuente texto={currentQuestion.explanation} /></details>}
               {currentQuestion.distractorExplanations && Object.keys(currentQuestion.distractorExplanations).length > 0 && <details className="nbme-details"><summary>Por qué las otras opciones no</summary>
-                <div className="pila">{currentQuestion.options.filter(option => option.id !== currentQuestion.answer && currentQuestion.distractorExplanations?.[option.id]).map(option => <div key={option.id}><b>{option.id}. <span lang="en">{option.text}</span></b><p className="nbme-source-text" lang="en">{currentQuestion.distractorExplanations?.[option.id]}</p></div>)}</div>
+                <div className="pila nbme-distractores">{currentQuestion.options.filter(option => option.id !== currentQuestion.answer && currentQuestion.distractorExplanations?.[option.id]).map(option => <div key={option.id} className="nbme-distractor"><b>{option.id}. <span lang="en">{normalizarTexto(option.text)}</span></b><TextoFuente texto={currentQuestion.distractorExplanations?.[option.id] ?? ''} /></div>)}</div>
               </details>}
               <p className="mini">Fuente: {source}. Explicación procedente del material importado.</p>
               {suggestedLinks && <p className="mini">Relación sugerida; confirma que corresponde al fundamento.</p>}

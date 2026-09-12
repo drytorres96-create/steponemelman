@@ -2,7 +2,7 @@
 
 Plataforma de estudio para USMLE Step 1 con sesiones, repaso espaciado y progreso asociado a una cuenta. El sitio existente está en [steponemelman.yoeltorres.workers.dev](https://steponemelman.yoeltorres.workers.dev/). Este repositorio contiene la aplicación React/Vite y el contrato de base de datos; Supabase conserva el material privado y el progreso.
 
-La versión de código **1.6.0** incorpora el banco privado de preguntas de las formas 27, 28 y 29: filtros combinados, sesiones breves, corrección y repetición de errores, y continuidad entre dispositivos. Mantiene tres destinos principales y el progreso de conceptos independiente. Consulta [Cambios de la versión](docs/cambios-1.6.0.md). La versión aparece en **Cuenta y ajustes → Ajustes y respaldo**.
+La versión de código **1.6.1** corrige la presentación del banco de preguntas importado —tablas de laboratorio reconstruidas, tipografía de la extracción y aviso sobre las cifras que el OCR dejó ilegibles— y evita volver a descargar el corpus completo en cada visita. Consulta [Cambios de la versión](docs/cambios-1.6.1.md). La **1.6.0** incorporó el banco privado de preguntas de las formas 27, 28 y 29: filtros combinados, sesiones breves, corrección y repetición de errores, y continuidad entre dispositivos ([cambios](docs/cambios-1.6.0.md)). La versión aparece en **Cuenta y ajustes → Ajustes y respaldo**.
 
 ## Estudiar y continuar en otro dispositivo
 
@@ -102,7 +102,7 @@ El [contrato de base de datos](database/README.md) describe revisiones, conflict
 
 El corpus **1.0.5** reúne **2.079 conceptos publicables**, **191 apartados para revisión**, **21 de 50 lotes transformados** y **29 pendientes**. Esta revisión convierte **461 preguntas de escritura extensa** en ejercicios con opciones y aparta **70 conceptos adicionales** por inconsistencias o incertidumbres médicas, conservando sus identificadores e historial. Los lotes **B019–B021** ya están procesados y aportan **212 conceptos nuevos** al material de estudio respecto a la etapa 1.1.0. Los publicados se clasifican en **1.523 Step 1** y **556 compartidos con Step 2**, sin conceptos exclusivos de Step 2. El [plan de calidad](docs/plan-calidad-2026-09-10.md) distingue organización implementada de cobertura oficial, filtrado médico, imágenes, variantes e inglés pendientes.
 
-Las comprobaciones y los cambios de comportamiento de esta entrega están documentados en [la versión 1.6.0](docs/cambios-1.6.0.md). Las pruebas de contenido privado usan archivos externos al repositorio y se omiten en CI si no se aportan esos archivos.
+Las comprobaciones y los cambios de comportamiento de esta entrega están documentados en [la versión 1.6.1](docs/cambios-1.6.1.md). Las pruebas de contenido privado usan archivos externos al repositorio y se omiten en CI si no se aportan esos archivos.
 
 La aplicación comprueba el índice y cada módulo antes de utilizarlos. Rechaza identificadores duplicados, cantidades o pertenencias inconsistentes, módulos incompletos y discrepancias de versión cuando el módulo declara una versión. También bloquea conceptos exclusivos de Step 2, conceptos en cuarentena y los que no alcanzan el umbral editorial de confianza. Un error de integridad detiene esa carga, en lugar de presentar un módulo parcial como completo. Los módulos históricos sin marca de versión siguen admitidos si cumplen las demás comprobaciones.
 

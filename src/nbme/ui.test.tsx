@@ -95,7 +95,8 @@ describe('NBME study interface', () => {
     await act(async () => root.render(<NbmePlayer onSalir={exit} onEstudiar={study} />))
     expect(host.textContent).toContain('Correcciones pendientes: 1')
     expect(host.textContent).toContain('Leer fundamento completo')
-    expect([...host.querySelectorAll('details')].some(item => item.textContent?.includes(source))).toBe(true)
+    // La presentación recorta el espaciado sobrante de la extracción; el texto se conserva íntegro.
+    expect([...host.querySelectorAll('details')].some(item => item.textContent?.includes(source.trim()))).toBe(true)
     expect(host.textContent).toContain('Relación sugerida; confirma que corresponde al fundamento.')
     await click('Explorar conceptos relacionados')
     expect(context.pauseSession).toHaveBeenCalledOnce()
