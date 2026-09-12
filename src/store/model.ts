@@ -1,5 +1,5 @@
 import { nuevoProgreso, programar } from '../srs/fsrs'
-import { CRITERIOS_POR_DEFECTO, calcularEstado, evaluarDominio, type CriteriosDominio } from '../srs/mastery'
+import { CRITERIOS_POR_DEFECTO, calcularEstado, evaluarDominio, type CriteriosDominio, sonCriteriosHeredados } from '../srs/mastery'
 import { intentoCorrecto, NOMBRE_ERROR, NOMBRE_ESTADO, type Intento, type ProgresoConcepto } from '../srs/tipos'
 
 export const CORPUS_VERSION = '1.0.5' as const
@@ -218,10 +218,25 @@ function leerReanudable(v: unknown): Reanudable | null | false {
   }
 }
 
+const FORMA_VERSION = /^\d+\.\d+\.\d+$/
+function compararVersion(a: string, b: string): number {
+  const pa = a.split('.').map(Number), pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pa[i] - pb[i]
+  return 0
+}
+/** Legible = con forma de versión y no posterior a la que entiende esta aplicación. */
+export function esVersionLegible(valor: string, actual: string = CORPUS_VERSION): boolean {
+  return FORMA_VERSION.test(valor) && compararVersion(valor, actual) <= 0
+}
+
 /** Lee versiones previas compatibles, sin aceptar estructuras parciales corruptas. */
 export function leerEstadoDesconocido(v: unknown): EstadoApp | null {
   if (!esObjeto(v) || v.version !== 1 || !esObjeto(v.progreso)) return null
-  if (v.corpus_version !== undefined && v.corpus_version !== '1.0.0' && v.corpus_version !== '1.0.1' && v.corpus_version !== '1.0.2' && v.corpus_version !== '1.0.3' && v.corpus_version !== '1.0.4' && v.corpus_version !== CORPUS_VERSION) return null
+  // Cualquier versión ya publicada es legible; una futura no, porque la habría escrito una
+  // aplicación más nueva y no se puede degradar a ciegas. La lista literal anterior habría
+  // rechazado el progreso de la versión inmediatamente anterior en cuanto se publicara una nueva.
+  if (v.corpus_version !== undefined
+    && (typeof v.corpus_version !== 'string' || !esVersionLegible(v.corpus_version))) return null
 
   const progreso: Record<string, ProgresoConcepto> = {}
   for (const [id, crudo] of Object.entries(v.progreso)) {
@@ -236,7 +251,10 @@ export function leerEstadoDesconocido(v: unknown): EstadoApp | null {
   const sesiones = sesionesCrudas.map(leerSesion)
   if (sesiones.some(s => s === null)) return null
 
-  const criterios = v.criterios === undefined ? CRITERIOS_POR_DEFECTO : leerCriterios(v.criterios)
+  const guardados = v.criterios === undefined ? CRITERIOS_POR_DEFECTO : leerCriterios(v.criterios)
+  // `criterios` se persiste y se sincroniza, así que endurecer la constante no basta: si lo
+  // guardado son exactamente los criterios heredados, es que nunca se tocaron a mano y se migran.
+  const criterios = guardados && sonCriteriosHeredados(guardados) ? CRITERIOS_POR_DEFECTO : guardados
   const reanudable = leerReanudable(v.reanudable)
   if (!criterios || reanudable === false) return null
   if (v.msEstudio !== undefined && !numero(v.msEstudio)) return null

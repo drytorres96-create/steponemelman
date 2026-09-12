@@ -67,8 +67,18 @@ export interface PlanDiario {
   errores: number
   nuevos: number
   hayRepasoAcumulado: boolean
+  /** true cuando el tope de repaso dejó fuera vencidos para reservar plazas a material nuevo. */
+  repasoLimitado: boolean
   explicacion: string
 }
+
+/**
+ * Proporción máxima del plan que puede ocupar el repaso cuando hay material nuevo disponible.
+ * Un plan que un lunes amanece siendo 100 % atraso no se abre, y lo que falla hoy vuelve a vencer
+ * mañana, así que sin tope la cola crece sola y expulsa todo lo nuevo. El tope no borra nada: los
+ * vencidos que no entran hoy siguen ahí y recuperan las plazas que el material nuevo no llene.
+ */
+export const TOPE_REPASO = 0.7
 
 /**
  * Selección global y determinista, compartida por la vista previa y el reproductor.
@@ -82,15 +92,25 @@ export function construirPlanDiario(conceptos: Concepto[], progreso: Progreso, l
   const idsVencidos = new Set(vencidos.map(c => c.concept_id))
   const errores = erroresRecientesPendientes(base, progreso, ahora).filter(c => !idsVencidos.has(c.concept_id))
   const nuevos = ordenarFundamentos(base.filter(c => !progreso[c.concept_id]?.intentos.length))
-  const lista = [...vencidos, ...errores, ...nuevos].slice(0, maximo)
+  const repaso = [...vencidos, ...errores]
+  const plazasRepaso = nuevos.length
+    ? Math.min(repaso.length, Math.max(1, Math.round(maximo * TOPE_REPASO)))
+    : maximo
+  const elegidos = [...repaso.slice(0, plazasRepaso), ...nuevos].slice(0, maximo)
+  // Si no hay suficientes conceptos nuevos, el repaso recupera las plazas libres.
+  const libres = maximo - elegidos.length
+  const lista = libres > 0 ? [...elegidos, ...repaso.slice(plazasRepaso, plazasRepaso + libres)] : elegidos
+  // Cierto sólo cuando el TOPE dejó vencidos fuera, no cuando simplemente no caben en el límite.
+  const repasoLimitado = nuevos.length > 0 && repaso.length > plazasRepaso
   const idsErrores = new Set(errores.map(c => c.concept_id))
   const nVencidos = lista.filter(c => idsVencidos.has(c.concept_id)).length
   const nErrores = lista.filter(c => idsErrores.has(c.concept_id)).length
   const nNuevos = lista.length - nVencidos - nErrores
   const hayRepasoAcumulado = maximo > 0 && vencidos.length >= Math.ceil(maximo / 2)
   return {
-    conceptos: lista, limite: maximo, vencidos: nVencidos, errores: nErrores, nuevos: nNuevos, hayRepasoAcumulado,
+    conceptos: lista, limite: maximo, vencidos: nVencidos, errores: nErrores, nuevos: nNuevos,
+    hayRepasoAcumulado, repasoLimitado,
     explicacion: !lista.length ? 'Ahora no hay repasos pendientes ni conceptos nuevos para esta selección.'
-      : `Hasta ${maximo} conceptos: primero repasos vencidos, después errores del último intento en los últimos ${DIAS_ERROR_RECIENTE} días y, si quedan plazas, conceptos nuevos. ${hayRepasoAcumulado ? 'El repaso acumulado reduce la cantidad de conceptos nuevos. ' : ''}Los nuevos empiezan por fundamentos; puedes elegir otra ruta.`,
+      : `Hasta ${maximo} conceptos: primero repasos vencidos, después errores del último intento en los últimos ${DIAS_ERROR_RECIENTE} días y, si quedan plazas, conceptos nuevos. ${repasoLimitado ? `El repaso ocupa como máximo ${Math.round(TOPE_REPASO * 100)} % del plan para que siempre entre material nuevo; el resto espera su turno. ` : ''}Los nuevos empiezan por fundamentos; puedes elegir otra ruta.`,
   }
 }

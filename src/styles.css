@@ -9,6 +9,9 @@
   --panel-2: #1a2135;
   --linea: #253048;
   --linea-suave: #1c2438;
+  /* Borde de controles interactivos: 3,41:1 sobre #0e1424 — WCAG 1.4.11 exige 3:1. */
+  --linea-interactiva: #5a6a90;
+  --linea-interactiva-viva: #8b9cc4;
   --texto: #e8ecf6;
   --texto-2: #a8b3cc;
   --texto-3: #929fb8;
@@ -67,11 +70,16 @@ button { font: inherit; color: inherit; }
 .nav { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: thin; min-width: 0; }
 .nav::-webkit-scrollbar { display: none; }
 .nav button {
-  background: none; border: 0; padding: 7px 12px; border-radius: 8px; cursor: pointer;
+  background: none; border: 0; padding: 7px 12px; border-radius: 8px 8px 0 0; cursor: pointer;
   color: var(--texto-2); font-size: .9rem; font-weight: 520; white-space: nowrap; transition: .16s;
+  min-height: 44px; border-bottom: 2px solid transparent;
 }
 .nav button:hover { color: var(--texto); background: #ffffff09; }
-.nav button[aria-current="page"] { color: var(--texto); background: var(--violeta-tenue); box-shadow: inset 0 0 0 1px #8b7cf640; }
+/* La vista activa se reconoce por el subrayado, no por un fondo casi invisible. */
+.nav button[aria-current="page"] {
+  color: var(--texto); background: var(--violeta-tenue);
+  border-bottom-color: var(--violeta-2); font-weight: 640;
+}
 .barra-fin { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 
 main { flex: 1; padding: 26px 0 72px; }
@@ -178,10 +186,10 @@ label { font-size: .85rem; color: var(--texto-2); }
 .pregunta { font-size: 1.14rem; line-height: 1.5; font-weight: 520; margin-bottom: 18px; white-space: pre-line; }
 .opcion {
   display: flex; gap: 11px; align-items: flex-start; width: 100%; text-align: left;
-  padding: 12px 14px; border-radius: 11px; border: 1px solid var(--linea-suave);
+  min-height: 48px; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--linea-interactiva);
   background: #0e1424; cursor: pointer; transition: .14s; margin-bottom: 8px;
 }
-.opcion:hover:not(:disabled) { border-color: #3b4767; background: #131b2e; }
+.opcion:hover:not(:disabled) { border-color: var(--linea-interactiva-viva); background: #131b2e; }
 .opcion .letra { width: 22px; height: 22px; border-radius: 6px; background: #ffffff0e; display: grid; place-items: center; font-size: .76rem; font-weight: 640; color: var(--texto-2); flex: none; margin-top: 1px; }
 .opcion.elegida { border-color: var(--violeta); background: var(--violeta-tenue); }
 .opcion.acierto { border-color: #3ecf8e66; background: #3ecf8e12; }
@@ -199,15 +207,15 @@ label { font-size: .85rem; color: var(--texto-2); }
 .flechas { display: grid; gap: 8px; }
 .flecha-fila { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 9px 13px; background: #0e1424; border: 1px solid var(--linea-suave); border-radius: 11px; }
 .flecha-ops { display: flex; gap: 4px; }
-.flecha-ops button { width: 40px; height: 32px; border-radius: 8px; border: 1px solid var(--linea-suave); background: #131b2e; cursor: pointer; font-size: 1rem; line-height: 1; transition: .14s; }
-.flecha-ops button:hover:not(:disabled) { border-color: #3b4767; }
+.flecha-ops button { min-width: 44px; height: 44px; border-radius: 8px; border: 1px solid var(--linea-interactiva); background: #131b2e; cursor: pointer; font-size: 1rem; line-height: 1; transition: .14s; }
+.flecha-ops button:hover:not(:disabled) { border-color: var(--linea-interactiva-viva); }
 .flecha-ops button.sel { border-color: var(--violeta); background: var(--violeta-tenue); color: var(--violeta-2); }
 .flecha-ops button.ok { border-color: #3ecf8e77; background: #3ecf8e18; color: var(--verde); }
 .flecha-ops button.mal { border-color: #f2606a77; background: #f2606a18; color: var(--rojo); }
 
 .fichas { display: flex; flex-wrap: wrap; gap: 7px; }
-.ficha { padding: 7px 12px; border-radius: 9px; border: 1px solid var(--linea-suave); background: #0e1424; cursor: pointer; font-size: .88rem; transition: .14s; }
-.ficha:hover:not(:disabled) { border-color: #3b4767; }
+.ficha { display: inline-flex; align-items: center; min-height: 44px; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--linea-interactiva); background: #0e1424; cursor: pointer; font-size: .88rem; transition: .14s; }
+.ficha:hover:not(:disabled) { border-color: var(--linea-interactiva-viva); }
 .ficha.sel { border-color: var(--violeta); background: var(--violeta-tenue); }
 .ficha.ok { border-color: #3ecf8e66; background: #3ecf8e12; }
 .ficha.mal { border-color: #f2606a66; background: #f2606a12; }
@@ -238,6 +246,9 @@ label { font-size: .85rem; color: var(--texto-2); }
 .modal-cab { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--linea-suave); position: sticky; top: 0; background: var(--panel); }
 .modal-cuerpo { padding: 20px; }
 
+/* El patrón reutilizable es lo que él busca en cada fallo: se lee sin desplegar nada. */
+.patron { border-left: 2px solid var(--violeta-2); background: var(--violeta-tenue); padding: 10px 13px; border-radius: 0 10px 10px 0; margin: 10px 0; font-size: .94rem; }
+.patron b { color: var(--violeta-2); }
 .aviso { display: flex; gap: 10px; padding: 11px 14px; border-radius: 11px; background: #f0a63c0e; border: 1px solid #f0a63c30; font-size: .87rem; color: #f5cd93; }
 .vacio { text-align: center; padding: 46px 20px; color: var(--texto-3); }
 

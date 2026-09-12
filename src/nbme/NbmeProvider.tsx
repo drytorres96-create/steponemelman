@@ -5,7 +5,8 @@ import { crearUUID } from '../store/model'
 import { createNbmeApi, parseNbmeCatalog, parseNbmeQuestion, questionRefKey, NbmeAccessError } from './api'
 import { preguntaConLecturasDudosas } from './texto'
 import { emptyNbmeState, parseNbmeState, mergeNbmeStates, startNbmeSession, setNbmeDraft,
-  submitNbmeAnswer, reviewNbmeAnswer, updateNbmeSession, activateNbmeSession, deriveNbmeSession, updateNbmeFilters } from './model'
+  submitNbmeAnswer, reviewNbmeAnswer, updateNbmeSession, activateNbmeSession, deriveNbmeSession, updateNbmeFilters,
+  discardNbmeSession, countNbmeSessionAttempts, setNbmeBankVersion } from './model'
 import { NbmeSyncEngine, parseNbmeSnapshot, stableNbmeJson, type NbmeSnapshot, type NbmeSyncReply } from './sync'
 import type { NbmeAttempt, NbmeCatalog, NbmeFilters, NbmeQuestion, NbmeQuestionRef, NbmeSession,
   NbmeSessionView, NbmeState } from './types'
@@ -39,11 +40,16 @@ interface NbmeContextValue {
   nextQuestion(): void
   pauseSession(): void
   resumeSession(id: string): Promise<boolean>
+  /** Salida siempre disponible para un bloque que ya no puede terminarse. */
+  discardSession(id: string): boolean
+  attemptsInSession(id: string): number
   continueSession(): void
   continueWithoutBudget(): void
   setFilters(filters: Partial<NbmeFilters>): void
   syncNow(): Promise<boolean>
   reloadCatalog(): Promise<void>
+  /** true cuando el catálogo mostrado viene de la copia local y aún no se ha refrescado. */
+  catalogStale: boolean
   retryQuestionLoad(): Promise<void>
   loadFigure(assetId: string, signal?: AbortSignal): Promise<Blob>
 }
@@ -79,6 +85,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
   const [change, setChange] = useState(0)
   const [contentChange, setContentChange] = useState(0)
   const [shownSessionId, setShownSessionId] = useState<string | null>(null)
+  const [catalogStale, setCatalogStale] = useState(false)
   const [elapsedNow, setElapsedNow] = useState(0)
   const actual = useRef(state)
   const mounted = useRef(false)
@@ -216,6 +223,9 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       if (!mounted.current || epoch !== aliveEpoch.current) return
       accessDenied.current = false
       setCatalog(next)
+      setCatalogStale(false)
+      // La versión del banco pasa al estado: es la clave con la que se detecta una corrección.
+      edit(previous => setNbmeBankVersion(previous, next.bankVersion))
       setError(null)
       await escribir(`nbme-catalog:${userId}`, { userId, catalog: next }, { estricto: true }).catch(() => undefined)
     } catch (failure) {
@@ -224,7 +234,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
         setError(userError(failure, 'No se pudo cargar el catálogo de preguntas.'))
       }
     } finally { controllers.current.delete(controller) }
-  }, [api, userId, denyAccess])
+  }, [api, userId, denyAccess, edit])
 
   const ensureQuestions = useCallback(async (refs: NbmeQuestionRef[]): Promise<void> => {
     if (accessDenied.current) throw new NbmeAccessError(403, 'Vuelve a comprobar el acceso al banco antes de continuar.')
@@ -317,11 +327,19 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       engineRef.current = engine
       const cachedCatalog = await leer<unknown>(`nbme-catalog:${userId}`)
       if (!isCurrent()) return
+      let desdeCache = false
       if (cachedCatalog && typeof cachedCatalog === 'object' && 'userId' in cachedCatalog && cachedCatalog.userId === userId && 'catalog' in cachedCatalog) {
-        setCatalog(parseNbmeCatalog(cachedCatalog.catalog))
+        const previo = parseNbmeCatalog(cachedCatalog.catalog)
+        setCatalog(previo)
+        desdeCache = !!previo
       }
+      setCatalogStale(desdeCache)
       setLoading(false)
-      await Promise.all([syncNow(), reloadCatalog()])
+      // El catálogo pesa ~180 KB y se pedía en cada arranque, aunque fuera a estudiar conceptos.
+      // Con copia local se refresca al abrir «Preguntas»; sin ella hace falta ahora, pero no
+      // bloquea la sincronización del progreso.
+      await syncNow()
+      if (!desdeCache) void reloadCatalog()
     })().catch(failure => {
       if (isCurrent()) { setError(userError(failure, 'No se pudo preparar tu banco de preguntas.')); setLoading(false) }
     })
@@ -460,8 +478,19 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
         if (!mounted.current || epoch !== aliveEpoch.current) return false
         accessDenied.current = false
         setCatalog(fresh)
-        if (session.initial.some(ref => !fresh.questions.some(q => q.id === ref.id && q.status === 'ready'))) {
-          throw new Error('Una pregunta de esta sesión necesita revisión. Tu progreso permanece guardado.')
+        // Comparar sólo el id dejaba reanudar un bloque fijado a una revisión anterior y
+        // calificarlo contra el contenido sin corregir.
+        const vigente = new Map(fresh.questions.map(q => [q.id, q]))
+        const retiradas = session.initial.filter(ref => vigente.get(ref.id)?.status !== 'ready')
+        const corregidas = session.initial.filter(ref => {
+          const q = vigente.get(ref.id)
+          return q?.status === 'ready' && q.revision !== ref.revision
+        })
+        if (retiradas.length) {
+          throw new Error(`${retiradas.length === 1 ? 'Una pregunta' : `${retiradas.length} preguntas`} de este bloque se retiraron del banco, así que no puede terminarse. Puedes descartarlo desde la biblioteca; tu progreso del resto se conserva.`)
+        }
+        if (corregidas.length) {
+          throw new Error(`${corregidas.length === 1 ? 'Una pregunta' : `${corregidas.length} preguntas`} de este bloque se corrigieron después de que lo empezaras. No se califica contra la versión antigua: descarta el bloque y empieza uno nuevo.`)
         }
       }
       await ensureQuestions(session.initial)
@@ -537,10 +566,22 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
   const elapsedMs = currentSession ? Math.max(currentSession.elapsedMs, elapsedNow) : 0
   const budgetReached = !!currentSession?.budgetMinutes && !currentSession.continueUnlimited
     && elapsedMs >= currentSession.budgetMinutes * 60_000
+  const discardSession = useCallback((id: string): boolean => {
+    if (!engineRef.current || !actual.current.sessions[id]) return false
+    if (shownSessionId === id) setShownSessionId(null)
+    if (engagedSession.current === id) engagedSession.current = null
+    edit(previous => discardNbmeSession(previous, id))
+    setError(null)
+    return true
+  }, [edit, shownSessionId])
+  const attemptsInSession = useCallback((id: string) => countNbmeSessionAttempts(actual.current, id), [])
+
   const value: NbmeContextValue = { catalog, state, currentSession, sessionView, currentQuestion, sessionQuestions,
     selectedOption, currentFeedback: sessionView?.attempt ?? null, filters: state.filters, loading, questionLoading, busy,
-    elapsedMs, budgetReached, error: error ?? storageWarning, storageWarning, syncStatus, startSession, selectAnswer, checkAnswer, nextQuestion,
-    pauseSession, resumeSession, continueSession, continueWithoutBudget: continueSession, setFilters, syncNow, reloadCatalog, retryQuestionLoad, loadFigure }
+    elapsedMs, budgetReached, error: error ?? storageWarning, storageWarning, syncStatus, catalogStale,
+    startSession, selectAnswer, checkAnswer, nextQuestion,
+    pauseSession, resumeSession, discardSession, attemptsInSession, continueSession,
+    continueWithoutBudget: continueSession, setFilters, syncNow, reloadCatalog, retryQuestionLoad, loadFigure }
   return <NbmeContext.Provider value={value}>{children}</NbmeContext.Provider>
 }
 export function useNbme(): NbmeContextValue {

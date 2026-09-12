@@ -31,10 +31,10 @@ function Opciones({ c, bloqueado, resultado, onResponder, semilla, ocultarFeedba
   const opciones = useMemo(() => mezclar(c.evaluacion.opciones ?? [], semilla ?? c.concept_id), [c, semilla])
   const [elegida, setElegida] = useState<number | null>(null)
   const seleccionada = elegida ?? (resultado ? opciones.findIndex(o => o.texto === resultado.respuestaDada) : null)
-  const responder = (i: number) => {
-    if (bloqueado) return
-    setElegida(i)
-    const o = opciones[i]
+  // Elegir no es responder: el intento se registra sólo al confirmar, igual que en el resto de formatos.
+  const enviar = () => {
+    if (bloqueado || elegida === null) return
+    const o = opciones[elegida]
     const dist = c.distractores_cercanos.some(d => normalizar(d.texto) === normalizar(o.texto))
     onResponder({
       veredicto: o.correcta ? 'correcta' : 'incorrecta',
@@ -45,23 +45,27 @@ function Opciones({ c, bloqueado, resultado, onResponder, semilla, ocultarFeedba
     })
   }
   return (
-    <div role="radiogroup" aria-label="Opciones de respuesta">
-      {opciones.map((o, i) => {
-        let cls = 'opcion'
-        if (seleccionada === i) cls += bloqueado && !ocultarFeedback ? (o.correcta ? ' acierto' : ' fallo') : ' elegida'
-        else if (bloqueado && !ocultarFeedback && o.correcta) cls += ' correcta-oculta'
-        return (
-          <button key={i} className={cls} onClick={() => responder(i)} disabled={bloqueado}
-                  role="radio" aria-checked={seleccionada === i}>
-            <span className="letra">{LETRAS[i]}</span>
-            <span style={{ flex: 1 }}>
-              {o.texto}
-              {bloqueado && !ocultarFeedback && o.correcta && <div className="mini" style={{ marginTop: 4, color: 'var(--verde)' }}>Respuesta correcta</div>}
-            </span>
-          </button>
-        )
-      })}
-      {resultado && null}
+    <div>
+      <div role="radiogroup" aria-label="Opciones de respuesta">
+        {opciones.map((o, i) => {
+          let cls = 'opcion'
+          if (seleccionada === i) cls += bloqueado && !ocultarFeedback ? (o.correcta ? ' acierto' : ' fallo') : ' elegida'
+          else if (bloqueado && !ocultarFeedback && o.correcta) cls += ' correcta-oculta'
+          return (
+            <button key={i} className={cls} onClick={() => { if (!bloqueado) setElegida(i) }} disabled={bloqueado}
+                    role="radio" aria-checked={seleccionada === i}>
+              <span className="letra">{LETRAS[i]}</span>
+              <span style={{ flex: 1 }}>
+                {o.texto}
+                {bloqueado && !ocultarFeedback && o.correcta && <div className="mini" style={{ marginTop: 4, color: 'var(--verde)' }}>Respuesta correcta</div>}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <button className="btn principal" style={{ marginTop: 12 }} onClick={enviar} disabled={bloqueado || elegida === null}>
+        Comprobar respuesta
+      </button>
     </div>
   )
 }

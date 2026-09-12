@@ -28,6 +28,26 @@ describe('normalización de respuestas', () => {
     ]) expect(['correcta', 'ortografia']).not.toContain(evaluarTexto(a, b))
     expect(evaluarTexto('TNF beta', 'TNF-α', [], ['TNF-β'])).toBe('incorrecta')
   })
+  it('una confusión de escritura en un término largo cuenta como errata, no como fallo', () => {
+    // s/z, b/v y la hache muda: la persona sabía el concepto y falló al escribirlo.
+    expect(evaluarTexto('glucoza', 'glucosa')).toBe('ortografia')
+    expect(evaluarTexto('rivoflavina', 'riboflavina')).toBe('ortografia')
+    expect(evaluarTexto('emoglobina', 'hemoglobina')).toBe('ortografia')
+    expect(evaluarTexto('hemoglovina', 'hemoglobina')).toBe('ortografia')
+  })
+  it('la errata no se concede donde una letra cambia el término', () => {
+    // Sustituciones que no son confusiones de escritura, truncamientos y cifras.
+    expect(evaluarTexto('L-DOPA', 'D-DOPA')).toBe('revision')
+    expect(evaluarTexto('fenoxibenzamin', 'fenoxibenzamina')).toBe('revision')
+    expect(evaluarTexto('insulina 10 U', 'insulina 40 U')).not.toBe('ortografia')
+    expect(evaluarTexto('lisina', 'lisita')).toBe('revision')   // término corto: 6 letras, t/n no confunden
+  })
+  it('la errata no se concede si la respuesta está igual de cerca de un distractor', () => {
+    // A una edición de la respuesta correcta y también de un distractor: no se decide sola.
+    expect(evaluarTexto('glucoza', 'glucosa', [], ['glucozo'])).toBe('revision')
+    // Si coincide exactamente con el distractor, es un fallo conceptual, no una errata.
+    expect(evaluarTexto('glucoza', 'glucosa', [], ['glucoza'])).toBe('incorrecta')
+  })
   it('deja palabras no reconocidas por revisar en vez de adivinar su significado', () => {
     expect(evaluarTexto('fenoxibenzamin', 'fenoxibenzamina')).toBe('revision')
     expect(evaluarTexto('propranolol', 'fenoxibenzamina')).toBe('revision')

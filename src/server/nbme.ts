@@ -1,10 +1,17 @@
 import config from '../../project.config.json'
+import { registrar } from './registro'
 import { preguntaConLecturasDudosas } from '../nbme/texto'
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: {
   'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Vary': 'Authorization',
 } })
-const unavailable = () => json({ error: 'No se pudo cargar el banco de preguntas. Vuelve a intentarlo.' }, 503)
+const MOTIVOS_BANCO = {
+  banco: 'No se pudo cargar el banco de preguntas. Vuelve a intentarlo.',
+  integridad: 'El banco devolvió datos que no cuadran con el catálogo. No se muestra nada a medias.',
+  interno: 'Algo falló en el servidor al cargar el banco. Tu sesión se conserva.',
+} as const
+const unavailable = (codigo: keyof typeof MOTIVOS_BANCO = 'banco') =>
+  json({ error: MOTIVOS_BANCO[codigo], codigo }, 503)
 const ID = /^NBME(?:27|28|29)-P\d{4}$/
 const REVISION = /^[a-zA-Z0-9_.-]{1,80}$/
 type Ref = { id: string; revision: string }
@@ -100,13 +107,22 @@ export async function handleNbme(request: Request): Promise<Response> {
     const paths = refs.map(r => `questions/${r.id}/${r.revision}.json`)
     const query = new URLSearchParams({ select: 'path,payload', path: `in.(${paths.join(',')})` })
     const result = await get(`/rest/v1/nbme_assets?${query}`)
-    if (!result.ok) return unavailable()
+    if (!result.ok) {
+      registrar('nbme/preguntas', `PostgREST respondió ${result.status}`, { preguntas: refs.length })
+      return unavailable()
+    }
     const rows: unknown = await result.json()
-    if (!Array.isArray(rows)) return unavailable()
+    if (!Array.isArray(rows)) {
+      registrar('nbme/preguntas', 'la respuesta de PostgREST no es una lista')
+      return unavailable('integridad')
+    }
     const byPath = new Map<string, Record<string, unknown>>()
     for (const row of rows) {
       if (!row || typeof row.path !== 'string' || !row.payload || typeof row.payload !== 'object'
-        || Array.isArray(row.payload) || byPath.has(row.path)) return unavailable()
+        || Array.isArray(row.payload) || byPath.has(row.path)) {
+        registrar('nbme/fila-invalida', 'una fila del banco no tiene la forma esperada o está repetida')
+        return unavailable('integridad')
+      }
       byPath.set(row.path, row.payload)
     }
     const values = paths.map(path => byPath.get(path))
@@ -115,10 +131,16 @@ export async function handleNbme(request: Request): Promise<Response> {
     }
     if (values.some(q => q!.status !== 'ready')) return json({ error: 'Una pregunta necesita revisión y no puede calificarse.' }, 422)
     if (values.some(q => typeof q!.stem !== 'string' || !Array.isArray(q!.options)
-      || !(q!.options as unknown[]).every(o => o && typeof o === 'object' && 'text' in o && typeof o.text === 'string'))) return unavailable()
+      || !(q!.options as unknown[]).every(o => o && typeof o === 'object' && 'text' in o && typeof o.text === 'string'))) {
+      registrar('nbme/pregunta-malformada', 'el enunciado o las opciones no tienen la forma esperada')
+      return unavailable('integridad')
+    }
     if (values.some(q => preguntaConLecturasDudosas(q as { stem: string; options: { text: string }[] }))) {
       return json({ error: 'Una pregunta contiene datos ilegibles y necesita cotejarse con la fuente.' }, 422)
     }
     return json({ questions: values })
-  } catch { return unavailable() }
+  } catch (causa) {
+    registrar('nbme', causa)
+    return unavailable('interno')
+  }
 }

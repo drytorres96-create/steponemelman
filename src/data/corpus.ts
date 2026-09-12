@@ -147,7 +147,11 @@ export async function cargarMigraciones(): Promise<Record<string, string>> {
   if (migracionesEnCurso) return migracionesEnCurso
   migracionesEnCurso = (async () => {
     const crudo = (window.__CORPUS__?.migrations ?? await traer(`${BASE}/concept-id-migrations.json`)) as any
-    if (!crudo || crudo.from_corpus_version !== '1.0.0' || crudo.to_corpus_version !== '1.0.1'
+    // Se comprueba la FORMA, no una pareja de versiones concreta. Con los literales anteriores,
+    // publicar un corpus nuevo con su propio mapa tumbaba la aplicación entera al arrancar.
+    const esVersion = (v: unknown) => typeof v === 'string' && /^\d+\.\d+\.\d+$/.test(v)
+    if (!crudo || !esVersion(crudo.from_corpus_version) || !esVersion(crudo.to_corpus_version)
+        || crudo.from_corpus_version === crudo.to_corpus_version
         || !crudo.map || typeof crudo.map !== 'object' || Array.isArray(crudo.map))
       throw new Error('El mapa de migración de concept_id no es válido')
     for (const [anterior, actual] of Object.entries(crudo.map))

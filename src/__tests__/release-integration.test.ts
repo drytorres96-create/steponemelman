@@ -65,7 +65,9 @@ async function responder(text: string) {
   if (!input) {
     const opcion = [...host.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find(b => b.lastElementChild?.textContent === text)
     expect(opcion, `No hay respuesta ${text} en ${host.textContent}`).toBeDefined()
-    await act(async () => { opcion!.click(); opcion!.click() })
+    // Elegir y confirmar son dos actos distintos: un toque suelto no registra el intento.
+    await act(async () => opcion!.click())
+    await click('Comprobar respuesta', true)
     return
   }
   await act(async () => {
@@ -124,7 +126,10 @@ describe('integración de estudio antes de publicar', () => {
     await render(cola)
     expect(host.textContent).not.toMatch(/Ver la fuente|Necesito una pista|Antes de recuperar|EXPLICACIÓN SINTÉTICA|FUENTE SINTÉTICA/)
     const beta = [...host.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find(b => b.textContent?.includes('beta'))!
-    await act(async () => { beta.click(); beta.click() })
+    await act(async () => beta.click())
+    // Durante el examen tampoco se registra nada hasta confirmar.
+    expect(host.textContent).not.toContain('Respuesta registrada')
+    await click('Comprobar respuesta', true)
     expect(host.textContent).toContain('Respuesta registrada')
     expect(host.textContent).not.toMatch(/Incorrecto|Respuesta correcta|DISTRACTOR SINTÉTICO|EXPLICACIÓN SINTÉTICA/)
     expect(host.querySelector('.fallo, .acierto, .correcta-oculta')).toBeNull()

@@ -8,7 +8,7 @@ import { calcularEstado, evaluarDominio, type CriteriosDominio } from '../srs/ma
 import { supabase } from '../lib/supabase'
 import { leer, escribir } from './db'
 import { ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, combinarEstados, reconstruirProgreso, serializarEstable, type EstadoApp, type Reanudable } from './model'
-import { StudySyncEngine, leerSnapshot, type CloudSnapshot, type SyncReply } from './sync'
+import { StudySyncEngine, leerSnapshot, diagnosticoSync, type CloudSnapshot, type SyncReply, type CodigoSync } from './sync'
 export type { EstadoApp, RegistroSesion, Reanudable } from './model'
 
 interface Ctx {
@@ -16,7 +16,7 @@ interface Ctx {
   indice: Indice | null
   estado: EstadoApp
   errorCarga: string | null
-  sincronizacion: { estado: 'inicializando' | 'pendiente' | 'sincronizando' | 'sincronizado' | 'error'; mensaje: string; ultima: number | null }
+  sincronizacion: { estado: 'inicializando' | 'pendiente' | 'sincronizando' | 'sincronizado' | 'error'; mensaje: string; ultima: number | null; codigo?: CodigoSync }
   sincronizarAhora: () => Promise<boolean>
   registrarIntento: (id: string, intento: Intento) => ProgresoConcepto
   progresoDe: (id: string) => ProgresoConcepto
@@ -103,8 +103,11 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
         setSync({ estado: 'sincronizado', ultima: Date.now(), mensaje: lectura.kind === 'reset' || resultado.kind === 'reset'
           ? 'Progreso actualizado tras el reinicio de tu cuenta' : 'Progreso sincronizado' })
         return true
-      } catch {
-        if (esActual()) setSync(s => ({ ...s, estado: 'error', mensaje: 'Cambios en este dispositivo; falta sincronizar' }))
+      } catch (causa) {
+        const { codigo, mensaje } = diagnosticoSync(causa)
+        // Una línea en la consola para poder distinguir el fallo sin adivinar.
+        console.warn('[sync]', codigo, causa)
+        if (esActual()) setSync(s => ({ ...s, estado: 'error', mensaje, codigo }))
         return false
       }
     })()
