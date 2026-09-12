@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { nuevoProgreso, programar, retencion, intervalo, estaVencido, prioridad, DIA, calificacionEfectiva } from '../srs/fsrs'
+import { nuevoProgreso, programar, retencion, intervalo, estaVencido, prioridad, DIA, calificacionEfectiva, techoHorizonte, EXAMEN_MS } from '../srs/fsrs'
 import type { Intento } from '../srs/tipos'
 
 const intento = (g: 1|2|3|4, extra: Partial<Intento> = {}): Intento => ({
@@ -85,5 +85,40 @@ describe('planificador de repetición espaciada', () => {
     }
     expect(calificacionEfectiva({ resultado: 'correcta', calificacion: 4,
       fuente_consultada: false, explicacion_previa: false, pistas_usadas: 0 })).toBe(4)
+  })
+})
+
+describe('horizonte del examen', () => {
+  const examen = Date.parse('2026-12-21T08:00:00-05:00')
+  const limite = examen - DIA
+
+  it('la fecha del examen está fijada y es un instante válido', () => {
+    expect(EXAMEN_MS).toBe(examen)
+    expect(Number.isFinite(EXAMEN_MS)).toBe(true)
+  })
+  it('comprime un repaso que caería después del examen al día anterior', () => {
+    const ahora = Date.parse('2026-09-12T12:00:00-04:00')
+    expect(techoHorizonte(ahora + 102 * DIA, ahora, examen)).toBe(limite)
+  })
+  it('no altera un repaso que ya cae dentro del horizonte', () => {
+    const ahora = Date.parse('2026-09-12T12:00:00-04:00')
+    const propuesta = ahora + 11 * DIA
+    expect(techoHorizonte(propuesta, ahora, examen)).toBe(propuesta)
+  })
+  it('deja de comprimir una vez pasado el horizonte, sin programar en el pasado', () => {
+    const despues = Date.parse('2026-12-22T12:00:00-05:00')
+    const propuesta = despues + 102 * DIA
+    expect(techoHorizonte(propuesta, despues, examen)).toBe(propuesta)
+  })
+  it('un tercer acierto no puede dejar el concepto sin comprobar hasta después del examen', () => {
+    const ahora = Date.parse('2026-09-12T12:00:00-04:00')
+    let p = nuevoProgreso('HORIZONTE')
+    for (const d of [0, 4, 9]) {
+      const t = ahora + d * DIA
+      p = programar(p, intento(3, { ts: t }), t, examen)
+    }
+    expect(p.proxima).not.toBeNull()
+    expect(p.proxima!).toBeLessThanOrEqual(limite)
+    expect(p.proxima!).toBeGreaterThan(ahora + 9 * DIA)
   })
 })

@@ -77,7 +77,11 @@ describe('respuestas breves y formatos interactivos', () => {
     await render(c, { ocultarFeedback: true })
     const falso = c.evaluacion.opciones![1].texto
     const radio = [...host.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find(b => b.lastElementChild?.textContent === falso)!
+    expect(boton('Comprobar respuesta').disabled).toBe(true)
     await pulsar(radio)
+    // Elegir una opción no registra el intento: un toque accidental no puede dejar un fallo permanente.
+    expect(resultado).not.toHaveBeenCalled()
+    await pulsar(boton('Comprobar respuesta'))
     expect(resultado.mock.calls[0][0]).toMatchObject({ veredicto: 'incorrecta', respuestaDada: falso, recuperacionActiva: false })
     await render(c, { bloqueado: true, ocultarFeedback: true })
     expect(host.textContent).not.toMatch(/EXPLICACIÓN|Respuesta correcta/)

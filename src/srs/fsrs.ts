@@ -16,6 +16,24 @@ export const W = [0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0
 const F = 19 / 81, C = -0.5
 export const DIA = 86_400_000
 
+/**
+ * Horizonte del examen. El planificador es un modelo de retención a largo plazo; el examen tiene
+ * fecha. Un repaso programado para después del 21-dic-2026 no llega a ocurrir, así que se comprime
+ * dentro del horizonte útil en lugar de dejar el concepto sin comprobar.
+ */
+export const FECHA_EXAMEN = '2026-12-21T08:00:00-05:00'
+export const EXAMEN_MS = Date.parse(FECHA_EXAMEN)
+
+/** Último instante en que un repaso todavía sirve: el día anterior al examen. */
+export function techoHorizonte(propuesta: number, ahora: number, examen = EXAMEN_MS): number {
+  if (!Number.isFinite(examen)) return propuesta
+  const limite = examen - DIA
+  // Pasado el horizonte, el planificador vuelve a su comportamiento largo sin quedarse
+  // atascado programando todo en el pasado.
+  if (limite <= ahora) return propuesta
+  return Math.min(propuesta, limite)
+}
+
 export function retencion(dias: number, estabilidad: number): number {
   if (estabilidad <= 0) return 0
   return Math.pow(1 + F * (dias / estabilidad), C)
@@ -78,7 +96,8 @@ export function calificacionEfectiva(intento: Pick<Intento, 'resultado' | 'calif
   return (asistido && intento.resultado === 'correcta' ? Math.min(2, g) : g) as 1 | 2 | 3 | 4
 }
 
-export function programar(p: ProgresoConcepto, intento: Intento, ahora = Date.now()): ProgresoConcepto {
+export function programar(p: ProgresoConcepto, intento: Intento, ahora = Date.now(),
+                          examen = EXAMEN_MS): ProgresoConcepto {
   // Una respuesta no reconocida requiere revisión, no es evidencia de olvido.
   if (intento.resultado === 'revision') return { ...p, intentos: [...p.intentos, intento] }
   // La respuesta comprobada gobierna el planificador. La calificación sólo matiza
@@ -96,7 +115,8 @@ export function programar(p: ProgresoConcepto, intento: Intento, ahora = Date.no
   const aciertos = p.aciertos + (correcto ? 1 : 0)
   const fallos = p.fallos + (correcto ? 0 : 1)
 
-  return { ...p, dificultad, estabilidad, ultimo: ahora, proxima: ahora + dias * DIA,
+  return { ...p, dificultad, estabilidad, ultimo: ahora,
+           proxima: techoHorizonte(ahora + dias * DIA, ahora, examen),
            intentos, aciertos, fallos }
 }
 
