@@ -22,6 +22,7 @@ import { NbmePlayer } from './nbme/NbmePlayer'
 import { NbmeProgress } from './nbme/NbmeProgress'
 import { deriveNbmeSession } from './nbme/model'
 import type { FiltrosBusqueda } from './lib/busqueda'
+import { Brand, NavigationIcon, StudyHero } from './components/Editorial'
 
 type Vista = 'inicio' | 'modulos' | 'repaso' | 'progreso' | 'auditoria' | 'ajustes' | 'estudio' | 'preguntas'
 const NAV: { id: Vista; txt: string }[] = [
@@ -157,16 +158,18 @@ export default function App() {
   if (!indice) return <div className="vacio" style={{ paddingTop: 120 }}><p>{errorCarga ?? 'No se pudo cargar el material de estudio.'}</p><button className="btn" onClick={() => location.reload()}>Volver a intentar</button></div>
 
   return (
-    <div className="app" data-app-version={APP_VERSION}>
+    <div className={`app editorial-app${enConcentracion ? ' study-focus' : ''}`} data-app-version={APP_VERSION}>
       <a className="saltar-contenido" href="#contenido" onClick={e => { e.preventDefault(); contenido.current?.focus() }}>Saltar al contenido</a>
       <header className="barra">
         <div className="contenedor barra-in">
-          <div className="marca"><span className="punto" /><span>Step 1</span></div>
+          <Brand />
+          {!enConcentracion && <p className="sidebar-caption">Tu espacio de aprendizaje</p>}
           {!enConcentracion && <nav className="nav" aria-label="Navegación principal">
             {NAV.map(n => (
-              <button key={n.id} onClick={() => ir(n.id)} aria-current={vista === n.id ? 'page' : undefined}>{n.txt}</button>
+              <button key={n.id} onClick={() => ir(n.id)} aria-current={vista === n.id ? 'page' : undefined}><NavigationIcon name={n.id} /><span>{n.txt}</span></button>
             ))}
           </nav>}
+          {!enConcentracion && <div className="sidebar-note"><span className="editorial-eyebrow">USMLE STEP 1</span><p>Entender.<br />Practicar.<br /><em>Consolidar.</em></p></div>}
           <div className="barra-fin">
             {sincronizacionVisible && <button className="btn pequeno fantasma" title="Comprobar y sincronizar el progreso"
               onClick={() => { void sincronizarTodo() }} aria-live="polite">{sincronizacionVisible}</button>}
@@ -181,6 +184,7 @@ export default function App() {
 
       <main id="contenido" ref={contenido} tabIndex={-1}>
         <div className="contenedor">
+          {!enConcentracion && <div className="workspace-topline"><span>Mi espacio <span aria-hidden="true">/</span> {[...NAV, ...SECUNDARIAS].find(n => n.id === vista)?.txt}</span><span className="workspace-edition">Medicina · Aprendizaje activo</span></div>}
           {error && <div className="aviso" style={{ marginBottom: 16 }}><span>⚠</span><div>{error}</div></div>}
           {cargando && <div className="vacio">Preparando la sesión…</div>}
 
@@ -197,11 +201,11 @@ export default function App() {
             onEstudiar={ids => { nbme.pauseSession(); void estudiarIds(ids) }}
             onBuscar={q => { nbme.pauseSession(); setFiltrosConceptos({ sistema: q.systems[0] ?? '', disciplina: q.disciplines[0] ?? '' }); setTipoContenido('conceptos'); ir('modulos') }} />}
           {!cargando && vista === 'inicio' && <>
-            {sesionPreguntasPendiente ? <div className="pila"><section className="tarjeta plan-hoy"><div className="pila">
-              <h1>Continúa tus preguntas</h1><p className="sutil">{sesionPreguntasPendiente.title}</p>
+            {sesionPreguntasPendiente ? <div className="pila"><StudyHero /><section className="tarjeta home-session"><div className="pila">
+              <p className="editorial-eyebrow">Tu sesión guardada</p><h2>Continúa tus preguntas</h2><p className="sutil">{sesionPreguntasPendiente.title}</p>
               <div><button className="btn principal" disabled={nbme.loading || nbme.busy} onClick={() => void continuarPreguntas()}>Continuar sesión de preguntas</button></div>
               {nbme.error && <p role="alert">{nbme.error}</p>}
-            </div></section><details className="tarjeta"><summary>Mi plan de conceptos</summary><div style={{ marginTop: 16 }}><Inicio onIr={ir} onContinuar={continuar}
+            </div></section><details className="tarjeta"><summary>Mi plan de conceptos</summary><div style={{ marginTop: 16 }}><Inicio embedded onIr={ir} onContinuar={continuar}
               onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} /></div></details></div>
               : <Inicio onIr={ir} onContinuar={continuar} onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} />}
           </>}

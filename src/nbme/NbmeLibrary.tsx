@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNbme } from './NbmeProvider'
 import { deriveNbmeSession, questionProgress } from './model'
 import type { NbmeQuestionMeta } from './types'
+import { ScreenHeading } from '../components/Editorial'
 import './nbme.css'
 
 export function NbmeLibrary({ onStart }: { onStart: () => void }) {
@@ -43,10 +44,7 @@ export function NbmeLibrary({ onStart }: { onStart: () => void }) {
   const countForForm = (form: NbmeQuestionMeta['form'], status?: NbmeQuestionMeta['status']) => questions.filter(q => q.form === form && (!status || q.status === status)).length
 
   return <div className="nbme-library pila">
-    <header>
-      <h1>Preguntas de aplicación</h1>
-      <p className="sutil">Practica con las formas 27, 28 y 29 y repasa los fundamentos que necesites.</p>
-    </header>
+    <ScreenHeading eyebrow="Del concepto al razonamiento" title="Preguntas de aplicación" description="Practica con las formas 27, 28 y 29 y repasa los fundamentos que necesites." />
 
     {next && <section className="tarjeta nbme-resume" aria-label="Sesión de preguntas guardada">
       <div><h2>Retoma donde lo dejaste</h2><p className="sutil">{next.session.title}</p>

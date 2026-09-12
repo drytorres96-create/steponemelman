@@ -288,7 +288,7 @@ function Clasificar({ c, bloqueado, onResponder, semilla, ocultarFeedback = fals
         {grupos.map((g, gi) => (
           <div key={gi}>
             <div className="rotulo" style={{ marginBottom: 6 }}>{g.nombre}</div>
-            <button className="zona" style={{ width: '100%', textAlign: 'left', cursor: activo ? 'pointer' : 'default', background: '#0b101c' }}
+            <button className="zona" style={{ width: '100%', textAlign: 'left', cursor: activo ? 'pointer' : 'default', background: 'var(--bg-2)' }}
               disabled={bloqueado || !activo}
               onClick={() => { if (activo) { setAsig(a => ({ ...a, [activo]: gi })); setActivo(null) } }}>
               <div className="fichas">

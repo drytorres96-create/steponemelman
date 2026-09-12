@@ -2,7 +2,7 @@
 
 Plataforma de estudio para USMLE Step 1 con sesiones, repaso espaciado y progreso asociado a una cuenta. El sitio existente está en [steponemelman.yoeltorres.workers.dev](https://steponemelman.yoeltorres.workers.dev/). Este repositorio contiene la aplicación React/Vite y el contrato de base de datos; Supabase conserva el material privado y el progreso.
 
-La versión de código **1.6.2** conserva correctamente la caché del corpus, protege la calificación de preguntas pendientes y reduce las consultas y el tamaño del catálogo. Consulta [Cambios de la versión](docs/cambios-1.6.2.md). La **1.6.1** mejoró la presentación de tablas y texto importado ([cambios](docs/cambios-1.6.1.md)). La **1.6.0** incorporó el banco privado de preguntas de las formas 27, 28 y 29: filtros combinados, sesiones breves, corrección y repetición de errores, y continuidad entre dispositivos ([cambios](docs/cambios-1.6.0.md)). La versión aparece en **Cuenta y ajustes → Ajustes y respaldo**.
+La versión de código **1.7.0** renueva el diseño con una identidad médica minimalista, abstracta y cinematográfica: imágenes originales, navegación lateral en escritorio y lectura clara sin distracciones. Consulta [Cambios de diseño](docs/cambios-1.7.0.md). Conserva las correcciones de caché y disponibilidad de **1.6.2** ([cambios](docs/cambios-1.6.2.md)) y las mejoras posteriores del corrector y del modo de estudio. La versión aparece en **Cuenta y ajustes → Ajustes y respaldo**.
 
 ## Estudiar y continuar en otro dispositivo
 
