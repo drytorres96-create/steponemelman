@@ -27,7 +27,7 @@ export type BloqueTexto =
 const CUALITATIVOS = /^(present|absent|increased|decreased|elevated|reduced|normal|negative|positive|trace|none|nonreactive|reactive|not detected|detected|within normal limits)\b/i
 
 /** Lecturas que el OCR dejó ilegibles: letras incrustadas en cifras, signos imposibles. */
-const LECTURA_DUDOSA = /[A-Za-z]{2}\d|\d[A-Za-z]{2}(?![a-z])|\^|\.'|\d:[A-Za-z]|[A-Za-z]:\d|\bQQ|[|]{2}/
+const LECTURA_DUDOSA = /[A-Za-z]{2}\d|\d[A-Za-z]{2}(?![a-z])|\^(?![+-]?\d)|\.'|\d:[A-Za-z]|[A-Za-z]:\d|\bQQ|[|]{2}/
 
 /**
  * Defectos de extracción que afectan a un dato clínico, no solo a su tipografía:
@@ -37,8 +37,7 @@ const LECTURA_DUDOSA = /[A-Za-z]{2}\d|\d[A-Za-z]{2}(?![a-z])|\^|\.'|\d:[A-Za-z]|
 const DEFECTOS_DE_LECTURA: { patron: RegExp; motivo: string }[] = [
   { patron: /\d\s*[A-Z]\s*-\s*(year|month|week|day)/g, motivo: 'edad' },
   { patron: /\/\s*mm\s*[^³23\s]/g, motivo: 'unidad de recuento' },
-  { patron: /\bQQ|\^|\.'/g, motivo: 'símbolo ilegible' },
-  { patron: /:[a-z]{3,}/g, motivo: 'palabra unida a un signo' },
+  { patron: /\bQQ|\^(?![+-]?\d)|\.'(?=\s*(?:dL|mL|L|kg|mm))/g, motivo: 'símbolo ilegible' },
 ]
 
 /**
@@ -55,6 +54,13 @@ export function detectarLecturasDudosas(texto: string): string[] {
     }
   }
   return [...encontrados]
+}
+
+/** Shared by import verification, the API and cached-question grading. */
+export function preguntaConLecturasDudosas(question: { stem: string; options: { text: string }[] }): boolean {
+  return detectarLecturasDudosas(question.stem).length > 0
+    || question.options.some(option => detectarLecturasDudosas(option.text).length > 0)
+    || analizarEnunciado(question.stem).some(block => block.tipo === 'laboratorio' && block.filas.some(row => row.dudoso))
 }
 
 /** Marcadores que introducen un bloque tabular en el enunciado. */
@@ -76,7 +82,7 @@ export function normalizarLinea(linea: string): string {
     // Palabra partida por un guión con espacios alrededor: «high- grade».
     .replace(/([a-záéíóúñ])\s*-\s+([a-záéíóúñ])/gi, '$1-$2')
     // Unidades con el exponente caído a la línea base: «mm 3» → «mm³».
-    .replace(/\b(mm|cm|mL|dL|L)\s*3\b/g, '$1³')
+    .replace(/\b(mm|cm)\s*3\b/g, '$1³')
     .replace(/\b(mm|cm|m)\s*2\b/g, '$1²')
     // Espacio introducido dentro de una unidad tras la barra: «/ mm³» → «/mm³».
     .replace(/\/\s+(mm³|mm²|mm|cm³|cm|dL|mL|L|kg|mg|µL|uL|mo?l)\b/g, '/$1')

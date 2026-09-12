@@ -117,6 +117,18 @@ describe('NBME study interface', () => {
     expect(host.textContent).not.toContain('El progreso está guardado en este dispositivo.')
   })
 
+  it('blocks illegible answer choices and their keyboard shortcuts', async () => {
+    prepareSession()
+    context.currentQuestion = { ...question, options: [{ id: 'A', text: '2.6 rng.\' dL' }, { id: 'B', text: 'Synthetic' }] }
+    context.selectedOption = 'A'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} onEstudiar={study} />))
+    expect(host.textContent).toContain('Pregunta pendiente de revisión')
+    expect(host.querySelectorAll('input[type="radio"]')).toHaveLength(0)
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true })))
+    expect(context.selectAnswer).not.toHaveBeenCalled()
+    expect(context.checkAnswer).not.toHaveBeenCalled()
+  })
+
   it('reports the first response separately from later correct retries', async () => {
     prepareSession()
     context.state = submitNbmeAnswer(context.state, 'QA-session', 0, question, 'A', 10, 200)

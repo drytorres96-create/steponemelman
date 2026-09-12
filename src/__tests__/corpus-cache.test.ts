@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
  * La copia local de un módulo es válida mientras no cambie la versión del
@@ -24,6 +24,7 @@ vi.mock('../lib/supabase', () => ({
         eq: (_columna: string, path: string) => ({
           maybeSingle: async () => {
             consultas(path)
+            if (errorRemoto) return { data: null, error: { status: 403, message: 'Unavailable' } }
             return { data: { payload: respuestas.get(path) ?? null }, error: null }
           },
         }),
@@ -33,6 +34,7 @@ vi.mock('../lib/supabase', () => ({
 }))
 
 const respuestas = new Map<string, unknown>()
+let errorRemoto = false
 
 function indice(version: string) {
   return {
@@ -65,7 +67,9 @@ beforeEach(() => {
   almacen.clear()
   respuestas.clear()
   consultas.mockClear()
+  errorRemoto = false
 })
+afterEach(() => vi.restoreAllMocks())
 
 describe('caché del corpus por versión', () => {
   it('no vuelve a descargar un módulo ya guardado para la misma versión', async () => {
@@ -127,5 +131,41 @@ describe('caché del corpus por versión', () => {
     const segunda = await cargarModuloLimpio()
     await segunda.cargarIndice()
     expect(consultas.mock.calls.map(([path]) => path)).toContain('index.json')
+  })
+
+  it('conserva índice, migraciones, progreso, otras cuentas y módulos de versiones más nuevas', async () => {
+    const conservar = ['corpus:estudiante:index.json', 'corpus:estudiante:concept-id-migrations.json',
+      'corpus:estudiante:quarantine.json', 'corpus:estudiante:1.0.6:modules/MOD-PRUEBA.json',
+      'corpus:otra-cuenta:1.0.4:modules/MOD-PRUEBA.json', 'nbme-state:estudiante', 'state:estudiante']
+    for (const key of conservar) almacen.set(key, { preserved: true })
+    almacen.set('corpus:estudiante:1.0.4:modules/MOD-PRUEBA.json', {})
+    respuestas.set('index.json', indice('1.0.5'))
+    await (await cargarModuloLimpio()).cargarIndice()
+    await vi.waitFor(() => expect(almacen.has('corpus:estudiante:1.0.4:modules/MOD-PRUEBA.json')).toBe(false))
+    for (const key of conservar) expect(almacen.has(key), key).toBe(true)
+  })
+
+  it('recupera índice, migraciones y módulo de una visita previa sin conexión', async () => {
+    respuestas.set('index.json', indice('1.0.5'))
+    respuestas.set('modules/MOD-PRUEBA.json', modulo('1.0.5', 'copia offline'))
+    respuestas.set('concept-id-migrations.json', { from_corpus_version: '1.0.0', to_corpus_version: '1.0.1', map: { anterior: 'actual' } })
+    almacen.set('corpus:estudiante:1.0.4:modules/MOD-PRUEBA.json', {})
+    const online = await cargarModuloLimpio()
+    await Promise.all([online.cargarModulo('MOD-PRUEBA'), online.cargarMigraciones()])
+    await vi.waitFor(() => expect(almacen.has('corpus:estudiante:1.0.4:modules/MOD-PRUEBA.json')).toBe(false))
+    errorRemoto = true
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const offline = await cargarModuloLimpio()
+    expect((await offline.cargarIndice()).corpus_version).toBe('1.0.5')
+    expect(await offline.cargarMigraciones()).toEqual({ anterior: 'actual' })
+    expect((await offline.cargarModulo('MOD-PRUEBA'))[0].objetivo).toBe('copia offline')
+  })
+
+  it('no sustituye una denegación online por el índice previamente guardado', async () => {
+    respuestas.set('index.json', indice('1.0.5'))
+    await (await cargarModuloLimpio()).cargarIndice()
+    errorRemoto = true
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    await expect((await cargarModuloLimpio()).cargarIndice()).rejects.toThrow('No se pudo cargar')
   })
 })

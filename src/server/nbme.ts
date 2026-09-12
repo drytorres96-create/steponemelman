@@ -1,4 +1,5 @@
 import config from '../../project.config.json'
+import { preguntaConLecturasDudosas } from '../nbme/texto'
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: {
   'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Vary': 'Authorization',
@@ -7,31 +8,6 @@ const unavailable = () => json({ error: 'No se pudo cargar el banco de preguntas
 const ID = /^NBME(?:27|28|29)-P\d{4}$/
 const REVISION = /^[a-zA-Z0-9_.-]{1,80}$/
 type Ref = { id: string; revision: string }
-
-/**
- * El catálogo es idéntico para toda cuenta con acceso y pesa cientos de
- * kilobytes, pero cada bloque de preguntas necesita consultarlo para no servir
- * material retirado. Se guarda brevemente en la caché del borde, que no es
- * alcanzable desde fuera: la comprobación de sesión y de membresía se hace
- * igualmente antes de devolver nada.
- */
-const CLAVE_CATALOGO = 'https://nbme.interno/catalog.json'
-const VIGENCIA_CATALOGO = 60
-
-async function catalogoVigente(
-  descargar: () => Promise<Record<string, unknown> | null>,
-): Promise<Record<string, unknown> | null> {
-  const cache = typeof caches !== 'undefined' ? await caches.open('nbme-catalogo').catch(() => null) : null
-  const guardado = await cache?.match(CLAVE_CATALOGO).catch(() => undefined)
-  if (guardado) return await guardado.json().catch(() => null)
-  const valor = await descargar()
-  if (valor && cache) {
-    await cache.put(CLAVE_CATALOGO, new Response(JSON.stringify(valor), {
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${VIGENCIA_CATALOGO}` },
-    })).catch(() => undefined)
-  }
-  return valor
-}
 
 async function readBody(request: Request): Promise<string | null> {
   const reader = request.body?.getReader()
@@ -95,8 +71,11 @@ export async function handleNbme(request: Request): Promise<Response> {
     const member = await get(`/rest/v1/nbme_members?select=user_id&user_id=eq.${encodeURIComponent(user.id)}`)
     if (!member.ok) return unavailable()
     if (!(await member.json() as unknown[]).length) return json({ error: 'Tu cuenta no tiene acceso a este banco.' }, 403)
+    // Always consult current availability through RLS. A shared cache must not
+    // retain withdrawn items or bypass revoked application membership.
+    const catalogoVigente = async () => await asset('catalog-index.json') ?? await asset('catalog.json')
     if (catalog) {
-      const value = await catalogoVigente(() => asset('catalog.json'))
+      const value = await catalogoVigente()
       if (!value || value.schemaVersion !== 1 || !Array.isArray(value.questions)) return unavailable()
       return json(value)
     }
@@ -110,7 +89,7 @@ export async function handleNbme(request: Request): Promise<Response> {
       return new Response(bytes, { headers: { 'Content-Type': String(value.mimeType),
         'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Vary': 'Authorization' } })
     }
-    const latestCatalog = await catalogoVigente(() => asset('catalog.json'))
+    const latestCatalog = await catalogoVigente()
     if (!latestCatalog || !Array.isArray(latestCatalog.questions)) return unavailable()
     const latest = new Map(latestCatalog.questions.map((q: { id: string; status: string }) => [q.id, q.status]))
     // Una pregunta retirada no llega a descargarse.
@@ -118,11 +97,28 @@ export async function handleNbme(request: Request): Promise<Response> {
       return json({ error: 'Una pregunta necesita revisión. Se conserva el historial de tu sesión.' }, 422)
     }
     // A session pins its revision. Never silently replace a saved question with another version.
-    const values = await Promise.all(refs.map(r => asset(`questions/${r.id}/${r.revision}.json`)))
+    const paths = refs.map(r => `questions/${r.id}/${r.revision}.json`)
+    const query = new URLSearchParams({ select: 'path,payload', path: `in.(${paths.join(',')})` })
+    const result = await get(`/rest/v1/nbme_assets?${query}`)
+    if (!result.ok) return unavailable()
+    const rows: unknown = await result.json()
+    if (!Array.isArray(rows)) return unavailable()
+    const byPath = new Map<string, Record<string, unknown>>()
+    for (const row of rows) {
+      if (!row || typeof row.path !== 'string' || !row.payload || typeof row.payload !== 'object'
+        || Array.isArray(row.payload) || byPath.has(row.path)) return unavailable()
+      byPath.set(row.path, row.payload)
+    }
+    const values = paths.map(path => byPath.get(path))
     if (values.some((q, i) => !q || q.id !== refs[i].id || q.revision !== refs[i].revision)) {
       return json({ error: 'No está disponible la versión guardada de una pregunta. Tu sesión se conserva para reintentar.' }, 409)
     }
     if (values.some(q => q!.status !== 'ready')) return json({ error: 'Una pregunta necesita revisión y no puede calificarse.' }, 422)
+    if (values.some(q => typeof q!.stem !== 'string' || !Array.isArray(q!.options)
+      || !(q!.options as unknown[]).every(o => o && typeof o === 'object' && 'text' in o && typeof o.text === 'string'))) return unavailable()
+    if (values.some(q => preguntaConLecturasDudosas(q as { stem: string; options: { text: string }[] }))) {
+      return json({ error: 'Una pregunta contiene datos ilegibles y necesita cotejarse con la fuente.' }, 422)
+    }
     return json({ questions: values })
   } catch { return unavailable() }
 }
