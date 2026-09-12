@@ -7,6 +7,7 @@ import { AuthGate } from './auth/AuthGate'
 import { NbmeProvider } from './nbme/NbmeProvider'
 import './styles.css'
 import './editorial.css'
+import './organic.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

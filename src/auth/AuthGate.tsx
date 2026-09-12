@@ -8,8 +8,8 @@ import './auth.css'
 
 function AuthFrame({ children }: { children: ReactNode }) {
   return <main className="auth-page" data-app-version={APP_VERSION}>
+    <MedicalImage scene="organic" priority sizes="100vw" className="auth-backdrop" />
     <section className="auth-intro" aria-label="Step 1 Melman">
-      <MedicalImage scene="membrane" priority sizes="(max-width: 760px) 100vw, 54vw" />
       <Brand />
       <div className="auth-editorial-copy">
         <span className="editorial-eyebrow">Medicina. Comprensión. Constancia.</span>

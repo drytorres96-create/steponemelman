@@ -13,6 +13,9 @@
 /images/v170/*
   Cache-Control: public, max-age=31536000, immutable
 
+/images/v171/*
+  Cache-Control: public, max-age=31536000, immutable
+
 /icon-192.png
   Cache-Control: public, max-age=604800
 /icon-512.png

@@ -1,9 +1,10 @@
 /** Decorative artwork is deliberately separate from the private medical content. */
 export function MedicalImage({ scene, className = '', priority = false, sizes = '(max-width: 760px) 100vw, 50vw' }: {
-  scene: 'membrane' | 'fluid'; className?: string; priority?: boolean; sizes?: string
+  scene: 'membrane' | 'fluid' | 'organic'; className?: string; priority?: boolean; sizes?: string
 }) {
-  return <img className={`medical-image ${className}`} src={`/images/v170/${scene}-768.webp`}
-    srcSet={`/images/v170/${scene}-768.webp 768w, /images/v170/${scene}-1536.webp 1536w`}
+  const directory = scene === 'organic' ? 'v171' : 'v170'
+  return <img className={`medical-image ${className}`} src={`/images/${directory}/${scene}-768.webp`}
+    srcSet={`/images/${directory}/${scene}-768.webp 768w, /images/${directory}/${scene}-1536.webp 1536w`}
     sizes={sizes} width={1536} height={1024} alt="" aria-hidden="true"
     loading={priority ? 'eager' : 'lazy'} decoding="async" />
 }
@@ -28,13 +29,13 @@ export function NavigationIcon({ name }: { name: string }) {
 
 export function StudyHero() {
   return <header className="editorial-hero">
-    <MedicalImage scene="membrane" priority sizes="(max-width: 760px) 100vw, 65vw" />
+    <MedicalImage scene="organic" priority sizes="(max-width: 760px) 100vw, 65vw" />
     <div className="editorial-hero-copy"><p className="editorial-eyebrow">Aprender con intención</p><h1>Tu estudio{' '}<br /><em>de hoy.</em></h1><p>Un siguiente paso. Puedes pausar y retomar cuando lo necesites.</p><span className="hero-signature">Comprende. Conecta. Recuerda.</span></div>
   </header>
 }
 
-export function ScreenHeading({ eyebrow, title, description, scene = 'fluid' }: {
-  eyebrow: string; title: string; description: string; scene?: 'membrane' | 'fluid'
+export function ScreenHeading({ eyebrow, title, description, scene = 'organic' }: {
+  eyebrow: string; title: string; description: string; scene?: 'membrane' | 'fluid' | 'organic'
 }) {
   return <header className={`screen-heading screen-heading-${scene}`}>
     <div><p className="editorial-eyebrow">{eyebrow}</p><h1>{title}</h1><p className="sutil">{description}</p></div>
