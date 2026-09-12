@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNbme } from './NbmeProvider'
 import { deriveNbmeSession, questionProgress } from './model'
 import type { NbmeQuestionMeta } from './types'
@@ -6,7 +6,9 @@ import './nbme.css'
 
 export function NbmeLibrary({ onStart }: { onStart: () => void }) {
   const { catalog, state, filters, setFilters, loading, busy, error, startSession, resumeSession,
-    discardSession, attemptsInSession, reloadCatalog } = useNbme()
+    discardSession, attemptsInSession, reloadCatalog, catalogStale } = useNbme()
+  // El catálogo se refresca al abrir esta vista, no en el arranque de la aplicación.
+  useEffect(() => { if (catalogStale) void reloadCatalog() }, [catalogStale, reloadCatalog])
   const [confirmarDescarte, setConfirmarDescarte] = useState<string | null>(null)
   const questions = catalog?.questions ?? []
   const systems = useMemo(() => [...new Set(questions.flatMap(q => q.systems))].sort((a, b) => a.localeCompare(b, 'es')), [catalog])

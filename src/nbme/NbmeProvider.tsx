@@ -48,6 +48,8 @@ interface NbmeContextValue {
   setFilters(filters: Partial<NbmeFilters>): void
   syncNow(): Promise<boolean>
   reloadCatalog(): Promise<void>
+  /** true cuando el catálogo mostrado viene de la copia local y aún no se ha refrescado. */
+  catalogStale: boolean
   retryQuestionLoad(): Promise<void>
   loadFigure(assetId: string, signal?: AbortSignal): Promise<Blob>
 }
@@ -83,6 +85,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
   const [change, setChange] = useState(0)
   const [contentChange, setContentChange] = useState(0)
   const [shownSessionId, setShownSessionId] = useState<string | null>(null)
+  const [catalogStale, setCatalogStale] = useState(false)
   const [elapsedNow, setElapsedNow] = useState(0)
   const actual = useRef(state)
   const mounted = useRef(false)
@@ -220,6 +223,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       if (!mounted.current || epoch !== aliveEpoch.current) return
       accessDenied.current = false
       setCatalog(next)
+      setCatalogStale(false)
       // La versión del banco pasa al estado: es la clave con la que se detecta una corrección.
       edit(previous => setNbmeBankVersion(previous, next.bankVersion))
       setError(null)
@@ -323,11 +327,19 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       engineRef.current = engine
       const cachedCatalog = await leer<unknown>(`nbme-catalog:${userId}`)
       if (!isCurrent()) return
+      let desdeCache = false
       if (cachedCatalog && typeof cachedCatalog === 'object' && 'userId' in cachedCatalog && cachedCatalog.userId === userId && 'catalog' in cachedCatalog) {
-        setCatalog(parseNbmeCatalog(cachedCatalog.catalog))
+        const previo = parseNbmeCatalog(cachedCatalog.catalog)
+        setCatalog(previo)
+        desdeCache = !!previo
       }
+      setCatalogStale(desdeCache)
       setLoading(false)
-      await Promise.all([syncNow(), reloadCatalog()])
+      // El catálogo pesa ~180 KB y se pedía en cada arranque, aunque fuera a estudiar conceptos.
+      // Con copia local se refresca al abrir «Preguntas»; sin ella hace falta ahora, pero no
+      // bloquea la sincronización del progreso.
+      await syncNow()
+      if (!desdeCache) void reloadCatalog()
     })().catch(failure => {
       if (isCurrent()) { setError(userError(failure, 'No se pudo preparar tu banco de preguntas.')); setLoading(false) }
     })
@@ -566,7 +578,8 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
 
   const value: NbmeContextValue = { catalog, state, currentSession, sessionView, currentQuestion, sessionQuestions,
     selectedOption, currentFeedback: sessionView?.attempt ?? null, filters: state.filters, loading, questionLoading, busy,
-    elapsedMs, budgetReached, error: error ?? storageWarning, storageWarning, syncStatus, startSession, selectAnswer, checkAnswer, nextQuestion,
+    elapsedMs, budgetReached, error: error ?? storageWarning, storageWarning, syncStatus, catalogStale,
+    startSession, selectAnswer, checkAnswer, nextQuestion,
     pauseSession, resumeSession, discardSession, attemptsInSession, continueSession,
     continueWithoutBudget: continueSession, setFilters, syncNow, reloadCatalog, retryQuestionLoad, loadFigure }
   return <NbmeContext.Provider value={value}>{children}</NbmeContext.Provider>
