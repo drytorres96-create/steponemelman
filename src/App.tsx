@@ -47,14 +47,19 @@ export default function App() {
   const [seleccionManual, setSeleccionManual] = useState<string[]>([])
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [concentracion, setConcentracion] = useState(true)
   const [tipoContenido, setTipoContenido] = useState<'conceptos' | 'preguntas'>('conceptos')
   const [tipoProgreso, setTipoProgreso] = useState<'conceptos' | 'preguntas'>('conceptos')
   const [filtrosConceptos, setFiltrosConceptos] = useState<Partial<FiltrosBusqueda> | undefined>()
   const contenido = useRef<HTMLElement>(null)
   const vistaAnterior = useRef(vista)
   const estudiando = vista === 'estudio' || vista === 'preguntas'
-  const enConcentracion = estudiando && concentracion
+  // Estudiando se estudia: la barra no muestra navegación, menú ni estado de sincronización.
+  const enConcentracion = estudiando
+  // El sincronismo corre solo. Solo se enseña cuando hay algo que el estudio no puede resolver:
+  // un fallo, o cambios sin subir por falta de conexión. Callarlos arriesgaría perder progreso.
+  const sincronizacionVisible = vista === 'preguntas'
+    ? (nbme.syncStatus.state === 'error' || nbme.syncStatus.state === 'offline' ? nbme.syncStatus.message : null)
+    : (sincronizacion.estado === 'error' ? sincronizacion.mensaje : null)
   const sesionPreguntasPendiente = Object.values(nbme.state.sessions)
     .filter(s => deriveNbmeSession(nbme.state, s.id)?.phase !== 'complete')
     .sort((a, b) => b.controlChangedAt - a.controlChangedAt)[0]
@@ -159,15 +164,13 @@ export default function App() {
           <div className="marca"><span className="punto" /><span>Step 1</span></div>
           {!enConcentracion && <nav className="nav" aria-label="Navegación principal">
             {NAV.map(n => (
-              <button key={n.id} onClick={() => ir(n.id)} aria-current={vista === n.id || vista === 'preguntas' && n.id === 'modulos' ? 'page' : undefined}>{n.txt}</button>
+              <button key={n.id} onClick={() => ir(n.id)} aria-current={vista === n.id ? 'page' : undefined}>{n.txt}</button>
             ))}
           </nav>}
           <div className="barra-fin">
-            {estudiando && <button className="btn pequeno fantasma" aria-pressed={concentracion}
-              onClick={() => setConcentracion(v => !v)}>{concentracion ? 'Mostrar menú' : 'Concentrarme'}</button>}
-            <button className="btn pequeno fantasma" title="Comprobar y sincronizar el progreso" onClick={() => { void sincronizarTodo() }} aria-live="polite">{vista === 'preguntas' ? nbme.syncStatus.message : sincronizacion.mensaje}</button>
+            {sincronizacionVisible && <button className="btn pequeno fantasma" title="Comprobar y sincronizar el progreso"
+              onClick={() => { void sincronizarTodo() }} aria-live="polite">{sincronizacionVisible}</button>}
             {!enConcentracion && <details className="menu-cuenta"><summary>Cuenta y ajustes</summary><div className="menu-cuenta-opciones">{SECUNDARIAS.map(n => <button className="btn pequeno fantasma" key={n.id} onClick={e => { ir(n.id); e.currentTarget.closest('details')?.removeAttribute('open') }}>{n.txt}</button>)}<button className="btn pequeno fantasma" onClick={async () => {
-              if (vista === 'preguntas') nbme.pauseSession()
               const guardado = await sincronizarTodo()
               if (!guardado && !confirm('Puede haber cambios pendientes. Se conservarán en este navegador para esta cuenta. ¿Cerrar sesión?')) return
               try { await signOut() } catch { setError('No se pudo cerrar la sesión. Vuelve a intentarlo.') }

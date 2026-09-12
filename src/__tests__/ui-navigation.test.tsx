@@ -59,12 +59,28 @@ describe('continuidad y navegación accesible', () => {
     } }
     await act(async () => { root.render(<App />) })
     expect(host.textContent).toContain('Tu estudio de hoy')
+    // Fuera de la sesión la barra sí navega.
+    expect(host.querySelector('nav')).not.toBeNull()
     await act(async () => { boton('Continuar sesión guardada').click() })
     expect(host.textContent).toContain('Sesión restaurada')
     expect(mock.reproductor.mock.calls.at(-1)?.[0].indiceInicial).toBe(1)
+    // Estudiando, la barra calla: ni navegación, ni menú de cuenta, ni interruptor de concentración.
     expect(host.querySelector('nav')).toBeNull()
-    await act(async () => { boton('Mostrar menú').click() })
-    expect(host.querySelector('nav')).not.toBeNull()
+    expect(host.querySelector('.menu-cuenta')).toBeNull()
+    expect(host.textContent).not.toContain('Mostrar menú')
+    expect(host.textContent).not.toContain('Concentrarme')
+  })
+
+  it('el estado de sincronización solo aparece cuando hay un problema que atender', async () => {
+    app.sincronizacion = { estado: 'sincronizado', mensaje: 'Progreso sincronizado' }
+    await act(async () => { root.render(<App />) })
+    expect(host.textContent).not.toContain('Progreso sincronizado')
+
+    await act(async () => { root.unmount() })
+    host = document.createElement('div'); document.body.append(host); root = createRoot(host)
+    app.sincronizacion = { estado: 'error', mensaje: 'El servidor no pudo guardar ahora.' }
+    await act(async () => { root.render(<App />) })
+    expect(host.textContent).toContain('El servidor no pudo guardar ahora.')
   })
 
   it('un error al preparar repaso deja una salida para reintentar', async () => {
