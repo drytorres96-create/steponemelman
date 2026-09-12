@@ -31,6 +31,27 @@ export class SyncError extends Error {
   }
 }
 
+export type CodigoSync = SyncError['code'] | 'sin_conexion' | 'red' | 'servidor' | 'desconocido'
+
+/**
+ * Un fallo, un motivo. Antes, quedarse sin cobertura y que el progreso no se guardara mostraban
+ * el mismo texto, así que no había forma de distinguirlos desde el teléfono.
+ */
+export function diagnosticoSync(causa: unknown): { codigo: CodigoSync; mensaje: string } {
+  if (causa instanceof SyncError) return { codigo: causa.code, mensaje: causa.message }
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return { codigo: 'sin_conexion', mensaje: 'Sin conexión. Tus cambios están guardados en este dispositivo.' }
+  }
+  const texto = causa instanceof Error ? `${causa.name}: ${causa.message}` : String(causa)
+  if (/\b(5\d{2})\b|server|servidor/i.test(texto)) {
+    return { codigo: 'servidor', mensaje: 'El servidor no pudo guardar ahora. Tus cambios están guardados aquí; vuelve a sincronizar.' }
+  }
+  if (/fetch|network|networkerror|timeout|abort|conexi/i.test(texto)) {
+    return { codigo: 'red', mensaje: 'No se pudo contactar con el servidor. Tus cambios están guardados en este dispositivo.' }
+  }
+  return { codigo: 'desconocido', mensaje: 'Cambios en este dispositivo; falta sincronizar' }
+}
+
 interface Callbacks {
   /** Debe leer una referencia actual, no el estado capturado al iniciar la petición. */
   getLocal(): EstadoApp

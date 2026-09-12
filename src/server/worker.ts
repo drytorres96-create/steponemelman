@@ -1,4 +1,5 @@
 import config from '../../project.config.json'
+import { registrar } from './registro'
 import { ConceptoZ, IndiceZ } from '../schema/concept'
 import { prepararConcepto } from '../lib/formatos'
 import { versionPregunta } from '../screens/sesion'
@@ -26,7 +27,18 @@ type CoachInput = { user: string; key: string; reference: string; sourceFragment
 export type CoachAnswer = { diferencia: string; explicacion: string; recordar: string; evidencia: string }
 const json = (value: unknown, status = 200) => Response.json(value, { status,
   headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } })
-const unavailable = () => json({ error: 'La ayuda de IA no está disponible ahora. Puedes seguir con la explicación del concepto.' }, 503)
+
+/** Un motivo por causa, en lugar de un 503 mudo para cinco fallos distintos. */
+export const MOTIVOS = {
+  ia: 'La ayuda de IA no está disponible ahora. Puedes seguir con la explicación del concepto.',
+  desactivada: 'La ayuda de IA está desactivada en este despliegue. La explicación del concepto sigue disponible.',
+  material: 'El material se está actualizando. Recarga la página para continuar.',
+  concepto_largo: 'Este concepto es demasiado extenso para la ayuda de IA. Su explicación sigue disponible.',
+  no_verificable: 'La ayuda no pudo respaldar su respuesta en la fuente, así que se descartó.',
+  interno: 'Algo falló en el servidor al preparar la ayuda. La explicación del concepto sigue disponible.',
+} as const
+export type Motivo = keyof typeof MOTIVOS
+const unavailable = (codigo: Motivo = 'ia') => json({ error: MOTIVOS[codigo], codigo }, 503)
 
 async function digest(value: string) {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
@@ -50,7 +62,7 @@ export class StudyCoach {
   private pending = new Map<string, Promise<Response>>()
   constructor(private state: { storage: Storage }, private env: Env) {}
   async fetch(request: Request): Promise<Response> {
-    if (this.env.AI_FREE_ENABLED !== 'true') return unavailable()
+    if (this.env.AI_FREE_ENABLED !== 'true') return unavailable('desactivada')
     const input = await request.json() as CoachInput
     const current = this.pending.get(input.key)
     if (current) return (await current).clone()
@@ -85,14 +97,20 @@ export class StudyCoach {
         new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), 25000) }),
       ])
       const answer = validarRespuesta(raw, input.sourceFragment)
-      if (!answer) return unavailable()
+      if (!answer) {
+        registrar('coach/respuesta-sin-evidencia', 'la respuesta del modelo no cita el fragmento fuente')
+        return unavailable('no_verificable')
+      }
       await this.state.storage.put(cacheKey, { at: Date.now(), answer })
       const entries = await this.state.storage.list<{ at: number }>({ prefix: 'cache:' })
       const old = [...entries].sort((a, b) => a[1].at - b[1].at)
       const remove = old.filter(([, v], n) => Date.now() - v.at > 7 * DAY || n < old.length - 200).map(([k]) => k)
       for (let n = 0; n < remove.length; n += 128) await this.state.storage.delete(remove.slice(n, n + 128))
       return json({ ...answer, source: input.source, cached: false })
-    } catch { return unavailable() } finally { if (timer) clearTimeout(timer) }
+    } catch (causa) {
+      registrar('coach/generar', causa)
+      return unavailable('interno')
+    } finally { if (timer) clearTimeout(timer) }
   }
 }
 
@@ -141,7 +159,7 @@ export default {
       if (!user.id || user.is_anonymous || !user.email_confirmed_at) return json({ error: 'Se necesita una cuenta verificada.' }, 403)
       const member = await get(`/rest/v1/app_members?select=user_id&user_id=eq.${encodeURIComponent(user.id)}`)
       if (!member.ok || !(await member.json() as unknown[]).length) return json({ error: 'Tu cuenta no tiene acceso al material.' }, 403)
-      if (env.AI_FREE_ENABLED !== 'true') return unavailable()
+      if (env.AI_FREE_ENABLED !== 'true') return unavailable('desactivada')
       const asset = async (path: string) => {
         const res = await get(`/rest/v1/corpus_assets?select=payload&path=eq.${encodeURIComponent(path)}`)
         if (!res.ok) throw new Error('corpus')
@@ -151,7 +169,11 @@ export default {
       const module = index.modulos.find(m => m.sesiones.some(s => s.conceptos.includes(input.conceptId)))
       if (!module) return json({ error: 'Concepto no disponible.' }, 404)
       const data = await asset(`modules/${module.module_id}.json`) as { conceptos?: unknown[]; corpus_version?: string }
-      if (data.corpus_version !== index.corpus_version) return unavailable()
+      if (data.corpus_version !== index.corpus_version) {
+        registrar('explicar/corpus-desalineado', 'el módulo y el índice declaran versiones distintas',
+                  { modulo: module.module_id })
+        return unavailable('material')
+      }
       const original = ConceptoZ.parse(data.conceptos?.find(c => (c as { concept_id: string }).concept_id === input.conceptId))
       if (original.revision_editorial) return json({ error: 'Este concepto tiene una aclaración editorial. Consulta su explicación y las referencias en «Ver la fuente».' }, 422)
       if (original.calidad.estado !== 'aprobado' || original.calidad.confianza < 0.7 || original.step === 'step2') return json({ error: 'Concepto no disponible.' }, 404)
@@ -159,12 +181,15 @@ export default {
       const c = prepararConcepto(aplicarVariante(original, input.variantId), { semilla: input.questionId, indice: input.index, ruta: input.route, forzarReconocimiento: input.retry, version: input.formatVersion ?? 1 })
       if (versionPregunta(c) !== input.version) return json({ error: 'La pregunta ha cambiado. Recarga el material para usar la ayuda.' }, 409)
       const reference = `${original.source.fragment}\n${c.afirmacion}\n${c.respuesta_canonica}\n${c.explicacion}\n${JSON.stringify(c.evaluacion.opciones ?? [])}`
-      if (reference.length > 11000 || c.evaluacion.pregunta.length > 1500) return unavailable()
+      if (reference.length > 11000 || c.evaluacion.pregunta.length > 1500) return unavailable('concepto_largo')
       const answer = input.answer.trim().normalize('NFC')
       const trusted: CoachInput = { user: user.id, key: await digest(JSON.stringify([user.id, index.corpus_version, c.concept_id, input.version, answer, reference, MODEL, 'coach-v1'])),
         reference, sourceFragment: original.source.fragment, question: c.evaluacion.pregunta, answer, canonical: c.respuesta_canonica,
         source: { title: original.source.doc_title, page: original.source.pdf_page ?? original.source.page } }
       return await env.COACH.get(env.COACH.idFromName('study-coach-v1')).fetch(new Request('https://coach/explicar', { method: 'POST', body: JSON.stringify(trusted) }))
-    } catch { return unavailable() }
+    } catch (causa) {
+      registrar('explicar', causa)
+      return unavailable('interno')
+    }
   },
 }
