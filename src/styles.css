@@ -318,6 +318,9 @@ label { font-size: .85rem; color: var(--texto-2); }
   .cronometro-lectura b{font-size:.86rem}.cronometro-lectura span{display:none}
   .cronometro-aviso{text-align:left}
 }
+.veredicto-ia{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:10px 0;padding:10px 12px;
+  border:1px dashed var(--linea-interactiva);border-radius:10px}
+.veredicto-ia p{margin:0;flex:1 1 220px}
 .ayuda-ia{margin-top:18px;padding:16px;border:1px solid var(--linea);border-radius:12px;background:var(--panel)}
 .ayuda-ia p{margin:0 0 8px}.ayuda-ia blockquote{margin:12px 0;padding-left:12px;border-left:3px solid var(--violeta)}
 .prioridad{padding:16px;border:1px solid var(--linea);border-radius:12px;display:flex;flex-direction:column;gap:10px}.prioridad h3{font-size:1rem;line-height:1.4}.prioridad p{font-size:.9rem;flex:1}.prioridad button{align-self:flex-start}

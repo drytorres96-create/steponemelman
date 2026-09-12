@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Concepto } from '../schema/concept'
 import { NOMBRE_INTERACCION } from '../schema/concept'
 import { useApp } from '../store/estado'
-import { Interaccion, EscrituraCorrectiva, type Resultado } from '../components/interacciones'
+import { Interaccion, EscrituraCorrectiva, usaTextoLibre, type Resultado } from '../components/interacciones'
+import { calificarConIA } from '../lib/calificacion-ia'
 import { Modal, PanelFuente, EtiquetaEstado } from '../components/comunes'
 import { NOMBRE_ERROR, type Intento, type TipoError } from '../srs/tipos'
 import { resumenDominio } from '../srs/mastery'
@@ -84,6 +85,11 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
   const [verFuente, setVerFuente] = useState(false)
   const [confianza, setConfianza] = useState<1 | 2 | 3 | null>(null)
   const [fuenteConsultada, setFuenteConsultada] = useState(false)
+  const [esperandoIA, setEsperandoIA] = useState(false)
+  const [avisoIA, setAvisoIA] = useState<string | null>(null)
+  const calificando = useRef(false)
+  const abortoIA = useRef(new AbortController())
+  const vivoIA = useRef(true)
   const [explicacionPrevia, setExplicacionPrevia] = useState(false)
   const [sesionLista, setSesionLista] = useState(false)
   const sesionId = useRef<string | null>(cola.sessionId ?? null)
@@ -129,6 +135,16 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
   const guardarPasoActual = useRef(guardarPaso)
   guardarPasoActual.current = guardarPaso
 
+  // Al desmontar, ninguna corrección en vuelo debe escribir sobre un reproductor que ya no existe.
+  // El montaje reestrena bandera y controlador: con StrictMode la limpieza corre una vez de más,
+  // y reutilizarlos dejaría la corrección abortada para el resto de la sesión.
+  useEffect(() => {
+    vivoIA.current = true
+    const aborto = new AbortController()
+    abortoIA.current = aborto
+    return () => { vivoIA.current = false; aborto.abort() }
+  }, [])
+
   useEffect(() => {
     if (!sesionId.current) sesionId.current = iniciarSesion(cola.modulo, cola.ruta)
     setSesionLista(true)
@@ -143,6 +159,8 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
     intentoActual.current = null
     setVerFuente(false)
     setRes(null)
+    setEsperandoIA(false)
+    setAvisoIA(null)
     if (!c) { reloj.current.activar(false); guardarPasoActual.current(); return }
     const progreso = progresoDe(c.concept_id)
     const id = identificarPregunta(sesionId.current, i, c.concept_id)
@@ -236,7 +254,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
   const avanzar = () => avanzarPaso(false)
 
   const responder = (r: Resultado) => {
-    if (!c || !sesionId.current || intentoActual.current || fase !== 'tarea') return
+    if (!c || !sesionId.current || intentoActual.current || fase !== 'tarea' || calificando.current) return
     const anterior = buscarIntentoPaso(progresoDe(c.concept_id), sesionId.current, preguntaId)
     if (anterior) {
       intentoActual.current = anterior
@@ -245,6 +263,44 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
       setFase('retro'); return
     }
     reloj.current.activar(false)
+    // Una palabra o frase corta la juzga la IA; lo demás lo resuelve el corrector propio.
+    if (usaTextoLibre(c) && r.respuestaDada.trim()) {
+      calificando.current = true
+      setEsperandoIA(true)
+      void (async () => {
+        // Pase lo que pase, la pregunta no puede quedarse congelada esperando a la IA.
+        let fallo: Awaited<ReturnType<typeof calificarConIA>>
+        try {
+          fallo = await calificarConIA({
+            conceptId: c.concept_id, answer: r.respuestaDada, questionId: preguntaId, version: versionPregunta(c),
+            formatVersion: versionFormato, variantId: c.variante_id, index: i, route: cola.ruta, retry: reintento,
+          }, abortoIA.current.signal)
+        } catch { fallo = { estado: 'sin_ia', motivo: 'No se pudo corregir con IA.' } }
+        calificando.current = false
+        if (!vivoIA.current) return
+        setEsperandoIA(false)
+        setAvisoIA(fallo.estado === 'ok' ? null : fallo.motivo)
+        registrarRespuesta(fallo.estado === 'ok' ? veredictoDeIA(r, fallo) : r, fallo.estado === 'ok')
+      })()
+      return
+    }
+    registrarRespuesta(r, false)
+  }
+
+  /**
+   * La IA manda sobre el veredicto, con una excepción: si el corrector propio detectó una errata
+   * y la IA da el concepto por bueno, se conserva «ortografía». Los dos coinciden en que el
+   * concepto está bien, y así no se pierde la práctica de escritura.
+   */
+  const veredictoDeIA = (local: Resultado, ia: { veredicto: 'correcta' | 'parcial' | 'incorrecta'; motivo: string }): Resultado => {
+    if (ia.veredicto === 'correcta' && local.veredicto === 'ortografia') return local
+    const tipoError: TipoError = ia.veredicto === 'correcta' ? 'ninguno'
+      : ia.veredicto === 'parcial' ? 'recuerdo_incompleto' : 'confusion_conceptos'
+    return { ...local, veredicto: ia.veredicto, tipoError, detalle: ia.motivo }
+  }
+
+  const registrarRespuesta = (r: Resultado, porIA: boolean) => {
+    if (!c || !sesionId.current || intentoActual.current) return
     let tipo: TipoError = r.tipoError
     const ayuda = pistas > 0 || fuenteConsultada || explicacionPrevia
     if (r.veredicto === 'correcta' && ayuda) tipo = 'correcta_con_pistas'
@@ -261,11 +317,26 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
       pregunta_id: preguntaId, pregunta_version: versionPregunta(c), evaluador_version: EVALUADOR_VERSION,
       fuente_consultada: fuenteConsultada, explicacion_previa: explicacionPrevia, modo: modoRegistro,
       tipo_evidencia: c.interaccion.recomendada === 'caso_clinico' ? 'aplicacion' : r.recuperacionActiva ? 'recuerdo' : 'discriminacion',
+      ...(porIA ? { calificado_por_ia: true } : {}),
     }
     intentoActual.current = intento
     registrarIntento(c.concept_id, intento)
     setRes({ ...r, tipoError: tipo })
     setFase('retro')
+  }
+
+  /** Rectificar un veredicto de la IA: reescribe el mismo intento y manda sobre él. */
+  const corregirVeredicto = (correcta: boolean) => {
+    const intento = intentoActual.current
+    if (!c || !intento || !res || ultimaAccion.current === preguntaId) return
+    const veredicto: Intento['resultado'] = correcta ? 'correcta' : 'incorrecta'
+    const tipo: TipoError = correcta ? 'ninguno' : 'confusion_conceptos'
+    const actualizado: Intento = { ...intento, resultado: veredicto, tipo_error: tipo,
+      calificacion: correcta ? 3 : 1, correccion_manual: true,
+      calificacion_actualizada_en: Math.max(Date.now(), (intento.calificacion_actualizada_en ?? intento.ts) + 1) }
+    intentoActual.current = actualizado
+    registrarIntento(c.concept_id, actualizado)
+    setRes({ ...res, veredicto, tipoError: tipo, detalle: undefined })
   }
 
   const calificar = (calificacion: 1 | 2 | 3 | 4) => {
@@ -392,7 +463,8 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
         </div></details>}
         {!examenSinAyuda && pistas > 0 && c.pistas.slice(0, pistas).map((t, k) => <div key={k} className="pista"><b>Pista {k + 1}:</b> {t}</div>)}
         {(!examenSinAyuda || fase === 'tarea') && <Interaccion key={`interaccion-${preguntaId}`} c={c} semilla={preguntaId} ocultarFeedback={examenSinAyuda}
-          bloqueado={fase !== 'tarea'} resultado={res} onResponder={responder} />}
+          bloqueado={fase !== 'tarea' || esperandoIA} resultado={res} onResponder={responder} />}
+        {esperandoIA && <p className="mini" role="status" style={{ marginTop: 10 }}>Comprobando tu respuesta con la IA…</p>}
         {fase === 'tarea' && !examenSinAyuda && <div className="fila" style={{ marginTop: 14 }}>
           <button className="btn pequeno fantasma" onClick={() => { setExplicacionPrevia(true); setFase('ensenanza'); guardarPaso({ explicacionPrevia: true, ensenanzaAbierta: true }) }}>Necesito aprenderlo</button>
           <button className="btn pequeno fantasma" disabled={pistas >= c.pistas.length} onClick={() => { setPistas(pistas + 1); guardarPaso({ pistas: pistas + 1 }) }}>
@@ -407,6 +479,15 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
       {fase === 'retro' && res && !examenSinAyuda && <div className={`retro ${res.veredicto === 'correcta' ? 'ok' : res.veredicto === 'incorrecta' ? 'no' : 'parcial'}`} role="status">
         <div className="fila" style={{ justifyContent: 'space-between', marginBottom: 8 }}><b>{etiquetaResultado(res.veredicto)}</b></div>
         <p className="mini">Tu respuesta ya está registrada.{intentoActual.current && conAyuda(intentoActual.current) ? ' Esta práctica tuvo ayuda.' : ''}</p>
+        {avisoIA && <p className="mini">La IA no pudo corregir esta respuesta: {avisoIA} Decidió el corrector propio.</p>}
+        {intentoActual.current?.calificado_por_ia && <div className="veredicto-ia">
+          <p className="mini">{intentoActual.current.correccion_manual
+            ? 'Lo decidió la IA y tú lo rectificaste. Vale tu corrección.'
+            : 'Este veredicto lo decidió la IA. Si se equivocó, corrígelo y contará como tú digas.'}</p>
+          {!intentoActual.current.correccion_manual && <button className="btn pequeno fantasma"
+            onClick={() => corregirVeredicto(res.veredicto !== 'correcta')}>
+            {res.veredicto === 'correcta' ? 'No, mi respuesta era incorrecta' : 'Mi respuesta sí era correcta'}</button>}
+        </div>}
         {presentacionCambio && <p className="aviso">La pregunta guardada pertenece a otra presentación. Tu respuesta y su resultado original se conservan; el texto mostrado es el actual.</p>}
         <p>Tu respuesta: <b>{res.respuestaDada || 'Respuesta registrada'}</b></p>
         {res.veredicto !== 'correcta' && <p>Respuesta de referencia: <b>{c.respuesta_canonica}</b></p>}

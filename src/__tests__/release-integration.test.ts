@@ -12,6 +12,11 @@ vi.mock('../data/corpus', () => ({ cargarIndice: async () => null, cargarMigraci
 vi.mock('../lib/supabase', () => ({ supabase: {
   from: () => ({ select: () => ({ eq: () => ({ maybeSingle: mocks.load }) }) }), rpc: mocks.rpc,
 } }))
+// Este circuito comprueba UI → proveedor → respaldo. La corrección con IA tiene sus propias
+// pruebas; aquí se deja sin IA para que mande el corrector propio, como fuera de línea.
+vi.mock('../lib/calificacion-ia', () => ({
+  calificarConIA: async () => ({ estado: 'sin_ia', motivo: 'Sin IA en las pruebas.' }),
+}))
 
 import { ProveedorEstado, useApp } from '../store/estado'
 import { Reproductor, type Cola } from '../screens/Reproductor'
@@ -59,6 +64,9 @@ function button(text: string): HTMLButtonElement {
 async function click(text: string, doble = false) {
   const target = button(text)
   await act(async () => { target.click(); if (doble) target.click() })
+  // Comprobar una respuesta escrita pasa por el corrector con IA, que es asíncrono aunque
+  // no haya IA: sin dejar asentar las promesas, la retroalimentación aún no está en pantalla.
+  await act(async () => { await Promise.resolve(); await Promise.resolve() })
 }
 async function responder(text: string) {
   const input = host.querySelector<HTMLInputElement>('input[aria-label="Tu respuesta"]')
