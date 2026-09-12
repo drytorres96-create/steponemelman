@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import worker, { StudyCoach, validarRespuesta } from './worker'
+import worker, { StudyCoach, validarCalificacion, validarRespuesta } from './worker'
 const fragment = 'Fragmento sintético: alfa es el primer elemento.'
 const output = { response: JSON.stringify({ diferencia: 'Alfa y beta son distintos.', explicacion: 'Alfa ocupa el primer lugar.', recordar: 'Alfa primero.', evidencia: 'alfa es el primer elemento.' }) }
 class MemoryStorage {
@@ -74,5 +74,67 @@ describe('ayuda de IA con cuota gratuita', () => {
     expect((await worker.fetch(request, env)).status).toBe(403)
     expect(remote).toHaveBeenCalledTimes(2)
     expect(env.COACH.get).not.toHaveBeenCalled()
+  })
+})
+
+const veredicto = (v: unknown) => ({ response: JSON.stringify(v) })
+function setupCalificar() {
+  const storage = new MemoryStorage()
+  const env = { AI_FREE_ENABLED: 'true', AI: { run: vi.fn().mockResolvedValue(veredicto({ veredicto: 'correcta', motivo: 'Es un sinónimo aceptado.' })) },
+    ASSETS: { fetch: vi.fn() }, COACH: { idFromName: vi.fn(), get: vi.fn() } }
+  const coach = new StudyCoach({ storage }, env)
+  const call = (key: string, user = 'one', answer = 'alpha') => coach.fetch(new Request('https://coach/calificar', { method: 'POST',
+    body: JSON.stringify({ key, user, mode: 'calificar', reference: fragment, sourceFragment: fragment, question: '¿Primero?',
+      answer, canonical: 'alfa', source: { title: 'QA', page: 1 } }) }))
+  return { storage, env, call }
+}
+
+describe('corrección de respuestas breves con IA', () => {
+  it('acepta solo los tres veredictos y un motivo corto', () => {
+    expect(validarCalificacion(veredicto({ veredicto: 'correcta', motivo: 'Sinónimo aceptado.' })))
+      .toEqual({ veredicto: 'correcta', motivo: 'Sinónimo aceptado.' })
+    expect(validarCalificacion(veredicto({ veredicto: 'parcial', motivo: 'Falta la segunda mitad.' })))
+      .toEqual({ veredicto: 'parcial', motivo: 'Falta la segunda mitad.' })
+    // Un veredicto inventado no puede convertirse en acierto ni en fallo.
+    expect(validarCalificacion(veredicto({ veredicto: 'casi', motivo: 'Casi.' }))).toBeNull()
+    expect(validarCalificacion(veredicto({ veredicto: 'correcta', motivo: '' }))).toBeNull()
+    expect(validarCalificacion(veredicto({ veredicto: 'correcta', motivo: 'x'.repeat(201) }))).toBeNull()
+    expect(validarCalificacion({ response: 'no es json' })).toBeNull()
+  })
+
+  it('devuelve el veredicto, lo cachea y la caché no gasta cuota', async () => {
+    const { storage, env, call } = setupCalificar()
+    const primera = await call('k1')
+    expect(primera.status).toBe(200)
+    expect(await primera.json()).toMatchObject({ veredicto: 'correcta', motivo: 'Es un sinónimo aceptado.', cached: false })
+    expect(await storage.get('quota')).toMatchObject({ total: 1 })
+
+    const repetida = await call('k1')
+    expect(await repetida.json()).toMatchObject({ veredicto: 'correcta', cached: true })
+    expect(env.AI.run).toHaveBeenCalledTimes(1)
+    expect(await storage.get('quota')).toMatchObject({ total: 1 })
+  })
+
+  it('agotada la cuota responde 429 para que mande el corrector propio', async () => {
+    const { storage, call } = setupCalificar()
+    await storage.put('quota', { day: new Date().toISOString().slice(0, 10), total: 0, users: { one: 20 } })
+    const respuesta = await call('k2')
+    expect(respuesta.status).toBe(429)
+    expect((await respuesta.json() as { error: string }).error).toContain('corrector propio')
+  })
+
+  it('el endpoint existe y exige lo mismo que la ayuda; una ruta desconocida sigue siendo 404', async () => {
+    const { env } = setupCalificar()
+    const assets = { ...env, ASSETS: { fetch: vi.fn().mockResolvedValue(new Response('site')) } }
+    expect((await worker.fetch(new Request('https://site/api/calificar', { method: 'POST' }), assets)).status).toBe(401)
+    expect((await worker.fetch(new Request('https://site/api/inventado', { method: 'POST' }), assets)).status).toBe(404)
+  })
+
+  it('un veredicto que el modelo no sabe dar no se convierte en calificación', async () => {
+    const { env, call } = setupCalificar()
+    env.AI.run.mockResolvedValueOnce(veredicto({ veredicto: 'depende', motivo: 'No sé.' }))
+    const respuesta = await call('k3')
+    expect(respuesta.status).toBe(503)
+    expect((await respuesta.json() as { codigo: string }).codigo).toBe('no_verificable')
   })
 })

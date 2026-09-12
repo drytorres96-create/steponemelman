@@ -36,6 +36,18 @@ describe('estado persistido compatible', () => {
     expect(leerEstadoDesconocido(estadoCon({ A: p }))?.progreso.A.intentos[0]).toEqual(actualizado)
   })
 
+  it('conserva quién calificó la respuesta al guardar y al sincronizar', () => {
+    // El lector es una lista blanca: un campo que no reconozca se pierde en la primera recarga.
+    const porIA: Intento = { ...intento('a', 1000), respuesta_dada: 'el primer elemento', calificado_por_ia: true }
+    const rectificado = { ...porIA, calificacion: 3 as const, correccion_manual: true, calificacion_actualizada_en: 2000 }
+    const p = reconstruirProgreso('A', [porIA, rectificado], ESTADO_INICIAL.criterios)
+    const leido = leerEstadoDesconocido(estadoCon({ A: p }))?.progreso.A.intentos[0]
+    expect(leido).toMatchObject({ calificado_por_ia: true, correccion_manual: true })
+    // Un valor que no sea booleano invalida el intento en lugar de colarse.
+    expect(leerEstadoDesconocido(estadoCon({ A: reconstruirProgreso('A',
+      [{ ...porIA, calificado_por_ia: 'sí' } as unknown as Intento], ESTADO_INICIAL.criterios) }))?.progreso.A.intentos ?? []).toHaveLength(0)
+  })
+
   it('fusiona dos dispositivos sin perder la calificación nueva ni la evidencia de ayuda', () => {
     const a = { ...intento('a', 1000), pregunta_id: 'q1', fuente_consultada: true }
     const b = { ...intento('b', 1001), pregunta_id: 'q1', fuente_consultada: false, calificacion: 2 as const, calificacion_actualizada_en: 3000 }

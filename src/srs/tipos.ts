@@ -44,6 +44,10 @@ export interface Intento {
   modo?: 'aprendizaje' | 'repaso' | 'examen'
   tipo_evidencia?: 'recuerdo' | 'discriminacion' | 'aplicacion'
   calificacion_actualizada_en?: number
+  /** El veredicto lo decidió la IA sobre una respuesta libre, no el corrector propio. */
+  calificado_por_ia?: boolean
+  /** Yoel rectificó ese veredicto a mano; manda sobre el de la IA y no se vuelve a tocar. */
+  correccion_manual?: boolean
   interaccion: string
   recuperacion_activa: boolean          // recuperación libre / escritura, frente a reconocimiento
   pistas_usadas: number

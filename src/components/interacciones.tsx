@@ -311,6 +311,14 @@ function Clasificar({ c, bloqueado, onResponder, semilla, ocultarFeedback = fals
   )
 }
 
+const CON_FORMATO_PROPIO = ['opcion_multiple', 'caso_clinico', 'verdadero_falso', 'numerico',
+  'prediccion_direccional', 'secuencia', 'relacionar', 'clasificar']
+
+/** Cierto cuando la pregunta se responde escribiendo una palabra o frase corta. */
+export function usaTextoLibre(c: Concepto): boolean {
+  return !CON_FORMATO_PROPIO.includes(c.interaccion.recomendada) && esRespuestaBreve(c.respuesta_canonica)
+}
+
 export function Interaccion(props: Props) {
   switch (props.c.interaccion.recomendada) {
     case 'opcion_multiple': case 'caso_clinico': case 'verdadero_falso': return <Opciones {...props} />
@@ -319,7 +327,7 @@ export function Interaccion(props: Props) {
     case 'secuencia': return <Secuencia {...props} />
     case 'relacionar': return <Relacionar {...props} />
     case 'clasificar': return <Clasificar {...props} />
-    default: return esRespuestaBreve(props.c.respuesta_canonica) ? <Texto {...props} /> : <RevisionSinEvaluacion {...props} />
+    default: return usaTextoLibre(props.c) ? <Texto {...props} /> : <RevisionSinEvaluacion {...props} />
   }
 }
 
