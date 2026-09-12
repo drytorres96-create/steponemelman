@@ -31,6 +31,12 @@ Do not glob every file in the output directory into the database. Audit files, f
 
 The authenticated server must only load requested IDs and exact revisions, and the session builder must select `status=ready`. Records blocked for missing images or incomplete options stay visible only as inventory counts/reasons until corrected from source.
 
+### Runtime availability and compact index (1.6.2)
+
+The current catalog may withdraw an already published question while retaining its immutable revision. In this case the catalog's `blocked` status takes precedence over a historical payload's `ready` status. Do not rewrite that payload or its revision hash. Import verification still requires parity for newly imported banks; a subsequent availability withdrawal is recorded separately with its previous catalog backup.
+
+`catalog-index.json` is an optional compact projection with the same schema version, bank version, question order, identities, revisions, classifications and availability as `catalog.json`. Only `topic`, `objective`, `conceptLinks` and `taxonomy` are omitted or replaced with empty schema-compatible values. Complete content remains in the private question objects. Publish both catalogs atomically, after validating all referenced assets and backing up the prior catalog. Never promote an incomplete staged bank by filling missing reviewed revisions from an unreviewed source.
+
 ## Structural gates
 
 Blocked conditions include missing/insufficient stem, missing/nonconsecutive options, repeated options, key absent or not selectable, missing explanation, unreadable option glyphs or columns, strong OCR noise, explicit source evidence of an omitted option, or any required figure not yet approved for responding. These gates are conservative and overlap; do not sum reason counts as record counts.

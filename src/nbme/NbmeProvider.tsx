@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { leer, escribir } from '../store/db'
 import { crearUUID } from '../store/model'
 import { createNbmeApi, parseNbmeCatalog, parseNbmeQuestion, questionRefKey, NbmeAccessError } from './api'
+import { preguntaConLecturasDudosas } from './texto'
 import { emptyNbmeState, parseNbmeState, mergeNbmeStates, startNbmeSession, setNbmeDraft,
   submitNbmeAnswer, reviewNbmeAnswer, updateNbmeSession, activateNbmeSession, deriveNbmeSession, updateNbmeFilters } from './model'
 import { NbmeSyncEngine, parseNbmeSnapshot, stableNbmeJson, type NbmeSnapshot, type NbmeSyncReply } from './sync'
@@ -67,6 +68,8 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
   const key = `nbme-state:${userId}`
   const [state, setState] = useState<NbmeState>(() => emptyNbmeState())
   const [catalog, setCatalog] = useState<NbmeCatalog | null>(null)
+  const currentCatalog = useRef<NbmeCatalog | null>(null)
+  currentCatalog.current = catalog
   const [loading, setLoading] = useState(true)
   const [questionLoading, setQuestionLoading] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -494,6 +497,11 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     const view = id ? deriveNbmeSession(actual.current, id) : null
     const question = view?.current ? questions.current.get(questionRefKey(view.current)) : null
     if (!id || !view?.current || view.phase !== 'question' || !question || actual.current.sessions[id].paused) return
+    if (preguntaConLecturasDudosas(question)
+      || !currentCatalog.current?.questions.some(q => q.id === question.id && q.status === 'ready')) {
+      setError('Esta pregunta necesita revisión de la fuente. Tu sesión y tus respuestas anteriores siguen guardadas.')
+      return
+    }
     const optionId = actual.current.sessions[id].drafts[String(view.current.position)]?.optionId
     if (!optionId) return
     flushTime()

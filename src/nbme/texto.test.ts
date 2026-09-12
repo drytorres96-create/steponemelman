@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { analizarEnunciado, normalizarLinea, normalizarTexto } from './texto'
+import { analizarEnunciado, detectarLecturasDudosas, normalizarLinea, normalizarTexto, preguntaConLecturasDudosas } from './texto'
+
+describe('control de lecturas antes de calificar', () => {
+  it('incluye las alternativas y los datos de las tablas', () => {
+    expect(preguntaConLecturasDudosas({ stem: 'Synthetic question.', options: [{ text: 'NAD ^' }] })).toBe(true)
+    expect(preguntaConLecturasDudosas({ stem: 'A 4 S -year-old patient.', options: [{ text: 'One' }] })).toBe(true)
+    expect(preguntaConLecturasDudosas({ stem: 'Laboratory studies show:\nFirst label\nSecond label\n10 units\n50:QQ0 units\nWhich value?', options: [] })).toBe(true)
+  })
+  it('conserva cocientes, exponentes explícitos y comillas sin falsas alarmas', () => {
+    expect(detectarLecturasDudosas("A ratio of cortisol:cortisone; 10^3. The patient says 'I sleep.'")).toEqual([])
+    expect(preguntaConLecturasDudosas({ stem: 'Laboratory studies show:\nFirst label\nSecond label\n10^3 units\n10^-2 units\nWhich value?', options: [] })).toBe(false)
+    expect(detectarLecturasDudosas("2.6 rng.' dL")).not.toEqual([])
+  })
+})
 
 describe('normalizarLinea', () => {
   it('repara edades partidas por la extracción', () => {
@@ -28,6 +41,9 @@ describe('normalizarLinea', () => {
     expect(normalizarLinea('8 g/dL')).toBe('8 g/dL')
     expect(normalizarLinea('Na+ 140 mEq/L')).toBe('Na+ 140 mEq/L')
     expect(normalizarLinea('Philadelphia (Ph1) chromosome')).toBe('Philadelphia (Ph1) chromosome')
+    expect(normalizarLinea('At the L3 vertebral level')).toBe('At the L3 vertebral level')
+    expect(normalizarLinea('5 mL 3 times daily')).toBe('5 mL 3 times daily')
+    expect(normalizarLinea('dL 3')).toBe('dL 3')
   })
 
   it('conserva una lectura dudosa en lugar de adivinarla', () => {

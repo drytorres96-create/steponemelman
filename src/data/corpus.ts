@@ -48,8 +48,11 @@ async function traer(ruta: string, version?: string): Promise<unknown> {
     try { await escribir(clave, data.payload) } catch { /* Sin copia offline de este activo. */ }
     return data.payload
   }
-  const local = await leer<unknown>(clave).catch(() => null)
-  if (local) return local
+  // An online denial must not be replaced with an old authorized response.
+  if (!navigator.onLine) {
+    const local = await leer<unknown>(clave).catch(() => null)
+    if (local) return local
+  }
   throw new Error(error ? 'No se pudo cargar el material. Revisa tu conexión e inténtalo de nuevo.' : 'Este material aún no está disponible para tu cuenta.')
 }
 
@@ -60,7 +63,17 @@ async function traer(ruta: string, version?: string): Promise<unknown> {
 async function limpiarVersionesAnteriores(userId: string, versionVigente: string): Promise<void> {
   const prefijo = `corpus:${userId}:`
   const claves = await clavesConPrefijo(prefijo)
-  const obsoletas = claves.filter(clave => !clave.startsWith(`${prefijo}${versionVigente}:`))
+  const actual = /^(\d+)\.(\d+)\.(\d+)$/.exec(versionVigente)?.slice(1).map(Number)
+  if (!actual) return
+  const obsoletas = claves.filter(clave => {
+    // Only old, versioned modules belong to this cleanup. Keep the shared index,
+    // migration map, quarantine and newer versions that another tab may need.
+    const anterior = /^(\d+)\.(\d+)\.(\d+):modules\/[^/:]+\.json$/.exec(clave.slice(prefijo.length))
+    if (!anterior) return false
+    const version = anterior.slice(1).map(Number)
+    const distinto = version.findIndex((n, i) => n !== actual[i])
+    return distinto >= 0 && version[distinto] < actual[distinto]
+  })
   if (obsoletas.length) await borrar(obsoletas)
 }
 

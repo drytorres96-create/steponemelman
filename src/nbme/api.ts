@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { supabase } from '../lib/supabase'
 import type { NbmeCatalog, NbmeQuestion, NbmeQuestionRef } from './types'
+import { preguntaConLecturasDudosas } from './texto'
 
 const text = z.string()
 const conceptLink = z.object({ conceptId: text, relation: z.enum(['tested', 'foundation']),
@@ -34,7 +35,7 @@ export function parseNbmeQuestion(value: unknown): NbmeQuestion | null {
   if (question.status !== 'ready' || question.options.length < 2 || question.answer === null
     || !question.options.some(option => option.id === question.answer)
     || new Set(question.options.map(option => option.id)).size !== question.options.length
-    || (question.figureRequired && !question.figures.length)) return null
+    || (question.figureRequired && !question.figures.length) || preguntaConLecturasDudosas(question)) return null
   return question
 }
 export function questionRefKey(ref: NbmeQuestionRef): string { return JSON.stringify([ref.id, ref.revision]) }

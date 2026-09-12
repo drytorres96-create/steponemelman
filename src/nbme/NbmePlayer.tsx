@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from '../components/comunes'
 import { useNbme } from './NbmeProvider'
-import { analizarEnunciado, detectarLecturasDudosas, normalizarTexto } from './texto'
+import { analizarEnunciado, normalizarTexto, preguntaConLecturasDudosas } from './texto'
 import type { NbmeQuestion } from './types'
 import './nbme.css'
 
@@ -68,7 +68,7 @@ function useQuestionFigures(question: NbmeQuestion | null) {
 
 export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => void; onEstudiar: (ids: string[]) => void; onBuscar?: (question: NbmeQuestion) => void }) {
   const {
-    currentSession, sessionView, currentQuestion, selectedOption, currentFeedback, questionLoading,
+    catalog, currentSession, sessionView, currentQuestion, selectedOption, currentFeedback, questionLoading,
     loading, busy, error, storageWarning, syncStatus, selectAnswer, checkAnswer, nextQuestion, pauseSession,
     retryQuestionLoad, syncNow, budgetReached, continueWithoutBudget,
   } = useNbme()
@@ -78,6 +78,8 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
   const figures = useQuestionFigures(currentQuestion)
   const feedback = sessionView?.phase === 'feedback' ? currentFeedback : null
   const currentReady = !!currentQuestion && currentQuestion.status === 'ready' && currentQuestion.id === sessionView?.current?.id
+    && !preguntaConLecturasDudosas(currentQuestion)
+    && !!catalog?.questions.some(q => q.id === currentQuestion.id && q.status === 'ready')
   const requiredFigureUnavailable = !!currentQuestion?.figureRequired && (!currentQuestion.figures.length || figures.loading || figures.error)
   const canAnswer = currentReady && !!selectedOption && !questionLoading && !busy && !requiredFigureUnavailable && !feedback
 
@@ -126,7 +128,6 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
   </section>
 
   const source = currentQuestion ? `NBME ${currentQuestion.form} · sección ${currentQuestion.section} · pregunta ${currentQuestion.item} · página ${currentQuestion.page}` : 'Pregunta de aplicación'
-  const lecturasDudosas = currentQuestion ? detectarLecturasDudosas(currentQuestion.stem) : []
   const explanationSource = currentQuestion?.objective || currentQuestion?.explanation
   const briefExplanation = explanationSource && explanationSource.length > 900 ? `${explanationSource.slice(0, 900).trimEnd()}…` : explanationSource
   const reviewedLinks = (currentQuestion?.conceptLinks ?? []).filter(link => link.review === 'reviewed')
@@ -157,10 +158,6 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
               </h1>
               <p className="mini">{source}</p>
               <Enunciado texto={currentQuestion.stem} />
-              {lecturasDudosas.length > 0 && <p className="nbme-aviso-fuente">
-                Esta pregunta conserva lecturas dudosas de la extracción ({lecturasDudosas.join(', ')}).
-                Contrasta las cifras con el PDF antes de darlas por buenas.
-              </p>}
               {figures.loading && <p role="status" className="sutil">Cargando figura…</p>}
               {figures.error && <div className="nbme-error" role="alert"><p>No se pudo cargar la figura.</p><button className="btn" onClick={figures.retry}>Reintentar figura</button></div>}
               {currentQuestion.figureRequired && !currentQuestion.figures.length && <p role="alert" className="nbme-error">Falta una figura necesaria para responder esta pregunta.</p>}

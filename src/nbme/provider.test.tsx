@@ -19,7 +19,7 @@ const question: NbmeQuestion = { id: 'NBME27-P0001', revision: 'synthetic-v1', f
   answer: 'B', explanation: 'Synthetic explanation.', figures: [],
   provenance: { sourceFile: 'test', sourceRecordId: 'test', notes: [] } }
 const questions = [question, { ...question, id: 'NBME28-P0001', form: '28' as const }]
-let host: HTMLDivElement, root: Root | null, current: ReturnType<typeof useNbme>, denied: boolean
+let host: HTMLDivElement, root: Root | null, current: ReturnType<typeof useNbme>, denied: boolean, withdrawn: boolean
 function Harness() { current = useNbme(); return <NbmePlayer onSalir={() => undefined} onEstudiar={() => undefined} /> }
 async function mount() {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
@@ -29,7 +29,7 @@ async function mount() {
 async function unmount() { await act(async () => root?.unmount()); root = null; host.remove() }
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
-  denied = false; memory.db.clear(); memory.row = null; localStorage.clear(); vi.clearAllMocks()
+  denied = false; withdrawn = false; memory.db.clear(); memory.row = null; localStorage.clear(); vi.clearAllMocks()
   memory.session.mockResolvedValue({ data: { session: { user: { id: 'test-owner' }, access_token: 'synthetic-token' } }, error: null })
   memory.from.mockImplementation(() => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: structuredClone(memory.row), error: null }) }) }) }))
   memory.rpc.mockImplementation(async (_name, args) => {
@@ -41,7 +41,8 @@ beforeEach(() => {
   })
   vi.stubGlobal('fetch', vi.fn(async (path: string, init?: RequestInit) => {
     if (denied) return Response.json({}, { status: 403 })
-    if (path.endsWith('/catalog')) return Response.json({ schemaVersion: 1, bankVersion: 'test-bank', total: questions.length, questions })
+    if (path.endsWith('/catalog')) return Response.json({ schemaVersion: 1, bankVersion: 'test-bank', total: questions.length,
+      questions: questions.map(q => withdrawn && q.id === question.id ? { ...q, status: 'blocked' } : q) })
     const refs = JSON.parse(String(init?.body)).refs as { id: string }[]
     return Response.json({ questions: refs.map(ref => questions.find(q => q.id === ref.id)) })
   }))
@@ -96,4 +97,25 @@ it('checks authorization before resuming cached material and preserves progress 
   await act(async () => current.checkAnswer())
   expect(Object.keys(current.state.attempts)).toHaveLength(0)
   expect(current.error).toContain('acceso al banco')
+})
+
+it('preserves a selected draft and past results when the current catalog withdraws a cached question', async () => {
+  await mount()
+  await act(async () => { expect(await current.startSession([questions[1], question])).toBe(true) })
+  const id = current.currentSession!.id
+  await act(async () => current.selectAnswer('B'))
+  await act(async () => current.checkAnswer())
+  await act(async () => current.nextQuestion())
+  await act(async () => current.selectAnswer('A'))
+  const attempts = structuredClone(current.state.attempts)
+  const drafts = structuredClone(current.state.sessions[id].drafts)
+  withdrawn = true
+  await act(async () => current.reloadCatalog())
+  await act(async () => current.checkAnswer())
+  expect(current.state.attempts).toEqual(attempts)
+  expect(current.state.sessions[id].drafts).toEqual(drafts)
+  expect(current.currentQuestion?.id).toBe(question.id)
+  expect(host.textContent).toContain('Pregunta pendiente de revisión')
+  expect(host.querySelectorAll('input[type="radio"]')).toHaveLength(0)
+  expect(current.error).toContain('revisión de la fuente')
 })
