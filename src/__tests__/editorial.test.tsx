@@ -20,6 +20,7 @@ describe('diseño médico abstracto', () => {
     expect(image.alt).toBe('')
     expect(image.getAttribute('aria-hidden')).toBe('true')
     expect(image.getAttribute('loading')).toBe('eager')
+    expect(image.getAttribute('srcset')).toBe('/images/v171/organic-768.webp 768w, /images/v171/organic-1536.webp 1536w')
     expect(image.width).toBe(1536)
     expect(image.height).toBe(1024)
     expect(host.querySelector('button')).toBeNull()
@@ -39,7 +40,7 @@ describe('diseño médico abstracto', () => {
     expect(host.textContent).toContain('Descripción visible.')
     expect(host.querySelector('img')?.getAttribute('aria-hidden')).toBe('true')
   })
-  it('solo publica los cuatro recursos abstractos y respeta el presupuesto de imagen', () => {
+  it('conserva los recursos anteriores y respeta el presupuesto del fondo nuevo', () => {
     const directory = resolve('public/images/v170')
     const files = readdirSync(directory).sort()
     expect(files).toEqual(['fluid-1536.webp', 'fluid-768.webp', 'membrane-1536.webp', 'membrane-768.webp'])
@@ -52,6 +53,18 @@ describe('diseño médico abstracto', () => {
       total += size
     }
     expect(total).toBeLessThan(150000)
+    const organicDirectory = resolve('public/images/v171')
+    const organicFiles = readdirSync(organicDirectory).sort()
+    expect(organicFiles).toEqual(['organic-1536.webp', 'organic-768.webp'])
+    let organicTotal = 0
+    for (const name of organicFiles) {
+      const file = resolve(organicDirectory, name)
+      const size = statSync(file).size
+      expect(size).toBeLessThan(name.includes('768') ? 24000 : 65000)
+      expect(readFileSync(file).subarray(8, 12).toString()).toBe('WEBP')
+      organicTotal += size
+    }
+    expect(organicTotal).toBeLessThan(90000)
   })
   it('mantiene contraste AA en texto, controles y estados sobre las superficies claras', () => {
     const css = readFileSync(resolve('src/editorial.css'), 'utf8')
@@ -66,6 +79,13 @@ describe('diseño médico abstracto', () => {
         const ratio = (luminance(colors[surface]) + .05) / (luminance(colors[text]) + .05)
         expect(ratio, `${text} sobre ${surface}`).toBeGreaterThanOrEqual(4.5)
       }
+    }
+    const organic = readFileSync(resolve('src/organic.css'), 'utf8')
+    const glass = Object.fromEntries([...organic.matchAll(/--(glass-[\w-]+):\s*(#[\da-f]{6})\s*;/g)].map(m => [m[1], m[2]]))
+    // Worst-case white artwork behind the 90%-opaque glass, before any dark overlay.
+    const worstSurface = '#' + [1, 3, 5].map(i => Math.round(parseInt(glass['glass-floor'].slice(i, i + 2), 16) * .9 + 255 * .1).toString(16).padStart(2, '0')).join('')
+    for (const token of ['glass-text', 'glass-muted']) {
+      expect((luminance(glass[token]) + .05) / (luminance(worstSurface) + .05), token).toBeGreaterThanOrEqual(4.5)
     }
   })
 })
