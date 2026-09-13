@@ -6,18 +6,19 @@ import { Vacio } from '../components/comunes'
 import { estaVencido } from '../srs/fsrs'
 import { dominioVigente } from '../srs/mastery'
 import { RUTAS } from '../lib/rutas'
-import { referenciaPagina } from '../lib/fuente'
 import { MapaProgreso } from '../components/MapaProgreso'
 import type { OpcionesSesionPersonalizada } from '../lib/busqueda'
 import { ScreenHeading } from '../components/Editorial'
-import { BandaDeCifras } from './ProgresoCifras'
+import { BandaDeCifras, type Ventana } from './ProgresoCifras'
+import { ProgresoHorizonte } from './ProgresoHorizonte'
+import { lunesDe } from '../lib/tiempo'
 
-export function Progreso({ onEstudiar, onContinuar }: { onContinuar?: () => void; onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void }) {
+export function Progreso({ onEstudiar, onContinuar, ventana = 'general' }:
+  { onContinuar?: () => void; ventana?: Ventana; onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void }) {
   const { indice, estado } = useApp()
   const [conceptos, setConceptos] = useState<Concepto[] | null>(null)
   const [error, setError] = useState(false)
   const [reintento, setReintento] = useState(0)
-  const [visiblesRevision, setVisiblesRevision] = useState(20)
   useEffect(() => {
     if (!indice) return
     let activo = true
@@ -33,35 +34,30 @@ export function Progreso({ onEstudiar, onContinuar }: { onContinuar?: () => void
   const publicados = new Set(conceptos.map(c => c.concept_id))
   const progresos = Object.values(estado.progreso).filter(p => publicados.has(p.concept_id))
   const dominados = progresos.filter(p => dominioVigente(p, estado.criterios)).length
-  const pendientes = conceptos.filter(c => estado.progreso[c.concept_id]?.intentos.at(-1)?.resultado === 'revision')
-  const sesiones = [...estado.sesiones].reverse().slice(0, 12)
+  const semanal = ventana === 'semana'
+  const desde = lunesDe().getTime()
+  const sesiones = [...estado.sesiones].reverse()
+    .filter(s => !semanal || s.inicio >= desde).slice(0, 12)
+  const respuestasSemana = progresos.flatMap(p => p.intentos).filter(t => t.ts >= desde).length
+  const tarjetas = semanal ? [
+    { n: progresos.filter(p => p.intentos.some(t => t.ts >= desde)).length, r: 'conceptos respondidos esta semana' },
+    { n: respuestasSemana, r: 'respuestas de concepto esta semana' },
+    { n: progresos.filter(p => dominioVigente(p, estado.criterios) && (p.dominado_en ?? 0) >= desde).length, r: 'nuevos dominios esta semana' },
+  ] : [
+    { n: progresos.filter(p => p.intentos.length).length, r: 'conceptos trabajados' },
+    { n: progresos.filter(p => estaVencido(p)).length, r: 'para repasar' },
+    { n: dominados, r: 'dominio vigente' },
+  ]
 
   return <div className="pila">
     <ScreenHeading eyebrow="Tu recorrido de aprendizaje" title="Progreso" description="Evidencia de tu práctica dentro del material publicado. No estima tu probabilidad de aprobar Step 1." />
-    <BandaDeCifras dominados={dominados} tocados={progresos.filter(p => p.intentos.length).length} total={total} />
-    <div className="rejilla r3">{[
-      { n: progresos.filter(p => p.intentos.length).length, r: 'conceptos trabajados' },
-      { n: progresos.filter(p => estaVencido(p)).length, r: 'para repasar' },
-      { n: dominados, r: 'dominio vigente' },
-    ].map(x => <div className="tarjeta" key={x.r}><div className="cifra">{x.n}</div><div className="rotulo">{x.r}</div><p className="mini">de {total} disponibles</p></div>)}</div>
+    <BandaDeCifras conceptos={conceptos} ventana={ventana} />
+    <div className="rejilla r3">{tarjetas.map(x => <div className="tarjeta" key={x.r}>
+      <div className="cifra">{x.n}</div><div className="rotulo">{x.r}</div><p className="mini">de {total} disponibles</p></div>)}</div>
+    <ProgresoHorizonte conceptos={conceptos} />
     <MapaProgreso conceptos={conceptos} onEstudiar={onEstudiar} onContinuar={onContinuar} />
-    {pendientes.length > 0 && <section className="tarjeta pila" aria-labelledby="revision-titulo">
-      <h2 id="revision-titulo">Respuestas por revisar ({pendientes.length})</h2>
-      <p className="sutil">El corrector automático no pudo decidir. Estas respuestas no cuentan como acierto ni como fallo.</p>
-      <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => onEstudiar(pendientes.slice(0, 20).map(c => c.concept_id))}>
-        Volver a practicar estas respuestas ({Math.min(20, pendientes.length)})
-      </button>
-      {pendientes.slice(0, visiblesRevision).map(c => <details key={c.concept_id} className="detalles-estudio">
-        <summary>{c.objetivo}</summary>
-        <p style={{ marginTop: 8 }}><b>Tu respuesta:</b> {estado.progreso[c.concept_id]?.intentos.at(-1)?.respuesta_dada || 'No disponible en este registro.'}</p>
-        <p><b>Respuesta de referencia:</b> {c.respuesta_canonica}</p><p className="sutil">{c.explicacion}</p>
-        <p className="mini">{c.source.doc_title}. {referenciaPagina(c.source)}. Consulta la fuente si necesitas aclarar una diferencia.</p>
-      </details>)}
-      {pendientes.length > visiblesRevision && <button className="btn pequeno fantasma" style={{ alignSelf: 'flex-start' }}
-        onClick={() => setVisiblesRevision(n => n + 20)}>Mostrar 20 más ({pendientes.length - visiblesRevision} restantes)</button>}
-    </section>}
-    <details className="tarjeta"><summary>Ver historial de sesiones</summary><p className="mini">Las cifras cuentan respuestas e incluyen reintentos. Se muestran las 12 sesiones más recientes.</p>
-      {!sesiones.length ? <Vacio titulo="Sin sesiones aún" texto="Verás lo que trabajaste, las respuestas correctas y el tiempo activo registrado." />
+    <details className="tarjeta"><summary>Ver historial de sesiones</summary><p className="mini">Las cifras cuentan respuestas e incluyen reintentos. Se muestran {semanal ? 'las sesiones de esta semana' : 'las 12 sesiones más recientes'}.</p>
+      {!sesiones.length ? <Vacio titulo={semanal ? 'Sin sesiones esta semana' : 'Sin sesiones aún'} texto="Verás lo que trabajaste, las respuestas correctas y el tiempo activo registrado." />
         : <div className="scroll-x"><table className="tabla">
           <thead><tr><th>Fecha</th><th>Ruta</th><th>Respuestas</th><th>Correctas (incluye reintentos)</th><th>Tiempo de estudio</th></tr></thead>
           <tbody>{sesiones.map(s => <tr key={s.id}>

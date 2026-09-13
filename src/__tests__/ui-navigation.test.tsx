@@ -134,24 +134,28 @@ describe('continuidad y navegación accesible', () => {
     expect(document.activeElement).toBe(host.querySelector('main'))
   })
 
-  it('las respuestas por revisar permiten ver el resto y practicar como máximo 20', async () => {
+  it('el progreso separa la ventana semanal de la general', async () => {
     window.history.replaceState(null, '', '/#progreso')
-    const conceptos = Array.from({ length: 21 }, (_, n) => ({ concept_id: `concepto-${n + 1}`, objetivo: `Objetivo ${n + 1}`,
-      clasificacion: { disciplina_primaria: 'Fisiología', sistema_primario: 'Renal' },
-      respuesta_canonica: 'Referencia', explicacion: 'Explicación', source: { doc_title: 'Documento', page: 1 },
-    }))
-    mock.cargarTodo.mockResolvedValue(conceptos)
-    app.estado = { ...ESTADO_INICIAL, progreso: Object.fromEntries(conceptos.map(c => [c.concept_id, {
-      concept_id: c.concept_id, estado: 'en_aprendizaje', dificultad: 5, estabilidad: 0, ultimo: 1, proxima: null,
-      aciertos: 0, fallos: 0, dominado_en: null,
-      intentos: [{ resultado: 'revision', ts: 1, ms: 1, tipo_error: 'ninguno', respuesta_dada: 'Mi respuesta' }],
-    }])) }
     await act(async () => { root.render(<App />) })
-    expect(host.querySelectorAll('[aria-labelledby="revision-titulo"] details')).toHaveLength(20)
-    await act(async () => { boton('Mostrar 20 más').click() })
-    expect(host.querySelectorAll('[aria-labelledby="revision-titulo"] details')).toHaveLength(21)
-    await act(async () => { boton('Volver a practicar estas respuestas').click() })
-    expect(mock.cargarConceptos.mock.calls.at(-1)?.[0]).toEqual(conceptos.slice(0, 20).map(c => c.concept_id))
+    const ventana = [...host.querySelectorAll('[aria-label="Ventana del progreso"] button')] as HTMLButtonElement[]
+    expect(ventana.map(b => b.textContent)).toEqual(['Esta semana', 'General'])
+    expect(ventana[1].getAttribute('aria-pressed')).toBe('true')
+    const rotulos = () => [...host.querySelectorAll('.rejilla.r3 .rotulo')].map(n => n.textContent)
+    expect(rotulos()).toEqual(['conceptos trabajados', 'para repasar', 'dominio vigente'])
+
+    await act(async () => { ventana[0].click() })
+    expect(ventana[0].getAttribute('aria-pressed')).toBe('true')
+    expect(rotulos()).toEqual(['conceptos respondidos esta semana', 'respuestas de concepto esta semana', 'nuevos dominios esta semana'])
+    expect(host.textContent).toContain('Cubrir el material en 10 semanas')
+  })
+
+  it('ya no quedan las secciones retiradas del progreso', async () => {
+    window.history.replaceState(null, '', '/#progreso')
+    await act(async () => { root.render(<App />) })
+    expect(host.textContent).not.toContain('Respuestas por revisar')
+    expect(host.textContent).not.toContain('¿Puedes aplicarlo en una pregunta nueva?')
+    expect(host.querySelector('[aria-labelledby="revision-titulo"]')).toBeNull()
+    expect(host.querySelector('[aria-labelledby="aplicacion-titulo"]')).toBeNull()
   })
 
   it('el modal contiene Tab, acepta Escape y devuelve el foco al control anterior', async () => {

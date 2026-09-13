@@ -332,3 +332,28 @@ summary::marker { color: var(--violeta); }
 }
 .banda-dato p.mini { margin: 4px 0 0; }
 .banda-de { font-size: 1rem; font-weight: 520; color: var(--texto-3); letter-spacing: 0; }
+
+/* ---------- Progreso: controles de ventana y visión a futuro ---------- */
+.progreso-controles { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; }
+
+.semana-progreso, .nbme-forma-barra { width: 100%; height: 4px; }
+.semana-tarjeta .semana-progreso { margin-bottom: 2px; }
+
+.horizonte-tabla th[scope="row"] { white-space: nowrap; font-weight: 560; }
+.horizonte-tabla .horizonte-actual { background: var(--violeta-tenue); }
+.horizonte-tabla .horizonte-actual th[scope="row"] { color: var(--violeta-2); }
+
+/* ---------- Progreso por forma NBME ---------- */
+.nbme-formas { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); }
+.nbme-formas > * { min-width: 0; }
+.nbme-forma {
+  border: 1px solid var(--linea-suave); border-radius: var(--radio);
+  padding: 16px; display: grid; gap: 8px; min-width: 0;
+}
+.nbme-forma-encabezado { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; justify-content: space-between; }
+.nbme-forma-encabezado h3 { margin: 0; }
+.nbme-forma-cifras { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); margin: 0; }
+.nbme-forma-cifras div { min-width: 0; }
+.nbme-forma-cifras dt { font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; color: var(--texto-3); }
+.nbme-forma-cifras dd { margin: 2px 0 0; font-size: 1.25rem; font-weight: 640; letter-spacing: -.02em; }
+.nbme-forma p.mini { margin: 0; }

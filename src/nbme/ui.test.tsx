@@ -138,7 +138,10 @@ describe('NBME study interface', () => {
     context.state = submitNbmeAnswer(context.state, 'QA-session', 1, question, 'I', 10, 300)
     await act(async () => root.render(<NbmeProgress />))
     const values = [...host.querySelectorAll('dd')].map(item => item.textContent)
-    expect(values).toEqual(['1', '0/1', '0'])
-    expect(host.textContent).toContain('Los reintentos no modifican ese resultado.')
+    // Totales y forma 27: vistas, correctas, incorrectas, a la primera, reincidentes.
+    // Corregir el fallo la deja como correcta, pero el primer intento fallado no se reescribe.
+    expect(values.slice(0, 5)).toEqual(['1/1', '1', '0', '0', '0'])
+    expect(values.slice(5, 10)).toEqual(['1', '1', '0', '0', '0'])
+    expect(host.textContent).toContain('«A la primera» cuenta el primer intento registrado')
   })
 })

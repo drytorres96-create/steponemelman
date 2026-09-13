@@ -8,8 +8,9 @@ import { Reproductor, type Cola } from '../screens/Reproductor'
 import { resumirIntentos } from '../screens/sesion'
 import type { Concepto } from '../schema/concept'
 import { guardarAvance } from './api'
+import { coberturaSesion } from './cobertura'
 import { pasoActual, separarGuion, tramoDeConceptos } from './guion'
-import type { SesionSemanal } from './tipos'
+import type { EstadoSesion, SesionSemanal } from './tipos'
 
 /**
  * Orquestador del recorrido mixto. No reescribe ninguno de los dos reproductores:
@@ -32,6 +33,7 @@ export function SesionMixta({ sesion, onSalir, efimera = false }:
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [tramoListo, setTramoListo] = useState<string | null>(null)
+  const [estadoGuardado, setEstadoGuardado] = useState<EstadoSesion>(sesion.estado)
   const esperandoId = useRef(false)
 
   // Una sesión de recuperación se arma al vuelo y no tiene fila que actualizar:
@@ -96,11 +98,12 @@ export function SesionMixta({ sesion, onSalir, efimera = false }:
     : [], [tramo, conceptos])
   const claveTramo = tramo ? `${sesion.id}:${tramo.inicio}` : null
 
+  // El cursor sólo dice por dónde va el recorrido. Si la sesión está hecha lo decide
+  // la evidencia registrada, en el efecto de abajo, no el hecho de llegar al final.
   const avanzarA = useCallback((siguiente: number) => {
     const destino = Math.min(Math.max(siguiente, 0), sesion.guion.length)
     setCursor(destino)
-    if (destino >= sesion.guion.length) void guardar({ cursor: destino, estado: 'completada', completadaEn: new Date().toISOString() })
-    else void guardar({ cursor: destino, estado: 'en_curso' })
+    void guardar({ cursor: destino })
   }, [guardar, sesion.guion.length])
 
   // El reproductor de conceptos exige que el punto de continuación guardado describa
@@ -139,23 +142,52 @@ export function SesionMixta({ sesion, onSalir, efimera = false }:
   const resumen = resumirIntentos(intentosSesion)
   const sinConflicto = vista ? vista.firstAnswered - vista.firstConflicts : 0
 
+  // Evidencia real de esta sesión: un intento por concepto y una respuesta por pregunta.
+  const conceptosConEvidencia = useMemo(() => Object.values(estado.progreso)
+    .filter(p => p.intentos.some(t => t.session_id === sesion.id))
+    .map(p => p.concept_id), [estado.progreso, sesion.id])
+  const preguntasRespondidas = useMemo(() => nbmeId
+    ? [...new Set(Object.values(nbme.state.attempts).filter(a => a.sessionId === nbmeId).map(a => a.questionId))]
+    : [], [nbme.state.attempts, nbmeId])
+  const cobertura = useMemo(() => coberturaSesion(sesion.guion, conceptosConEvidencia, preguntasRespondidas),
+    [sesion.guion, conceptosConEvidencia, preguntasRespondidas])
+
+  // Una sesión se marca completada sola en cuanto la evidencia cubre el guion, y nunca
+  // vuelve atrás: lo estudiado no se desestudia porque se abra otra vez la sesión.
+  const estadoDeseado: EstadoSesion = cobertura.cumple ? 'completada'
+    : cobertura.hechos > 0 || cursor > 0 ? 'en_curso' : 'pendiente'
+  useEffect(() => {
+    if (cargando || estadoGuardado === 'auditada' || estadoGuardado === 'completada') return
+    if (estadoDeseado === estadoGuardado || estadoDeseado === 'pendiente') return
+    setEstadoGuardado(estadoDeseado)
+    void guardar({ estado: estadoDeseado,
+      ...(estadoDeseado === 'completada' ? { completadaEn: new Date().toISOString() } : {}) })
+  }, [estadoDeseado, estadoGuardado, cargando, guardar])
+
   const encabezado = <div className="sesion-mixta-guia">
     <p className="mini">{sesion.titulo}</p>
-    <p className="sutil">Paso {Math.min(cursor + 1, sesion.guion.length)} de {sesion.guion.length} · {conceptIds.length} conceptos · {preguntas.length} preguntas</p>
-    <progress className="sesion-mixta-progreso" aria-label="Avance de la sesión" value={cursor} max={sesion.guion.length} />
+    <p className="sutil">Paso {Math.min(cursor + 1, sesion.guion.length)} de {sesion.guion.length} · {cobertura.hechos} respondidos · {conceptIds.length} conceptos · {preguntas.length} preguntas</p>
+    <progress className="sesion-mixta-progreso" aria-label="Pasos respondidos de la sesión" value={cobertura.hechos} max={sesion.guion.length} />
   </div>
 
   if (error) return <div className="tarjeta pila" role="alert"><h2>No se pudo abrir la sesión</h2><p>{error}</p>
     <button className="btn principal" onClick={onSalir}>Volver a mis sesiones</button></div>
 
   if (cursor >= sesion.guion.length) return <section className="tarjeta pila" aria-labelledby="sesion-mixta-fin">
-    <div><span className="rotulo">Sesión terminada</span><h2 id="sesion-mixta-fin">{sesion.titulo}</h2></div>
+    <div><span className={`etq ${cobertura.cumple ? 'verde' : 'ambar'}`}>{cobertura.cumple ? 'Sesión completada' : 'Recorrido terminado'}</span>
+      <h2 id="sesion-mixta-fin" style={{ marginTop: 10 }}>{sesion.titulo}</h2></div>
     <p>{conceptIds.length} conceptos y {preguntas.length} preguntas en este recorrido.</p>
+    <p>Respondiste {cobertura.hechos} de {cobertura.pasos} pasos: {cobertura.conceptos.hechos} de {cobertura.conceptos.total} conceptos y {cobertura.preguntas.hechas} de {cobertura.preguntas.total} preguntas.</p>
     <p>{resumen.independientes} de {resumen.vistos} respuestas de concepto resueltas sin ayuda.</p>
     {vista && <p>{vista.firstCorrect} de {sinConflicto} preguntas NBME acertadas en primera vuelta.</p>}
     {vista && vista.pendingErrors > 0 && <p className="sutil">{vista.pendingErrors} preguntas quedan pendientes de corregir; las encontrarás en Recuperación.</p>}
+    {!cobertura.cumple && <p className="sutil">La sesión no queda marcada como completada hasta que respondas al menos {Math.ceil(cobertura.pasos * 0.85)} de sus {cobertura.pasos} pasos. Acertar no hace falta; responder sí.</p>}
     {aviso && <p className="mini">{aviso}</p>}
-    <button className="btn principal" style={{ alignSelf: 'flex-start' }} onClick={onSalir}>Volver a mis sesiones</button>
+    <div className="fila">
+      {!cobertura.cumple && cobertura.primeroPendiente >= 0 && <button className="btn principal"
+        onClick={() => avanzarA(cobertura.primeroPendiente)}>Volver a los pasos que faltan</button>}
+      <button className={`btn${cobertura.cumple ? ' principal' : ''}`} onClick={onSalir}>Volver a mis sesiones</button>
+    </div>
   </section>
 
   if (cargando || !paso) return <div className="vacio" role="status">Preparando tu sesión…</div>

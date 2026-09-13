@@ -47,13 +47,17 @@ vi.mock('../store/estado', async () => {
   }
   return { useApp: () => ({ ...acciones, estado: useSyncExternalStore(suscribir, leer) }) }
 })
-const ESTADO_NBME = {
+const nbmeBase = () => ({
   sessions: { 'nbme-1': { id: 'nbme-1', title: 'Mixta', initial: [{ id: 'NBME27-P0009', revision: 'rev-1' }],
     startedAt: 1, paused: false, controlChangedAt: 1, elapsedMs: 0, budgetMinutes: null, continueUnlimited: false, drafts: {} } },
-  attempts: {}, activeSessionId: 'nbme-1',
-}
+  attempts: {} as Record<string, { id: string; sessionId: string; questionId: string }>,
+  activeSessionId: 'nbme-1',
+})
+// La identidad del estado NBME es estable dentro de una prueba: cambiarla en cada
+// render reabriría la sesión en bucle, igual que en el proveedor real.
+let estadoNbme = nbmeBase()
 vi.mock('../nbme/NbmeProvider', () => ({ useNbme: () => ({
-  state: ESTADO_NBME, catalog: null, loading: false, busy: false,
+  state: estadoNbme, catalog: null, loading: false, busy: false,
   startSession: mock.startSession, resumeSession: mock.resumeSession, nextQuestion: mock.nextQuestion,
   pauseSession: () => {},
 }) }))
@@ -89,6 +93,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mock.estado.valor = { ...ESTADO_INICIAL }
   mock.estado.oyentes.clear()
+  estadoNbme = nbmeBase()
   mock.cargarConceptos.mockResolvedValue(new Map([['C1', concepto('C1')], ['C2', concepto('C2')], ['C3', concepto('C3')]]))
   mock.guardarAvance.mockResolvedValue({ ok: true })
   mock.resumeSession.mockResolvedValue(true)
@@ -104,6 +109,7 @@ afterEach(async () => {
 })
 
 const boton = (texto: string) => [...host.querySelectorAll('button')].find(b => b.textContent?.includes(texto))!
+const avances = () => mock.guardarAvance.mock.calls.map(c => c[1] as Record<string, unknown>)
 
 describe('orquestador de la sesión mixta', () => {
   it('recorre el guion montando un reproductor u otro y cierra la sesión al final', async () => {
@@ -123,19 +129,37 @@ describe('orquestador de la sesión mixta', () => {
     expect(host.textContent).toContain('Reproductor de preguntas')
     expect(host.textContent).not.toContain('Reproductor de conceptos')
     expect(mock.jugadorPreguntas.mock.calls.at(-1)?.[0]).toEqual({ modoPaso: true })
-    expect(mock.guardarAvance).toHaveBeenCalledWith('semana-1', { cursor: 3, estado: 'en_curso' })
+    // El cursor y el estado se guardan por separado: moverse no es haber estudiado.
+    expect(mock.guardarAvance).toHaveBeenCalledWith('semana-1', { cursor: 3 })
+    expect(mock.guardarAvance).toHaveBeenCalledWith('semana-1', { estado: 'en_curso' })
 
-    // Último paso consumido: la sesión queda completada y con fecha de cierre.
+    // Llegar al final sin responder nada no completa la sesión.
     await act(async () => { boton('Revisar y continuar').click() })
     expect(mock.nextQuestion).toHaveBeenCalledOnce()
-    const ultimo = mock.guardarAvance.mock.calls.at(-1)!
-    expect(ultimo[0]).toBe('semana-1')
-    expect(ultimo[1]).toMatchObject({ cursor: 4, estado: 'completada' })
-    expect(typeof ultimo[1].completadaEn).toBe('string')
-    expect(host.textContent).toContain('Sesión terminada')
+    expect(mock.guardarAvance).toHaveBeenCalledWith('semana-1', { cursor: 4 })
+    expect(avances().some(a => a.estado === 'completada')).toBe(false)
+    expect(host.textContent).toContain('Recorrido terminado')
+    expect(host.textContent).toContain('Respondiste 0 de 4 pasos')
 
     await act(async () => { boton('Volver a mis sesiones').click() })
     expect(salir).toHaveBeenCalledOnce()
+  })
+
+  it('se marca completada sola cuando la evidencia cubre el guion, sin llegar al final', async () => {
+    mock.estado.valor = { ...ESTADO_INICIAL, progreso: Object.fromEntries(['C1', 'C2', 'C3'].map(id => [id, {
+      concept_id: id, estado: 'en_aprendizaje', dificultad: 5, estabilidad: 0, ultimo: 1, proxima: null,
+      aciertos: 0, fallos: 0, dominado_en: null,
+      intentos: [{ resultado: 'incorrecta', ts: 1, ms: 1, tipo_error: 'desconocimiento', session_id: 'semana-1' }],
+    }])) }
+    estadoNbme = { ...nbmeBase(), attempts: { a1: { id: 'a1', sessionId: 'nbme-1', questionId: 'NBME27-P0009' } } }
+
+    // Cursor en 1: el recorrido va por el segundo paso, pero los cuatro están respondidos.
+    await act(async () => { root.render(<SesionMixta sesion={{ ...sesion, cursor: 1 }} onSalir={vi.fn()} />) })
+    const completada = avances().find(a => a.estado === 'completada')
+    expect(completada).toBeTruthy()
+    expect(typeof completada!.completadaEn).toBe('string')
+    // Fallar no lo impide: completar la sesión es haber hecho el trabajo, no acertarlo.
+    expect(host.textContent).toContain('Reproductor de conceptos')
   })
 
   it('retoma desde el cursor guardado sin repetir lo ya recorrido', async () => {

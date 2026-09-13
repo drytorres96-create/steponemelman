@@ -63,6 +63,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [tipoContenido, setTipoContenido] = useState<'conceptos' | 'preguntas'>('conceptos')
   const [tipoProgreso, setTipoProgreso] = useState<'conceptos' | 'preguntas'>('conceptos')
+  const [ventanaProgreso, setVentanaProgreso] = useState<'semana' | 'general'>('general')
   const [sesionSemanal, setSesionSemanal] = useState<{ sesion: SesionSemanal; efimera: boolean } | null>(null)
   const [filtrosConceptos, setFiltrosConceptos] = useState<Partial<FiltrosBusqueda> | undefined>()
   const contenido = useRef<HTMLElement>(null)
@@ -264,10 +265,18 @@ export default function App() {
           </div>{tipoContenido === 'preguntas' ? <NbmeLibrary onStart={() => ir('preguntas')} />
             : <Modulos onEstudiar={estudiarIds} seleccion={seleccionManual} onSeleccion={setSeleccionManual} filtrosIniciales={filtrosConceptos} />}</div>}
           {!cargando && vista === 'repaso' && <Repaso onEstudiar={estudiarIds} />}
-          {!cargando && vista === 'progreso' && <div className="pila"><div className="fila" role="group" aria-label="Tipo de progreso">
-            <button className={`btn${tipoProgreso === 'conceptos' ? ' principal' : ' fantasma'}`} aria-pressed={tipoProgreso === 'conceptos'} onClick={() => setTipoProgreso('conceptos')}>Conceptos</button>
-            <button className={`btn${tipoProgreso === 'preguntas' ? ' principal' : ' fantasma'}`} aria-pressed={tipoProgreso === 'preguntas'} onClick={() => setTipoProgreso('preguntas')}>Preguntas</button>
-          </div>{tipoProgreso === 'preguntas' ? <NbmeProgress onContinuar={() => { setTipoContenido('preguntas'); ir('modulos') }} /> : <Progreso onEstudiar={estudiarIds} onContinuar={continuar} />}</div>}
+          {!cargando && vista === 'progreso' && <div className="pila"><div className="progreso-controles">
+            <div className="fila" role="group" aria-label="Tipo de progreso">
+              <button className={`btn${tipoProgreso === 'conceptos' ? ' principal' : ' fantasma'}`} aria-pressed={tipoProgreso === 'conceptos'} onClick={() => setTipoProgreso('conceptos')}>Conceptos</button>
+              <button className={`btn${tipoProgreso === 'preguntas' ? ' principal' : ' fantasma'}`} aria-pressed={tipoProgreso === 'preguntas'} onClick={() => setTipoProgreso('preguntas')}>Preguntas</button>
+            </div>
+            <div className="fila" role="group" aria-label="Ventana del progreso">
+              <button className={`btn${ventanaProgreso === 'semana' ? ' principal' : ' fantasma'}`} aria-pressed={ventanaProgreso === 'semana'} onClick={() => setVentanaProgreso('semana')}>Esta semana</button>
+              <button className={`btn${ventanaProgreso === 'general' ? ' principal' : ' fantasma'}`} aria-pressed={ventanaProgreso === 'general'} onClick={() => setVentanaProgreso('general')}>General</button>
+            </div>
+          </div>{tipoProgreso === 'preguntas'
+            ? <NbmeProgress ventana={ventanaProgreso} onContinuar={() => { setTipoContenido('preguntas'); ir('modulos') }} />
+            : <Progreso ventana={ventanaProgreso} onEstudiar={estudiarIds} onContinuar={continuar} />}</div>}
           {!cargando && vista === 'auditoria' && <Auditoria />}
           {!cargando && vista === 'ajustes' && <Ajustes />}
         </div>

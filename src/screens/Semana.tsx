@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Vacio } from '../components/comunes'
+import { useApp } from '../store/estado'
+import { useNbme } from '../nbme/NbmeProvider'
 import { cargarSesionesSemana } from '../semana/api'
+import { coberturaSesion, type CoberturaSesion } from '../semana/cobertura'
 import { separarGuion } from '../semana/guion'
 import type { SesionSemanal } from '../semana/tipos'
 
@@ -31,18 +34,28 @@ function composicion(sesion: SesionSemanal): string {
   return partes.join(' · ')
 }
 
-function Tarjeta({ sesion, onAbrir }: { sesion: SesionSemanal; onAbrir: (s: SesionSemanal) => void }) {
+function Tarjeta({ sesion, cobertura, onAbrir }:
+  { sesion: SesionSemanal; cobertura: CoberturaSesion; onAbrir: (s: SesionSemanal) => void }) {
   const fecha = fechaLocal(sesion.semanaInicio, sesion.dia - 1)
-  const hecha = sesion.estado === 'completada'
+  const hecha = sesion.estado === 'completada' || cobertura.cumple
+  const empezada = cobertura.hechos > 0 || sesion.cursor > 0
   return <article className={`tarjeta semana-tarjeta${hecha ? ' completada' : ''}`}>
     <p className="semana-dia">{DIAS[sesion.dia - 1]} {diaYMes(fecha)}</p>
     <h3>{sesion.titulo}</h3>
     {sesion.subtitulo && <p className="sutil">{sesion.subtitulo}</p>}
     <p className="mini">{composicion(sesion)}</p>
-    {hecha
-      ? <p className="etq verde" role="status">Hecha · {sesion.guion.length} pasos</p>
+    <p className="mini">{cobertura.hechos} de {cobertura.pasos} pasos respondidos</p>
+    <progress className="semana-progreso" aria-label={`Pasos respondidos de ${sesion.titulo}`}
+      value={cobertura.hechos} max={cobertura.pasos || 1} />
+    {hecha ? <div className="fila">
+      <p className="etq verde" role="status">Completada</p>
+      {/* El umbral deja pasos sin responder: siguen a un clic, no se pierden al marcarse hecha. */}
+      {cobertura.hechos < cobertura.pasos && <button className="btn pequeno fantasma" onClick={() => onAbrir(sesion)}>
+        Retomar los {cobertura.pasos - cobertura.hechos} que faltan
+      </button>}
+    </div>
       : <button className="btn principal" onClick={() => onAbrir(sesion)}>
-        {sesion.cursor > 0 ? `Continuar (paso ${sesion.cursor + 1} de ${sesion.guion.length})` : 'Empezar'}
+        {empezada ? `Continuar (paso ${Math.min(sesion.cursor + 1, sesion.guion.length)} de ${sesion.guion.length})` : 'Empezar'}
       </button>}
   </article>
 }
@@ -52,9 +65,37 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
   onRecuperacion: () => void
   onBiblioteca: (tipo: 'conceptos' | 'preguntas') => void
 }) {
+  const { estado } = useApp()
+  const nbme = useNbme()
   const [sesiones, setSesiones] = useState<SesionSemanal[] | null>(null)
   const [error, setError] = useState(false)
   const [reintento, setReintento] = useState(0)
+
+  // Evidencia registrada, agrupada por sesión: es lo que decide si una sesión está hecha.
+  const conceptosPorSesion = useMemo(() => {
+    const mapa = new Map<string, Set<string>>()
+    for (const progreso of Object.values(estado.progreso)) {
+      for (const intento of progreso.intentos) {
+        if (!intento.session_id) continue
+        const set = mapa.get(intento.session_id) ?? new Set<string>()
+        set.add(progreso.concept_id)
+        mapa.set(intento.session_id, set)
+      }
+    }
+    return mapa
+  }, [estado.progreso])
+  const preguntasPorSesion = useMemo(() => {
+    const mapa = new Map<string, Set<string>>()
+    for (const intento of Object.values(nbme.state.attempts)) {
+      const set = mapa.get(intento.sessionId) ?? new Set<string>()
+      set.add(intento.questionId)
+      mapa.set(intento.sessionId, set)
+    }
+    return mapa
+  }, [nbme.state.attempts])
+  const coberturaDe = useCallback((s: SesionSemanal) => coberturaSesion(s.guion,
+    conceptosPorSesion.get(s.id) ?? [], preguntasPorSesion.get(s.nbmeSessionId ?? '') ?? []),
+    [conceptosPorSesion, preguntasPorSesion])
 
   useEffect(() => {
     let vivo = true
@@ -70,7 +111,8 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
   if (!sesiones) return <div className="vacio" role="status">Cargando tus sesiones…</div>
 
   const semanas = [...new Map(sesiones.map(s => [s.semana, s])).values()]
-  const pendientes = sesiones.filter(s => s.estado !== 'completada')
+  const hecha = (s: SesionSemanal) => s.estado === 'completada' || coberturaDe(s).cumple
+  const pendientes = sesiones.filter(s => !hecha(s))
   const enCurso = semanas.find(s => pendientes.some(p => p.semana === s.semana)) ?? semanas[0]
 
   const masCosas = <details className="tarjeta semana-extra">
@@ -95,7 +137,7 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
       <p className="editorial-eyebrow">Mi semana</p>
       <h1>{enCurso.semana} · {rotuloSemana(enCurso.semanaInicio)}</h1>
       <p className="sutil">{pendientes.length
-        ? `${pendientes.length} ${pendientes.length === 1 ? 'sesión pendiente' : 'sesiones pendientes'}. Puedes pausar y retomar cuando lo necesites.`
+        ? `${pendientes.length} ${pendientes.length === 1 ? 'sesión pendiente' : 'sesiones pendientes'}. Una sesión se marca completada sola cuando respondes el 85 % de sus pasos.`
         : 'Todas las sesiones planificadas están hechas.'}</p>
     </header>
 
@@ -105,7 +147,8 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
     {semanas.map(bloque => <section key={bloque.semana} className="pila" aria-labelledby={`semana-${bloque.semana}`}>
       <h2 id={`semana-${bloque.semana}`} className="rotulo">{bloque.semana} · {rotuloSemana(bloque.semanaInicio)}</h2>
       <div className="semana-grid">
-        {sesiones.filter(s => s.semana === bloque.semana).map(s => <Tarjeta key={s.id} sesion={s} onAbrir={abrir} />)}
+        {sesiones.filter(s => s.semana === bloque.semana).map(s =>
+          <Tarjeta key={s.id} sesion={s} cobertura={coberturaDe(s)} onAbrir={abrir} />)}
       </div>
     </section>)}
 
