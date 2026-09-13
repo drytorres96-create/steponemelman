@@ -1,12 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
-import { summarizeNbmeState } from '../nbme/model'
+import { progresoPorForma } from '../nbme/formas'
 import { cargarHistorialSesiones } from '../semana/api'
 import type { SesionSemanal } from '../semana/tipos'
+import type { Concepto } from '../schema/concept'
+import { dominioVigente } from '../srs/mastery'
+import { lunesDe } from '../lib/tiempo'
 
 /** El examen es el lunes 21 de diciembre de 2026: todo el ritmo se mide contra esa fecha. */
 export const FECHA_EXAMEN = new Date(2026, 11, 21)
 const SEMANA_MS = 7 * 24 * 3_600_000
+
+export type Ventana = 'semana' | 'general'
 
 const hecha = (s: SesionSemanal) => s.estado === 'completada' || s.estado === 'auditada'
 
@@ -40,12 +46,21 @@ export function calcularRitmo(sesiones: SesionSemanal[], ahora = Date.now()): Ri
 
 const decimal = (n: number) => n.toLocaleString('es', { maximumFractionDigits: 1 })
 
+function Dato({ cifra, de, rotulo, nota }: { cifra: number | string; de?: number | string; rotulo: string; nota: string }) {
+  return <div className="banda-dato">
+    <div className="cifra">{cifra}{de !== undefined && <span className="banda-de"> / {de}</span>}</div>
+    <div className="rotulo">{rotulo}</div>
+    <p className="mini">{nota}</p>
+  </div>
+}
+
 /**
- * Banda de cifras: dónde está el corpus, cómo van las preguntas y si el ritmo de
- * las últimas cuatro semanas alcanza para llegar al examen. Números y una línea
- * que los explique, sin florituras.
+ * Banda de cifras con dos ventanas. **General** mide todo el historial contra el
+ * corpus completo; **Esta semana** mide sólo lo hecho desde el lunes, que es la
+ * unidad con la que se planifica el estudio. Números y una línea que los explique.
  */
-export function BandaDeCifras({ dominados, tocados, total }: { dominados: number; tocados: number; total: number }) {
+export function BandaDeCifras({ conceptos, ventana }: { conceptos: Concepto[]; ventana: Ventana }) {
+  const { estado } = useApp()
   const nbme = useNbme()
   const [sesiones, setSesiones] = useState<SesionSemanal[] | null>(null)
   const [fallo, setFallo] = useState(false)
@@ -56,35 +71,54 @@ export function BandaDeCifras({ dominados, tocados, total }: { dominados: number
     return () => { vivo = false }
   }, [])
 
-  const preguntas = summarizeNbmeState(nbme.state)
+  const desde = ventana === 'semana' ? lunesDe().getTime() : 0
+  const formas = useMemo(() => progresoPorForma(nbme.state, nbme.catalog, desde), [nbme.state, nbme.catalog, desde])
+  const preguntas = formas.reduce((suma, f) => ({
+    total: suma.total + f.total, vistas: suma.vistas + f.vistas,
+    nuevas: suma.nuevas + f.nuevas, primeraVez: suma.primeraVez + f.primeraVez,
+    reincidentes: suma.reincidentes + f.reincidentes,
+  }), { total: 0, vistas: 0, nuevas: 0, primeraVez: 0, reincidentes: 0 })
+
+  const total = conceptos.length
+  const publicados = new Set(conceptos.map(c => c.concept_id))
+  const progresos = Object.values(estado.progreso).filter(p => publicados.has(p.concept_id))
+  const dominados = progresos.filter(p => dominioVigente(p, estado.criterios)).length
+  const tocados = progresos.filter(p => p.intentos.length).length
+  const trabajadosSemana = progresos.filter(p => p.intentos.some(t => t.ts >= desde)).length
+  const dominadosSemana = progresos.filter(p => dominioVigente(p, estado.criterios) && (p.dominado_en ?? 0) >= desde).length
+
+  const delaSemana = (sesiones ?? []).filter(s => fechaDeSesion(s).getTime() >= desde)
   const ritmo = sesiones ? calcularRitmo(sesiones) : null
   const alDia = ritmo ? ritmo.porSemana >= ritmo.necesarioPorSemana : false
+  const notaSesiones = fallo ? 'No se pudo leer el plan de sesiones ahora mismo.'
+    : !sesiones ? 'Leyendo el plan de sesiones…' : null
 
-  return <section className="banda-cifras" aria-label="Resumen del avance">
-    <div className="banda-dato">
-      <div className="cifra">{dominados}<span className="banda-de"> / {total}</span></div>
-      <div className="rotulo">conceptos con dominio vigente</div>
-      <p className="mini">{tocados} trabajados alguna vez de {total} publicados.</p>
-    </div>
-    <div className="banda-dato">
-      <div className="cifra">{preguntas.firstCorrect}<span className="banda-de"> / {preguntas.firstEvaluated}</span></div>
-      <div className="rotulo">preguntas NBME acertadas de primera</div>
-      <p className="mini">{preguntas.firstEvaluated
-        ? `${Math.round(preguntas.firstCorrect / preguntas.firstEvaluated * 100)} % del primer intento, sin contar reintentos ni ayudas.`
-        : 'Todavía no hay primeras respuestas evaluadas.'}</p>
-    </div>
-    <div className="banda-dato">
-      <div className="cifra">{ritmo ? ritmo.completadas : '—'}<span className="banda-de"> / {ritmo ? ritmo.planificadas : '—'}</span></div>
-      <div className="rotulo">sesiones de la semana completadas</div>
-      <p className="mini">{fallo ? 'No se pudo leer el plan de sesiones ahora mismo.'
-        : !ritmo ? 'Leyendo el plan de sesiones…'
-        : `${ritmo.planificadas - ritmo.completadas} pendientes en el plan.`}</p>
-    </div>
-    <div className="banda-dato">
-      <div className="cifra">{ritmo ? decimal(ritmo.porSemana) : '—'}<span className="banda-de"> / {ritmo ? decimal(ritmo.necesarioPorSemana) : '—'}</span></div>
-      <div className="rotulo">sesiones por semana: tuyo frente al necesario</div>
-      <p className="mini">{!ritmo ? 'Leyendo el plan de sesiones…'
-        : `Ritmo de las últimas cuatro semanas frente al que pide lo que queda hasta el 21-dic-2026 (${ritmo.semanasRestantes} semanas). ${alDia ? 'Vas al día.' : 'Hoy vas por debajo.'}`}</p>
-    </div>
+  if (ventana === 'semana') return <section className="banda-cifras" aria-label="Resumen de esta semana">
+    <Dato cifra={dominadosSemana} rotulo="conceptos que cruzaron a dominio esta semana"
+      nota={`${dominados} con dominio vigente en total, de ${total} publicados.`} />
+    <Dato cifra={trabajadosSemana} rotulo="conceptos respondidos esta semana"
+      nota={`${tocados} trabajados alguna vez de ${total} publicados.`} />
+    <Dato cifra={preguntas.vistas} rotulo="preguntas NBME respondidas esta semana"
+      nota={preguntas.vistas
+        ? `${preguntas.nuevas} nuevas · ${preguntas.primeraVez} acertadas a la primera · ${preguntas.reincidentes} reincidentes.`
+        : 'Aún no has respondido preguntas esta semana.'} />
+    <Dato cifra={delaSemana.filter(hecha).length} de={delaSemana.length} rotulo="sesiones de esta semana completadas"
+      nota={notaSesiones ?? (delaSemana.length
+        ? `${delaSemana.length - delaSemana.filter(hecha).length} pendientes en el plan de esta semana.`
+        : 'No hay sesiones planificadas para esta semana.')} />
+  </section>
+
+  return <section className="banda-cifras" aria-label="Resumen general del avance">
+    <Dato cifra={dominados} de={total} rotulo="conceptos con dominio vigente"
+      nota={`${tocados} trabajados alguna vez de ${total} publicados.`} />
+    <Dato cifra={preguntas.primeraVez} de={preguntas.vistas} rotulo="preguntas NBME acertadas a la primera"
+      nota={preguntas.vistas
+        ? `${preguntas.vistas} respondidas de ${preguntas.total} publicadas · ${preguntas.reincidentes} reincidentes.`
+        : 'Todavía no hay preguntas respondidas.'} />
+    <Dato cifra={ritmo ? ritmo.completadas : '—'} de={ritmo ? ritmo.planificadas : '—'} rotulo="sesiones de la semana completadas"
+      nota={notaSesiones ?? `${ritmo!.planificadas - ritmo!.completadas} pendientes en el plan.`} />
+    <Dato cifra={ritmo ? decimal(ritmo.porSemana) : '—'} de={ritmo ? decimal(ritmo.necesarioPorSemana) : '—'}
+      rotulo="sesiones por semana: tuyo frente al necesario"
+      nota={notaSesiones ?? `Ritmo de las últimas cuatro semanas frente al que pide lo que queda hasta el 21-dic-2026 (${ritmo!.semanasRestantes} semanas). ${alDia ? 'Vas al día.' : 'Hoy vas por debajo.'}`} />
   </section>
 }

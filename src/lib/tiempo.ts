@@ -21,3 +21,15 @@ export function contextoReanudacion(estado: EstadoApp): string {
   }
   return `${ids.size} conceptos trabajados · ${pendientes.size} pendientes${errores ? `, incluidos ${errores} errores por corregir` : ''}${r.msVisibles ? ` · ${tiempoLegible(r.msVisibles)} de estudio` : ''}`
 }
+
+/** Lunes 00:00 local de la semana que contiene `fecha`. La semana de estudio empieza el lunes. */
+export function lunesDe(fecha: Date | number = Date.now()): Date {
+  const f = new Date(fecha)
+  const d = new Date(f.getFullYear(), f.getMonth(), f.getDate())
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d
+}
+/** `2026-09-14` en hora local, sin el desplazamiento que introduce `toISOString`. */
+export function fechaISO(f: Date): string {
+  return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`
+}
