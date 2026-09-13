@@ -66,7 +66,14 @@ function useQuestionFigures(question: NbmeQuestion | null) {
   return { figures, loading, error, retry: () => setRetry(value => value + 1) }
 }
 
-export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => void; onEstudiar: (ids: string[]) => void; onBuscar?: (question: NbmeQuestion) => void }) {
+/**
+ * `modoPaso` presenta UNA pregunta y devuelve el control: el orquestador de la
+ * sesión mixta decide qué viene después y es quien llama a `nbme.nextQuestion()`
+ * antes de volver a montar el reproductor. Sin esa prop nada cambia.
+ */
+export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, onPasoCompleto, etiquetaSalida }:
+  { onSalir: () => void; onEstudiar?: (ids: string[]) => void; onBuscar?: (question: NbmeQuestion) => void
+    modoPaso?: boolean; onPasoCompleto?: () => void; etiquetaSalida?: string }) {
   const {
     catalog, currentSession, sessionView, currentQuestion, selectedOption, currentFeedback, questionLoading,
     loading, busy, error, storageWarning, syncStatus, selectAnswer, checkAnswer, nextQuestion, pauseSession,
@@ -111,7 +118,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
 
   if (loading) return <div className="nbme-player tarjeta" role="status">Preparando tu sesión…</div>
   if (!currentSession || !sessionView) return <div className="nbme-player tarjeta nbme-empty"><h1>Elige una sesión de preguntas</h1>
-    <p className="sutil">Puedes iniciar una nueva o retomar una guardada.</p><button className="btn principal" onClick={onSalir}>Elegir preguntas</button></div>
+    <p className="sutil">Puedes iniciar una nueva o retomar una guardada.</p><button className="btn principal" onClick={onSalir}>{etiquetaSalida ?? 'Elegir preguntas'}</button></div>
 
   const scoredFirst = sessionView.firstAnswered - sessionView.firstConflicts
   if (sessionView.phase === 'complete') return <section className="nbme-player tarjeta pila" aria-labelledby="nbme-complete-title">
@@ -124,7 +131,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
     {storageWarning && <div className="nbme-error" role="alert"><p>{storageWarning}</p><button className="btn" onClick={() => void syncNow()}>Sincronizar ahora</button></div>}
     <p className="nbme-status" role="status">{syncText}</p>
     {(syncStatus.state === 'error' || syncStatus.state === 'offline') && <button className="btn" disabled={busy} onClick={() => void syncNow()}>Reintentar sincronización</button>}
-    <div className="nbme-actions"><button className="btn principal" onClick={onSalir}>Volver a elegir contenido</button></div>
+    <div className="nbme-actions"><button className="btn principal" onClick={onSalir}>{etiquetaSalida ?? 'Volver a elegir contenido'}</button></div>
   </section>
 
   const source = currentQuestion ? `NBME ${currentQuestion.form} · sección ${currentQuestion.section} · pregunta ${currentQuestion.item} · página ${currentQuestion.page}` : 'Pregunta de aplicación'
@@ -138,7 +145,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
   return <div className="nbme-player pila">
     <header className="nbme-player-header">
       <div><p className="mini">{currentSession.title}</p><p className="sutil">Primera vuelta: {sessionView.firstAnswered}/{sessionView.initialCount} · Correcciones pendientes: {sessionView.pendingErrors}</p></div>
-      <button className="btn fantasma" onClick={pause}>Pausar y guardar</button>
+      <button className="btn fantasma" onClick={pause}>{etiquetaSalida ?? 'Pausar y guardar'}</button>
     </header>
     <progress className="nbme-session-progress" aria-label="Preguntas respondidas en primera vuelta" value={sessionView.firstAnswered} max={sessionView.initialCount || 1} />
     {budgetReached && !feedback && <section className="tarjeta pila" aria-label="Aviso de pausa"><div><h2>Un momento para decidir</h2>
@@ -150,7 +157,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
     {questionLoading ? <div className="tarjeta" role="status">Cargando pregunta…</div>
       : !currentQuestion ? <div className="tarjeta pila"><p>No se pudo cargar esta pregunta. Tu posición está guardada.</p>
         <div className="nbme-actions"><button className="btn principal" disabled={busy} onClick={() => void retryQuestionLoad()}>Reintentar</button><button className="btn" onClick={pause}>Pausar sesión</button></div></div>
-        : !currentReady ? <div className="tarjeta pila"><h2>Pregunta pendiente de revisión</h2><p className="sutil">Esta versión no puede calificarse. Tu sesión permanece guardada.</p><button className="btn" onClick={pause}>Volver a elegir contenido</button></div>
+        : !currentReady ? <div className="tarjeta pila"><h2>Pregunta pendiente de revisión</h2><p className="sutil">Esta versión no puede calificarse. Tu sesión permanece guardada.</p><button className="btn" onClick={pause}>{etiquetaSalida ?? 'Volver a elegir contenido'}</button></div>
           : <>
             <section className="tarjeta nbme-question" aria-labelledby="nbme-question-title">
               <h1 id="nbme-question-title" className="nbme-question-heading" tabIndex={-1} ref={titleRef}>
@@ -199,8 +206,9 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar }: { onSalir: () => v
               </details>}
               <p className="mini">Fuente: {source}. Explicación procedente del material importado.</p>
               {suggestedLinks && <p className="mini">Relación sugerida; confirma que corresponde al fundamento.</p>}
-              <div className="nbme-actions"><button className="btn principal" disabled={busy} onClick={nextQuestion}>Continuar</button>
-                {conceptIds.length > 0 && <button className="btn fantasma" onClick={() => { pauseSession(); onEstudiar(conceptIds) }}>{suggestedLinks ? 'Explorar conceptos relacionados' : 'Repasar fundamento'}</button>}
+              <div className="nbme-actions"><button className="btn principal" disabled={busy}
+                onClick={modoPaso && onPasoCompleto ? onPasoCompleto : nextQuestion}>Continuar</button>
+                {conceptIds.length > 0 && onEstudiar && <button className="btn fantasma" onClick={() => { pauseSession(); onEstudiar(conceptIds) }}>{suggestedLinks ? 'Explorar conceptos relacionados' : 'Repasar fundamento'}</button>}
                 {conceptIds.length === 0 && onBuscar && <button className="btn fantasma" onClick={() => { pauseSession(); onBuscar(currentQuestion) }}>Explorar fundamentos</button>}
               </div>
             </section>}

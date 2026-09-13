@@ -10,6 +10,7 @@ import { referenciaPagina } from '../lib/fuente'
 import { MapaProgreso } from '../components/MapaProgreso'
 import type { OpcionesSesionPersonalizada } from '../lib/busqueda'
 import { ScreenHeading } from '../components/Editorial'
+import { BandaDeCifras } from './ProgresoCifras'
 
 export function Progreso({ onEstudiar, onContinuar }: { onContinuar?: () => void; onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void }) {
   const { indice, estado } = useApp()
@@ -37,6 +38,7 @@ export function Progreso({ onEstudiar, onContinuar }: { onContinuar?: () => void
 
   return <div className="pila">
     <ScreenHeading eyebrow="Tu recorrido de aprendizaje" title="Progreso" description="Evidencia de tu práctica dentro del material publicado. No estima tu probabilidad de aprobar Step 1." />
+    <BandaDeCifras dominados={dominados} tocados={progresos.filter(p => p.intentos.length).length} total={total} />
     <div className="rejilla r3">{[
       { n: progresos.filter(p => p.intentos.length).length, r: 'conceptos trabajados' },
       { n: progresos.filter(p => estaVencido(p)).length, r: 'para repasar' },

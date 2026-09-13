@@ -5,6 +5,12 @@ import type { Concepto } from './schema/concept'
 import { Inicio } from './screens/Inicio'
 import { Modulos } from './screens/Modulos'
 import { Repaso } from './screens/Repaso'
+import { Recuperacion } from './screens/Recuperacion'
+import { Semana } from './screens/Semana'
+import { SesionMixta } from './semana/SesionMixta'
+import { construirGuion } from './semana/guion'
+import type { SesionSemanal } from './semana/tipos'
+import { crearUUID } from './store/model'
 import { Progreso } from './screens/Progreso'
 import { Auditoria } from './screens/Auditoria'
 import { Ajustes } from './screens/Ajustes'
@@ -22,20 +28,27 @@ import { NbmePlayer } from './nbme/NbmePlayer'
 import { NbmeProgress } from './nbme/NbmeProgress'
 import { deriveNbmeSession } from './nbme/model'
 import type { FiltrosBusqueda } from './lib/busqueda'
+import type { NbmeQuestionRef } from './nbme/types'
 import { Brand, NavigationIcon, StudyHero } from './components/Editorial'
 
-type Vista = 'inicio' | 'modulos' | 'repaso' | 'progreso' | 'auditoria' | 'ajustes' | 'estudio' | 'preguntas'
+type Vista = 'semana' | 'recuperacion' | 'progreso' | 'inicio' | 'modulos' | 'repaso' | 'auditoria' | 'ajustes'
+  | 'estudio' | 'preguntas' | 'sesion'
 const NAV: { id: Vista; txt: string }[] = [
-  { id: 'inicio', txt: 'Hoy' }, { id: 'modulos', txt: 'Elegir contenido' }, { id: 'progreso', txt: 'Progreso' },
+  { id: 'semana', txt: 'Mi semana' }, { id: 'recuperacion', txt: 'Recuperación' }, { id: 'progreso', txt: 'Progreso' },
 ]
 const SECUNDARIAS: { id: Vista; txt: string }[] = [
-  { id: 'repaso', txt: 'Repasos pendientes' }, { id: 'ajustes', txt: 'Ajustes y respaldo' }, { id: 'auditoria', txt: 'Calidad del material' },
+  { id: 'modulos', txt: 'Elegir contenido' }, { id: 'ajustes', txt: 'Ajustes y respaldo' },
+  { id: 'auditoria', txt: 'Calidad del material' }, { id: 'inicio', txt: 'Plan diario clásico' },
 ]
+/** Las vistas de concentración no llevan navegación ni migas. */
+const CONCENTRACION: Vista[] = ['estudio', 'preguntas', 'sesion']
 
 // A session queue is restored from the saved study state, never from the URL alone.
 function vistaDesdeHash(): Vista {
   const value = location.hash.slice(1)
-  return [...NAV, ...SECUNDARIAS].some(n => n.id === value) ? value as Vista : 'inicio'
+  // `repaso` ya no está en la navegación, pero los enlaces guardados siguen llegando a su relevo.
+  if (value === 'repaso') return 'recuperacion'
+  return [...NAV, ...SECUNDARIAS].some(n => n.id === value) ? value as Vista : 'semana'
 }
 
 export default function App() {
@@ -50,15 +63,16 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [tipoContenido, setTipoContenido] = useState<'conceptos' | 'preguntas'>('conceptos')
   const [tipoProgreso, setTipoProgreso] = useState<'conceptos' | 'preguntas'>('conceptos')
+  const [sesionSemanal, setSesionSemanal] = useState<{ sesion: SesionSemanal; efimera: boolean } | null>(null)
   const [filtrosConceptos, setFiltrosConceptos] = useState<Partial<FiltrosBusqueda> | undefined>()
   const contenido = useRef<HTMLElement>(null)
   const vistaAnterior = useRef(vista)
-  const estudiando = vista === 'estudio' || vista === 'preguntas'
+  const estudiando = CONCENTRACION.includes(vista)
   // Estudiando se estudia: la barra no muestra navegación, menú ni estado de sincronización.
   const enConcentracion = estudiando
   // El sincronismo corre solo. Solo se enseña cuando hay algo que el estudio no puede resolver:
   // un fallo, o cambios sin subir por falta de conexión. Callarlos arriesgaría perder progreso.
-  const sincronizacionVisible = vista === 'preguntas'
+  const sincronizacionVisible = vista === 'preguntas' || vista === 'sesion'
     ? (nbme.syncStatus.state === 'error' || nbme.syncStatus.state === 'offline' ? nbme.syncStatus.message : null)
     : (sincronizacion.estado === 'error' ? sincronizacion.mensaje : null)
   const sesionPreguntasPendiente = Object.values(nbme.state.sessions)
@@ -70,21 +84,49 @@ export default function App() {
   }
 
   useEffect(() => {
-    const h = () => { if (!['estudio', 'preguntas'].includes(location.hash.slice(1))) setVista(vistaDesdeHash()) }
+    const h = () => { if (!CONCENTRACION.includes(location.hash.slice(1) as Vista)) setVista(vistaDesdeHash()) }
     window.addEventListener('hashchange', h); return () => window.removeEventListener('hashchange', h)
   }, [])
   useEffect(() => { contenido.current?.focus({ preventScroll: true }) }, [vista])
   useEffect(() => {
-    if (vistaAnterior.current === 'preguntas' && vista !== 'preguntas') nbme.pauseSession()
+    if ((vistaAnterior.current === 'preguntas' || vistaAnterior.current === 'sesion') && vista !== vistaAnterior.current) nbme.pauseSession()
     vistaAnterior.current = vista
   }, [vista, nbme.pauseSession])
   const ir = useCallback((v: string) => {
-    if (vista === 'preguntas' && v !== 'preguntas') nbme.pauseSession()
-    setCola(null); setVista(v as Vista); location.hash = v
+    if ((vista === 'preguntas' || vista === 'sesion') && v !== vista) nbme.pauseSession()
+    setCola(null); setSesionSemanal(null); setVista(v as Vista); location.hash = v
   }, [vista, nbme.pauseSession])
   const continuarPreguntas = async () => {
     if (sesionPreguntasPendiente && await nbme.resumeSession(sesionPreguntasPendiente.id)) ir('preguntas')
   }
+
+  /** Abre una sesión de la semana tal como viene planificada, sin recalcular su guion. */
+  const abrirSesionSemanal = useCallback((sesion: SesionSemanal) => {
+    setCola(null); setError(null)
+    setSesionSemanal({ sesion, efimera: false })
+    setVista('sesion'); location.hash = 'sesion'
+  }, [])
+
+  /** Recuperación en bloque de preguntas: una sesión NBME nueva con lo que quedó sin corregir. */
+  const abrirPreguntas = useCallback(async (refs: NbmeQuestionRef[], titulo: string) => {
+    if (!refs.length) return
+    if (await nbme.startSession(refs, { title: titulo, budgetMinutes: null })) ir('preguntas')
+  }, [nbme.startSession, ir])
+
+  /** Recuperación mixta al vuelo: el guion se construye aquí y no se guarda como sesión de la semana. */
+  const abrirMezcla = useCallback((conceptIds: string[], refs: NbmeQuestionRef[], titulo: string) => {
+    const guion = construirGuion(conceptIds, refs)
+    if (!guion.length) return
+    const hoy = new Date()
+    const iso = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+    setCola(null); setError(null)
+    setSesionSemanal({ efimera: true, sesion: {
+      id: crearUUID(), semana: 'Recuperación', semanaInicio: iso, dia: 1, orden: 1, titulo,
+      subtitulo: 'Sesión de recuperación armada con lo que tenías pendiente.',
+      guion, presupuestoMin: 30, estado: 'en_curso', cursor: 0, nbmeSessionId: null, completadaEn: null,
+    } })
+    setVista('sesion'); location.hash = 'sesion'
+  }, [])
 
   const abrir = useCallback(async (moduloId: string, ruta: RutaId, limite: number, sesionId?: string, desde = 0, presupuestoMinutos?: 10 | 20 | 30) => {
     if (!indice) return
@@ -194,21 +236,28 @@ export default function App() {
                 <h1 style={{ fontSize: '1.25rem' }}>{cola.titulo}</h1>
                 <p className="sutil" style={{ margin: 0 }}>{cola.subtitulo}</p>
               </div>
-              <Reproductor cola={cola} indiceInicial={indiceInicial} onSalir={() => ir('inicio')} />
+              <Reproductor cola={cola} indiceInicial={indiceInicial} onSalir={() => ir('semana')} />
             </>
           )}
           {!cargando && vista === 'preguntas' && <NbmePlayer onSalir={() => { setTipoContenido('preguntas'); ir('modulos') }}
             onEstudiar={ids => { nbme.pauseSession(); void estudiarIds(ids) }}
             onBuscar={q => { nbme.pauseSession(); setFiltrosConceptos({ sistema: q.systems[0] ?? '', disciplina: q.disciplines[0] ?? '' }); setTipoContenido('conceptos'); ir('modulos') }} />}
-          {!cargando && vista === 'inicio' && <>
-            {sesionPreguntasPendiente ? <div className="pila"><StudyHero /><section className="tarjeta home-session"><div className="pila">
+          {!cargando && vista === 'semana' && <Semana onAbrir={abrirSesionSemanal} onRecuperacion={() => ir('recuperacion')}
+            onBiblioteca={tipo => { setTipoContenido(tipo); ir('modulos') }} />}
+          {!cargando && vista === 'sesion' && sesionSemanal && <SesionMixta key={sesionSemanal.sesion.id}
+            sesion={sesionSemanal.sesion} efimera={sesionSemanal.efimera} onSalir={() => ir('semana')} />}
+          {!cargando && vista === 'sesion' && !sesionSemanal && <div className="vacio"><p>Esta sesión ya no está abierta.</p>
+            <button className="btn" onClick={() => ir('semana')}>Volver a mis sesiones</button></div>}
+          {!cargando && vista === 'recuperacion' && <Recuperacion onEstudiar={estudiarIds}
+            onPreguntas={(refs, titulo) => { void abrirPreguntas(refs, titulo) }} onMezclar={abrirMezcla} />}
+          {!cargando && vista === 'inicio' && <div className="pila"><StudyHero />
+            {sesionPreguntasPendiente && <section className="tarjeta home-session"><div className="pila">
               <p className="editorial-eyebrow">Tu sesión guardada</p><h2>Continúa tus preguntas</h2><p className="sutil">{sesionPreguntasPendiente.title}</p>
               <div><button className="btn principal" disabled={nbme.loading || nbme.busy} onClick={() => void continuarPreguntas()}>Continuar sesión de preguntas</button></div>
               {nbme.error && <p role="alert">{nbme.error}</p>}
-            </div></section><details className="tarjeta"><summary>Mi plan de conceptos</summary><div style={{ marginTop: 16 }}><Inicio embedded onIr={ir} onContinuar={continuar}
-              onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} /></div></details></div>
-              : <Inicio onIr={ir} onContinuar={continuar} onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} />}
-          </>}
+            </div></section>}
+            <Inicio embedded onIr={ir} onContinuar={continuar} onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} />
+          </div>}
           {!cargando && vista === 'modulos' && <div className="pila"><div className="fila" role="group" aria-label="Tipo de contenido">
             <button className={`btn${tipoContenido === 'conceptos' ? ' principal' : ' fantasma'}`} aria-pressed={tipoContenido === 'conceptos'} onClick={() => setTipoContenido('conceptos')}>Conceptos</button>
             <button className={`btn${tipoContenido === 'preguntas' ? ' principal' : ' fantasma'}`} aria-pressed={tipoContenido === 'preguntas'} onClick={() => setTipoContenido('preguntas')}>Preguntas</button>

@@ -5,20 +5,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ESTADO_INICIAL } from '../store/model'
 import type { Concepto } from '../schema/concept'
 
-const mock = vi.hoisted(() => ({ app: vi.fn(), cargarTodo: vi.fn(), cargarConceptos: vi.fn(), reproductor: vi.fn() }))
+const mock = vi.hoisted(() => ({ app: vi.fn(), cargarTodo: vi.fn(), cargarConceptos: vi.fn(), reproductor: vi.fn(),
+  sesionesSemana: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ signOut: vi.fn() }) }))
 vi.mock('../nbme/NbmeProvider', () => ({ useNbme: () => ({
-  state: { sessions: {}, attempts: {} }, catalog: null, pauseSession: vi.fn(), syncNow: vi.fn().mockResolvedValue(true),
+  state: { sessions: {}, attempts: {}, activeSessionId: null }, catalog: null, pauseSession: vi.fn(),
+  syncNow: vi.fn().mockResolvedValue(true), startSession: vi.fn().mockResolvedValue(true),
+  resumeSession: vi.fn().mockResolvedValue(true), nextQuestion: vi.fn(), loading: false, busy: false,
   syncStatus: { message: 'Preguntas sincronizadas' },
 }) }))
+vi.mock('../semana/api', () => ({
+  cargarSesionesSemana: mock.sesionesSemana,
+  cargarHistorialSesiones: vi.fn().mockResolvedValue([]),
+  guardarAvance: vi.fn().mockResolvedValue({ ok: true }),
+}))
 vi.mock('../data/corpus', () => ({ cargarTodo: mock.cargarTodo, cargarConceptos: mock.cargarConceptos, cargarModulo: vi.fn() }))
 vi.mock('../screens/Reproductor', () => ({ Reproductor: (props: { indiceInicial: number }) => {
   mock.reproductor(props)
   return <div>Sesión restaurada</div>
 } }))
-vi.mock('../screens/Repaso', () => ({ Repaso: (props: { onEstudiar: (ids: string[]) => void }) =>
-  <button onClick={() => props.onEstudiar(['concepto-1'])}>Abrir repaso de prueba</button> }))
+vi.mock('../screens/Recuperacion', () => ({ Recuperacion: (props: { onEstudiar: (ids: string[]) => void }) =>
+  <button onClick={() => props.onEstudiar(['concepto-1'])}>Abrir recuperación de prueba</button> }))
 
 import App from '../App'
 import { Modal } from '../components/comunes'
@@ -40,6 +48,7 @@ beforeEach(() => {
   }
   mock.app.mockImplementation(() => app)
   mock.cargarTodo.mockResolvedValue([])
+  mock.sesionesSemana.mockResolvedValue([])
   mock.cargarConceptos.mockResolvedValue(new Map([['concepto-1', { concept_id: 'concepto-1' } as Concepto]]))
 })
 
@@ -52,15 +61,37 @@ afterEach(async () => {
 const boton = (texto: string) => [...host.querySelectorAll('button')].find(b => b.textContent?.includes(texto))!
 
 describe('continuidad y navegación accesible', () => {
-  it('recargar #estudio muestra Inicio y permite recuperar incluso el resumen pendiente', async () => {
+  it('la navegación principal son tres secciones y «Mi semana» es la vista por defecto', async () => {
+    await act(async () => { root.render(<App />) })
+    const nav = host.querySelector('nav')!
+    expect([...nav.querySelectorAll('button')].map(b => b.textContent)).toEqual(['Mi semana', 'Recuperación', 'Progreso'])
+    expect(host.textContent).toContain('Sin sesiones preparadas')
+    // Lo retirado sigue accesible desde el menú discreto, sin borrarse.
+    expect(boton('Elegir contenido')).toBeTruthy()
+    expect(boton('Calidad del material')).toBeTruthy()
+    expect(boton('Plan diario clásico')).toBeTruthy()
+  })
+
+  it('#repaso resuelve hacia Recuperación para no romper enlaces guardados', async () => {
+    window.history.replaceState(null, '', '/#repaso')
+    await act(async () => { root.render(<App />) })
+    expect(boton('Abrir recuperación de prueba')).toBeTruthy()
+    expect(host.textContent).toContain('Mi espacio / Recuperación')
+  })
+
+  it('recargar #estudio muestra la semana y el plan clásico permite recuperar el resumen pendiente', async () => {
     window.history.replaceState(null, '', '/#estudio')
     app.estado = { ...ESTADO_INICIAL, reanudable: {
       modulo: 'modulo-1', sesion: 'guiada', indice: 1, ts: 1, conceptIds: ['concepto-1'], titulo: 'Bioquímica',
     } }
     await act(async () => { root.render(<App />) })
-    expect(host.textContent).toContain('Tu estudio de hoy')
+    // Una cola nunca se restaura desde la URL: se aterriza en la portada.
+    expect(host.textContent).toContain('Mi semana')
+    expect(host.textContent).not.toContain('Sesión restaurada')
     // Fuera de la sesión la barra sí navega.
     expect(host.querySelector('nav')).not.toBeNull()
+    await act(async () => { boton('Plan diario clásico').click() })
+    expect(host.textContent).toContain('Tu estudio de hoy')
     await act(async () => { boton('Continuar sesión guardada').click() })
     expect(host.textContent).toContain('Sesión restaurada')
     expect(mock.reproductor.mock.calls.at(-1)?.[0].indiceInicial).toBe(1)
@@ -85,21 +116,21 @@ describe('continuidad y navegación accesible', () => {
     expect(host.textContent).toContain('El servidor no pudo guardar ahora.')
   })
 
-  it('un error al preparar repaso deja una salida para reintentar', async () => {
-    window.history.replaceState(null, '', '/#repaso')
+  it('un error al preparar recuperación deja una salida para reintentar', async () => {
+    window.history.replaceState(null, '', '/#recuperacion')
     mock.cargarConceptos.mockRejectedValueOnce(new Error('offline'))
     await act(async () => { root.render(<App />) })
-    await act(async () => { boton('Abrir repaso de prueba').click() })
+    await act(async () => { boton('Abrir recuperación de prueba').click() })
     expect(host.textContent).toContain('No se pudo preparar el repaso')
     expect(host.textContent).not.toContain('Preparando la sesión')
-    expect(boton('Abrir repaso de prueba')).toBeTruthy()
+    expect(boton('Abrir recuperación de prueba')).toBeTruthy()
   })
 
   it('saltar al contenido conserva la pantalla actual', async () => {
-    window.history.replaceState(null, '', '/#repaso')
+    window.history.replaceState(null, '', '/#recuperacion')
     await act(async () => { root.render(<App />) })
     await act(async () => { (host.querySelector('.saltar-contenido') as HTMLAnchorElement).click() })
-    expect(window.location.hash).toBe('#repaso')
+    expect(window.location.hash).toBe('#recuperacion')
     expect(document.activeElement).toBe(host.querySelector('main'))
   })
 

@@ -62,8 +62,8 @@ function Cronometro({ msVisibles, presupuesto, sinLimite }: { msVisibles: number
   </div>
 }
 
-export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
-  { cola: Cola; onSalir: () => void; indiceInicial?: number }) {
+export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto }:
+  { cola: Cola; onSalir: () => void; indiceInicial?: number; onTramoCompleto?: () => void }) {
   const { registrarIntento, progresoDe, estado, guardarReanudable, iniciarSesion, cerrarSesion } = useApp()
   const guardada = cola.sessionId && estado.reanudable?.sessionId === cola.sessionId ? estado.reanudable : null
   const [versionFormato] = useState<1 | 2>(guardada ? guardada.versionFormato ?? 1 : 2)
@@ -221,12 +221,14 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
   }, [estado.reanudable, relojSesion, sesionLista, !!c, pausaTiempo])
   useEffect(() => () => { if (!saliendo.current && !tiempoRef.current.pausa) guardarPasoActual.current() }, [])
 
+  // Cuando el reproductor es un tramo dentro de una sesión mixta, el final de la cola
+  // devuelve el control al orquestador en vez de sacar al estudiante de la sesión.
   const salir = () => {
     saliendo.current = true; relojSesion.activar(false)
     reloj.current.activar(false)
     if (sesionId.current) cerrarSesion(sesionId.current, datosSesion())
     guardarReanudable(null)
-    onSalir()
+    ;(onTramoCompleto ?? onSalir)()
   }
   const pausar = () => {
     saliendo.current = true; relojSesion.activar(false)
@@ -411,7 +413,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0 }:
         {resumen.porRevisar > 0 && <p>{resumen.porRevisar} respuestas por revisar. No se contaron como aciertos ni fallos.</p>}
         <p className="sutil">Los errores evaluados se han vuelto a practicar en esta sesión. Acertarlos después de ver la explicación cuenta como corrección; el dominio se confirma en repasos posteriores.</p>
         {examen && <p className="mini">Práctica sin ayuda con preguntas de tu corpus. Este resultado no estima tu probabilidad de aprobar Step 1.</p>}
-        <button className="btn principal" onClick={salir}>Volver a mi plan</button>
+        <button className="btn principal" onClick={salir}>{onTramoCompleto ? 'Continuar la sesión' : 'Volver a mi plan'}</button>
       </div>
       {revisiones()}
     </div>

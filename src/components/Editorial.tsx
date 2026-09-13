@@ -21,6 +21,8 @@ export function NavigationIcon({ name }: { name: string }) {
     modulos: 'M12 5v16M12 5C9 3 5 3 2 4v15c4-1 7-1 10 2 3-3 6-3 10-2V4c-3-1-7-1-10 1Z',
     progreso: 'M4 3v17h17M9 15v-4m5 4V7m5 8V4',
     repaso: 'M3 10a9 9 0 1 1 2 8M3 4v6h6M12 7v5l3 2',
+    recuperacion: 'M3 10a9 9 0 1 1 2 8M3 4v6h6M12 7v5l3 2',
+    semana: 'M4 6a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6Zm0 4h16M8 3v4m8-4v4',
     arrow: 'M4 12h16m-6-6 6 6-6 6',
   }
   return <svg className="navigation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
