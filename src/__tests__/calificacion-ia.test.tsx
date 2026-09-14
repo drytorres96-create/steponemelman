@@ -13,6 +13,7 @@ const mock = vi.hoisted(() => ({ app: vi.fn(), calificar: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../components/AyudaIA', () => ({ AyudaIA: () => <div>ayuda</div> }))
 vi.mock('../lib/calificacion-ia', () => ({ calificarConIA: mock.calificar }))
+vi.mock('../lib/confusion-ia', () => ({ conQueSeConfundio: async () => null, ORIGEN_PARECIDO: {} }))
 
 import { Reproductor } from '../screens/Reproductor'
 
@@ -111,6 +112,41 @@ describe('la IA corrige las respuestas breves', () => {
     expect(host.textContent).toContain('Vale tu corrección')
     // Ya rectificado, no se ofrece rectificar otra vez.
     expect(boton('No, mi respuesta era incorrecta')).toBeUndefined()
+  })
+
+  /**
+   * Una respuesta escrita que el corrector propio no supo decidir queda «en revisión»: ni
+   * acierto ni fallo, no acredita nada. Casi siempre porque la IA no estaba disponible en
+   * ese momento. Poder pedírselo después recupera el intento en vez de perderlo.
+   */
+  it('una respuesta sin evaluar la puede juzgar la IA, reescribiendo el mismo intento', async () => {
+    mock.calificar.mockResolvedValue({ estado: 'sin_ia', motivo: 'La cuota de hoy se ha agotado.' } satisfies ResultadoCalificacion)
+    await responder('gamma')
+    expect(ultimo()).toMatchObject({ resultado: 'revision', tipo_error: 'error_por_revisar' })
+    const registrado = ultimo().attempt_id
+    expect(registrados).toHaveLength(1)
+
+    mock.calificar.mockResolvedValue({ estado: 'ok', veredicto: 'parcial', motivo: 'Nombra solo una parte.' } satisfies ResultadoCalificacion)
+    await act(async () => boton('Que la IA juzgue mi respuesta')!.click())
+
+    expect(mock.calificar.mock.calls.at(-1)![0]).toMatchObject({ conceptId: 'QA-1', answer: 'gamma' })
+    expect(registrados).toHaveLength(2)
+    expect(ultimo().attempt_id).toBe(registrado)
+    expect(ultimo()).toMatchObject({ resultado: 'parcial', calificacion: 2, tipo_error: 'recuerdo_incompleto', calificado_por_ia: true })
+    expect(ultimo().calificacion_actualizada_en).toBeGreaterThan(0)
+    expect(host.textContent).toContain('Nombra solo una parte.')
+    expect(boton('Que la IA juzgue mi respuesta')).toBeUndefined()
+  })
+
+  it('si la IA sigue sin poder, la respuesta se queda como estaba y se dice por qué', async () => {
+    mock.calificar.mockResolvedValue({ estado: 'sin_ia', motivo: 'La cuota de hoy se ha agotado.' } satisfies ResultadoCalificacion)
+    await responder('gamma')
+    await act(async () => boton('Que la IA juzgue mi respuesta')!.click())
+
+    expect(registrados).toHaveLength(1)
+    expect(ultimo().resultado).toBe('revision')
+    expect(host.textContent).toContain('La cuota de hoy se ha agotado.')
+    expect(boton('Que la IA juzgue mi respuesta')).toBeTruthy()
   })
 
   it('mientras la IA responde, la pregunta queda bloqueada y no se registra dos veces', async () => {
