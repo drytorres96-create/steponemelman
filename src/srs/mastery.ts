@@ -1,5 +1,6 @@
 import { intentoCorrecto, type Intento, type ProgresoConcepto, type EstadoDominio } from './tipos'
-import { DIA, estaVencido } from './fsrs'
+import { DIA, estaVencido, retencion } from './fsrs'
+import { azarAcumulado, porcentajeAzar, UMBRAL_AZAR } from './azar'
 
 /** Criterios de dominio — configurables desde Ajustes. */
 export interface CriteriosDominio {
@@ -42,7 +43,7 @@ export function sonCriteriosHeredados(c: CriteriosDominio): boolean {
 }
 
 /** Identificador estable de cada criterio, para razonar sobre ellos sin leer el rótulo. */
-export type ClaveCriterio = 'aciertos' | 'sesiones' | 'separacion' | 'pistas' | 'activa' | 'confusion'
+export type ClaveCriterio = 'aciertos' | 'sesiones' | 'separacion' | 'pistas' | 'azar' | 'retencion' | 'confusion'
 
 export interface EvidenciaDominio {
   cumple: boolean
@@ -56,14 +57,19 @@ export function evidenciaActiva(i: Intento): boolean {
   return i.recuperacion_activa || i.tipo_evidencia === 'aplicacion'
 }
 /**
- * Aciertos extra exigidos cuando no hay ni un recuerdo libre ni una aplicación.
- *
- * Uno, no dos. Con el techo del horizonte de examen los intervalos se comprimen, y en la práctica
- * casi todo concepto con opciones válidas se presenta como reconocimiento, así que exigir cinco
- * aciertos dejaba el umbral fuera de alcance antes del 21-dic. Cuatro aciertos entre tres opciones
- * son 1 de cada 81 por azar: sigue siendo una barrera real y se puede alcanzar.
+ * Probabilidad de recordarlo hoy por debajo de la cual el concepto pide repaso. Es el mismo
+ * 0,90 con el que el planificador calcula sus intervalos, así que la cifra que se enseña y la
+ * regla que vence un concepto son la misma. Decidido por Yoel el 14-sep-2026.
  */
-export const RECARGO_RECONOCIMIENTO = 1
+export const UMBRAL_RETENCION = 0.9
+
+/**
+ * Aciertos que se descuentan al fallar. Antes un fallo borraba toda la evidencia vigente:
+ * cuatro aciertos y un mal día te devolvían a cero. Descontar dos retrocede un escalón real
+ * —el planificador además recorta la estabilidad, así que la retención baja sola— sin tirar
+ * semanas de trabajo. Decidido por Yoel el 14-sep-2026.
+ */
+export const DESCUENTO_POR_FALLO = 2
 
 /** Lo no registrado en historiales antiguos no prueba que no se utilizó ayuda. */
 export function evidenciaIndependiente(i: Intento): boolean {
@@ -81,20 +87,30 @@ function ultimoResuelto(p: ProgresoConcepto): Intento | undefined {
  * dominio necesita saber desde cuándo corre el reloj de la separación.
  */
 export function aciertosVigentes(p: ProgresoConcepto): Intento[] {
-  const ultimoFallo = p.intentos.reduce((ultimo, i, n) =>
-    i.resultado !== 'revision' && !intentoCorrecto(i) ? n : ultimo, -1)
-  return p.intentos.slice(ultimoFallo + 1).filter(evidenciaIndependiente)
+  const vigentes: Intento[] = []
+  for (const intento of p.intentos) {
+    // Una respuesta por revisar no es evidencia de saber ni de olvidar: no suma ni resta.
+    if (intento.resultado === 'revision') continue
+    if (intentoCorrecto(intento)) {
+      if (evidenciaIndependiente(intento)) vigentes.push(intento)
+    } else {
+      vigentes.splice(Math.max(0, vigentes.length - DESCUENTO_POR_FALLO))
+    }
+  }
+  return vigentes
 }
 
 export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): EvidenciaDominio {
   const correctas = aciertosVigentes(p)
-  const activas = correctas.filter(evidenciaActiva)
-  // Acertar tres veces entre tres opciones ocurre por azar una vez de cada 27. Cuando toda la
-  // evidencia vigente es reconocimiento, el umbral sube uno (1 de cada 81); un solo recuerdo libre
-  // o la aplicación de un caso lo devuelven al umbral normal.
-
-  const soloReconocimiento = c.exigirRecuperacionActiva && correctas.length > 0 && activas.length === 0
-  const requeridas = soloReconocimiento ? c.recuperaciones + RECARGO_RECONOCIMIENTO : c.recuperaciones
+  const requeridas = c.recuperaciones
+  // Evidencia contra el azar: cada acierto aporta la probabilidad de haberlo acertado sin
+  // saberlo, y el conjunto se multiplica. Dos recuerdos libres bastan (0,25 %); cuatro
+  // aciertos de opción múltiple entre cuatro, también (0,39 %); tres, todavía no (1,6 %).
+  const azar = azarAcumulado(correctas)
+  // Probabilidad de recordarlo hoy según el planificador. Es la señal continua: sube con cada
+  // acierto bien espaciado y baja sola con los días, así que el avance se ve sin puertas.
+  const dias = p.ultimo ? Math.max(0, (ahora - p.ultimo) / DIA) : 0
+  const prevista = p.estabilidad > 0 ? retencion(dias, p.estabilidad) : 0
   const sesiones = new Set(correctas.map(i => i.session_id || `legacy-dia-${Math.floor(i.ts / DIA)}`))
   const separadas = c.separacionHoras === 0 || c.sesiones < 2
     ? true
@@ -110,26 +126,48 @@ export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora =
     { clave: 'separacion', criterio: `separadas ≥ ${c.separacionHoras} h`, cumplido: separadas, valor: separadas ? 'sí' : 'no' },
     ...(c.exigirSinPistas ? [{ clave: 'pistas' as const, criterio: 'al menos una sin pistas', cumplido: sinPistas, valor: sinPistas ? 'sí' : 'no' }] : []),
     ...(c.exigirRecuperacionActiva ? [{
-      clave: 'activa' as const,
-      criterio: 'recuerdo libre o aplicación, no sólo reconocimiento',
-      cumplido: activas.length > 0 || correctas.length >= requeridas,
-      valor: activas.length > 0 ? `${activas.length}` : `ninguno · umbral ${requeridas}`,
+      clave: 'azar' as const,
+      criterio: `probabilidad de acertarlo por azar ≤ ${porcentajeAzar(UMBRAL_AZAR)}`,
+      cumplido: correctas.length > 0 && azar <= UMBRAL_AZAR,
+      valor: correctas.length ? porcentajeAzar(azar) : 'sin evidencia',
     }] : []),
+    // Indicador, no puerta. El planificador ya fija `proxima` en el instante en que la
+    // retención cae a este mismo 0,90, así que exigirlo aquí además duplicaría el
+    // vencimiento y borraría la diferencia entre «nunca lo dominaste» y «toca repasarlo».
+    // Vive en el detalle porque es la señal continua: sube y baja cada día, a la vista.
+    {
+      clave: 'retencion' as const,
+      criterio: `probabilidad de recordarlo hoy ≥ ${Math.round(UMBRAL_RETENCION * 100)} %`,
+      cumplido: prevista >= UMBRAL_RETENCION,
+      valor: `${Math.round(prevista * 100)} %`,
+    },
     { clave: 'confusion', criterio: `sin confusiones en ${c.ventanaConfusionDias} días`, cumplido: !confusionReciente, valor: confusionReciente ? 'hay confusión reciente' : 'ninguna' },
   ]
-  return { cumple: detalle.every(d => d.cumplido), requeridas, detalle }
+  return { cumple: detalle.every(d => d.clave === 'retencion' || d.cumplido), requeridas, detalle }
 }
 
-/** Explica la evidencia que falta sin equiparar acertar un reintento con dominar. */
+/**
+ * Explica la evidencia que falta sin equiparar acertar un reintento con dominar.
+ *
+ * El texto lleva siempre las dos señales continuas —lo improbable que es que la racha sea
+ * suerte y la probabilidad de recordarlo hoy— porque son las que se mueven cada día. Un
+ * conteo de aciertos se queda quieto; estos dos números enseñan el avance mientras lo hay.
+ */
 export function resumenDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): { texto: string; pendientes: string[] } {
   const ev = evaluarDominio(p, c, ahora)
   const pendientes = ev.detalle.filter(d => !d.cumplido).map(d => d.criterio)
+  const de = (clave: ClaveCriterio) => ev.detalle.find(d => d.clave === clave)?.valor ?? '—'
+  const senales = `recuerdo hoy ${de('retencion')}`
+    + (ev.detalle.some(d => d.clave === 'azar') ? ` · azar ${de('azar')}` : '')
+
   if (ev.cumple) return {
-    texto: estaVencido(p, ahora) ? 'Criterios de dominio alcanzados · repaso pendiente' : 'Dominio acreditado',
+    texto: estaVencido(p, ahora)
+      ? `Criterios de dominio alcanzados · repaso pendiente · ${senales}`
+      : `Dominio acreditado · ${senales}`,
     pendientes: estaVencido(p, ahora) ? ['Completar el repaso pendiente para mantener el dominio vigente'] : [],
   }
   return {
-    texto: `Dominio: ${ev.detalle[0].valor}/${ev.requeridas} aciertos independientes · ${ev.detalle[1].valor}/${c.sesiones} sesiones`,
+    texto: `Dominio: ${de('aciertos')}/${ev.requeridas} aciertos independientes · ${de('sesiones')}/${c.sesiones} sesiones · ${senales}`,
     pendientes,
   }
 }

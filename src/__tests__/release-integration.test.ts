@@ -369,7 +369,8 @@ describe('integración de estudio antes de publicar', () => {
   it('endurecer criterios conserva el hito y los intentos aunque retire el dominio vigente', async () => {
     await render(nuevaCola('guiada'))
     await responder('alfa')
-    await act(async () => api.actualizarCriterios({ ...api.estado.criterios, recuperaciones: 1, sesiones: 1, separacionHoras: 0 }))
+    await act(async () => api.actualizarCriterios({ ...api.estado.criterios,
+      exigirRecuperacionActiva: false, recuperaciones: 1, sesiones: 1, separacionHoras: 0 }))
     const antes = clone(api.estado.progreso['QA-001'])
     expect(antes.dominado_en).not.toBeNull()
     await act(async () => api.actualizarCriterios({ ...api.estado.criterios, recuperaciones: 10, sesiones: 6 }))
