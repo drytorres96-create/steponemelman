@@ -5,6 +5,7 @@ import { prepararConcepto } from '../lib/formatos'
 import { versionPregunta } from '../screens/sesion'
 import { aplicarVariante } from '../lib/variantes'
 import { handleNbme } from './nbme'
+import { handlePlan, type PlanEnv } from './plan'
 
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 const DAY = 86400000
@@ -17,7 +18,7 @@ interface Storage {
   list<T>(options: { prefix: string }): Promise<Map<string, T>>
   transaction<T>(fn: (storage: Storage) => Promise<T>): Promise<T>
 }
-interface Env {
+interface Env extends PlanEnv {
   AI_FREE_ENABLED?: string
   AI: { run(model: string, input: unknown): Promise<unknown> }
   COACH: { idFromName(name: string): unknown; get(id: unknown): { fetch(request: Request): Promise<Response> } }
@@ -194,6 +195,7 @@ export default {
     const url = new URL(request.url)
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request)
     if (url.pathname.startsWith('/api/nbme/')) return handleNbme(request)
+    if (url.pathname.startsWith('/api/plan/')) return handlePlan(request, env)
     const modo: CoachMode | null = url.pathname === '/api/explicar' ? 'explicar'
       : url.pathname === '/api/calificar' ? 'calificar' : null
     if (!modo) return json({ error: 'No encontrado' }, 404)

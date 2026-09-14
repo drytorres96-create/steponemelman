@@ -18,8 +18,8 @@ import type { EstadoSesion, SesionSemanal } from './tipos'
  * sigue viviendo en `study_state` y `nbme_state`; `weekly_sessions` sólo guarda
  * por dónde va, así que un fallo al guardar la posición no borra nada estudiado.
  */
-export function SesionMixta({ sesion, onSalir, efimera = false }:
-  { sesion: SesionSemanal; onSalir: () => void; efimera?: boolean }) {
+export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada }:
+  { sesion: SesionSemanal; onSalir: () => void; efimera?: boolean; onCompletada?: () => void }) {
   const { indice, estado, guardarReanudable } = useApp()
   const nbme = useNbme()
   const nbmeRef = useRef(nbme)
@@ -162,7 +162,10 @@ export function SesionMixta({ sesion, onSalir, efimera = false }:
     setEstadoGuardado(estadoDeseado)
     void guardar({ estado: estadoDeseado,
       ...(estadoDeseado === 'completada' ? { completadaEn: new Date().toISOString() } : {}) })
-  }, [estadoDeseado, estadoGuardado, cargando, guardar])
+    // El checkpoint del plan se marca solo al completarse la sesión: es lo que
+    // elimina el marcar dos veces. Se avisa una vez, en la misma transición.
+    if (estadoDeseado === 'completada') onCompletada?.()
+  }, [estadoDeseado, estadoGuardado, cargando, guardar, onCompletada])
 
   const encabezado = <div className="sesion-mixta-guia">
     <p className="mini">{sesion.titulo}</p>

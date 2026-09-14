@@ -10,6 +10,7 @@ import { MapaProgreso } from '../components/MapaProgreso'
 import type { OpcionesSesionPersonalizada } from '../lib/busqueda'
 import { ScreenHeading } from '../components/Editorial'
 import { BandaDeCifras, type Ventana } from './ProgresoCifras'
+import { BandaAdherencia } from './ProgresoAdherencia'
 import { ProgresoHorizonte } from './ProgresoHorizonte'
 import { lunesDe } from '../lib/tiempo'
 
@@ -51,6 +52,7 @@ export function Progreso({ onEstudiar, onContinuar, ventana = 'general' }:
 
   return <div className="pila">
     <ScreenHeading eyebrow="Tu recorrido de aprendizaje" title="Progreso" description="Evidencia de tu práctica dentro del material publicado. No estima tu probabilidad de aprobar Step 1." />
+    <BandaAdherencia />
     <BandaDeCifras conceptos={conceptos} ventana={ventana} />
     <div className="rejilla r3">{tarjetas.map(x => <div className="tarjeta" key={x.r}>
       <div className="cifra">{x.n}</div><div className="rotulo">{x.r}</div><p className="mini">de {total} disponibles</p></div>)}</div>
