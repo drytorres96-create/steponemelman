@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { notificarUsoIA } from './cuota-ia'
 import type { CoachExamen } from '../server/worker'
 
 export type { CoachExamen }
@@ -28,6 +29,8 @@ export async function comoCaeEnElExamen(conceptId: string, signal?: AbortSignal)
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ conceptId }),
     })
+    // Haya ido bien o mal, la llamada puede haber gastado: el medidor tiene que enterarse.
+    notificarUsoIA()
     if (!response.headers.get('content-type')?.includes('application/json')) {
       return { estado: 'sin_ia', motivo: 'Esta función no está disponible en este entorno.' }
     }

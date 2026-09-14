@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { notificarUsoIA } from './cuota-ia'
 import type { CoachConfusion, OrigenParecido, Parecido } from '../server/worker'
 
 export type { CoachConfusion, OrigenParecido, Parecido }
@@ -35,6 +36,8 @@ export async function conQueSeConfundio(conceptId: string, answer: string, signa
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ conceptId, answer: answer.slice(0, 300) }),
     })
+    // Haya ido bien o mal, la llamada puede haber gastado: el medidor tiene que enterarse.
+    notificarUsoIA()
     if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) return null
     const data = await response.json() as Partial<CoachConfusion>
     return data.mejor || Array.isArray(data.candidatos)

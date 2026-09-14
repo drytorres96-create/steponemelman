@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { notificarUsoIA } from './cuota-ia'
 import type { CoachVeredicto } from '../server/worker'
 
 /** Lo que devuelve el intento de corrección: un veredicto, o por qué no lo hubo. */
@@ -44,6 +45,8 @@ export async function calificarConIA(peticion: PeticionCalificacion, signal?: Ab
         index: peticion.index, route: peticion.route, retry: peticion.retry,
       }),
     })
+    // Haya ido bien o mal, la llamada puede haber gastado: el medidor tiene que enterarse.
+    notificarUsoIA()
     if (!response.headers.get('content-type')?.includes('application/json')) {
       return { estado: 'sin_ia', motivo: 'La corrección con IA no está disponible en este entorno.' }
     }
