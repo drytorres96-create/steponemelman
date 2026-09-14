@@ -478,31 +478,49 @@ summary::marker { color: var(--violeta); }
 }
 
 /* ---------- Medidor de la IA gratuita ----------
-   Vive en el raíl, encima de la cuenta: se mira sin buscarlo y no compite con la
-   navegación. El anillo transiciona en vez de saltar, para que el consumo se vea
-   ocurrir. Ámbar cuando queda poco; gris cuando la ayuda está apagada. */
-.medidor-ia { position: relative; display: flex; align-items: center; gap: 11px; --medidor: #487a5a; }
-.medidor-ia.medidor-bajo { --medidor: var(--ambar); }
-.medidor-ia.medidor-apagado { --medidor: var(--linea); }
-.medidor-ia svg { width: 40px; height: 40px; flex: none; transform: rotate(-90deg); }
-.medidor-pista { fill: none; stroke: #e1e8dd; stroke-width: 4; }
+   Lo único que hay que leer aquí es el número, así que el número manda: va en el color
+   del texto, no en el del anillo, y a un tamaño que se lee de reojo desde el otro lado
+   de la mesa. El anillo es el contexto y el color es el estado —verde con margen, ámbar
+   por debajo del 20 %, rojo agotado, gris apagado—, nunca el portador del dato. */
+.medidor-ia {
+  --medidor: #2c5c48; --medidor-pista: #dde7dd;
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  padding: 16px 12px 14px; border: 1px solid var(--linea-suave); border-radius: var(--radio);
+  background: linear-gradient(180deg, #fbfdf9, var(--panel));
+}
+.medidor-ia.medidor-bajo { --medidor: #9a6510; --medidor-pista: #f0e6d2; }
+.medidor-ia.medidor-bajo.medidor-cero { --medidor: var(--rojo); --medidor-pista: #f0dedb; }
+.medidor-ia.medidor-apagado { --medidor: #93a094; --medidor-pista: #e6e9e4; }
+
+.medidor-titulo { margin: 0; font-size: .58rem; color: var(--texto-3); letter-spacing: .17em; }
+
+.medidor-anillo { position: relative; display: grid; place-items: center; width: 84px; height: 84px; }
+.medidor-anillo svg { width: 84px; height: 84px; transform: rotate(-90deg); }
+.medidor-pista { fill: none; stroke: var(--medidor-pista); stroke-width: 7; }
 .medidor-arco {
-  fill: none; stroke: var(--medidor); stroke-width: 4; stroke-linecap: round;
-  transition: stroke-dashoffset .75s cubic-bezier(.22, .61, .36, 1), stroke .4s ease;
+  fill: none; stroke: var(--medidor); stroke-width: 7; stroke-linecap: round;
+  transition: stroke-dashoffset .9s cubic-bezier(.22, .61, .36, 1), stroke .45s ease;
 }
-.medidor-cifra {
-  position: absolute; width: 40px; text-align: center; font-size: .66rem;
-  font-weight: 700; color: var(--medidor); pointer-events: none;
+.medidor-valor {
+  position: absolute; display: flex; align-items: baseline; gap: 1px;
+  font-size: 1.6rem; font-weight: 700; line-height: 1; letter-spacing: -.045em;
+  color: var(--texto); font-variant-numeric: tabular-nums;
 }
-.medidor-texto { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
-.medidor-rotulo { font-size: .72rem; font-weight: 600; color: var(--texto-2); }
-.medidor-detalle { font-size: .66rem; color: var(--texto-3); }
+.medidor-valor i { font-size: .72rem; font-style: normal; font-weight: 600; color: var(--texto-3); }
+.medidor-detalle { margin: 0; text-align: center; font-size: .67rem; line-height: 1.4; color: var(--texto-3); }
 
 @media (prefers-reduced-motion: reduce) { .medidor-arco { transition: none; } }
 
 @media (max-width: 760px) {
-  /* En el encabezado compacto solo cabe el anillo; el rótulo lo da el título accesible. */
-  .medidor-texto { display: none; }
-  .medidor-ia svg { width: 34px; height: 34px; }
-  .medidor-cifra { width: 34px; font-size: .62rem; }
+  /* En el encabezado compacto el medidor se tumba y se queda en lo esencial. */
+  .medidor-ia { flex-direction: row; gap: 10px; padding: 7px 12px 7px 8px; border-radius: 999px; }
+  .medidor-titulo, .medidor-detalle { display: none; }
+  .medidor-anillo, .medidor-anillo svg { width: 42px; height: 42px; }
+  .medidor-pista, .medidor-arco { stroke-width: 8; }
+  .medidor-valor { font-size: .9rem; }
+  .medidor-valor i { font-size: .55rem; }
+  .medidor-ia::after {
+    content: 'IA gratis hoy'; font-size: .68rem; font-weight: 600;
+    color: var(--texto-2); white-space: nowrap;
+  }
 }

@@ -44,7 +44,7 @@ describe('medidor de la IA gratuita', () => {
     expect(host.textContent).toContain('IA gratis hoy')
     expect(host.textContent).toContain('90 % disponible')
     // El arco tapado es el gasto: al 90 % restante queda un 10 % del perímetro oculto.
-    const perimetro = 2 * Math.PI * 17
+    const perimetro = 2 * Math.PI * 30
     expect(Number(arco()!.getAttribute('stroke-dashoffset'))).toBeCloseTo(perimetro * 0.1, 5)
   })
 
@@ -56,15 +56,43 @@ describe('medidor de la IA gratuita', () => {
     // Ya montado, el medidor se entera por el store: no hace falta volver a pintarlo.
     red.mockResolvedValue(cuota(0))
     await act(async () => { await refrescarCuota(true) })
-    expect(host.textContent).toContain('Agotada')
+    expect(host.textContent).toContain('Sin cuota hoy')
     expect(host.textContent).toContain('00:00 UTC')
+  })
+
+  it('el primer dato aparece directo; solo los cambios se cuentan', async () => {
+    vi.useFakeTimers()
+    await pintar()
+    // Sin avanzar un solo fotograma: al entrar se lee el dato, no un contador arrancando.
+    expect(host.querySelector('.medidor-valor')!.textContent).toBe('90%')
+
+    red.mockResolvedValue(cuota(1700))
+    await act(async () => { await refrescarCuota(true) })
+    const enCamino = host.querySelector('.medidor-valor')!.textContent
+    await act(async () => { await vi.advanceTimersByTimeAsync(1200) })
+    expect(host.querySelector('.medidor-valor')!.textContent).toBe('20%')
+    expect(enCamino).not.toBe('20%')
+  })
+
+  it('agotada se distingue de baja, para que el rojo signifique algo', async () => {
+    red.mockResolvedValue(cuota(0))
+    await pintar()
+    expect(host.querySelector('.medidor-cero')).toBeTruthy()
+    expect(host.querySelector('.medidor-bajo')).toBeTruthy()
+
+    red.mockResolvedValue(cuota(1700))
+    await act(async () => { await refrescarCuota(true) })
+    expect(host.querySelector('.medidor-cero')).toBeNull()
+    expect(host.querySelector('.medidor-bajo')).toBeTruthy()
   })
 
   it('con la ayuda apagada lo dice en vez de fingir que hay cuota', async () => {
     red.mockResolvedValue(cuota(8500, { activa: false }))
     await pintar()
-    expect(host.textContent).toContain('Desactivada')
+    expect(host.textContent).toContain('desactivada')
     expect(host.querySelector('.medidor-apagado')).toBeTruthy()
+    // El anillo apagado no pinta un saldo falso: el número sigue siendo el real.
+    expect(host.textContent).toContain('100')
   })
 
   it('baja después de un uso, sin que la pantalla tenga que pedir nada', async () => {
