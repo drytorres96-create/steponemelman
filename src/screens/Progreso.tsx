@@ -12,6 +12,7 @@ import { ScreenHeading } from '../components/Editorial'
 import { BandaDeCifras, type Ventana } from './ProgresoCifras'
 import { BandaAdherencia } from './ProgresoAdherencia'
 import { ProgresoHorizonte } from './ProgresoHorizonte'
+import { LecturaSemana } from './LecturaSemana'
 import { lunesDe } from '../lib/tiempo'
 
 export function Progreso({ onEstudiar, onContinuar, ventana = 'general' }:
@@ -56,6 +57,7 @@ export function Progreso({ onEstudiar, onContinuar, ventana = 'general' }:
     <BandaDeCifras conceptos={conceptos} ventana={ventana} />
     <div className="rejilla r3">{tarjetas.map(x => <div className="tarjeta" key={x.r}>
       <div className="cifra">{x.n}</div><div className="rotulo">{x.r}</div><p className="mini">de {total} disponibles</p></div>)}</div>
+    <LecturaSemana conceptos={conceptos} onEstudiar={onEstudiar} />
     <ProgresoHorizonte conceptos={conceptos} />
     <MapaProgreso conceptos={conceptos} onEstudiar={onEstudiar} onContinuar={onContinuar} />
     <details className="tarjeta"><summary>Ver historial de sesiones</summary><p className="mini">Las cifras cuentan respuestas e incluyen reintentos. Se muestran {semanal ? 'las sesiones de esta semana' : 'las 12 sesiones más recientes'}.</p>

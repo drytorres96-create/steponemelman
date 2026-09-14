@@ -42,6 +42,6 @@ export function AyudaIA({ concepto, respuesta, preguntaId, indice, ruta, reinten
         <p className="mini">{concepto.source.doc_title} · {referenciaPagina(concepto.source)}</p></details>
       <p className="mini">Ayuda generada por IA; puede equivocarse. Tu calificación y tu dominio no cambian por leerla.</p>
     </div>}
-    {!answer && <p className="mini">Opcional · usa el concepto y tu respuesta · hasta 20 ayudas nuevas al día, sujetas a la cuota gratuita.</p>}
+    {!answer && <p className="mini">Opcional · usa el concepto y tu respuesta · sale del presupuesto gratuito del día, que se renueva a las 00:00 UTC.</p>}
   </section>
 }
