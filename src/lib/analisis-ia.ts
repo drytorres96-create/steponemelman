@@ -34,8 +34,9 @@ export async function analizarSemana(fallos: FalloSemanal[], signal?: AbortSigna
     if (!response.headers.get('content-type')?.includes('application/json')) {
       return { estado: 'sin_ia', motivo: 'La lectura con IA no está disponible en este entorno.' }
     }
-    const data = await response.json() as Partial<CoachAnalisis> & { error?: string; cached?: boolean }
-    if (!response.ok) return { estado: 'sin_ia', motivo: data.error || 'No se pudo leer la semana.' }
+    const data = await response.json() as Partial<CoachAnalisis> & { error?: string; cached?: boolean; detalle?: string }
+    // El detalle dice qué falló exactamente; sin él, cualquier fallo se ve igual desde fuera.
+    if (!response.ok) return { estado: 'sin_ia', motivo: (data.error || 'No se pudo leer la semana.') + (data.detalle ? ` (${data.detalle})` : '') }
     if (!Array.isArray(data.patrones) || !data.patrones.length || typeof data.enfoque !== 'string') {
       return { estado: 'sin_ia', motivo: 'La IA no devolvió una lectura utilizable.' }
     }

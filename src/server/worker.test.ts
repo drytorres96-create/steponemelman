@@ -338,19 +338,49 @@ describe('lectura de la semana con IA', () => {
     expect(leerFallosDeSemana({ conceptos: Array.from({ length: 19 }, (_, n) => ({ id: `QA-${n}`, fallos: 1, aciertos: 0, error: 'desconocimiento' })) })).toBeNull()
   })
 
-  it('descarta un patrón que cita un concepto que no estaba en la semana', () => {
-    const bueno = { patrones: [{ titulo: 'Dos vías opuestas', porque: 'Comparten enzimas.', conceptos: ['QA-1', 'QA-2'], accion: 'Repasa las irreversibles.' }], enfoque: 'Empieza por la glucólisis.' }
-    expect(validarAnalisis({ response: JSON.stringify(bueno) }, ['QA-1', 'QA-2'])).toMatchObject({ enfoque: 'Empieza por la glucólisis.' })
-    expect(validarAnalisis({ response: JSON.stringify(bueno) }, ['QA-1'])).toBeNull()
-    expect(validarAnalisis({ response: JSON.stringify({ ...bueno, patrones: [] }) }, ['QA-1', 'QA-2'])).toBeNull()
-    expect(validarAnalisis({ response: JSON.stringify({ patrones: bueno.patrones }) }, ['QA-1', 'QA-2'])).toBeNull()
-    expect(validarAnalisis({ response: 'no es json' }, ['QA-1'])).toBeNull()
+  /**
+   * El caso que lo rompía en producción: dos identificadores del corpus que solo se
+   * distinguen por ocho caracteres al azar. Citarlos por número los vuelve inconfundibles.
+   */
+  const REALES = ['CPT-ENDOCRINE-017-0ffaad42', 'CPT-ENDOCRINE-017-c5b8beda', 'CPT-ARROWS-072-f9cde77d']
+  const lectura = (patrones: unknown[], enfoque = 'Empieza por el eje.') => ({ response: JSON.stringify({ patrones, enfoque }) })
+  const patron = (conceptos: unknown[]) => ({ titulo: 'Dos vías opuestas', porque: 'Comparten enzimas.', accion: 'Repasa las irreversibles.', conceptos })
+
+  it('resuelve las citas por número de la lista, no por identificador copiado', () => {
+    const leido = validarAnalisis(lectura([patron([1, 3])]), REALES)
+    expect(leido).toEqual({ ok: { enfoque: 'Empieza por el eje.', patrones: [{ ...patron([REALES[0], REALES[2]]) }] } })
+    // Un número que llega como texto, y un identificador exacto, también valen.
+    expect(validarAnalisis(lectura([patron(['2'])]), REALES)).toMatchObject({ ok: { patrones: [{ conceptos: [REALES[1]] }] } })
+    expect(validarAnalisis(lectura([patron([REALES[1]])]), REALES)).toMatchObject({ ok: { patrones: [{ conceptos: [REALES[1]] }] } })
+  })
+
+  it('una cita que no se puede resolver se cae sola, sin llevarse la lectura entera', () => {
+    // Un sufijo mal copiado: antes invalidaba las dos horas de estudio que resumía.
+    const leido = validarAnalisis(lectura([patron([1, 'CPT-ENDOCRINE-017-deadbeef', 99])]), REALES)
+    expect(leido).toMatchObject({ ok: { patrones: [{ conceptos: [REALES[0]] }] } })
+    // Un patrón sin ninguna cita válida se descarta; la lectura sigue si otro sí la tiene.
+    expect(validarAnalisis(lectura([patron([99]), patron([2])]), REALES)).toMatchObject({ ok: { patrones: [{ conceptos: [REALES[1]] }] } })
+  })
+
+  it('nunca inventa: sin nada citable de esta semana, no hay lectura y se dice por qué', () => {
+    expect(validarAnalisis(lectura([patron([99])]), REALES)).toEqual({ error: 'ningún patrón citaba conceptos de esta semana' })
+    expect(validarAnalisis(lectura([]), REALES)).toEqual({ error: 'la lectura llegó sin patrones' })
+    expect(validarAnalisis({ response: JSON.stringify({ patrones: [patron([1])] }) }, REALES)).toEqual({ error: 'la lectura llegó sin enfoque' })
+    expect(validarAnalisis({ response: 'no es json' }, REALES)).toEqual({ error: 'el modelo no devolvió JSON' })
+  })
+
+  it('recorta lo que se pasa de largo en vez de tirar la lectura', () => {
+    const leido = validarAnalisis(lectura([patron([1])].map(p => ({ ...p, porque: 'x'.repeat(900) })), 'y'.repeat(900)), REALES)
+    expect(leido).toHaveProperty('ok')
+    const { ok } = leido as { ok: { enfoque: string; patrones: { porque: string }[] } }
+    expect(ok.enfoque).toHaveLength(400)
+    expect(ok.patrones[0].porque).toHaveLength(500)
   })
 
   it('resuelve el material desde el corpus y agrupa lo que el modelo devuelve', async () => {
     vi.stubGlobal('fetch', corpusFalso())
     const storage = new MemoryStorage()
-    const analisis = { patrones: [{ titulo: 'Vías inversas', porque: 'Comparten intermediarios.', conceptos: ['QA-1', 'QA-2'], accion: 'Repasa las tres irreversibles.' }], enfoque: 'Empieza por las enzimas reguladoras.' }
+    const analisis = { patrones: [{ titulo: 'Vías inversas', porque: 'Comparten intermediarios.', conceptos: [1, 2], accion: 'Repasa las tres irreversibles.' }], enfoque: 'Empieza por las enzimas reguladoras.' }
     const env = { AI_FREE_ENABLED: 'true', AI: { run: vi.fn().mockResolvedValue({ response: JSON.stringify(analisis) }) },
       ASSETS: { fetch: vi.fn() }, COACH: { idFromName: vi.fn(), get: vi.fn() } }
     const coach = new StudyCoach({ storage }, env)
@@ -359,8 +389,12 @@ describe('lectura de la semana con IA', () => {
     const respuesta = await worker.fetch(semana(DOS_FALLOS), env)
     expect(respuesta.status).toBe(200)
     expect(await respuesta.json()).toMatchObject({ enfoque: 'Empieza por las enzimas reguladoras.', cached: false })
-    // El prompt lleva la afirmación del corpus, no lo que dijera el cliente.
-    expect(JSON.stringify(env.AI.run.mock.calls[0][1])).toContain('Afirmación de QA-1.')
+    // El prompt lleva la afirmación del corpus, numerada, no lo que dijera el cliente.
+    const enviado = JSON.stringify(env.AI.run.mock.calls[0][1])
+    expect(enviado).toContain('Afirmación de QA-1.')
+    expect(enviado).toContain('\\"n\\":1')
+    // Y los conceptos citados por número se devuelven ya resueltos a identificadores.
+    expect(await (await worker.fetch(semana(DOS_FALLOS), env)).json()).toMatchObject({ patrones: [{ conceptos: ['QA-1', 'QA-2'] }] })
 
     const repetida = await worker.fetch(semana(DOS_FALLOS), env)
     expect(await repetida.json()).toMatchObject({ cached: true })

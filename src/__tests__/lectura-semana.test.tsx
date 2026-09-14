@@ -51,9 +51,11 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.clearAllMocks() })
 
 describe('lectura de la semana', () => {
-  it('no pide nada hasta que se pulsa, y enseña antes lo que enviaría', () => {
-    pintar()
+  it('no pide nada hasta que se pulsa, y enseña antes lo que enviaría', async () => {
+    await act(async () => { pintar() })
     expect(mock.analizar).not.toHaveBeenCalled()
+    // La cuota sí se consulta al entrar: no gasta IA y decide si merece la pena pulsar.
+    expect(host.textContent).toContain('Queda el 90 % de la cuota gratuita de hoy.')
     expect(host.textContent).toContain('Ver los fallos que se enviarían')
     expect(host.textContent).toContain('Tus respuestas escritas no se envían.')
     expect(host.textContent).toContain('La glucólisis produce dos ATP netos.')
@@ -70,7 +72,6 @@ describe('lectura de la semana', () => {
     ])
     expect(host.textContent).toContain('Vías opuestas')
     expect(host.textContent).toContain('Empieza por las enzimas irreversibles.')
-    expect(host.textContent).toContain('queda el 90 % de la cuota gratuita de hoy')
     await pulsar('Repasar estos 2')
     expect(estudiar).toHaveBeenCalledWith(['QA-1', 'QA-2'])
   })
@@ -81,6 +82,13 @@ describe('lectura de la semana', () => {
     await pulsar('Leer mi semana con IA')
     expect(host.textContent).toContain('La cuota de análisis gratuito de hoy se ha agotado.')
     expect(host.textContent).toContain('Leer mi semana con IA')
+  })
+
+  it('un fallo del modelo llega con su detalle, para saber qué pasó sin mirar logs', async () => {
+    mock.analizar.mockResolvedValue({ estado: 'sin_ia', motivo: 'La ayuda no pudo respaldar su respuesta en la fuente, así que se descartó. (ningún patrón citaba conceptos de esta semana)' })
+    pintar()
+    await pulsar('Leer mi semana con IA')
+    expect(host.textContent).toContain('ningún patrón citaba conceptos de esta semana')
   })
 
   it('sin fallos esta semana la tarjeta no aparece', () => {
