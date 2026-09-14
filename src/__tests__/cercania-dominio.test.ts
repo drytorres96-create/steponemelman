@@ -29,14 +29,14 @@ describe('cercanía al dominio', () => {
     expect(c.cumple).toBe(false)
     expect(c.bastaUnAcierto).toBe(false)
     expect(c.esperandoSeparacion).toBe(true)
-    expect(c.disponibleDesde).toBe(T0 + 96 * HORA)
-    expect(c.faltan).toEqual(['separadas ≥ 96 h'])
+    expect(c.disponibleDesde).toBe(T0 + 48 * HORA)
+    expect(c.faltan).toEqual(['separadas ≥ 48 h'])
   })
 
   it('cuando de verdad falta un acierto lo dice, y ese acierto lo cierra', () => {
-    // Dos aciertos ya separados 96 h: sólo falta el tercero.
-    const intentos = [acierto(T0, 's1'), acierto(T0 + 100 * HORA, 's2')]
-    const ahora = T0 + 101 * HORA
+    // Dos aciertos ya separados más de 48 h: sólo falta el tercero.
+    const intentos = [acierto(T0, 's1'), acierto(T0 + 60 * HORA, 's2')]
+    const ahora = T0 + 61 * HORA
     const c = cercania(intentos, ahora)
     expect(c.bastaUnAcierto).toBe(true)
     expect(c.esperandoSeparacion).toBe(false)
@@ -49,8 +49,8 @@ describe('cercanía al dominio', () => {
   })
 
   it('un concepto ya dominado no pide nada más', () => {
-    const intentos = [acierto(T0, 's1'), acierto(T0 + 50 * HORA, 's2'), acierto(T0 + 100 * HORA, 's3')]
-    const c = cercania(intentos, T0 + 101 * HORA)
+    const intentos = [acierto(T0, 's1'), acierto(T0 + 25 * HORA, 's2'), acierto(T0 + 50 * HORA, 's3')]
+    const c = cercania(intentos, T0 + 51 * HORA)
     expect(c).toEqual({ cumple: true, bastaUnAcierto: false, esperandoSeparacion: false, disponibleDesde: null, faltan: [] })
   })
 
@@ -72,7 +72,7 @@ describe('cercanía al dominio', () => {
     ]
     const c = cercania(intentos, T0 + 315 * HORA)
     expect(c.esperandoSeparacion).toBe(true)
-    expect(c.disponibleDesde).toBe(T0 + 310 * HORA + 96 * HORA)
+    expect(c.disponibleDesde).toBe(T0 + 310 * HORA + 48 * HORA)
   })
 
   it('un acierto con ayuda no cuenta como punto de partida de la separación', () => {
@@ -83,7 +83,7 @@ describe('cercanía al dominio', () => {
     const c = cercania(intentos, T0 + 7 * HORA)
     expect(c.esperandoSeparacion).toBe(true)
     // Arranca en el primero independiente, el de +2 h, no en el que llevó explicación previa.
-    expect(c.disponibleDesde).toBe(T0 + 2 * HORA + 96 * HORA)
+    expect(c.disponibleDesde).toBe(T0 + 2 * HORA + 48 * HORA)
   })
 
   it('sin ningún acierto vigente no inventa una fecha', () => {

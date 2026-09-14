@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { nuevoProgreso, programar } from '../srs/fsrs'
-import { evidenciaIndependiente, CRITERIOS_HEREDADOS } from '../srs/mastery'
+import { evidenciaIndependiente, CRITERIOS_HEREDADOS, CRITERIOS_96H } from '../srs/mastery'
 import type { Intento } from '../srs/tipos'
 import {
   CORPUS_VERSION, ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, reconstruirProgreso, combinarEstados,
@@ -147,11 +147,12 @@ describe('estado persistido compatible', () => {
 })
 
 describe('migración de criterios al leer el estado guardado', () => {
-  it('un estado con los criterios heredados adopta los endurecidos', () => {
-    const guardado = { ...ESTADO_INICIAL, criterios: { ...CRITERIOS_HEREDADOS } }
-    const leido = leerEstadoDesconocido(guardado)
-    expect(leido?.criterios.separacionHoras).toBe(96)
-    expect(leido?.criterios.ventanaConfusionDias).toBe(7)
+  it('un estado con los criterios de cualquier generación anterior adopta los vigentes', () => {
+    for (const generacion of [CRITERIOS_HEREDADOS, CRITERIOS_96H]) {
+      const leido = leerEstadoDesconocido({ ...ESTADO_INICIAL, criterios: { ...generacion } })
+      expect(leido?.criterios.separacionHoras).toBe(48)
+      expect(leido?.criterios.ventanaConfusionDias).toBe(7)
+    }
   })
   it('unos criterios ajustados a mano se conservan intactos', () => {
     const propios = { ...CRITERIOS_HEREDADOS, separacionHoras: 48, recuperaciones: 4 }
