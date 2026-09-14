@@ -408,3 +408,12 @@ summary::marker { color: var(--violeta); }
   .plan-lista { padding: 6px 16px 16px; }
   .plan-fila-sesion { margin-left: 0; }
 }
+
+/* ---------- Recuperación: lo que sólo espera separación ---------- */
+.espera-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.espera-lista li {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; justify-content: space-between;
+  padding-bottom: 8px; border-bottom: 1px solid var(--linea-suave);
+}
+.espera-lista li:last-child { border-bottom: 0; padding-bottom: 0; }
+.espera-lista li > span:first-child { color: var(--texto-2); font-size: .88rem; min-width: 0; }

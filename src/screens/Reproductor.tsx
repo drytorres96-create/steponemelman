@@ -7,6 +7,7 @@ import { calificarConIA } from '../lib/calificacion-ia'
 import { Modal, PanelFuente, EtiquetaEstado } from '../components/comunes'
 import { NOMBRE_ERROR, type Intento, type TipoError } from '../srs/tipos'
 import { resumenDominio } from '../srs/mastery'
+import { cercaniaDominio } from '../srs/cercania'
 import { crearUUID } from '../store/model'
 import { EVALUADOR_VERSION } from '../lib/normalize'
 import { esRespuestaBreve, prepararConcepto } from '../lib/formatos'
@@ -390,6 +391,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
   const p = progresoDe(c.concept_id)
   const presentacionCambio = !!intentoActual.current?.pregunta_version && intentoActual.current.pregunta_version !== versionPregunta(c)
   const dominio = resumenDominio(p, estado.criterios)
+  const cercania = cercaniaDominio(p, estado.criterios)
   const modo = modoEnsenanza(c)
   const alternativa = res?.veredicto === 'revision' && original ? prepararConcepto(original, {
     semilla: identificarPregunta(sesionId.current!, orden.length, original.concept_id), indice: orden.length,
@@ -476,7 +478,12 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
           {c.evaluacion.opciones?.filter(o => !o.correcta && o.texto !== res.respuestaDada && o.por_que).map(o => <p className="mini" key={o.texto}><b>{o.texto}:</b> {o.por_que}</p>)}
           {c.relacionados.length > 0 && <p className="mini">Conecta con: {c.relacionados.join(' · ')}</p>}
           <p className="mini">{dominio.texto}</p>
-          {dominio.pendientes.length > 0 && <ul className="mini">{dominio.pendientes.map(criterio => <li key={criterio}>{criterio}</li>)}</ul>}
+          {/* Acertar de nuevo no adelanta la separación: decirlo aquí evita repetirlo en balde. */}
+          {cercania.esperandoSeparacion && cercania.disponibleDesde !== null
+            ? <p className="mini">Ya tiene los aciertos que pide el umbral. Falta que estén separados {estado.criterios.separacionHoras} h:
+              se acredita a partir del {new Date(cercania.disponibleDesde).toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'short' })}.
+              Repetirlo antes no adelanta ese reloj.</p>
+            : dominio.pendientes.length > 0 && <ul className="mini">{dominio.pendientes.map(criterio => <li key={criterio}>{criterio}</li>)}</ul>}
         </details>
         {res.veredicto !== 'correcta' && !presentacionCambio && <details style={{ marginTop: 12 }}><summary>Sigo sin entender</summary><AyudaIA key={preguntaId} concepto={c} respuesta={res.respuestaDada} preguntaId={preguntaId} indice={i} ruta={cola.ruta} reintento={reintento} versionFormato={versionFormato} /></details>}
         <button className="btn pequeno fantasma" style={{ marginTop: 10 }} onClick={() => setVerFuente(true)}>Abrir la fuente</button>

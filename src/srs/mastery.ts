@@ -31,11 +31,14 @@ export function sonCriteriosHeredados(c: CriteriosDominio): boolean {
     .every(k => c[k] === CRITERIOS_HEREDADOS[k])
 }
 
+/** Identificador estable de cada criterio, para razonar sobre ellos sin leer el rótulo. */
+export type ClaveCriterio = 'aciertos' | 'sesiones' | 'separacion' | 'pistas' | 'activa' | 'confusion'
+
 export interface EvidenciaDominio {
   cumple: boolean
   /** Aciertos exigidos para este concepto: sube cuando toda la evidencia es reconocimiento. */
   requeridas: number
-  detalle: { criterio: string; cumplido: boolean; valor: string }[]
+  detalle: { clave: ClaveCriterio; criterio: string; cumplido: boolean; valor: string }[]
 }
 
 /** Recuerdo libre o aplicación de un caso, frente al reconocimiento entre opciones. */
@@ -62,9 +65,12 @@ function ultimoResuelto(p: ProgresoConcepto): Intento | undefined {
   return [...p.intentos].reverse().find(i => i.resultado !== 'revision')
 }
 
-function aciertosVigentes(p: ProgresoConcepto): Intento[] {
-  // El historial se conserva. La evidencia vigente se reconstruye tras el último
-  // fallo comprobado, evitando certificar de nuevo por aciertos antiguos.
+/**
+ * Aciertos que siguen contando. El historial se conserva, pero la evidencia vigente
+ * se reconstruye tras el último fallo comprobado. Exportado porque la cercanía al
+ * dominio necesita saber desde cuándo corre el reloj de la separación.
+ */
+export function aciertosVigentes(p: ProgresoConcepto): Intento[] {
   const ultimoFallo = p.intentos.reduce((ultimo, i, n) =>
     i.resultado !== 'revision' && !intentoCorrecto(i) ? n : ultimo, -1)
   return p.intentos.slice(ultimoFallo + 1).filter(evidenciaIndependiente)
@@ -88,17 +94,18 @@ export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora =
   const confusionReciente = p.intentos.some(i =>
     i.tipo_error === 'confusion_conceptos' && (ahora - i.ts) < c.ventanaConfusionDias * DIA)
 
-  const detalle = [
-    { criterio: `${requeridas} respuestas correctas independientes`, cumplido: correctas.length >= requeridas, valor: `${correctas.length}` },
-    { criterio: `${c.sesiones} sesiones distintas`, cumplido: sesiones.size >= c.sesiones, valor: `${sesiones.size}` },
-    { criterio: `separadas ≥ ${c.separacionHoras} h`, cumplido: separadas, valor: separadas ? 'sí' : 'no' },
-    ...(c.exigirSinPistas ? [{ criterio: 'al menos una sin pistas', cumplido: sinPistas, valor: sinPistas ? 'sí' : 'no' }] : []),
+  const detalle: EvidenciaDominio['detalle'] = [
+    { clave: 'aciertos', criterio: `${requeridas} respuestas correctas independientes`, cumplido: correctas.length >= requeridas, valor: `${correctas.length}` },
+    { clave: 'sesiones', criterio: `${c.sesiones} sesiones distintas`, cumplido: sesiones.size >= c.sesiones, valor: `${sesiones.size}` },
+    { clave: 'separacion', criterio: `separadas ≥ ${c.separacionHoras} h`, cumplido: separadas, valor: separadas ? 'sí' : 'no' },
+    ...(c.exigirSinPistas ? [{ clave: 'pistas' as const, criterio: 'al menos una sin pistas', cumplido: sinPistas, valor: sinPistas ? 'sí' : 'no' }] : []),
     ...(c.exigirRecuperacionActiva ? [{
+      clave: 'activa' as const,
       criterio: 'recuerdo libre o aplicación, no sólo reconocimiento',
       cumplido: activas.length > 0 || correctas.length >= requeridas,
       valor: activas.length > 0 ? `${activas.length}` : `ninguno · umbral ${requeridas}`,
     }] : []),
-    { criterio: `sin confusiones en ${c.ventanaConfusionDias} días`, cumplido: !confusionReciente, valor: confusionReciente ? 'hay confusión reciente' : 'ninguna' },
+    { clave: 'confusion', criterio: `sin confusiones en ${c.ventanaConfusionDias} días`, cumplido: !confusionReciente, valor: confusionReciente ? 'hay confusión reciente' : 'ninguna' },
   ]
   return { cumple: detalle.every(d => d.cumplido), requeridas, detalle }
 }
