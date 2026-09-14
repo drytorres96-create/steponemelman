@@ -4,7 +4,7 @@ import { cargarTodo } from '../data/corpus'
 import type { Concepto } from '../schema/concept'
 import { NOMBRE_INTERACCION } from '../schema/concept'
 import { estaVencido, prioridad, retencion, DIA } from '../srs/fsrs'
-import { calcularEstado } from '../srs/mastery'
+import { cercaniaDominio, type Cercania } from '../srs/cercania'
 import { erroresRecientesPendientes } from '../lib/plan-estudio'
 import { EtiquetaEstado, Vacio } from '../components/comunes'
 import { ScreenHeading } from '../components/Editorial'
@@ -14,6 +14,15 @@ import type { NbmeQuestionRef } from '../nbme/types'
 import type { OpcionesSesionPersonalizada } from '../lib/busqueda'
 
 const TAMANOS = [5, 10, 20] as const
+
+/** Cuándo deja de bloquear la separación, dicho en el lenguaje de quien espera. */
+function fechaDisponible(cuando: number | null, ahora: number): string {
+  if (cuando === null) return 'sin fecha'
+  const horas = (cuando - ahora) / 3_600_000
+  if (horas <= 0) return 'ya disponible'
+  if (horas < 24) return `en ${Math.ceil(horas)} h`
+  return new Date(cuando).toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'short' })
+}
 
 /**
  * Recuperación reúne en un sitio lo que hoy estaba repartido: conceptos vencidos
@@ -49,10 +58,20 @@ export function Recuperacion({ onEstudiar, onPreguntas, onMezclar }: {
   if (!conceptos) return <div className="vacio" role="status">Cargando lo que toca recuperar…</div>
 
   const ahora = Date.now()
-  const cerca = conceptos
-    .filter(c => { const p = estado.progreso[c.concept_id]; return p && calcularEstado(p, estado.criterios, ahora) === 'proximo_dominio' })
-    .sort((a, b) => prioridad(estado.progreso[b.concept_id]!, ahora) - prioridad(estado.progreso[a.concept_id]!, ahora))
-  const yaContados = new Set(cerca.map(c => c.concept_id))
+  const porPrioridad = (a: Concepto, b: Concepto) =>
+    prioridad(estado.progreso[b.concept_id]!, ahora) - prioridad(estado.progreso[a.concept_id]!, ahora)
+  const cercania = new Map<string, Cercania>()
+  for (const c of conceptos) {
+    const p = estado.progreso[c.concept_id]
+    if (p) cercania.set(c.concept_id, cercaniaDominio(p, estado.criterios, ahora))
+  }
+  // «Cerca de dominio» son sólo los que de verdad cierran con un acierto más. Los que
+  // ya tienen los aciertos y lo único que les falta es la separación en el tiempo van
+  // aparte: responderlos hoy no adelanta ese reloj.
+  const cerca = conceptos.filter(c => cercania.get(c.concept_id)?.bastaUnAcierto).sort(porPrioridad)
+  const esperando = conceptos.filter(c => cercania.get(c.concept_id)?.esperandoSeparacion)
+    .sort((a, b) => (cercania.get(a.concept_id)!.disponibleDesde ?? 0) - (cercania.get(b.concept_id)!.disponibleDesde ?? 0))
+  const yaContados = new Set([...cerca, ...esperando].map(c => c.concept_id))
 
   const vencidos = conceptos
     .filter(c => { const p = estado.progreso[c.concept_id]; return p && estaVencido(p, ahora) && !yaContados.has(c.concept_id) })
@@ -63,7 +82,7 @@ export function Recuperacion({ onEstudiar, onPreguntas, onMezclar }: {
 
   const idsMezcla = [...cerca, ...paraConceptos].slice(0, limite).map(c => c.concept_id)
   const refsMezcla = preguntas.slice(0, Math.min(Math.max(1, Math.ceil(limite / 3)), preguntas.length, 20))
-  const nada = !cerca.length && !paraConceptos.length && !preguntas.length
+  const nada = !cerca.length && !esperando.length && !paraConceptos.length && !preguntas.length
 
   const grupo = (
     clave: string, titulo: string, texto: string, cuenta: number,
@@ -77,6 +96,11 @@ export function Recuperacion({ onEstudiar, onPreguntas, onMezclar }: {
     <ScreenHeading eyebrow="Lo que te debe la memoria" title="Recuperación" scene="fluid"
       description="Lo que fallaste y lo que vence, en un solo sitio. Empieza por lo que está a un acierto de consolidarse." />
 
+    {esperando.length > 0 && cerca.length === 0 && <div className="aviso" role="status"><span>ⓘ</span><div>
+      {esperando.length === 1 ? 'Un concepto tiene' : `${esperando.length} conceptos tienen`} ya todos los aciertos que pide el umbral;
+      lo único que falta es que pase el tiempo de separación. Repasarlos hoy no los marcará como dominados.
+    </div></div>}
+
     <div className="fila" role="group" aria-label="Tamaño de la sesión de recuperación">
       <label htmlFor="limite-recuperacion">Carga de la sesión</label>
       <select id="limite-recuperacion" style={{ width: 'auto' }} value={limite}
@@ -87,11 +111,29 @@ export function Recuperacion({ onEstudiar, onPreguntas, onMezclar }: {
 
     {nada && <Vacio titulo="No hay nada que recuperar ahora" texto="Ni repasos vencidos, ni errores recientes, ni preguntas por corregir. Vuelve a Mi semana cuando quieras." />}
 
-    {grupo('cerca', 'Cerca de dominio', 'Con un acierto más cruzan el umbral. Son los más baratos de cerrar.', cerca.length,
+    {grupo('cerca', 'Cerca de dominio', 'Sólo les falta un acierto independiente: hoy sí cruzan el umbral.', cerca.length,
       <button className="btn principal" style={{ alignSelf: 'flex-start' }}
         onClick={() => onEstudiar(cerca.slice(0, limite).map(c => c.concept_id), { titulo: 'Cerca de dominio', subtitulo: 'Un acierto más y quedan consolidados.', ruta: 'repaso', modulo: 'recuperacion' })}>
         Consolidar ahora ({Math.min(limite, cerca.length)})
       </button>)}
+
+    {esperando.length > 0 && <section className="tarjeta pila" aria-labelledby="recuperacion-esperando">
+      <div><h2 id="recuperacion-esperando">Esperando separación ({esperando.length})</h2>
+        <p className="sutil">Ya tienen los aciertos que pide el umbral. Lo único que falta es tiempo:
+          el dominio exige que los aciertos estén separados {estado.criterios.separacionHoras} h, y ese
+          reloj no se adelanta respondiendo otra vez. Acertarlos hoy no los acredita.</p></div>
+      <ul className="espera-lista">
+        {esperando.slice(0, 12).map(c => <li key={c.concept_id}>
+          <span>{c.objetivo}</span>
+          <span className="etq">{fechaDisponible(cercania.get(c.concept_id)!.disponibleDesde, ahora)}</span>
+        </li>)}
+      </ul>
+      {esperando.length > 12 && <p className="mini">Y {esperando.length - 12} más.</p>}
+      <button className="btn fantasma" style={{ alignSelf: 'flex-start' }}
+        onClick={() => onEstudiar(esperando.slice(0, limite).map(c => c.concept_id), { titulo: 'Repaso sin acreditar', subtitulo: 'Refuerzo voluntario: el umbral sigue esperando su separación.', ruta: 'repaso', modulo: 'recuperacion' })}>
+        Repasarlos igualmente ({Math.min(limite, esperando.length)})
+      </button>
+    </section>}
 
     {grupo('conceptos', 'Conceptos', 'Repasos vencidos por el planificador y errores de los últimos siete días.', paraConceptos.length,
       <button className="btn principal" style={{ alignSelf: 'flex-start' }}
@@ -122,7 +164,7 @@ export function Recuperacion({ onEstudiar, onPreguntas, onMezclar }: {
       <p className="mini" style={{ marginTop: 12 }}>La retención es una estimación del planificador, no una medición directa de tu memoria. Puedes estudiar sin revisar estos valores.</p>
       <div className="scroll-x">
         <table className="tabla">
-          <thead><tr><th>Concepto</th><th>Interacción</th><th>Estado</th><th>Retención</th><th>Prioridad</th><th>Vencido desde</th></tr></thead>
+          <thead><tr><th>Concepto</th><th>Interacción</th><th>Estado</th><th>Qué falta</th><th>Retención</th><th>Prioridad</th><th>Vencido desde</th></tr></thead>
           <tbody>
             {paraConceptos.slice(0, 60).map(c => {
               const p = estado.progreso[c.concept_id]!
@@ -133,6 +175,7 @@ export function Recuperacion({ onEstudiar, onPreguntas, onMezclar }: {
                   <div className="mini">{c.clasificacion.disciplina_primaria} · {c.clasificacion.tema}</div></td>
                 <td className="sutil">{NOMBRE_INTERACCION[c.interaccion.recomendada]}</td>
                 <td><EtiquetaEstado estado={p.estado} /></td>
+                <td className="mini">{cercania.get(c.concept_id)?.faltan.join(' · ') || 'nada'}</td>
                 <td style={{ color: r < 0.7 ? 'var(--ambar)' : 'var(--texto-2)' }}>{(r * 100).toFixed(0)} %</td>
                 <td>{prioridad(p, ahora).toFixed(2)}</td>
                 <td className="sutil">{!p.proxima ? 'sin fecha' : atraso < 1 ? `${Math.max(0, Math.round(atraso * 24))} h` : `${Math.round(atraso)} d`}</td>
