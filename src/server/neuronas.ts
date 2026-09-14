@@ -39,7 +39,7 @@ export const FRACCION_POR_USUARIO = 0.9
 /** Cortafuegos contra un bucle del cliente: ninguna sesión legítima se acerca a esto. */
 export const LIMITE_LLAMADAS_USUARIO = 300
 
-export type ModoIA = 'calificar' | 'explicar' | 'analizar' | 'examen' | 'confusion'
+export type ModoIA = 'calificar' | 'explicar' | 'analizar' | 'examen' | 'confusion' | 'chat'
 
 /**
  * Hasta qué parte del presupuesto puede llegar cada modo.
@@ -50,11 +50,12 @@ export type ModoIA = 'calificar' | 'explicar' | 'analizar' | 'examen' | 'confusi
  * una respuesta va con él y cuesta unas pocas neuronas, porque no genera texto. La lectura
  * de la semana es semanal y barata. La explicación es cara y prescindible —el concepto ya
  * trae la suya—, y la viñeta de examen es la más cara de todas y lo más opcional que hay:
- * son las primeras en quedarse fuera. Así un día de muchas dudas no puede dejar sin
+ * son las primeras en quedarse fuera. El chat va por encima de las dos: una duda concreta
+ * en el momento en que aparece vale más que cualquier texto preparado de antemano. Así un día de muchas dudas no puede dejar sin
  * corrector al día siguiente.
  */
 export const TECHO_POR_MODO: Record<ModoIA, number> = {
-  calificar: 1, confusion: 1, analizar: 0.85, explicar: 0.7, examen: 0.6,
+  calificar: 1, confusion: 1, analizar: 0.85, chat: 0.75, explicar: 0.7, examen: 0.6,
 }
 
 export const techoDeModo = (modo: ModoIA) => Math.floor(PRESUPUESTO_UTIL * TECHO_POR_MODO[modo])

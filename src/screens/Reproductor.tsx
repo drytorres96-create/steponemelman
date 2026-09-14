@@ -14,6 +14,7 @@ import { esRespuestaBreve, prepararConcepto } from '../lib/formatos'
 import { AyudaIA } from '../components/AyudaIA'
 import { ExamenIA } from '../components/ExamenIA'
 import { ConfusionIA } from '../components/ConfusionIA'
+import { ChatConcepto } from '../components/ChatConcepto'
 import { Cronometro } from '../components/Cronometro'
 import { tiempoLegible } from '../lib/tiempo'
 import { buscarIntentoPaso, conAyuda, diasParaCalificacion, identificarPregunta, necesitaReintento, resumirCorrecciones, resumirIntentos, RelojActividad, siguienteCola, versionPregunta } from './sesion'
@@ -526,6 +527,8 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
         </details>
         {/* A diferencia de la ayuda, esto no espera a que falles: sirve igual cuando aciertas. */}
         {!presentacionCambio && <details style={{ marginTop: 12 }}><summary>Cómo caería en el examen</summary><ExamenIA key={c.concept_id} concepto={c} /></details>}
+        {/* Solo después de responder: preguntar antes sería pedirle la respuesta. */}
+        {!presentacionCambio && <details style={{ marginTop: 12 }}><summary>Preguntar sobre esta pregunta</summary><ChatConcepto key={c.concept_id} concepto={c} /></details>}
         {res.veredicto !== 'correcta' && !presentacionCambio && <details style={{ marginTop: 12 }}><summary>Sigo sin entender</summary><AyudaIA key={preguntaId} concepto={c} respuesta={res.respuestaDada} preguntaId={preguntaId} indice={i} ruta={cola.ruta} reintento={reintento} versionFormato={versionFormato} /></details>}
         <button className="btn pequeno fantasma" style={{ marginTop: 10 }} onClick={() => setVerFuente(true)}>Abrir la fuente</button>
         {res.veredicto === 'ortografia' && c.escritura_correctiva.elegible && c.escritura_correctiva.termino && <button className="btn pequeno fantasma" onClick={() => setFase('ortografia')}>Practicar escritura (opcional)</button>}
