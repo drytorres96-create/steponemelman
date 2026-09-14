@@ -11,24 +11,34 @@ export interface CriteriosDominio {
   ventanaConfusionDias: number  // sin confusiones fundamentales recientes
 }
 export const CRITERIOS_POR_DEFECTO: CriteriosDominio = {
-  // 96 h y no 20: tres aciertos separados por 20 horas caben en una tarde larga y la mañana
-  // siguiente, que es machacar la misma huella, no espaciarla.
-  recuperaciones: 3, sesiones: 2, separacionHoras: 96,
+  // 48 h, decidido por Yoel el 14-sep-2026. Veinte horas caben en una tarde larga y la mañana
+  // siguiente —machacar la misma huella, no espaciarla—, pero 96 h eran cuatro días por concepto
+  // con el examen en diciembre: demasiado para ver progreso. Dos noches de sueño separan los
+  // aciertos de verdad y caben en la semana.
+  recuperaciones: 3, sesiones: 2, separacionHoras: 48,
   exigirSinPistas: true, exigirRecuperacionActiva: true, ventanaConfusionDias: 7,
 }
 
 /**
- * Criterios con los que se venía sincronizando antes de endurecerlos. `criterios` es un campo
+ * Criterios con los que se venía sincronizando antes de cada ajuste. `criterios` es un campo
  * persistido, así que cambiar CRITERIOS_POR_DEFECTO no llega a una cuenta que ya guardó los
- * anteriores: la lectura del estado los migra cuando coinciden exactamente con estos.
+ * anteriores: la lectura del estado los migra cuando coinciden exactamente con alguna generación
+ * anterior. Coincidir exactamente es la prueba de que nunca se tocaron a mano.
  */
 export const CRITERIOS_HEREDADOS: CriteriosDominio = {
   recuperaciones: 3, sesiones: 2, separacionHoras: 20,
   exigirSinPistas: true, exigirRecuperacionActiva: true, ventanaConfusionDias: 14,
 }
+/** La generación de 96 h, vigente entre el 10 y el 14 de septiembre de 2026. */
+export const CRITERIOS_96H: CriteriosDominio = {
+  recuperaciones: 3, sesiones: 2, separacionHoras: 96,
+  exigirSinPistas: true, exigirRecuperacionActiva: true, ventanaConfusionDias: 7,
+}
+export const GENERACIONES_HEREDADAS: CriteriosDominio[] = [CRITERIOS_HEREDADOS, CRITERIOS_96H]
+
 export function sonCriteriosHeredados(c: CriteriosDominio): boolean {
-  return (Object.keys(CRITERIOS_HEREDADOS) as (keyof CriteriosDominio)[])
-    .every(k => c[k] === CRITERIOS_HEREDADOS[k])
+  const claves = Object.keys(CRITERIOS_POR_DEFECTO) as (keyof CriteriosDominio)[]
+  return GENERACIONES_HEREDADAS.some(g => claves.every(k => c[k] === g[k]))
 }
 
 /** Identificador estable de cada criterio, para razonar sobre ellos sin leer el rótulo. */

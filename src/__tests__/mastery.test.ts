@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { nuevoProgreso, programar, DIA } from '../srs/fsrs'
-import { CRITERIOS_POR_DEFECTO, CRITERIOS_HEREDADOS, sonCriteriosHeredados, evaluarDominio, calcularEstado, dominioVigente, evidenciaIndependiente, etapa, resumenDominio } from '../srs/mastery'
+import { CRITERIOS_POR_DEFECTO, CRITERIOS_HEREDADOS, CRITERIOS_96H, sonCriteriosHeredados, evaluarDominio, calcularEstado, dominioVigente, evidenciaIndependiente, etapa, resumenDominio } from '../srs/mastery'
 import type { Intento } from '../srs/tipos'
 
 const it3 = (ts: number, extra: Partial<Intento> = {}): Intento => ({
@@ -173,7 +173,7 @@ describe('criterios de dominio', () => {
     expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 180_000).cumple).toBe(false)
     const resumen = resumenDominio(p, CRITERIOS_POR_DEFECTO, t + 180_000)
     expect(resumen.texto).toBe('Dominio: 0/3 aciertos independientes · 0/2 sesiones')
-    expect(resumen.pendientes).toContain('separadas ≥ 96 h')
+    expect(resumen.pendientes).toContain('separadas ≥ 48 h')
   })
   it('términos breves y selección múltiple pueden acreditar dominio con evidencia independiente', () => {
     const t = Date.now()
@@ -189,17 +189,19 @@ describe('criterios de dominio', () => {
 })
 
 describe('migración de los criterios guardados', () => {
-  it('los criterios heredados se reconocen exactamente', () => {
+  it('cada generación anterior se reconoce exactamente', () => {
     expect(sonCriteriosHeredados(CRITERIOS_HEREDADOS)).toBe(true)
+    expect(sonCriteriosHeredados(CRITERIOS_96H)).toBe(true)
     expect(sonCriteriosHeredados(CRITERIOS_POR_DEFECTO)).toBe(false)
     // Un valor tocado a mano ya no es «heredado» y no se debe pisar.
     expect(sonCriteriosHeredados({ ...CRITERIOS_HEREDADOS, separacionHoras: 48 })).toBe(false)
     expect(sonCriteriosHeredados({ ...CRITERIOS_HEREDADOS, recuperaciones: 4 })).toBe(false)
+    expect(sonCriteriosHeredados({ ...CRITERIOS_96H, recuperaciones: 4 })).toBe(false)
   })
-  it('los criterios endurecidos no son los heredados', () => {
-    expect(CRITERIOS_POR_DEFECTO.separacionHoras).toBe(96)
+  it('los criterios vigentes piden 48 h de separación', () => {
+    expect(CRITERIOS_POR_DEFECTO.separacionHoras).toBe(48)
     expect(CRITERIOS_POR_DEFECTO.ventanaConfusionDias).toBe(7)
     expect(CRITERIOS_HEREDADOS.separacionHoras).toBe(20)
-    expect(CRITERIOS_HEREDADOS.ventanaConfusionDias).toBe(14)
+    expect(CRITERIOS_96H.separacionHoras).toBe(96)
   })
 })

@@ -26,7 +26,7 @@ const HORA = 3_600_000
 // Relativo al reloj real: la prueba no debe depender del día en que se ejecute.
 const AHORA = Date.now()
 const T0 = AHORA - 16 * HORA
-const DISPONIBLE = new Date(T0 + 96 * HORA)
+const DISPONIBLE = new Date(T0 + 48 * HORA)
   .toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'short' })
 
 const acierto = (ts: number, sesion: string): Intento => ({
@@ -60,7 +60,7 @@ beforeEach(() => {
         ], CRITERIOS_POR_DEFECTO),
         // Dos aciertos ya separados 96 h: a este sí le falta sólo un acierto.
         'C-cerca': reconstruirProgreso('C-cerca', [
-          acierto(T0 - 200 * HORA, 's4'), acierto(T0 - 100 * HORA, 's5'),
+          acierto(T0 - 120 * HORA, 's4'), acierto(T0 - 60 * HORA, 's5'),
         ], CRITERIOS_POR_DEFECTO),
       },
     },
@@ -84,7 +84,7 @@ describe('Recuperación distingue lo que cierra hoy de lo que sólo espera', () 
     expect(espera.textContent).toContain('Esperando separación (1)')
     expect(espera.textContent).toContain('Wolff-Chaikoff')
     expect(espera.textContent).toContain('Acertarlos hoy no los acredita')
-    // 96 h desde el primer acierto vigente, no desde el último.
+    // 48 h desde el primer acierto vigente, no desde el último.
     expect(espera.textContent).toContain(DISPONIBLE)
   })
 
