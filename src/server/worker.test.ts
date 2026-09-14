@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import worker, { StudyCoach, leerFallosDeSemana, validarAnalisis, validarCalificacion, validarRespuesta } from './worker'
+import worker, { StudyCoach, candidatosDeConfusion, coseno, leerFallosDeSemana, ordenarParecidos, validarAnalisis, validarCalificacion, validarExamen, validarRespuesta, vectoresDe } from './worker'
 import { FRACCION_POR_USUARIO, PRESUPUESTO_UTIL, neuronasDe, techoDeModo } from './neuronas'
 import { olvidarCachePlan } from './plan'
 const fragment = 'Fragmento sintético: alfa es el primer elemento.'
@@ -421,5 +421,130 @@ describe('lectura de la semana con IA', () => {
     const respuesta = await worker.fetch(new Request('https://site/api/ia/estado', { headers: { Authorization: 'Bearer ' + 'x'.repeat(30) } }), env)
     expect(respuesta.status).toBe(200)
     expect(await respuesta.json()).toMatchObject({ presupuesto: PRESUPUESTO_UTIL, gastadas: 0, restantes: PRESUPUESTO_UTIL, activa: false })
+  })
+})
+
+/**
+ * Cómo caería un concepto en el examen.
+ *
+ * Es el único modo que escribe contenido nuevo, así que lo que se comprueba no es que
+ * diga la verdad —no se puede— sino que llegue entero: una viñeta con cuerpo, el dato que
+ * decide, distractores con motivo y un patrón. Lo que llegue a medias no se enseña.
+ */
+const vinetaLarga = 'Una mujer de 34 años acude por debilidad progresiva de seis meses. La exploración muestra hiperpigmentación de pliegues y presión de 86/54 mmHg. El sodio es de 128 mEq/L y el potasio de 5,8 mEq/L. ¿Cuál es el mecanismo más probable?'
+const examenBueno = {
+  vineta: vinetaLarga, dato_clave: 'La hiperpigmentación con hiponatremia e hiperpotasemia apunta al fallo primario.',
+  trampas: [{ opcion: 'Insuficiencia suprarrenal secundaria', por_que: 'No cursa con hiperpigmentación ni hiperpotasemia.' },
+            { opcion: 'Síndrome de secreción inadecuada de ADH', por_que: 'No explica el potasio alto ni la hipotensión.' }],
+  patron: 'Si ves hiperpigmentación + hiponatremia + hiperpotasemia, piensa en fallo suprarrenal primario.',
+  utilidad: 'Reconocerlo cambia la reposición inicial en urgencias.',
+}
+
+describe('cómo caería en el examen', () => {
+  it('acepta una viñeta completa y rechaza la que llega a medias', () => {
+    expect(validarExamen({ response: JSON.stringify(examenBueno) })).toMatchObject({ patron: examenBueno.patron })
+    // Dos líneas no son una viñeta: eso ya lo traía el concepto.
+    expect(validarExamen({ response: JSON.stringify({ ...examenBueno, vineta: '¿Cuál es el mecanismo?' }) })).toBeNull()
+    expect(validarExamen({ response: JSON.stringify({ ...examenBueno, trampas: [examenBueno.trampas[0]] }) })).toBeNull()
+    expect(validarExamen({ response: JSON.stringify({ ...examenBueno, patron: '' }) })).toBeNull()
+    expect(validarExamen({ response: 'no es json' })).toBeNull()
+  })
+
+  it('una trampa sin motivo se cae sola mientras queden dos completas', () => {
+    const con = { ...examenBueno, trampas: [...examenBueno.trampas, { opcion: 'Sin motivo' }] }
+    expect(validarExamen({ response: JSON.stringify(con) })).toMatchObject({ trampas: [{}, {}] })
+  })
+
+  it('se pide sobre el concepto, no sobre la respuesta, y se cachea', async () => {
+    vi.stubGlobal('fetch', corpusFalso())
+    const storage = new MemoryStorage()
+    const env = { AI_FREE_ENABLED: 'true', AI: { run: vi.fn().mockResolvedValue({ response: JSON.stringify(examenBueno) }) },
+      ASSETS: { fetch: vi.fn() }, COACH: { idFromName: vi.fn(), get: vi.fn() } }
+    const coach = new StudyCoach({ storage }, env)
+    env.COACH.get.mockReturnValue({ fetch: (r: Request) => coach.fetch(r) })
+    const pedir = () => worker.fetch(new Request('https://site/api/aplicar', { method: 'POST',
+      headers: { Authorization: 'Bearer ' + 'x'.repeat(30) }, body: JSON.stringify({ conceptId: 'QA-1' }) }), env)
+
+    const respuesta = await pedir()
+    expect(respuesta.status).toBe(200)
+    expect(await respuesta.json()).toMatchObject({ patron: examenBueno.patron, cached: false })
+    expect(JSON.stringify(env.AI.run.mock.calls[0][1])).toContain('Afirmación de QA-1.')
+    expect(await (await pedir()).json()).toMatchObject({ cached: true })
+    expect(env.AI.run).toHaveBeenCalledTimes(1)
+  })
+
+  it('exige sesión y cuerpo válido antes de tocar el corpus', async () => {
+    const remoto = corpusFalso()
+    vi.stubGlobal('fetch', remoto)
+    const env = { AI_FREE_ENABLED: 'true', AI: { run: vi.fn() }, ASSETS: { fetch: vi.fn() }, COACH: { idFromName: vi.fn(), get: vi.fn() } }
+    expect((await worker.fetch(new Request('https://site/api/aplicar', { method: 'POST' }), env)).status).toBe(401)
+    expect((await worker.fetch(new Request('https://site/api/aplicar', { method: 'POST', headers: { Authorization: 'Bearer ' + 'x'.repeat(30) }, body: '{}' }), env)).status).toBe(400)
+    expect(remoto).not.toHaveBeenCalled()
+    expect(env.AI.run).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Con qué se confundió una respuesta. Aquí no hay nada que pueda inventarse: los textos
+ * comparados salen del concepto y el modelo solo devuelve vectores.
+ */
+describe('detección de confusiones por parecido', () => {
+  it('el coseno aguanta vectores vacíos y de distinta longitud', () => {
+    expect(coseno([1, 0], [1, 0])).toBe(1)
+    expect(coseno([1, 0], [0, 1])).toBe(0)
+    expect(coseno([1, 0], [1, 0, 0])).toBe(0)
+    expect(coseno([0, 0], [1, 1])).toBe(0)
+    expect(coseno([], [])).toBe(0)
+  })
+
+  it('solo acepta el lote completo de vectores', () => {
+    expect(vectoresDe({ data: [[1, 0], [0, 1]] }, 2)).toEqual([[1, 0], [0, 1]])
+    expect(vectoresDe({ data: [[1, 0]] }, 2)).toBeNull()
+    expect(vectoresDe({ data: [[1, 0], ['x']] }, 2)).toBeNull()
+    expect(vectoresDe({ data: [[1, 0], [Number.NaN, 1]] }, 2)).toBeNull()
+    expect(vectoresDe(null, 2)).toBeNull()
+  })
+
+  it('nombra el más parecido y calla cuando nada se parece de verdad', () => {
+    const candidatos = [{ texto: 'colágeno tipo I', origen: 'correcta' as const }, { texto: 'elastina', origen: 'distractor' as const }]
+    const cerca = ordenarParecidos(candidatos, [[1, 0], [0.98, 0.2], [0, 1]])
+    expect(cerca.mejor).toMatchObject({ texto: 'colágeno tipo I', origen: 'correcta' })
+    expect(cerca.candidatos).toHaveLength(2)
+    // Por debajo del umbral no se afirma nada: peor que callar es sugerir una confusión falsa.
+    expect(ordenarParecidos(candidatos, [[1, 0], [0.2, 1], [0, 1]]).mejor).toBeNull()
+  })
+
+  it('los candidatos salen del concepto, sin repetidos y con su origen', () => {
+    const c = {
+      respuesta_canonica: 'alfa', sinonimos: ['alfa'], distractores_cercanos: [{ texto: 'beta' }],
+      confusiones: ['gamma'], relacionados: ['delta'],
+      evaluacion: { opciones: [{ texto: 'alfa', correcta: true }, { texto: 'épsilon', correcta: false }] },
+    } as unknown as Parameters<typeof candidatosDeConfusion>[0]
+    expect(candidatosDeConfusion(c)).toEqual([
+      { texto: 'alfa', origen: 'correcta' }, { texto: 'beta', origen: 'distractor' },
+      { texto: 'gamma', origen: 'confusion' }, { texto: 'épsilon', origen: 'opcion' },
+      { texto: 'delta', origen: 'relacionado' },
+    ])
+  })
+
+  it('compara contra el corpus con una sola llamada barata y la cachea', async () => {
+    vi.stubGlobal('fetch', corpusFalso())
+    const storage = new MemoryStorage()
+    const env = { AI_FREE_ENABLED: 'true', AI: { run: vi.fn().mockResolvedValue({ data: [[1, 0], [0.99, 0.1], [0, 1]] }) },
+      ASSETS: { fetch: vi.fn() }, COACH: { idFromName: vi.fn(), get: vi.fn() } }
+    const coach = new StudyCoach({ storage }, env)
+    env.COACH.get.mockReturnValue({ fetch: (r: Request) => coach.fetch(r) })
+    const pedir = () => worker.fetch(new Request('https://site/api/confusion', { method: 'POST',
+      headers: { Authorization: 'Bearer ' + 'x'.repeat(30) }, body: JSON.stringify({ conceptId: 'QA-1', answer: 'beta' }) }), env)
+
+    const respuesta = await pedir()
+    expect(respuesta.status).toBe(200)
+    expect(await respuesta.json()).toMatchObject({ mejor: { texto: 'alfa', origen: 'correcta' } })
+    expect(env.AI.run.mock.calls[0][0]).toContain('bge')
+    // Una sola llamada para toda la comparación, y gasta neuronas de embedding, no de texto.
+    expect(env.AI.run).toHaveBeenCalledTimes(1)
+    expect((await storage.get<{ neuronas: number }>('gasto'))!.neuronas).toBeLessThan(5)
+    expect(await (await pedir()).json()).toMatchObject({ cached: true })
+    expect(env.AI.run).toHaveBeenCalledTimes(1)
   })
 })

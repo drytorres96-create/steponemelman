@@ -13,6 +13,12 @@
 export const TARIFA_ENTRADA = 26_668
 export const TARIFA_SALIDA = 204_805
 
+/**
+ * Tarifa del modelo de embeddings, `@cf/baai/bge-m3`. Dos órdenes de magnitud por debajo
+ * del modelo de texto: comparar cincuenta candidatos cuesta una neurona, no cien.
+ */
+export const TARIFA_EMBEDDING = 1_075
+
 /** Lo que regala el plan gratuito cada día. No se sobrepasa: no hay respaldo de pago. */
 export const PRESUPUESTO_DIARIO = 10_000
 
@@ -33,19 +39,23 @@ export const FRACCION_POR_USUARIO = 0.9
 /** Cortafuegos contra un bucle del cliente: ninguna sesión legítima se acerca a esto. */
 export const LIMITE_LLAMADAS_USUARIO = 300
 
-export type ModoIA = 'calificar' | 'explicar' | 'analizar'
+export type ModoIA = 'calificar' | 'explicar' | 'analizar' | 'examen' | 'confusion'
 
 /**
  * Hasta qué parte del presupuesto puede llegar cada modo.
  *
  * No todos los usos valen lo mismo para estudiar. Corregir una respuesta libre decide el
  * veredicto que se guarda en el historial, y de ahí salen el dominio y la repetición
- * espaciada: ese uso llega hasta el final del presupuesto. La lectura de la semana es
- * semanal y barata. La explicación es la más cara y la más prescindible —el concepto ya
- * trae la suya—, así que es la primera en quedarse fuera. Así un día de muchas dudas no
- * puede dejar sin corrector al día siguiente.
+ * espaciada: ese uso llega hasta el final del presupuesto. Detectar con qué se confundió
+ * una respuesta va con él y cuesta unas pocas neuronas, porque no genera texto. La lectura
+ * de la semana es semanal y barata. La explicación es cara y prescindible —el concepto ya
+ * trae la suya—, y la viñeta de examen es la más cara de todas y lo más opcional que hay:
+ * son las primeras en quedarse fuera. Así un día de muchas dudas no puede dejar sin
+ * corrector al día siguiente.
  */
-export const TECHO_POR_MODO: Record<ModoIA, number> = { calificar: 1, analizar: 0.85, explicar: 0.7 }
+export const TECHO_POR_MODO: Record<ModoIA, number> = {
+  calificar: 1, confusion: 1, analizar: 0.85, explicar: 0.7, examen: 0.6,
+}
 
 export const techoDeModo = (modo: ModoIA) => Math.floor(PRESUPUESTO_UTIL * TECHO_POR_MODO[modo])
 
@@ -64,6 +74,11 @@ export function neuronasDe(entrada: number, salida: number): number {
  */
 export function costeEstimado(entrada: string, maxTokensSalida: number): number {
   return neuronasDe(tokensDeTexto(entrada), maxTokensSalida)
+}
+
+/** Un embedding no escribe nada: solo cuenta lo que entra, y a su propia tarifa. */
+export function costeEmbedding(textos: string[]): number {
+  return Math.ceil(textos.reduce((n, t) => n + tokensDeTexto(t), 0) * TARIFA_EMBEDDING / 1_000_000)
 }
 
 /**

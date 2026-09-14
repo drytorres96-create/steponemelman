@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  FRACCION_POR_USUARIO, PRESUPUESTO_DIARIO, PRESUPUESTO_UTIL, TARIFA_ENTRADA, TARIFA_SALIDA,
-  costeEstimado, costeReal, neuronasDe, techoDeModo, tokensDeTexto, tokensUsados,
+  FRACCION_POR_USUARIO, PRESUPUESTO_DIARIO, PRESUPUESTO_UTIL, TARIFA_EMBEDDING, TARIFA_ENTRADA, TARIFA_SALIDA,
+  costeEmbedding, costeEstimado, costeReal, neuronasDe, techoDeModo, tokensDeTexto, tokensUsados,
 } from './neuronas'
 
 /**
@@ -46,6 +46,20 @@ describe('presupuesto de neuronas', () => {
     expect(tokensUsados(undefined)).toBeNull()
     expect(costeReal({ usage: { prompt_tokens: 300, completion_tokens: 40 } }, 120)).toBe(neuronasDe(300, 40))
     expect(costeReal({ response: 'sin uso' }, 120)).toBe(120)
+  })
+
+  it('comparar por parecido cuesta calderilla al lado de escribir', () => {
+    // Dos docenas de candidatos cortos: lo que cuesta detectar con qué se confundió algo.
+    const candidatos = Array.from({ length: 24 }, () => 'un término de cinco palabras más o menos')
+    expect(TARIFA_EMBEDDING).toBeLessThan(TARIFA_ENTRADA / 20)
+    expect(costeEmbedding(candidatos)).toBeLessThan(5)
+    expect(costeEmbedding(candidatos)).toBeLessThan(costeEstimado(candidatos.join(' '), 160))
+    expect(costeEmbedding([])).toBe(0)
+  })
+
+  it('la viñeta de examen es el modo más caro y el primero en quedarse fuera', () => {
+    expect(techoDeModo('examen')).toBeLessThan(techoDeModo('explicar'))
+    expect(techoDeModo('confusion')).toBe(techoDeModo('calificar'))
   })
 
   it('el presupuesto da para muchas más correcciones de las que cabían contando llamadas', () => {

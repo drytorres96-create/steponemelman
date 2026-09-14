@@ -12,6 +12,8 @@ import { crearUUID } from '../store/model'
 import { EVALUADOR_VERSION } from '../lib/normalize'
 import { esRespuestaBreve, prepararConcepto } from '../lib/formatos'
 import { AyudaIA } from '../components/AyudaIA'
+import { ExamenIA } from '../components/ExamenIA'
+import { ConfusionIA } from '../components/ConfusionIA'
 import { Cronometro } from '../components/Cronometro'
 import { tiempoLegible } from '../lib/tiempo'
 import { buscarIntentoPaso, conAyuda, diasParaCalificacion, identificarPregunta, necesitaReintento, resumirCorrecciones, resumirIntentos, RelojActividad, siguienteCola, versionPregunta } from './sesion'
@@ -56,6 +58,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
   const [confianza, setConfianza] = useState<1 | 2 | 3 | null>(null)
   const [fuenteConsultada, setFuenteConsultada] = useState(false)
   const [esperandoIA, setEsperandoIA] = useState(false)
+  const [juzgandoIA, setJuzgandoIA] = useState(false)
   const [avisoIA, setAvisoIA] = useState<string | null>(null)
   const calificando = useRef(false)
   const abortoIA = useRef(new AbortController())
@@ -297,6 +300,35 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
     setFase('retro')
   }
 
+  /**
+   * Pedir a la IA que juzgue una respuesta que el corrector propio no supo decidir.
+   *
+   * Una respuesta «en revisión» no cuenta ni como acierto ni como fallo: se escribió, se
+   * pensó, y no acredita nada. Casi siempre pasa cuando la IA no estaba disponible en ese
+   * momento. Esto reescribe el mismo intento, no crea otro, así que el esfuerzo original
+   * es el que acaba contando.
+   */
+  const juzgarConIA = async () => {
+    const intento = intentoActual.current
+    if (!c || !intento || !res || juzgandoIA || !res.respuestaDada.trim()) return
+    setJuzgandoIA(true); setAvisoIA(null)
+    const fallo = await calificarConIA({
+      conceptId: c.concept_id, answer: res.respuestaDada, questionId: preguntaId, version: versionPregunta(c),
+      formatVersion: versionFormato, variantId: c.variante_id, index: i, route: cola.ruta, retry: reintento,
+    }, abortoIA.current.signal).catch(() => ({ estado: 'sin_ia', motivo: 'No se pudo corregir con IA.' } as const))
+    if (!vivoIA.current) return
+    setJuzgandoIA(false)
+    if (fallo.estado !== 'ok') { setAvisoIA(fallo.motivo); return }
+    const juzgado = veredictoDeIA(res, fallo)
+    const actualizado: Intento = { ...intento, resultado: juzgado.veredicto, tipo_error: juzgado.tipoError,
+      calificacion: juzgado.veredicto === 'correcta' ? 3 : juzgado.veredicto === 'incorrecta' ? 1 : 2,
+      calificado_por_ia: true,
+      calificacion_actualizada_en: Math.max(Date.now(), (intento.calificacion_actualizada_en ?? intento.ts) + 1) }
+    intentoActual.current = actualizado
+    registrarIntento(c.concept_id, actualizado)
+    setRes(juzgado)
+  }
+
   /** Rectificar un veredicto de la IA: reescribe el mismo intento y manda sobre él. */
   const corregirVeredicto = (correcta: boolean) => {
     const intento = intentoActual.current
@@ -465,8 +497,15 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
         <p>Tu respuesta: <b>{res.respuestaDada || 'Respuesta registrada'}</b></p>
         {res.veredicto !== 'correcta' && <p>Respuesta de referencia: <b>{c.respuesta_canonica}</b></p>}
         {res.veredicto === 'revision' && <p>El corrector no puede decidir esta respuesta con seguridad. Compárala con la referencia; no se contará como acierto ni fallo.</p>}
+        {/* Una respuesta escrita que nadie juzga no acredita nada: la IA puede decidirla. */}
+        {res.veredicto === 'revision' && res.respuestaDada.trim() && usaTextoLibre(c) && !presentacionCambio
+          && <button className="btn pequeno" disabled={juzgandoIA} onClick={() => void juzgarConIA()}>
+            {juzgandoIA ? 'Corrigiendo con IA…' : 'Que la IA juzgue mi respuesta'}</button>}
         {necesitaReintento(res.veredicto) && <p>Este concepto volverá al final de la cola hasta que lo aciertes.</p>}
         {(res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que) && <p className="sutil">{res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que}</p>}
+        {/* Solo con respuesta escrita: en un formato de opciones ya se sabe qué se eligió. */}
+        {res.veredicto !== 'correcta' && res.veredicto !== 'revision' && usaTextoLibre(c) && res.respuestaDada.trim()
+          && <ConfusionIA conceptId={c.concept_id} respuesta={res.respuestaDada} />}
         <p>{c.explicacion}</p>
         {c.patron && <p className="patron"><b>Si ves esto → piensa:</b> {c.patron}</p>}
         {c.confusiones.length > 0 && <p className="mini">No lo confundas con: {c.confusiones.join(' · ')}</p>}
@@ -485,6 +524,8 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
               Repetirlo antes no adelanta ese reloj.</p>
             : dominio.pendientes.length > 0 && <ul className="mini">{dominio.pendientes.map(criterio => <li key={criterio}>{criterio}</li>)}</ul>}
         </details>
+        {/* A diferencia de la ayuda, esto no espera a que falles: sirve igual cuando aciertas. */}
+        {!presentacionCambio && <details style={{ marginTop: 12 }}><summary>Cómo caería en el examen</summary><ExamenIA key={c.concept_id} concepto={c} /></details>}
         {res.veredicto !== 'correcta' && !presentacionCambio && <details style={{ marginTop: 12 }}><summary>Sigo sin entender</summary><AyudaIA key={preguntaId} concepto={c} respuesta={res.respuestaDada} preguntaId={preguntaId} indice={i} ruta={cola.ruta} reintento={reintento} versionFormato={versionFormato} /></details>}
         <button className="btn pequeno fantasma" style={{ marginTop: 10 }} onClick={() => setVerFuente(true)}>Abrir la fuente</button>
         {res.veredicto === 'ortografia' && c.escritura_correctiva.elegible && c.escritura_correctiva.termino && <button className="btn pequeno fantasma" onClick={() => setFase('ortografia')}>Practicar escritura (opcional)</button>}

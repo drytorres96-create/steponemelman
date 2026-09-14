@@ -1,6 +1,6 @@
 import config from '../../project.config.json'
 import { registrar } from './registro'
-import { ConceptoZ, IndiceZ } from '../schema/concept'
+import { ConceptoZ, IndiceZ, type Concepto, type Indice } from '../schema/concept'
 import { prepararConcepto } from '../lib/formatos'
 import { versionPregunta } from '../screens/sesion'
 import { aplicarVariante } from '../lib/variantes'
@@ -9,10 +9,15 @@ import { handleNbme } from './nbme'
 import { handlePlan, type PlanEnv } from './plan'
 import {
   FRACCION_POR_USUARIO, LIMITE_LLAMADAS_USUARIO, PRESUPUESTO_UTIL,
-  costeEstimado, costeReal, techoDeModo, type ModoIA,
+  costeEmbedding, costeEstimado, costeReal, techoDeModo, type ModoIA,
 } from './neuronas'
 
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+/** Embeddings: dos órdenes de magnitud más baratos, y no escriben nada que pueda inventarse. */
+const MODELO_EMBEDDING = '@cf/baai/bge-m3'
+/** Por debajo de esto, el parecido es ruido y no se afirma nada. */
+export const UMBRAL_PARECIDO = 0.55
+const MAX_CANDIDATOS = 24
 const DAY = 86400000
 /** Conceptos que entran en una lectura de la semana, y módulos que se pueden abrir para armarla. */
 const MAX_CONCEPTOS_ANALISIS = 18
@@ -33,7 +38,8 @@ interface Env extends PlanEnv {
   ASSETS: { fetch(request: Request): Promise<Response> }
 }
 type CoachMode = ModoIA | 'estado'
-type CoachInput = { user: string; key: string; mode: CoachMode; reference: string; sourceFragment: string; question: string; answer: string; canonical: string; source: { title: string; page: number }; ids?: string[] }
+type Candidato = { texto: string; origen: OrigenParecido }
+type CoachInput = { user: string; key: string; mode: CoachMode; reference: string; sourceFragment: string; question: string; answer: string; canonical: string; source: { title: string; page: number }; ids?: string[]; candidatos?: Candidato[] }
 export type CoachAnswer = { diferencia: string; explicacion: string; recordar: string; evidencia: string }
 export type CoachVeredicto = { veredicto: 'correcta' | 'parcial' | 'incorrecta'; motivo: string }
 export type CoachPatron = { titulo: string; porque: string; conceptos: string[]; accion: string }
@@ -88,6 +94,20 @@ export function validarCalificacion(raw: unknown): CoachVeredicto | null {
   } catch { return null }
 }
 
+/**
+ * Cómo caería un concepto en el examen.
+ *
+ * A diferencia de la ayuda, esto NO se verifica contra la fuente: la viñeta y el patrón
+ * los escribe el modelo. Por eso no se califica, no cuenta como intento y no toca el
+ * dominio ni la repetición espaciada; es material para leer, y la pantalla lo dice.
+ */
+/** De dónde sale cada texto con el que se compara: todos del corpus, ninguno inventado. */
+export type OrigenParecido = 'correcta' | 'sinonimo' | 'distractor' | 'confusion' | 'opcion' | 'relacionado'
+export type Parecido = { texto: string; origen: OrigenParecido; similitud: number }
+export type CoachConfusion = { mejor: Parecido | null; candidatos: Parecido[] }
+
+export type CoachExamen = { vineta: string; dato_clave: string; trampas: { opcion: string; por_que: string }[]; patron: string; utilidad: string }
+
 const recortar = (v: unknown, max: number): string | null => {
   const texto = typeof v === 'string' ? v.trim() : ''
   return texto ? texto.slice(0, max) : null
@@ -141,6 +161,66 @@ export function validarAnalisis(raw: unknown, ids: string[]): LecturaValidada {
   return patrones.length ? { ok: { patrones, enfoque } } : { error: 'ningún patrón citaba conceptos de esta semana' }
 }
 
+/**
+ * Una viñeta vale si tiene forma de viñeta. No se puede comprobar contra el material
+ * —es contenido nuevo a propósito—, así que lo que se exige es que esté completa: un
+ * caso con cuerpo, el dato que decide, distractores con su motivo y un patrón que
+ * arranque del hallazgo. Lo que llegue a medias no se enseña.
+ */
+export function validarExamen(raw: unknown): CoachExamen | null {
+  let value: unknown
+  try {
+    const result = raw as { response?: unknown }
+    value = typeof result?.response === 'string' ? JSON.parse(result.response.replace(/^```(?:json)?\s*|\s*```$/g, '')) : result?.response
+  } catch { return null }
+  if (!value || typeof value !== 'object') return null
+  const obj = value as Record<string, unknown>
+  const vineta = recortar(obj.vineta, 1200)
+  const dato_clave = recortar(obj.dato_clave, 300)
+  const patron = recortar(obj.patron, 300)
+  const utilidad = recortar(obj.utilidad, 400)
+  // Una viñeta de dos líneas no es una viñeta: es la pregunta que el concepto ya traía.
+  if (!vineta || vineta.length < 120 || !dato_clave || !patron || !utilidad) return null
+  if (!Array.isArray(obj.trampas)) return null
+  const trampas: CoachExamen['trampas'] = []
+  for (const bruta of obj.trampas.slice(0, 4)) {
+    if (!bruta || typeof bruta !== 'object') continue
+    const t = bruta as Record<string, unknown>
+    const opcion = recortar(t.opcion, 160)
+    const por_que = recortar(t.por_que, 300)
+    if (opcion && por_que) trampas.push({ opcion, por_que })
+  }
+  return trampas.length >= 2 ? { vineta, dato_clave, trampas, patron, utilidad } : null
+}
+
+/** Coseno entre dos vectores. Devuelve 0 si alguno viene vacío o degenerado. */
+export function coseno(a: number[], b: number[]): number {
+  if (!a?.length || a.length !== b?.length) return 0
+  let punto = 0, na = 0, nb = 0
+  for (let i = 0; i < a.length; i++) { punto += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i] }
+  return na && nb ? punto / Math.sqrt(na * nb) : 0
+}
+
+/** Los vectores tal y como los devuelve Workers AI, o null si no vinieron todos. */
+export function vectoresDe(raw: unknown, esperados: number): number[][] | null {
+  const data = (raw as { data?: unknown } | null)?.data
+  if (!Array.isArray(data) || data.length !== esperados) return null
+  return data.every(v => Array.isArray(v) && v.length && v.every(n => typeof n === 'number' && Number.isFinite(n)))
+    ? data as number[][] : null
+}
+
+/**
+ * Con qué se parece lo que se respondió. No hay nada que validar contra invención: los
+ * textos comparados salen del corpus y lo único que pone el modelo es la distancia.
+ */
+export function ordenarParecidos(candidatos: Candidato[], vectores: number[][]): CoachConfusion {
+  const [respuesta, ...resto] = vectores
+  const parecidos = candidatos.map((c, n) => ({ ...c, similitud: Math.round(coseno(respuesta, resto[n]) * 1000) / 1000 }))
+    .sort((a, b) => b.similitud - a.similitud)
+  const mejor = parecidos[0]
+  return { mejor: mejor && mejor.similitud >= UMBRAL_PARECIDO ? mejor : null, candidatos: parecidos.slice(0, 4) }
+}
+
 /** Only this Worker can address the object. No public endpoint accepts trusted source text. */
 export class StudyCoach {
   private pending = new Map<string, Promise<Response>>()
@@ -153,7 +233,9 @@ export class StudyCoach {
     const current = this.pending.get(input.key)
     if (current) return (await current).clone()
     const work = input.mode === 'calificar' ? this.grade(input)
-      : input.mode === 'analizar' ? this.analyse(input) : this.explain(input)
+      : input.mode === 'analizar' ? this.analyse(input)
+      : input.mode === 'examen' ? this.examine(input)
+      : input.mode === 'confusion' ? this.compare(input) : this.explain(input)
     this.pending.set(input.key, work)
     try { return (await work).clone() } finally { this.pending.delete(input.key) }
   }
@@ -333,6 +415,89 @@ export class StudyCoach {
       await this.liquidar(input.user, estimado, costeReal(raw, estimado))
     }
   }
+
+  /**
+   * Con qué se confundió una respuesta.
+   *
+   * Es el modo más barato y el único que no puede inventarse nada: el modelo solo
+   * convierte textos en vectores y aquí se mide la distancia. Los textos comparados salen
+   * todos del corpus, así que lo peor que puede pasar es que no se parezca a ninguno.
+   */
+  private async compare(input: CoachInput): Promise<Response> {
+    const candidatos = input.candidatos ?? []
+    if (!candidatos.length) return json({ mejor: null, candidatos: [] })
+    const cacheKey = `cache:${input.key}`
+    const saved = await this.state.storage.get<{ at: number; confusion: CoachConfusion }>(cacheKey)
+    if (saved?.confusion && Date.now() - saved.at < 7 * DAY) return json({ ...saved.confusion, cached: true })
+    const textos = [input.answer, ...candidatos.map(c => c.texto)]
+    const estimado = costeEmbedding(textos)
+    if (!await this.admitir(input.user, 'confusion', estimado)) return json({ error: 'La cuota gratuita de hoy se ha agotado. Se renueva a las 00:00 UTC.' }, 429)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      const raw = await Promise.race([
+        this.env.AI.run(MODELO_EMBEDDING, { text: textos }),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), 12000) }),
+      ])
+      const vectores = vectoresDe(raw, textos.length)
+      if (!vectores) {
+        registrar('coach/embeddings-incompletos', 'faltaron vectores para comparar')
+        return unavailable('no_verificable')
+      }
+      const confusion = ordenarParecidos(candidatos, vectores)
+      await this.state.storage.put(cacheKey, { at: Date.now(), confusion })
+      await this.podarCache()
+      return json({ ...confusion, cached: false })
+    } catch (causa) {
+      registrar('coach/comparar', causa)
+      return unavailable('interno')
+    } finally {
+      // Un embedding cuesta lo que entra, y eso ya se sabía al reservar: no hay que liquidar.
+      if (timer) clearTimeout(timer)
+    }
+  }
+
+  /**
+   * Convierte un concepto en el ítem que lo preguntaría.
+   *
+   * Es el único modo que escribe contenido nuevo en vez de reordenar el que hay, y se
+   * acepta a sabiendas: sirve para ver cómo se usa un dato que parece teórico, no para
+   * evaluarse. Nada de lo que sale de aquí entra en el historial.
+   */
+  private async examine(input: CoachInput): Promise<Response> {
+    const cacheKey = `cache:${input.key}`
+    const saved = await this.state.storage.get<{ at: number; exam: CoachExamen }>(cacheKey)
+    if (saved?.exam && Date.now() - saved.at < 7 * DAY) return json({ ...saved.exam, source: input.source, cached: true })
+    const messages = [
+      { role: 'system', content: 'Eres examinador de USMLE Step 1. Recibes un concepto del material de estudio y muestras cómo se preguntaría en un examen real de tipo NBME: una viñeta clínica, no una definición. Escribe la viñeta al estilo de los ítems oficiales: paciente con edad y sexo, motivo de consulta, los hallazgos y valores que hacen falta, y la pregunta final; entre 4 y 8 frases. El concepto recibido debe ser lo que el ítem evalúa. Puedes apoyarte en tu conocimiento de ciencias básicas y de cómo se examina, pero no contradigas el material recibido y no presentes como suyo nada que no esté en él. Nada de datos de pacientes reales. Devuelve solo JSON: vineta (el caso completo con su pregunta), dato_clave (el hallazgo del enunciado que decide la respuesta y por qué manda), trampas (de 2 a 4 objetos con opcion, un distractor plausible, y por_que, la razón por la que se descarta), patron (una regla reutilizable con la forma «si ves X + Y, piensa en Z») y utilidad (para qué sirve reconocerlo en la práctica clínica). Todo en español, salvo los términos técnicos que se usan en inglés.' },
+      { role: 'user', content: input.reference },
+    ]
+    const estimado = costeEstimado(JSON.stringify(messages), 1000)
+    if (!await this.admitir(input.user, 'examen', estimado)) return json({ error: 'La cuota de viñetas de hoy se ha agotado. Se renueva a las 00:00 UTC; el concepto y su explicación siguen aquí.' }, 429)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let raw: unknown
+    try {
+      raw = await Promise.race([
+        // Más suelta que los demás modos: aquí se le pide escribir, no resumir.
+        this.env.AI.run(MODEL, { stream: false, temperature: 0.4, max_tokens: 1000,
+          response_format: { type: 'json_object' }, messages }),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), 30000) }),
+      ])
+      const exam = validarExamen(raw)
+      if (!exam) {
+        registrar('coach/examen-incompleto', 'la viñeta llegó a medias y no se enseña')
+        return unavailable('no_verificable')
+      }
+      await this.state.storage.put(cacheKey, { at: Date.now(), exam })
+      await this.podarCache()
+      return json({ ...exam, source: input.source, cached: false })
+    } catch (causa) {
+      registrar('coach/examen', causa)
+      return unavailable('interno')
+    } finally {
+      if (timer) clearTimeout(timer)
+      await this.liquidar(input.user, estimado, costeReal(raw, estimado))
+    }
+  }
 }
 
 async function boundedBody(request: Request): Promise<string | null> {
@@ -376,6 +541,34 @@ async function identificar(request: Request): Promise<{ userId: string; get: Lec
   const member = await get(`/rest/v1/app_members?select=user_id&user_id=eq.${encodeURIComponent(user.id)}`)
   if (!member.ok || !(await member.json() as unknown[]).length) return json({ error: 'Tu cuenta no tiene acceso al material.' }, 403)
   return { userId: user.id, get }
+}
+
+const activos = (get: Lector) => async (path: string) => {
+  const res = await get(`/rest/v1/corpus_assets?select=payload&path=eq.${encodeURIComponent(path)}`)
+  if (!res.ok) throw new Error('corpus')
+  return (await res.json() as { payload: unknown }[])[0]?.payload
+}
+
+/**
+ * El concepto tal y como está publicado, con los mismos filtros que la ayuda: material
+ * alineado con el índice, aprobado, de Step 1 y sin aclaración editorial pendiente.
+ */
+async function conceptoPublicado(get: Lector, conceptId: string): Promise<{ indice: Indice; concepto: Concepto } | Response> {
+  const asset = activos(get)
+  const indice = IndiceZ.parse(await asset('index.json'))
+  const modulo = indice.modulos.find(m => m.sesiones.some(s => s.conceptos.includes(conceptId)))
+  if (!modulo) return json({ error: 'Concepto no disponible.' }, 404)
+  const data = await asset(`modules/${modulo.module_id}.json`) as { conceptos?: unknown[]; corpus_version?: string }
+  if (data?.corpus_version !== indice.corpus_version) {
+    registrar('concepto/corpus-desalineado', 'el módulo y el índice declaran versiones distintas', { modulo: modulo.module_id })
+    return unavailable('material')
+  }
+  const leido = ConceptoZ.safeParse(data.conceptos?.find(c => (c as { concept_id: string }).concept_id === conceptId))
+  if (!leido.success) return json({ error: 'Concepto no disponible.' }, 404)
+  const concepto = leido.data
+  if (concepto.revision_editorial) return json({ error: 'Este concepto tiene una aclaración editorial. Consulta su explicación y las referencias en «Ver la fuente».' }, 422)
+  if (concepto.calidad.estado !== 'aprobado' || concepto.calidad.confianza < 0.7 || concepto.step === 'step2') return json({ error: 'Concepto no disponible.' }, 404)
+  return { indice, concepto }
 }
 
 const alCoach = (env: Env, modo: CoachMode, cuerpo: unknown) =>
@@ -489,6 +682,95 @@ async function handleAnalisis(request: Request, url: URL, env: Env): Promise<Res
   }
 }
 
+/**
+ * Cómo caería un concepto en el examen. No depende de la pregunta que se esté viendo ni de
+ * ninguna respuesta: se pide sobre el concepto, y por eso una viñeta sirve para siempre.
+ */
+async function handleExamen(request: Request, url: URL, env: Env): Promise<Response> {
+  const parado = preflight(request, url, 'POST')
+  if (parado) return parado
+  try {
+    const body = await boundedBody(request)
+    if (body === null) return json({ error: 'Solicitud demasiado larga.' }, 413)
+    const input = JSON.parse(body) as { conceptId?: unknown }
+    if (typeof input.conceptId !== 'string' || !input.conceptId || input.conceptId.length > 200) return json({ error: 'Solicitud no válida.' }, 400)
+    const quien = await identificar(request)
+    if (quien instanceof Response) return quien
+    if (env.AI_FREE_ENABLED !== 'true') return unavailable('desactivada')
+    const material = await conceptoPublicado(quien.get, input.conceptId)
+    if (material instanceof Response) return material
+    const { indice, concepto } = material
+    const reference = JSON.stringify({
+      concepto: concepto.afirmacion, respuesta: concepto.respuesta_canonica, explicacion: concepto.explicacion,
+      objetivo: concepto.objetivo, contexto: concepto.contexto ?? '', patron_conocido: concepto.patron ?? '',
+      confusiones: concepto.confusiones.slice(0, 5),
+      distractores: concepto.distractores_cercanos.slice(0, 5).map(d => d.texto),
+      disciplina: concepto.clasificacion.disciplina_primaria, sistema: concepto.clasificacion.sistema_primario,
+      tema: concepto.clasificacion.tema, tipo: concepto.clasificacion.tipo_conocimiento,
+      fragmento: concepto.source.fragment,
+    })
+    if (reference.length > 11000) return unavailable('concepto_largo')
+    const trusted: CoachInput = {
+      user: quien.userId, mode: 'examen',
+      key: await digest(JSON.stringify([quien.userId, indice.corpus_version, concepto.concept_id, reference, MODEL, 'examen-v1'])),
+      reference, sourceFragment: concepto.source.fragment, question: '', answer: '', canonical: concepto.respuesta_canonica,
+      source: { title: concepto.source.doc_title, page: concepto.source.pdf_page ?? concepto.source.page },
+    }
+    return await alCoach(env, 'examen', trusted)
+  } catch (causa) {
+    registrar('aplicar', causa)
+    return unavailable('interno')
+  }
+}
+
+/**
+ * Los textos con los que se compara una respuesta fallada. Todos salen del concepto
+ * publicado: la respuesta buena, sus sinónimos, los distractores que el material declara,
+ * las confusiones conocidas, las opciones incorrectas y los conceptos vecinos.
+ */
+export function candidatosDeConfusion(c: Concepto): Candidato[] {
+  const lista: Candidato[] = [{ texto: c.respuesta_canonica, origen: 'correcta' }]
+  for (const s of c.sinonimos) lista.push({ texto: s, origen: 'sinonimo' })
+  for (const d of c.distractores_cercanos) lista.push({ texto: d.texto, origen: 'distractor' })
+  for (const x of c.confusiones) lista.push({ texto: x, origen: 'confusion' })
+  for (const o of c.evaluacion.opciones ?? []) if (!o.correcta) lista.push({ texto: o.texto, origen: 'opcion' })
+  for (const r of c.relacionados) lista.push({ texto: r, origen: 'relacionado' })
+  const vistos = new Set<string>()
+  return lista
+    .filter(x => x.texto.trim().length > 1 && x.texto.length <= 300 && !vistos.has(x.texto.toLowerCase()) && vistos.add(x.texto.toLowerCase()))
+    .slice(0, MAX_CANDIDATOS)
+}
+
+/** Con qué se confundió una respuesta. Sin generación de texto: solo distancias. */
+async function handleConfusion(request: Request, url: URL, env: Env): Promise<Response> {
+  const parado = preflight(request, url, 'POST')
+  if (parado) return parado
+  try {
+    const body = await boundedBody(request)
+    if (body === null) return json({ error: 'Solicitud demasiado larga.' }, 413)
+    const input = JSON.parse(body) as { conceptId?: unknown; answer?: unknown }
+    if (typeof input.conceptId !== 'string' || !input.conceptId || input.conceptId.length > 200) return json({ error: 'Solicitud no válida.' }, 400)
+    const answer = typeof input.answer === 'string' ? input.answer.trim().normalize('NFC').slice(0, 300) : ''
+    if (!answer) return json({ error: 'Solicitud no válida.' }, 400)
+    const quien = await identificar(request)
+    if (quien instanceof Response) return quien
+    if (env.AI_FREE_ENABLED !== 'true') return unavailable('desactivada')
+    const material = await conceptoPublicado(quien.get, input.conceptId)
+    if (material instanceof Response) return material
+    const candidatos = candidatosDeConfusion(material.concepto)
+    const trusted: CoachInput = {
+      user: quien.userId, mode: 'confusion', candidatos, answer,
+      key: await digest(JSON.stringify([quien.userId, material.indice.corpus_version, material.concepto.concept_id, answer, MODELO_EMBEDDING, 'confusion-v1'])),
+      reference: '', sourceFragment: '', question: '', canonical: material.concepto.respuesta_canonica,
+      source: { title: material.concepto.source.doc_title, page: material.concepto.source.pdf_page ?? material.concepto.source.page },
+    }
+    return await alCoach(env, 'confusion', trusted)
+  } catch (causa) {
+    registrar('confusion', causa)
+    return unavailable('interno')
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -497,6 +779,8 @@ export default {
     if (url.pathname.startsWith('/api/plan/')) return handlePlan(request, env)
     if (url.pathname === '/api/ia/estado') return handleCuota(request, url, env)
     if (url.pathname === '/api/analizar') return handleAnalisis(request, url, env)
+    if (url.pathname === '/api/aplicar') return handleExamen(request, url, env)
+    if (url.pathname === '/api/confusion') return handleConfusion(request, url, env)
     const modo: CoachMode | null = url.pathname === '/api/explicar' ? 'explicar'
       : url.pathname === '/api/calificar' ? 'calificar' : null
     if (!modo) return json({ error: 'No encontrado' }, 404)
