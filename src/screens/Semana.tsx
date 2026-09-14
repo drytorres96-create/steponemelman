@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Vacio } from '../components/comunes'
+import { useAuth } from '../auth/AuthProvider'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
 import { cargarSesionesSemana } from '../semana/api'
 import { coberturaSesion, type CoberturaSesion } from '../semana/cobertura'
 import { separarGuion } from '../semana/guion'
 import type { SesionSemanal } from '../semana/tipos'
+import { cargarPlanSemana, marcarCheckpoint, PlanEscrituraError } from '../plan/api'
+import { enlazarCheckpoints, sesionesDeLaSemana } from '../plan/enlace'
+import { Enfoque } from '../plan/Enfoque'
+import { DIAS_SEMANA, esTarea, MINUTOS_POR_KIND, type PlanCheckpoint, type PlanSemana } from '../plan/tipos'
+import { fechaISO } from '../lib/tiempo'
 
-const DIAS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+const DIAS = [...DIAS_SEMANA, 'domingo']
 
 /** `2026-09-14` como fecha local: parsearla como ISO la desplazaría un día según la zona. */
 function fechaLocal(iso: string, mas = 0): Date {
@@ -34,15 +40,12 @@ function composicion(sesion: SesionSemanal): string {
   return partes.join(' · ')
 }
 
-function Tarjeta({ sesion, cobertura, onAbrir }:
-  { sesion: SesionSemanal; cobertura: CoberturaSesion; onAbrir: (s: SesionSemanal) => void }) {
-  const fecha = fechaLocal(sesion.semanaInicio, sesion.dia - 1)
+/** Pasos, progreso y cobertura de una sesión preparada. La misma información en las dos vistas. */
+function CuerpoSesion({ sesion, cobertura, onAbrir }:
+  { sesion: SesionSemanal; cobertura: CoberturaSesion; onAbrir: () => void }) {
   const hecha = sesion.estado === 'completada' || cobertura.cumple
   const empezada = cobertura.hechos > 0 || sesion.cursor > 0
-  return <article className={`tarjeta semana-tarjeta${hecha ? ' completada' : ''}`}>
-    <p className="semana-dia">{DIAS[sesion.dia - 1]} {diaYMes(fecha)}</p>
-    <h3>{sesion.titulo}</h3>
-    {sesion.subtitulo && <p className="sutil">{sesion.subtitulo}</p>}
+  return <>
     <p className="mini">{composicion(sesion)}</p>
     <p className="mini">{cobertura.hechos} de {cobertura.pasos} pasos respondidos</p>
     <progress className="semana-progreso" aria-label={`Pasos respondidos de ${sesion.titulo}`}
@@ -50,26 +53,89 @@ function Tarjeta({ sesion, cobertura, onAbrir }:
     {hecha ? <div className="fila">
       <p className="etq verde" role="status">Completada</p>
       {/* El umbral deja pasos sin responder: siguen a un clic, no se pierden al marcarse hecha. */}
-      {cobertura.hechos < cobertura.pasos && <button className="btn pequeno fantasma" onClick={() => onAbrir(sesion)}>
+      {cobertura.hechos < cobertura.pasos && <button className="btn pequeno fantasma" onClick={onAbrir}>
         Retomar los {cobertura.pasos - cobertura.hechos} que faltan
       </button>}
     </div>
-      : <button className="btn principal" onClick={() => onAbrir(sesion)}>
-        {empezada ? `Continuar (paso ${Math.min(sesion.cursor + 1, sesion.guion.length)} de ${sesion.guion.length})` : 'Empezar'}
+      : <button className="btn principal" onClick={onAbrir}>
+        {empezada ? `Continuar sesión (paso ${Math.min(sesion.cursor + 1, sesion.guion.length)} de ${sesion.guion.length})` : 'Empezar sesión'}
       </button>}
+  </>
+}
+
+function Tarjeta({ sesion, cobertura, onAbrir }:
+  { sesion: SesionSemanal; cobertura: CoberturaSesion; onAbrir: (s: SesionSemanal) => void }) {
+  const fecha = fechaLocal(sesion.semanaInicio, sesion.dia - 1)
+  const hecha = sesion.estado === 'completada' || cobertura.cumple
+  return <article className={`tarjeta semana-tarjeta${hecha ? ' completada' : ''}`}>
+    <p className="semana-dia">{DIAS[sesion.dia - 1]} {diaYMes(fecha)}</p>
+    <h3>{sesion.titulo}</h3>
+    {sesion.subtitulo && <p className="sutil">{sesion.subtitulo}</p>}
+    <CuerpoSesion sesion={sesion} cobertura={cobertura} onAbrir={() => onAbrir(sesion)} />
   </article>
 }
 
+/** `S2 · 14–19 sep · Reproductivo…` se parte en titular y contexto. */
+function partirTitulo(titulo: string): { titular: string; resto: string } {
+  const partes = titulo.split(' · ')
+  return partes.length > 2
+    ? { titular: partes.slice(0, 2).join(' · '), resto: partes.slice(2).join(' · ') }
+    : { titular: titulo, resto: '' }
+}
+
+interface FilaProps {
+  cp: PlanCheckpoint
+  hecho: boolean
+  sesion: SesionSemanal | null
+  cobertura: CoberturaSesion | null
+  error: string | null
+  onMarcar: (cp: PlanCheckpoint, done: boolean) => void
+  onEnfocar: (cp: PlanCheckpoint) => void
+  onAbrirSesion: (cp: PlanCheckpoint, s: SesionSemanal) => void
+}
+
+function Fila({ cp, hecho, sesion, cobertura, error, onMarcar, onEnfocar, onAbrirSesion }: FilaProps) {
+  const minutos = MINUTOS_POR_KIND[cp.kind]
+  return <li className={`plan-fila${hecho ? ' hecha' : ''}`}>
+    <label className="plan-fila-marca">
+      <input type="checkbox" checked={hecho} onChange={e => onMarcar(cp, e.currentTarget.checked)} />
+      <span>{cp.kind === 'podcast' ? '🎧 ' : ''}{cp.label}</span>
+    </label>
+    <div className="fila plan-fila-acciones">
+      {/* El audio se escucha fuera de la app: se marca, no se cronometra. */}
+      {cp.kind === 'podcast' && !hecho && <button className="btn pequeno fantasma" onClick={() => onMarcar(cp, true)}>Oído</button>}
+      {!sesion && minutos !== null && !hecho && <>
+        <span className="mini">~{minutos} min</span>
+        <button className="btn pequeno" onClick={() => onEnfocar(cp)}>Empezar</button>
+      </>}
+    </div>
+    {sesion && cobertura && <div className="plan-fila-sesion">
+      {sesion.subtitulo && <p className="sutil">{sesion.subtitulo}</p>}
+      <CuerpoSesion sesion={sesion} cobertura={cobertura} onAbrir={() => onAbrirSesion(cp, sesion)} />
+    </div>}
+    {error && <p className="plan-fila-error" role="alert">{error}</p>}
+  </li>
+}
+
 export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
-  onAbrir: (s: SesionSemanal) => void
+  onAbrir: (s: SesionSemanal, alCompletar?: () => void) => void
   onRecuperacion: () => void
   onBiblioteca: (tipo: 'conceptos' | 'preguntas') => void
 }) {
   const { estado } = useApp()
+  const { session } = useAuth()
+  const token = session?.access_token ?? ''
   const nbme = useNbme()
   const [sesiones, setSesiones] = useState<SesionSemanal[] | null>(null)
   const [error, setError] = useState(false)
   const [reintento, setReintento] = useState(0)
+  const [plan, setPlan] = useState<PlanSemana | null>(null)
+  const [planListo, setPlanListo] = useState(false)
+  // Marcas optimistas: lo que se ve antes de que la base conteste. Una que no cuaja se revierte.
+  const [marcas, setMarcas] = useState<Record<number, boolean>>({})
+  const [fallos, setFallos] = useState<Record<number, string>>({})
+  const [diaAbierto, setDiaAbierto] = useState<number | null>(null)
+  const [enfoque, setEnfoque] = useState<PlanCheckpoint | null>(null)
 
   // Evidencia registrada, agrupada por sesión: es lo que decide si una sesión está hecha.
   const conceptosPorSesion = useMemo(() => {
@@ -104,16 +170,68 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
     return () => { vivo = false }
   }, [reintento])
 
+  // El plan nunca bloquea: si no llega, la pantalla se queda con las sesiones preparadas.
+  useEffect(() => {
+    let vivo = true
+    setPlanListo(false)
+    cargarPlanSemana(token).then(p => { if (vivo) { setPlan(p); setPlanListo(true) } })
+    return () => { vivo = false }
+  }, [token, reintento])
+
   const abrir = useCallback((s: SesionSemanal) => onAbrir(s), [onAbrir])
 
-  if (error) return <Vacio titulo="No se pudieron cargar tus sesiones" texto="Tu progreso está a salvo. Comprueba la conexión y vuelve a intentarlo."
-    accion={<button className="btn" onClick={() => setReintento(v => v + 1)}>Volver a intentar</button>} />
-  if (!sesiones) return <div className="vacio" role="status">Cargando tus sesiones…</div>
+  const hechoDe = useCallback((cp: PlanCheckpoint) => marcas[cp.id] ?? cp.done, [marcas])
 
-  const semanas = [...new Map(sesiones.map(s => [s.semana, s])).values()]
-  const hecha = (s: SesionSemanal) => s.estado === 'completada' || coberturaDe(s).cumple
-  const pendientes = sesiones.filter(s => !hecha(s))
-  const enCurso = semanas.find(s => pendientes.some(p => p.semana === s.semana)) ?? semanas[0]
+  const marcar = useCallback(async (cp: PlanCheckpoint, done: boolean) => {
+    if (!esTarea(cp)) return
+    setMarcas(m => ({ ...m, [cp.id]: done }))
+    setFallos(f => { const { [cp.id]: _fuera, ...resto } = f; return resto })
+    try {
+      const guardado = await marcarCheckpoint(cp.id, done, token)
+      // Manda lo releído de la base, no lo que se envió.
+      setMarcas(m => ({ ...m, [cp.id]: guardado.done }))
+    } catch (causa) {
+      setMarcas(m => ({ ...m, [cp.id]: cp.done }))
+      setFallos(f => ({ ...f, [cp.id]: causa instanceof PlanEscrituraError ? causa.message
+        : 'No se pudo guardar la marca en tu plan. Se deja como estaba.' }))
+    }
+  }, [token])
+
+  const sesionesPlan = useMemo(() => plan ? sesionesDeLaSemana(sesiones ?? [], plan.inicio, plan.fin) : [],
+    [plan, sesiones])
+  const enlaces = useMemo(() => plan ? enlazarCheckpoints(plan.checkpoints, sesionesPlan) : new Map<number, SesionSemanal>(),
+    [plan, sesionesPlan])
+
+  const porDia = useMemo(() => {
+    const mapa = new Map<number, PlanCheckpoint[]>()
+    for (const cp of plan?.checkpoints ?? []) mapa.set(cp.dia, [...(mapa.get(cp.dia) ?? []), cp])
+    return mapa
+  }, [plan])
+
+  // El día de hoy dentro de la semana del plan; `null` si hoy cae fuera (domingo incluido).
+  const diaDeHoy = useMemo(() => {
+    if (!plan) return null
+    const hoy = fechaISO(new Date())
+    if (hoy < plan.inicio || hoy > plan.fin) return null
+    const dias = Math.round((fechaLocal(hoy).getTime() - fechaLocal(plan.inicio).getTime()) / 86400000) + 1
+    return dias >= 1 && dias <= 6 ? dias : null
+  }, [plan])
+
+  const pendientesDe = useCallback((dia: number) =>
+    (porDia.get(dia) ?? []).filter(cp => esTarea(cp) && !hechoDe(cp)).length, [porDia, hechoDe])
+
+  // Un solo día abierto: la pantalla llena es lo que hace que no se empiece.
+  useEffect(() => {
+    if (!plan) return
+    setDiaAbierto(actual => {
+      if (actual !== null) return actual
+      if (diaDeHoy !== null && porDia.has(diaDeHoy)) return diaDeHoy
+      const dias = [...porDia.keys()].sort((a, b) => a - b)
+      return dias.find(d => pendientesDe(d) > 0) ?? dias[0] ?? null
+    })
+    // `pendientesDe` cambia con cada marca; el día abierto se elige una vez por semana cargada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan, diaDeHoy, porDia])
 
   const masCosas = <details className="tarjeta semana-extra">
     <summary>Quiero hacer algo más</summary>
@@ -124,8 +242,79 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
     </div>
   </details>
 
+  if (error) return <Vacio titulo="No se pudieron cargar tus sesiones" texto="Tu progreso está a salvo. Comprueba la conexión y vuelve a intentarlo."
+    accion={<button className="btn" onClick={() => setReintento(v => v + 1)}>Volver a intentar</button>} />
+  if (!sesiones || !planListo) return <div className="vacio" role="status">Cargando tu semana…</div>
+
+  if (enfoque) return <Enfoque minutos={MINUTOS_POR_KIND[enfoque.kind] ?? 20} etiqueta={enfoque.label}
+    onTerminar={hecho => { if (hecho) void marcar(enfoque, true); setEnfoque(null) }} />
+
+  if (plan) {
+    const { titular, resto } = partirTitulo(plan.titulo)
+    const tareas = plan.checkpoints.filter(esTarea)
+    const hechas = tareas.filter(hechoDe).length
+    const dias = [...porDia.keys()].sort((a, b) => a - b)
+
+    return <div className="pila">
+      <header className="semana-encabezado">
+        <p className="editorial-eyebrow">Mi semana</p>
+        <h1>{titular}</h1>
+        {resto && <p className="sutil">{resto}</p>}
+        <p className="mini">{hechas} de {tareas.length} hechos</p>
+        <progress className="semana-progreso" aria-label="Avance del plan de esta semana"
+          value={hechas} max={tareas.length || 1} />
+      </header>
+
+      {plan.nota && <details className="tarjeta semana-extra">
+        <summary>Por qué esta semana es así</summary>
+        <p className="sutil" style={{ marginTop: 12, whiteSpace: 'pre-wrap' }}>{plan.nota}</p>
+      </details>}
+
+      {dias.map(dia => {
+        const lista = porDia.get(dia)!
+        const abierto = dia === diaAbierto
+        const descanso = lista.every(cp => cp.kind === 'descanso')
+        const fecha = fechaLocal(plan.inicio, dia - 1)
+        const pendientes = pendientesDe(dia)
+        const resumen = descanso ? 'Descanso'
+          : pendientes ? `${pendientes} ${pendientes === 1 ? 'pendiente' : 'pendientes'}` : 'todo hecho'
+        return <section key={dia} className={`tarjeta plan-dia${abierto ? ' abierto' : ''}${descanso ? ' descanso' : ''}`}>
+          <button className="plan-dia-titulo" aria-expanded={abierto}
+            onClick={() => setDiaAbierto(d => d === dia ? null : dia)}>
+            <span aria-hidden="true">{abierto ? '▾' : '▸'}</span>
+            <b>{dia === diaDeHoy ? 'HOY · ' : ''}{DIAS[dia - 1]} {diaYMes(fecha)}</b>
+            <span className="mini">{resumen}</span>
+          </button>
+          {abierto && (descanso
+            // Un descanso no es una tarea: ni casilla, ni cronómetro, ni cuenta en el total.
+            ? <p className="sutil plan-descanso">{lista.map(cp => cp.label).join(' · ')}. Hoy no se estudia; eso también es el plan.</p>
+            : <ul className="plan-lista">
+              {lista.map(cp => {
+                const sesion = enlaces.get(cp.id) ?? null
+                return <Fila key={cp.id} cp={cp} hecho={hechoDe(cp)} sesion={sesion}
+                  cobertura={sesion ? coberturaDe(sesion) : null} error={fallos[cp.id] ?? null}
+                  onMarcar={(punto, done) => { void marcar(punto, done) }}
+                  onEnfocar={setEnfoque}
+                  onAbrirSesion={(punto, s) => onAbrir(s, () => { void marcar(punto, true) })} />
+              })}
+            </ul>)}
+        </section>
+      })}
+
+      {masCosas}
+    </div>
+  }
+
+  // Sin plan: exactamente lo que hacía la pantalla antes de que existiera.
+  const avisoPlan = <p className="mini plan-ausente" role="status">El plan no está disponible ahora mismo. Estas son las sesiones de la semana.</p>
+  const semanas = [...new Map(sesiones.map(s => [s.semana, s])).values()]
+  const hecha = (s: SesionSemanal) => s.estado === 'completada' || coberturaDe(s).cumple
+  const pendientes = sesiones.filter(s => !hecha(s))
+  const enCurso = semanas.find(s => pendientes.some(p => p.semana === s.semana)) ?? semanas[0]
+
   if (!sesiones.length) return <div className="pila">
     <header className="semana-encabezado"><p className="editorial-eyebrow">Mi semana</p><h1>Sin sesiones preparadas</h1>
+      {avisoPlan}
       <p className="sutil">Cuando haya sesiones planificadas aparecerán aquí, en orden por día.</p></header>
     <Vacio titulo="Nada que estudiar ahora mismo" texto="Mientras tanto puedes ponerte al día con lo que fallaste o con lo que vence."
       accion={<button className="btn" onClick={onRecuperacion}>Ir a Recuperación</button>} />
@@ -136,6 +325,7 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
     <header className="semana-encabezado">
       <p className="editorial-eyebrow">Mi semana</p>
       <h1>{enCurso.semana} · {rotuloSemana(enCurso.semanaInicio)}</h1>
+      {avisoPlan}
       <p className="sutil">{pendientes.length
         ? `${pendientes.length} ${pendientes.length === 1 ? 'sesión pendiente' : 'sesiones pendientes'}. Una sesión se marca completada sola cuando respondes el 85 % de sus pasos.`
         : 'Todas las sesiones planificadas están hechas.'}</p>

@@ -1,6 +1,7 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import worker, { StudyCoach, validarCalificacion, validarRespuesta } from './worker'
+import { olvidarCachePlan } from './plan'
 const fragment = 'Fragmento sintético: alfa es el primer elemento.'
 const output = { response: JSON.stringify({ diferencia: 'Alfa y beta son distintos.', explicacion: 'Alfa ocupa el primer lugar.', recordar: 'Alfa primero.', evidencia: 'alfa es el primer elemento.' }) }
 class MemoryStorage {
@@ -136,5 +137,117 @@ describe('corrección de respuestas breves con IA', () => {
     const respuesta = await call('k3')
     expect(respuesta.status).toBe(503)
     expect((await respuesta.json() as { codigo: string }).codigo).toBe('no_verificable')
+  })
+})
+
+
+/**
+ * Proxy al plan de estudio. El Worker tiene la `service_role` de la base de
+ * planificación, así que estas dos rutas no pueden quedar abiertas ni servir
+ * filas de otro usuario. Y cuando el secreto no está, la respuesta es un 503
+ * limpio: la pantalla degrada, no se rompe.
+ */
+const AUTORIZACION = { Authorization: 'Bearer ' + 'x'.repeat(30) }
+const secretos = {
+  PLAN_SUPABASE_URL: 'https://plan.supabase.co',
+  PLAN_SUPABASE_SERVICE_KEY: 'clave-de-servicio',
+  PLAN_USER_ID: 'dd1d5d7c-a9f4-42aa-a08e-f40603c767c2',
+}
+const entornoPlan = (extra: Record<string, unknown> = {}) => ({
+  AI_FREE_ENABLED: 'true', AI: { run: vi.fn() }, COACH: { idFromName: vi.fn(), get: vi.fn() },
+  ASSETS: { fetch: vi.fn().mockResolvedValue(new Response('site')) }, ...secretos, ...extra,
+})
+const cuentaValida = (mock: ReturnType<typeof vi.fn>) => mock
+  .mockResolvedValueOnce(Response.json({ id: 'usuario', email_confirmed_at: '2026-01-01' }))
+  .mockResolvedValueOnce(Response.json([{ user_id: 'usuario' }]))
+const punto = { id: 64, idx: 5, dia: 1, kind: 'tarjetas', label: 'Sesión 1/4', done: false, done_at: null }
+
+beforeEach(() => olvidarCachePlan())
+
+describe('proxy al plan de la semana', () => {
+  it('sin secretos responde 503 y nunca toca ninguna base', async () => {
+    const remoto = vi.fn()
+    vi.stubGlobal('fetch', remoto)
+    for (const falta of ['PLAN_SUPABASE_URL', 'PLAN_SUPABASE_SERVICE_KEY', 'PLAN_USER_ID']) {
+      const env = entornoPlan({ [falta]: undefined })
+      const respuesta = await worker.fetch(new Request('https://site/api/plan/semana', { headers: AUTORIZACION }), env)
+      expect(respuesta.status).toBe(503)
+      expect(await respuesta.json()).toEqual({ error: 'plan no configurado' })
+    }
+    expect(remoto).not.toHaveBeenCalled()
+  })
+
+  it('exige sesión, mismo origen y método antes de mirar el plan', async () => {
+    const remoto = vi.fn()
+    vi.stubGlobal('fetch', remoto)
+    const env = entornoPlan()
+    expect((await worker.fetch(new Request('https://site/api/plan/semana'), env)).status).toBe(401)
+    expect((await worker.fetch(new Request('https://site/api/plan/semana',
+      { headers: { ...AUTORIZACION, Origin: 'https://otro' } }), env)).status).toBe(403)
+    expect((await worker.fetch(new Request('https://site/api/plan/semana',
+      { method: 'POST', headers: AUTORIZACION }), env)).status).toBe(405)
+    expect((await worker.fetch(new Request('https://site/api/plan/checkpoint/no-es-un-id',
+      { method: 'PATCH', headers: AUTORIZACION, body: '{"done":true}' }), env)).status).toBe(400)
+    expect(remoto).not.toHaveBeenCalled()
+  })
+
+  it('devuelve la primera semana del rango que tenga checkpoints y la cachea', async () => {
+    const remoto = cuentaValida(vi.fn())
+      .mockResolvedValueOnce(Response.json([
+        { id: 'pto', title: 'PTO', starts_on: '2026-09-14', ends_on: '2026-09-19', note: null },
+        { id: 'S2', title: 'S2 · 14–19 sep · Repro', starts_on: '2026-09-14', ends_on: '2026-09-19', note: 'La nota.' },
+      ]))
+      // El evento de vacaciones existe en el rango pero no tiene plan que hacer.
+      .mockResolvedValueOnce(Response.json([{ event_id: 'S2', ...punto }]))
+      // La segunda lectura sólo debería llegar a comprobar la cuenta.
+      .mockResolvedValueOnce(Response.json({ id: 'usuario', email_confirmed_at: '2026-01-01' }))
+      .mockResolvedValueOnce(Response.json([{ user_id: 'usuario' }]))
+    vi.stubGlobal('fetch', remoto)
+    const pedir = () => worker.fetch(new Request('https://site/api/plan/semana?hoy=2026-09-14', { headers: AUTORIZACION }), entornoPlan())
+    expect(await (await pedir()).json()).toEqual({
+      eventoId: 'S2', titulo: 'S2 · 14–19 sep · Repro', inicio: '2026-09-14', fin: '2026-09-19', nota: 'La nota.',
+      checkpoints: [{ id: 64, idx: 5, dia: 1, kind: 'tarjetas', label: 'Sesión 1/4', done: false, doneAt: null }],
+    })
+    // Segunda lectura servida del caché: se repite la comprobación de la cuenta,
+    // pero ya no se vuelve a consultar la base del plan.
+    expect((await pedir()).status).toBe(200)
+    expect(remoto).toHaveBeenCalledTimes(6)
+    expect(remoto.mock.calls.filter(c => String(c[0]).startsWith(secretos.PLAN_SUPABASE_URL))).toHaveLength(2)
+  })
+
+  it('el PATCH devuelve lo releído de la base, no lo que se envió', async () => {
+    const remoto = cuentaValida(vi.fn())
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json([{ ...punto, done: false, done_at: null }]))
+    vi.stubGlobal('fetch', remoto)
+    const respuesta = await worker.fetch(new Request('https://site/api/plan/checkpoint/64',
+      { method: 'PATCH', headers: AUTORIZACION, body: JSON.stringify({ done: true }) }), entornoPlan())
+    expect(respuesta.status).toBe(200)
+    expect(await respuesta.json()).toMatchObject({ id: 64, done: false, doneAt: null })
+    // La escritura y la relectura van filtradas por el usuario del plan.
+    const escritura = remoto.mock.calls[2]
+    expect(escritura[0]).toContain(`user_id=eq.${encodeURIComponent(secretos.PLAN_USER_ID)}`)
+    expect(JSON.parse(escritura[1].body).done).toBe(true)
+    expect(remoto.mock.calls[3][0]).toContain('user_id=eq.')
+  })
+
+  it('el PATCH rechaza un id que es de otro user_id', async () => {
+    const remoto = cuentaValida(vi.fn())
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      // El filtro por usuario no devuelve nada: esa fila no es de este plan.
+      .mockResolvedValueOnce(Response.json([]))
+    vi.stubGlobal('fetch', remoto)
+    const respuesta = await worker.fetch(new Request('https://site/api/plan/checkpoint/1',
+      { method: 'PATCH', headers: AUTORIZACION, body: JSON.stringify({ done: true }) }), entornoPlan())
+    expect(respuesta.status).toBe(404)
+  })
+
+  it('no atiende a una cuenta sin acceso al material', async () => {
+    const remoto = vi.fn()
+      .mockResolvedValueOnce(Response.json({ id: 'usuario', email_confirmed_at: '2026-01-01' }))
+      .mockResolvedValueOnce(Response.json([]))
+    vi.stubGlobal('fetch', remoto)
+    expect((await worker.fetch(new Request('https://site/api/plan/semana', { headers: AUTORIZACION }), entornoPlan())).status).toBe(403)
+    expect(remoto).toHaveBeenCalledTimes(2)
   })
 })

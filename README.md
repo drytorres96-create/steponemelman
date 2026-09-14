@@ -96,6 +96,16 @@ Sin esa variable, la prueba del conjunto privado se omite y las pruebas sintéti
 
 `project.config.json` contiene la URL de Supabase y su clave **publishable**, destinada al cliente. El acceso al material depende de la sesión y de las políticas RLS. No añadas claves `service_role`, claves secretas ni contraseñas de base de datos al código.
 
+El plan de estudio vive en una segunda base de Supabase y el Worker hace de proxy en `/api/plan/*`, con tres **secretos del Worker** que se ponen con `npx wrangler secret put` y no van en `vars` ni en el bundle del cliente:
+
+| Secreto | Contenido |
+| --- | --- |
+| `PLAN_SUPABASE_URL` | URL del proyecto de planificación |
+| `PLAN_SUPABASE_SERVICE_KEY` | su clave `service_role` |
+| `PLAN_USER_ID` | UUID del usuario dueño del plan en esa base |
+
+Si falta alguno, la ruta responde `503` con `{ error: 'plan no configurado' }` y la pantalla de inicio cae a las sesiones preparadas. Las dos rutas exigen igualmente una cuenta verificada con acceso al material: la clave `service_role` da acceso total a la base del plan.
+
 El [contrato de base de datos](database/README.md) describe revisiones, conflictos y generaciones de restablecimiento. `database/schema.sql` permite reconstruir el esquema en un proyecto vacío; no debe ejecutarse de nuevo sobre las tablas instaladas. `database/verify.sql` comprueba permisos y aislamiento con datos temporales y termina con `ROLLBACK`.
 
 ## Contenido y alcance

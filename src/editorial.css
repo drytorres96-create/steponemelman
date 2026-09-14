@@ -357,3 +357,54 @@ summary::marker { color: var(--violeta); }
 .nbme-forma-cifras dt { font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; color: var(--texto-3); }
 .nbme-forma-cifras dd { margin: 2px 0 0; font-size: 1.25rem; font-weight: 640; letter-spacing: -.02em; }
 .nbme-forma p.mini { margin: 0; }
+
+/* ---------- Mi semana: el plan por días ---------- */
+/* Un día abierto y los demás plegados. La pantalla llena es lo que hace que no se empiece. */
+.plan-dia { padding: 0; overflow: hidden; }
+.plan-dia-titulo {
+  display: flex; align-items: baseline; gap: 10px; width: 100%;
+  background: none; border: 0; padding: 16px 20px; cursor: pointer;
+  text-align: left; color: var(--texto); font: inherit;
+}
+.plan-dia-titulo b { flex: 1 1 auto; min-width: 0; font-weight: 620; }
+.plan-dia-titulo:hover { background: var(--bg-2); }
+.plan-dia.abierto .plan-dia-titulo { border-bottom: 1px solid var(--linea-suave); }
+.plan-dia.descanso .plan-dia-titulo b { font-weight: 520; color: var(--texto-2); }
+
+.plan-lista { list-style: none; margin: 0; padding: 6px 20px 18px; display: grid; gap: 2px; }
+.plan-descanso { margin: 0; padding: 16px 20px 20px; }
+
+.plan-fila {
+  display: grid; gap: 6px; padding: 10px 0;
+  border-bottom: 1px solid var(--linea-suave);
+}
+.plan-fila:last-child { border-bottom: 0; }
+.plan-fila-marca { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; line-height: 1.5; }
+.plan-fila-marca input { margin: .25em 0 0; flex: 0 0 auto; width: 16px; height: 16px; accent-color: var(--verde); }
+.plan-fila-marca span { min-width: 0; overflow-wrap: anywhere; }
+/* Lo hecho se queda a la vista, pero deja de pedir atención. */
+.plan-fila.hecha .plan-fila-marca span { color: var(--texto-3); text-decoration: line-through; }
+.plan-fila-acciones { gap: 8px; align-items: center; }
+.plan-fila-acciones:empty { display: none; }
+.plan-fila-error { margin: 0; font-size: .78rem; color: var(--rojo); }
+
+/* La tarjeta rica de la sesión preparada, dentro de su fila y no en una sección aparte. */
+.plan-fila-sesion {
+  display: grid; gap: 6px; margin: 2px 0 4px 26px; padding: 12px 14px;
+  border: 1px solid var(--linea-suave); border-radius: var(--radio); background: var(--bg-2);
+}
+.plan-fila-sesion p { margin: 0; }
+.plan-fila-sesion .btn { justify-self: start; margin-top: 4px; }
+
+.plan-ausente { margin: 0; }
+.plan-enfoque { max-width: 640px; margin: 0 auto; align-items: flex-start; }
+.plan-enfoque h2 { margin: 0; }
+.plan-enfoque p { margin: 0; }
+.plan-adherencia h2.rotulo { margin: 0; }
+.plan-adherencia p.mini { margin: 4px 0 0; }
+
+@media (max-width: 720px) {
+  .plan-dia-titulo { flex-wrap: wrap; padding: 14px 16px; }
+  .plan-lista { padding: 6px 16px 16px; }
+  .plan-fila-sesion { margin-left: 0; }
+}

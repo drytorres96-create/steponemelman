@@ -64,7 +64,7 @@ export default function App() {
   const [tipoContenido, setTipoContenido] = useState<'conceptos' | 'preguntas'>('conceptos')
   const [tipoProgreso, setTipoProgreso] = useState<'conceptos' | 'preguntas'>('conceptos')
   const [ventanaProgreso, setVentanaProgreso] = useState<'semana' | 'general'>('general')
-  const [sesionSemanal, setSesionSemanal] = useState<{ sesion: SesionSemanal; efimera: boolean } | null>(null)
+  const [sesionSemanal, setSesionSemanal] = useState<{ sesion: SesionSemanal; efimera: boolean; alCompletar?: () => void } | null>(null)
   const [filtrosConceptos, setFiltrosConceptos] = useState<Partial<FiltrosBusqueda> | undefined>()
   const contenido = useRef<HTMLElement>(null)
   const vistaAnterior = useRef(vista)
@@ -101,10 +101,14 @@ export default function App() {
     if (sesionPreguntasPendiente && await nbme.resumeSession(sesionPreguntasPendiente.id)) ir('preguntas')
   }
 
-  /** Abre una sesión de la semana tal como viene planificada, sin recalcular su guion. */
-  const abrirSesionSemanal = useCallback((sesion: SesionSemanal) => {
+  /**
+   * Abre una sesión de la semana tal como viene planificada, sin recalcular su guion.
+   * `alCompletar` lo pone la pantalla de inicio para marcar el checkpoint del plan
+   * en cuanto la sesión se da por completada.
+   */
+  const abrirSesionSemanal = useCallback((sesion: SesionSemanal, alCompletar?: () => void) => {
     setCola(null); setError(null)
-    setSesionSemanal({ sesion, efimera: false })
+    setSesionSemanal({ sesion, efimera: false, alCompletar })
     setVista('sesion'); location.hash = 'sesion'
   }, [])
 
@@ -246,7 +250,8 @@ export default function App() {
           {!cargando && vista === 'semana' && <Semana onAbrir={abrirSesionSemanal} onRecuperacion={() => ir('recuperacion')}
             onBiblioteca={tipo => { setTipoContenido(tipo); ir('modulos') }} />}
           {!cargando && vista === 'sesion' && sesionSemanal && <SesionMixta key={sesionSemanal.sesion.id}
-            sesion={sesionSemanal.sesion} efimera={sesionSemanal.efimera} onSalir={() => ir('semana')} />}
+            sesion={sesionSemanal.sesion} efimera={sesionSemanal.efimera}
+            onCompletada={sesionSemanal.alCompletar} onSalir={() => ir('semana')} />}
           {!cargando && vista === 'sesion' && !sesionSemanal && <div className="vacio"><p>Esta sesión ya no está abierta.</p>
             <button className="btn" onClick={() => ir('semana')}>Volver a mis sesiones</button></div>}
           {!cargando && vista === 'recuperacion' && <Recuperacion onEstudiar={estudiarIds}
