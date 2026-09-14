@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { notificarUsoIA } from './cuota-ia'
 import type { CoachRespuesta, TurnoChat } from '../server/worker'
 
 export type { CoachRespuesta, TurnoChat }
@@ -30,6 +31,8 @@ export async function preguntarSobreConcepto(
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ conceptId, pregunta: pregunta.trim().slice(0, 400), historial: historial.slice(-MAX_HISTORIAL) }),
     })
+    // Haya ido bien o mal, la llamada puede haber gastado: el medidor tiene que enterarse.
+    notificarUsoIA()
     if (!response.headers.get('content-type')?.includes('application/json')) {
       return { estado: 'sin_ia', motivo: 'El chat no está disponible en este entorno.' }
     }

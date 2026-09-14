@@ -19,6 +19,7 @@ import { construirCola, RUTAS, type RutaId } from './lib/rutas'
 import { cargarTodo } from './data/corpus'
 import { useAuth } from './auth/AuthProvider'
 import { APP_VERSION } from './release'
+import { MedidorIA } from './components/MedidorIA'
 import type { OpcionesSesionPersonalizada } from './lib/busqueda'
 import { alternarFormatos } from './lib/formatos'
 import { aplicarVariante, siguienteVariante } from './lib/variantes'
@@ -218,6 +219,7 @@ export default function App() {
           </nav>}
           {!enConcentracion && <div className="sidebar-note"><span className="editorial-eyebrow">USMLE STEP 1</span><p>Entender.<br />Practicar.<br /><em>Consolidar.</em></p></div>}
           <div className="barra-fin">
+            {!enConcentracion && <MedidorIA />}
             {sincronizacionVisible && <button className="btn pequeno fantasma" title="Comprobar y sincronizar el progreso"
               onClick={() => { void sincronizarTodo() }} aria-live="polite">{sincronizacionVisible}</button>}
             {!enConcentracion && <details className="menu-cuenta"><summary>Cuenta y ajustes</summary><div className="menu-cuenta-opciones">{SECUNDARIAS.map(n => <button className="btn pequeno fantasma" key={n.id} onClick={e => { ir(n.id); e.currentTarget.closest('details')?.removeAttribute('open') }}>{n.txt}</button>)}<button className="btn pequeno fantasma" onClick={async () => {

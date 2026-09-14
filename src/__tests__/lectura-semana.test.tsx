@@ -14,7 +14,12 @@ const mock = vi.hoisted(() => ({ app: vi.fn(), analizar: vi.fn(), cuota: vi.fn()
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../lib/analisis-ia', async () => ({
   ...await vi.importActual<typeof import('../lib/analisis-ia')>('../lib/analisis-ia'),
-  analizarSemana: mock.analizar, cuotaIA: mock.cuota,
+  analizarSemana: mock.analizar,
+}))
+// La cuota ya no la pide esta pantalla: la sirve el mismo store que alimenta el medidor.
+vi.mock('../lib/cuota-ia', async () => ({
+  ...await vi.importActual<typeof import('../lib/cuota-ia')>('../lib/cuota-ia'),
+  useCuotaIA: mock.cuota,
 }))
 
 import { LecturaSemana } from '../screens/LecturaSemana'
@@ -45,7 +50,7 @@ const pulsar = async (texto: string) => {
 beforeEach(() => {
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
   estudiar.mockClear()
-  mock.cuota.mockResolvedValue({ presupuesto: 8500, gastadas: 850, restantes: 7650, llamadas: 3, activa: true })
+  mock.cuota.mockReturnValue({ presupuesto: 8500, gastadas: 850, restantes: 7650, llamadas: 3, activa: true })
   mock.app.mockReturnValue({ estado: { progreso: { 'QA-1': progreso('QA-1'), 'QA-2': progreso('QA-2') } } })
 })
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.clearAllMocks() })
@@ -54,7 +59,7 @@ describe('lectura de la semana', () => {
   it('no pide nada hasta que se pulsa, y enseña antes lo que enviaría', async () => {
     await act(async () => { pintar() })
     expect(mock.analizar).not.toHaveBeenCalled()
-    // La cuota sí se consulta al entrar: no gasta IA y decide si merece la pena pulsar.
+    // La cuota se ve antes de pulsar: saber cuánto queda decide si merece la pena.
     expect(host.textContent).toContain('Queda el 90 % de la cuota gratuita de hoy.')
     expect(host.textContent).toContain('Ver los fallos que se enviarían')
     expect(host.textContent).toContain('Tus respuestas escritas no se envían.')

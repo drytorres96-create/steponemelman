@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
-import type { CoachAnalisis, CoachCuota, CoachPatron } from '../server/worker'
+import { notificarUsoIA } from './cuota-ia'
+import type { CoachAnalisis, CoachPatron } from '../server/worker'
 import type { FalloSemanal } from './semana-fallos'
 
 export type { CoachPatron as Patron }
@@ -31,6 +32,8 @@ export async function analizarSemana(fallos: FalloSemanal[], signal?: AbortSigna
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ conceptos: fallos }),
     })
+    // Haya ido bien o mal, la llamada puede haber gastado: el medidor tiene que enterarse.
+    notificarUsoIA()
     if (!response.headers.get('content-type')?.includes('application/json')) {
       return { estado: 'sin_ia', motivo: 'La lectura con IA no está disponible en este entorno.' }
     }
@@ -46,18 +49,4 @@ export async function analizarSemana(fallos: FalloSemanal[], signal?: AbortSigna
     if (limite?.aborted) return { estado: 'sin_ia', motivo: 'La IA tardó demasiado.' }
     return { estado: 'sin_ia', motivo: causa instanceof Error && causa.name === 'TypeError' ? 'Sin conexión con el analizador.' : 'No se pudo leer la semana.' }
   }
-}
-
-/** Lo que queda hoy del regalo diario de Cloudflare. `null` cuando no se puede saber. */
-export async function cuotaIA(signal?: AbortSignal): Promise<CoachCuota | null> {
-  try {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return null
-    const response = await fetch('/api/ia/estado', { signal, headers: { Authorization: `Bearer ${session.access_token}` } })
-    if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) return null
-    const data = await response.json() as Partial<CoachCuota>
-    return typeof data.restantes === 'number' && typeof data.presupuesto === 'number'
-      ? { presupuesto: data.presupuesto, gastadas: data.gastadas ?? 0, restantes: data.restantes, llamadas: data.llamadas ?? 0, activa: data.activa === true }
-      : null
-  } catch { return null }
 }

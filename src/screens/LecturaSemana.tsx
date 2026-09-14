@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../store/estado'
 import type { Concepto } from '../schema/concept'
 import type { OpcionesSesionPersonalizada } from '../lib/busqueda'
-import { analizarSemana, cuotaIA, MINIMO_CONCEPTOS, type Patron } from '../lib/analisis-ia'
+import { analizarSemana, MINIMO_CONCEPTOS, type Patron } from '../lib/analisis-ia'
+import { porcentajeRestante, useCuotaIA } from '../lib/cuota-ia'
 import { fallosDeSemana } from '../lib/semana-fallos'
 import { NOMBRE_ERROR } from '../srs/tipos'
 import { lunesDe } from '../lib/tiempo'
@@ -22,20 +23,13 @@ export function LecturaSemana({ conceptos, onEstudiar }: {
   onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void
 }) {
   const { estado } = useApp()
+  // El medidor del raíl y esta línea leen el mismo dato: una sola fuente para la cuota.
+  const cuota = useCuotaIA()
   const [cargando, setCargando] = useState(false)
   const [aviso, setAviso] = useState('')
   const [lectura, setLectura] = useState<{ patrones: Patron[]; enfoque: string } | null>(null)
-  const [restantes, setRestantes] = useState<number | null>(null)
   const aborto = useRef<AbortController | null>(null)
   useEffect(() => () => aborto.current?.abort(), [])
-
-  // La cuota se consulta al entrar: no gasta IA, y saber cuánto queda antes de pulsar es
-  // parte de decidir si pulsar. Antes solo se sabía si la lectura había salido bien.
-  useEffect(() => {
-    const control = new AbortController()
-    void cuotaIA(control.signal).then(c => { if (!control.signal.aborted && c) setRestantes(Math.round(c.restantes / c.presupuesto * 100)) })
-    return () => control.abort()
-  }, [])
 
   const publicados = new Set(conceptos.map(c => c.concept_id))
   const titulo = (id: string) => conceptos.find(c => c.concept_id === id)?.afirmacion ?? id
@@ -50,9 +44,6 @@ export function LecturaSemana({ conceptos, onEstudiar }: {
     setCargando(false)
     if (resultado.estado === 'ok') setLectura({ patrones: resultado.patrones, enfoque: resultado.enfoque })
     else setAviso(resultado.motivo)
-    // También tras un fallo: una lectura que no salió puede haber gastado su reserva.
-    const cuota = await cuotaIA(control.signal)
-    if (!control.signal.aborted && cuota) setRestantes(Math.round(cuota.restantes / cuota.presupuesto * 100))
   }
 
   if (!fallos.length) return null
@@ -63,7 +54,7 @@ export function LecturaSemana({ conceptos, onEstudiar }: {
       {fallos.length} concepto{fallos.length === 1 ? '' : 's'} con fallos esta semana
       {fallos.length >= MINIMO_CONCEPTOS ? '. La IA los agrupa por mecanismo para que el repaso empiece por donde más rinde.'
         : `. Hacen falta ${MINIMO_CONCEPTOS} para pedir una lectura.`}
-      {restantes !== null && ` Queda el ${restantes} % de la cuota gratuita de hoy.`}
+      {cuota && ` Queda el ${porcentajeRestante(cuota)} % de la cuota gratuita de hoy.`}
     </p>
 
     {!lectura && fallos.length >= MINIMO_CONCEPTOS &&

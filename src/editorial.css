@@ -476,3 +476,33 @@ summary::marker { color: var(--violeta); }
   .chat-hilo { max-height: 340px; }
   .chat-entrada { flex-direction: column; }
 }
+
+/* ---------- Medidor de la IA gratuita ----------
+   Vive en el raíl, encima de la cuenta: se mira sin buscarlo y no compite con la
+   navegación. El anillo transiciona en vez de saltar, para que el consumo se vea
+   ocurrir. Ámbar cuando queda poco; gris cuando la ayuda está apagada. */
+.medidor-ia { position: relative; display: flex; align-items: center; gap: 11px; --medidor: #487a5a; }
+.medidor-ia.medidor-bajo { --medidor: var(--ambar); }
+.medidor-ia.medidor-apagado { --medidor: var(--linea); }
+.medidor-ia svg { width: 40px; height: 40px; flex: none; transform: rotate(-90deg); }
+.medidor-pista { fill: none; stroke: #e1e8dd; stroke-width: 4; }
+.medidor-arco {
+  fill: none; stroke: var(--medidor); stroke-width: 4; stroke-linecap: round;
+  transition: stroke-dashoffset .75s cubic-bezier(.22, .61, .36, 1), stroke .4s ease;
+}
+.medidor-cifra {
+  position: absolute; width: 40px; text-align: center; font-size: .66rem;
+  font-weight: 700; color: var(--medidor); pointer-events: none;
+}
+.medidor-texto { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.medidor-rotulo { font-size: .72rem; font-weight: 600; color: var(--texto-2); }
+.medidor-detalle { font-size: .66rem; color: var(--texto-3); }
+
+@media (prefers-reduced-motion: reduce) { .medidor-arco { transition: none; } }
+
+@media (max-width: 760px) {
+  /* En el encabezado compacto solo cabe el anillo; el rótulo lo da el título accesible. */
+  .medidor-texto { display: none; }
+  .medidor-ia svg { width: 34px; height: 34px; }
+  .medidor-cifra { width: 34px; font-size: .62rem; }
+}
