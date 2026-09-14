@@ -29,6 +29,14 @@ export function LecturaSemana({ conceptos, onEstudiar }: {
   const aborto = useRef<AbortController | null>(null)
   useEffect(() => () => aborto.current?.abort(), [])
 
+  // La cuota se consulta al entrar: no gasta IA, y saber cuánto queda antes de pulsar es
+  // parte de decidir si pulsar. Antes solo se sabía si la lectura había salido bien.
+  useEffect(() => {
+    const control = new AbortController()
+    void cuotaIA(control.signal).then(c => { if (!control.signal.aborted && c) setRestantes(Math.round(c.restantes / c.presupuesto * 100)) })
+    return () => control.abort()
+  }, [])
+
   const publicados = new Set(conceptos.map(c => c.concept_id))
   const titulo = (id: string) => conceptos.find(c => c.concept_id === id)?.afirmacion ?? id
   const fallos = fallosDeSemana(Object.values(estado.progreso), lunesDe().getTime(), publicados)
@@ -42,6 +50,7 @@ export function LecturaSemana({ conceptos, onEstudiar }: {
     setCargando(false)
     if (resultado.estado === 'ok') setLectura({ patrones: resultado.patrones, enfoque: resultado.enfoque })
     else setAviso(resultado.motivo)
+    // También tras un fallo: una lectura que no salió puede haber gastado su reserva.
     const cuota = await cuotaIA(control.signal)
     if (!control.signal.aborted && cuota) setRestantes(Math.round(cuota.restantes / cuota.presupuesto * 100))
   }
@@ -54,6 +63,7 @@ export function LecturaSemana({ conceptos, onEstudiar }: {
       {fallos.length} concepto{fallos.length === 1 ? '' : 's'} con fallos esta semana
       {fallos.length >= MINIMO_CONCEPTOS ? '. La IA los agrupa por mecanismo para que el repaso empiece por donde más rinde.'
         : `. Hacen falta ${MINIMO_CONCEPTOS} para pedir una lectura.`}
+      {restantes !== null && ` Queda el ${restantes} % de la cuota gratuita de hoy.`}
     </p>
 
     {!lectura && fallos.length >= MINIMO_CONCEPTOS &&
@@ -75,7 +85,7 @@ export function LecturaSemana({ conceptos, onEstudiar }: {
       </div>)}
       <p className="mini">
         Lectura generada por IA sobre tus fallos de esta semana; puede equivocarse. No cambia tu dominio ni
-        reordena tus repasos{restantes !== null ? ` · queda el ${restantes} % de la cuota gratuita de hoy` : ''}.
+        reordena tus repasos.
       </p>
     </div>}
 
