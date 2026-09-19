@@ -96,7 +96,7 @@ it('exports real screen DOM with synthetic providers and no network, auth bypass
       }
       const markup = snapshot.innerHTML
       const css = styles.map(s => `<link rel="stylesheet" href="./styles/${s.replaceAll('/', '-')}">`).join('\n')
-      writeFileSync(resolve(out, `${file}.html`), `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Melman · ${file} · DEMO</title>${css}<style>.qa-demo{position:fixed;bottom:10px;left:12px;z-index:100;background:#14272a;color:#d9e5d4;border:1px solid #95aa8d70;padding:6px 9px;border-radius:6px;font:9px system-ui;letter-spacing:.04em;pointer-events:none}</style></head><body><aside class="qa-demo">DEMO · Datos sintéticos · 16 sep 2026 · Vista estática</aside><div id="root">${markup}</div></body></html>`)
+      writeFileSync(resolve(out, `${file}.html`), `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Melman · ${file} · DEMO</title>${css}<style>.qa-demo{position:fixed;bottom:10px;left:12px;z-index:100;background:#14272a;color:#d9e5d4;border:1px solid #95aa8d70;padding:6px 9px;border-radius:6px;font:9px system-ui;letter-spacing:.04em;pointer-events:none}@media(max-width:760px){.qa-demo{bottom:0;font-size:8px;padding:1px 5px;line-height:10px}}</style></head><body><aside class="qa-demo">DEMO · Datos sintéticos · 16 sep 2026 · Vista estática</aside><div id="root">${markup}</div></body></html>`)
     }
   }
   expect(network).not.toHaveBeenCalled()

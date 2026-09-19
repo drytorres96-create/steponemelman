@@ -390,12 +390,12 @@ progress::-moz-progress-bar { background: #bfceab; border-radius: 99px; }
   .cinematic-backdrop::after { background: linear-gradient(90deg, #0b191cc7, #0b191c30), linear-gradient(0deg, #0b191c 5%, #0b191c55 80%); }
   .pila, .section-workspace { gap: 20px; }
   .screen-heading, .semana-encabezado, .editorial-hero { min-height: 175px; padding: 23px 0 17px; }
-  .semana-workspace { gap: 14px; }
+  .semana-workspace { gap: 12px; }
   .screen-heading > .screen-heading-copy { max-width: 90%; }
   .screen-heading h1, .semana-encabezado h1 { font-size: 2.75rem; margin-bottom: 11px; }
   .screen-heading .editorial-eyebrow, .semana-encabezado .editorial-eyebrow { font-size: .55rem; margin-bottom: 9px; }
   .screen-heading p.sutil, .semana-encabezado p.sutil { font-size: .81rem; }
-  .semana-encabezado { grid-template-columns: minmax(0, 1fr) 103px; gap: 18px; padding-right: 0; }
+  .semana-encabezado { grid-template-columns: minmax(0, 1fr) 103px; gap: 18px; padding: 15px 0 10px; min-height: 150px; }
   .semana-crystal { display: none; }
   .semana-fechas { font-size: .78rem; }
   .semana-balance { padding-left: 15px; }
@@ -455,16 +455,21 @@ progress::-moz-progress-bar { background: #bfceab; border-radius: 99px; }
   .auth-art::after { background: linear-gradient(90deg, #0b191c99, #0b191c22), linear-gradient(0deg, #0b191c, #0b191c44 80%); }
   .auth-art-rule { display: none; }
   .auth-brand, .auth-intro, .auth-card, .auth-footnote { width: 100%; max-width: 430px; margin-inline: auto; }
+  .auth-page .editorial-brand .brand-wordmark { display: block; }
   .auth-brand .brand-wordmark { font-size: 1.25rem; }
   .auth-brand .brand-mark { width: 35px; height: 35px; }
   .auth-intro { min-height: 0; }
-  .auth-editorial-copy { padding: 50px 0 30px; }
-  .auth-intro h1 { font-size: 3.8rem; margin-bottom: 19px; }
+  .auth-editorial-copy { padding: 32px 0 22px; }
+  .auth-intro h1 { font-size: 2.9rem; margin-bottom: 17px; }
+  .auth-intro h1 br:first-child { display: initial; }
   .auth-intro .editorial-eyebrow { font-size: .52rem; margin-bottom: 20px; }
   .auth-intro .auth-editorial-copy > p { font-size: .81rem; max-width: 290px; }
-  .auth-card { padding: 28px 0; border-radius: 0; }
-  .auth-card > .editorial-eyebrow { margin-bottom: 19px; }
-  .auth-heading h2 { font-size: 2rem; }
+  .auth-card { padding: 22px 0 24px; border-radius: 0; }
+  .auth-card > .editorial-eyebrow { margin-bottom: 15px; }
+  .auth-heading { margin-bottom: 18px; }
+  .auth-heading h2 { font-size: 1.9rem; margin-bottom: 9px; }
+  .auth-card .auth-tabs { margin-bottom: 20px; }
+  .auth-form { gap: 18px; }
   .auth-footnote { display: flex; padding-top: 19px; }
 }
 @media (max-width: 390px) {
