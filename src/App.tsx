@@ -30,7 +30,7 @@ import { NbmeProgress } from './nbme/NbmeProgress'
 import { deriveNbmeSession } from './nbme/model'
 import type { FiltrosBusqueda } from './lib/busqueda'
 import type { NbmeQuestionRef } from './nbme/types'
-import { Brand, NavigationIcon, StudyHero } from './components/Editorial'
+import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, CrystalOrbit, type CinematicScene } from './components/Editorial'
 
 type Vista = 'semana' | 'recuperacion' | 'progreso' | 'inicio' | 'modulos' | 'repaso' | 'auditoria' | 'ajustes'
   | 'estudio' | 'preguntas' | 'sesion'
@@ -43,6 +43,13 @@ const SECUNDARIAS: { id: Vista; txt: string }[] = [
 ]
 /** Las vistas de concentración no llevan navegación ni migas. */
 const CONCENTRACION: Vista[] = ['estudio', 'preguntas', 'sesion']
+
+/** Section scenery is stable; answering uses an image-free atmosphere. */
+const SCENES: Record<Vista, CinematicScene> = {
+  semana: 'constellation', recuperacion: 'lens', progreso: 'horizon', inicio: 'dawn',
+  modulos: 'ribbons', repaso: 'lens', auditoria: 'stone', ajustes: 'smoke',
+  estudio: 'smoke', preguntas: 'smoke', sesion: 'smoke',
+}
 
 // A session queue is restored from the saved study state, never from the URL alone.
 function vistaDesdeHash(): Vista {
@@ -206,7 +213,8 @@ export default function App() {
   if (!indice) return <div className="vacio" style={{ paddingTop: 120 }}><p>{errorCarga ?? 'No se pudo cargar el material de estudio.'}</p><button className="btn" onClick={() => location.reload()}>Volver a intentar</button></div>
 
   return (
-    <div className={`app editorial-app${enConcentracion ? ' study-focus' : ''}`} data-app-version={APP_VERSION}>
+    <div className={`app editorial-app${enConcentracion ? ' study-focus' : ''}`} data-app-version={APP_VERSION} data-view={vista}>
+      <CinematicBackdrop scene={SCENES[vista]} quiet={enConcentracion} />
       <a className="saltar-contenido" href="#contenido" onClick={e => { e.preventDefault(); contenido.current?.focus() }}>Saltar al contenido</a>
       <header className="barra">
         <div className="contenedor barra-in">
@@ -217,7 +225,7 @@ export default function App() {
               <button key={n.id} onClick={() => ir(n.id)} aria-current={vista === n.id ? 'page' : undefined}><NavigationIcon name={n.id} /><span>{n.txt}</span></button>
             ))}
           </nav>}
-          {!enConcentracion && <div className="sidebar-note"><span className="editorial-eyebrow">USMLE STEP 1</span><p>Entender.<br />Practicar.<br /><em>Consolidar.</em></p></div>}
+          {!enConcentracion && <div className="sidebar-note"><span className="editorial-eyebrow">USMLE STEP 1</span><CrystalOrbit /></div>}
           <div className="barra-fin">
             {!enConcentracion && <MedidorIA />}
             {sincronizacionVisible && <button className="btn pequeno fantasma" title="Comprobar y sincronizar el progreso"

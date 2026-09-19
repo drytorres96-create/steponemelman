@@ -12,15 +12,17 @@ beforeEach(() => {
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove() })
 
-describe('diseño médico abstracto', () => {
+describe('diseño cinematográfico decorativo', () => {
   it('conserva títulos y texto reales; el arte es decorativo y no contiene controles', async () => {
     await act(async () => root.render(<StudyHero />))
     expect(host.querySelector('h1')?.textContent).toContain('Tu estudio de hoy')
     const image = host.querySelector('img')!
     expect(image.alt).toBe('')
     expect(image.getAttribute('aria-hidden')).toBe('true')
-    expect(image.getAttribute('loading')).toBe('eager')
-    expect(image.getAttribute('srcset')).toBe('/images/v171/organic-768.webp 768w, /images/v171/organic-1536.webp 1536w')
+    expect(image.getAttribute('loading')).toBe('lazy')
+    expect(image.getAttribute('src')).toBe('/images/cinematic/constellation-desktop.webp')
+    expect(host.querySelector('source')?.getAttribute('srcset')).toBe('/images/cinematic/constellation-mobile.webp')
+    expect(host.querySelector('source')?.getAttribute('media')).toBe('(max-width: 760px)')
     expect(image.width).toBe(1536)
     expect(image.height).toBe(1024)
     expect(host.querySelector('button')).toBeNull()
@@ -31,7 +33,8 @@ describe('diseño médico abstracto', () => {
     expect(image.getAttribute('loading')).toBe('lazy')
     expect(image.getAttribute('decoding')).toBe('async')
     expect(image.getAttribute('sizes')).toBe('240px')
-    expect(image.getAttribute('srcset')).toBe('/images/v170/fluid-768.webp 768w, /images/v170/fluid-1536.webp 1536w')
+    expect(image.getAttribute('src')).toBe('/images/cinematic/ribbons-desktop.webp')
+    expect(host.querySelector('source')?.getAttribute('srcset')).toBe('/images/cinematic/ribbons-mobile.webp')
   })
   it('mantiene el encabezado accesible y evita que el arte se interprete como material clínico', async () => {
     await act(async () => root.render(<ScreenHeading eyebrow="Biblioteca" title="Preguntas de aplicación" description="Descripción visible." />))
@@ -65,9 +68,21 @@ describe('diseño médico abstracto', () => {
       organicTotal += size
     }
     expect(organicTotal).toBeLessThan(90000)
+    const cinematicDirectory = resolve('public/images/cinematic')
+    const cinematicFiles = readdirSync(cinematicDirectory).filter(name => name.endsWith('.webp'))
+    expect(cinematicFiles).toHaveLength(20)
+    let cinematicTotal = 0
+    for (const name of cinematicFiles) {
+      const file = resolve(cinematicDirectory, name)
+      const size = statSync(file).size
+      expect(size).toBeLessThan(name.includes('mobile') ? 90000 : 350000)
+      expect(readFileSync(file).subarray(8, 12).toString()).toBe('WEBP')
+      cinematicTotal += size
+    }
+    expect(cinematicTotal).toBeLessThan(1700000)
   })
-  it('mantiene contraste AA en texto, controles y estados sobre las superficies claras', () => {
-    const css = readFileSync(resolve('src/editorial.css'), 'utf8')
+  it('mantiene contraste AA en los tokens de texto y estados sobre superficies oscuras', () => {
+    const css = readFileSync(resolve('src/organic.css'), 'utf8')
     const colors = Object.fromEntries([...css.matchAll(/--([\w-]+):\s*(#[\da-f]{6})\s*;/g)].map(m => [m[1], m[2]]))
     const luminance = (hex: string) => {
       const values = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
@@ -76,7 +91,7 @@ describe('diseño médico abstracto', () => {
     }
     for (const surface of ['bg', 'panel']) {
       for (const text of ['texto', 'texto-2', 'texto-3', 'violeta', 'verde', 'ambar', 'rojo', 'cian']) {
-        const ratio = (luminance(colors[surface]) + .05) / (luminance(colors[text]) + .05)
+        const ratio = (luminance(colors[text]) + .05) / (luminance(colors[surface]) + .05)
         expect(ratio, `${text} sobre ${surface}`).toBeGreaterThanOrEqual(4.5)
       }
     }
