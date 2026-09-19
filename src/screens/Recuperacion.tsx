@@ -87,12 +87,12 @@ export function Recuperacion({ onEstudiar, onPreguntas, onMezclar }: {
   const grupo = (
     clave: string, titulo: string, texto: string, cuenta: number,
     accion: React.ReactNode,
-  ) => <section className="tarjeta pila" aria-labelledby={`recuperacion-${clave}`}>
-    <div><h2 id={`recuperacion-${clave}`}>{titulo} ({cuenta})</h2><p className="sutil">{texto}</p></div>
-    {cuenta > 0 ? accion : <p className="mini">Nada pendiente en este grupo.</p>}
+  ) => <section className={`recovery-group recovery-group-${clave}${cuenta ? ' con-pendientes' : ''}`} aria-labelledby={`recuperacion-${clave}`}>
+    <div className="recovery-group-copy"><h2 id={`recuperacion-${clave}`}>{titulo} <span className="recovery-count">({cuenta})</span></h2><p className="sutil">{texto}</p></div>
+    <div className="recovery-group-action">{cuenta > 0 ? accion : <p className="mini">Nada pendiente en este grupo.</p>}</div>
   </section>
 
-  return <div className="pila">
+  return <div className="pila recovery-workspace">
     <ScreenHeading eyebrow="Lo que te debe la memoria" title="Recuperación" scene="fluid"
       description="Lo que fallaste y lo que vence, en un solo sitio. Empieza por lo que está a un acierto de consolidarse." />
 
@@ -101,7 +101,7 @@ export function Recuperacion({ onEstudiar, onPreguntas, onMezclar }: {
       lo único que falta es que pase el tiempo de separación. Repasarlos hoy no los marcará como dominados.
     </div></div>}
 
-    <div className="fila" role="group" aria-label="Tamaño de la sesión de recuperación">
+    <div className="fila recovery-toolbar" role="group" aria-label="Tamaño de la sesión de recuperación">
       <label htmlFor="limite-recuperacion">Carga de la sesión</label>
       <select id="limite-recuperacion" style={{ width: 'auto' }} value={limite}
         onChange={e => setLimite(Number(e.target.value) as (typeof TAMANOS)[number])}>

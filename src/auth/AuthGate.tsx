@@ -8,17 +8,17 @@ import './auth.css'
 
 function AuthFrame({ children }: { children: ReactNode }) {
   return <main className="auth-page" data-app-version={APP_VERSION}>
-    <MedicalImage scene="organic" priority sizes="100vw" className="auth-backdrop" />
+    <div className="auth-art" aria-hidden="true"><MedicalImage scene="organic" priority sizes="60vw" className="auth-backdrop" /><span className="auth-art-rule" /></div>
+    <div className="auth-brand"><Brand /></div>
     <section className="auth-intro" aria-label="Step 1 Melman">
-      <Brand />
       <div className="auth-editorial-copy">
-        <span className="editorial-eyebrow">Medicina. Comprensión. Constancia.</span>
-        <h1>Un concepto{' '}<br />a la vez.<br /><span>Un paso más cerca.</span></h1>
+        <span className="editorial-eyebrow">USMLE Step 1 · Aprendizaje activo</span>
+        <h1>Un concepto<br /><span>a la vez.</span></h1>
         <p>Practica, repasa y retoma tus sesiones con la misma cuenta en cada dispositivo.</p>
       </div>
-      <p className="auth-footnote">USMLE STEP 1 <span>Un espacio para aprender con intención.</span></p>
     </section>
-    <section className="auth-card tarjeta" aria-label="Acceso a tu cuenta"><p className="editorial-eyebrow">Tu espacio de estudio</p>{children}</section>
+    <section className="auth-card tarjeta" aria-label="Acceso a tu cuenta"><p className="editorial-eyebrow">Tu cuenta · Tu continuidad</p>{children}</section>
+    <p className="auth-footnote">MELMAN <span>Tu espacio de estudio para Step 1.</span></p>
   </main>
 }
 

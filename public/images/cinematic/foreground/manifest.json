@@ -1,0 +1,28 @@
+{
+  "description": "Primeros planos generados con transparencia real para integrar la composición, no interfaces incrustadas.",
+  "assets": [
+    {
+      "file": "crystal.webp",
+      "original": "exec-6022c9c7-f464-42d1-bd3d-f33c2f1f91ae.png",
+      "sourceReference": "01_Bosque_y_cristal/Fondo_11.png",
+      "size": [
+        760,
+        760
+      ],
+      "bytes": 126954
+    },
+    {
+      "file": "forest.webp",
+      "original": "exec-2e9a531a-634f-43c1-a55c-d48b63b9b098.png",
+      "sourceReferences": [
+        "01_Bosque_y_cristal/Fondo_03.png",
+        "02_Sunrise_y_sunset/Fondo_04.png"
+      ],
+      "size": [
+        1100,
+        619
+      ],
+      "bytes": 252148
+    }
+  ]
+}

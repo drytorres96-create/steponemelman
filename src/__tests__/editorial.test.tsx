@@ -41,7 +41,7 @@ describe('diseño cinematográfico decorativo', () => {
     expect(host.querySelectorAll('h1')).toHaveLength(1)
     expect(host.querySelector('h1')?.textContent).toBe('Preguntas de aplicación')
     expect(host.textContent).toContain('Descripción visible.')
-    expect(host.querySelector('img')?.getAttribute('aria-hidden')).toBe('true')
+    expect(host.querySelector('img')).toBeNull() // El ambiente vive en el shell, fuera del encabezado.
   })
   it('conserva los recursos anteriores y respeta el presupuesto del fondo nuevo', () => {
     const directory = resolve('public/images/v170')

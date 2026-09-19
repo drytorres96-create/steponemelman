@@ -90,11 +90,11 @@ export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion, 
   const visibles = hayFiltros ? modulos.filter(m => coincidenciasModulo(m).length > 0) : modulos
 
   return (
-    <div className="pila">
+    <div className="pila library-workspace">
       <ScreenHeading eyebrow="Biblioteca de conceptos" title="Elige qué estudiar" description="Combina disciplina y sistema para crear una sesión a tu medida. Puedes practicar conceptos nuevos o ya estudiados." />
 
-      <div className="tarjeta pila">
-        <div><h2>Sesión personalizada</h2><p className="mini">Ejemplos: Farmacología + Endocrino; Fisiología + Cardiovascular; Patología + Hematológico y oncológico. Cada concepto debe cumplir todos los filtros elegidos.</p></div>
+      <div className="tarjeta pila library-composer">
+        <div className="library-composer-heading"><span className="editorial-eyebrow">Preparar una sesión</span><h2>Sesión personalizada</h2><p className="mini">Ejemplos: Farmacología + Endocrino; Fisiología + Cardiovascular; Patología + Hematológico y oncológico. Cada concepto debe cumplir todos los filtros elegidos.</p></div>
         <div className="rejilla filtros-conceptos">
         <div><label htmlFor="modulos-disciplina">Disciplina</label><select id="modulos-disciplina" value={filtros.disciplina} onChange={e => cambiarFiltro({ disciplina: e.target.value })} aria-label="Filtrar por disciplina" disabled={!conceptos}>
           <option value="">Todas las disciplinas</option>
@@ -151,7 +151,7 @@ export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion, 
 
       {conceptos && visibles.length === 0 && <Vacio titulo="Ningún concepto coincide" texto="Prueba con otros filtros." />}
 
-      <div className="rejilla r2">
+      <div className="rejilla r2 library-modules">
         {visibles.map(m => {
           const s = stats(m)
           const abiertoEste = abierto === m.module_id
