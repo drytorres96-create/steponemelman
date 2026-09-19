@@ -1,0 +1,236 @@
+{
+  "source": "Fondos_Melman_Step_One_25.zip — archivos aportados por el usuario",
+  "note": "Compresión y tamaños adaptativos; sin ampliación artificial ni resolución 4K nativa. Escenas decorativas, no material médico.",
+  "scenes": [
+    {
+      "id": "forest",
+      "source": "01_Bosque_y_cristal/Fondo_03.png",
+      "originalSize": [
+        1536,
+        1024
+      ],
+      "focalPoint": "78% 38%",
+      "variants": {
+        "desktop": {
+          "file": "forest-desktop.webp",
+          "width": 1536,
+          "height": 1024,
+          "bytes": 303766
+        },
+        "mobile": {
+          "file": "forest-mobile.webp",
+          "width": 768,
+          "height": 512,
+          "bytes": 75706
+        }
+      }
+    },
+    {
+      "id": "dawn",
+      "source": "01_Bosque_y_cristal/Fondo_01.png",
+      "originalSize": [
+        1536,
+        1024
+      ],
+      "focalPoint": "76% 30%",
+      "variants": {
+        "desktop": {
+          "file": "dawn-desktop.webp",
+          "width": 1536,
+          "height": 1024,
+          "bytes": 129636
+        },
+        "mobile": {
+          "file": "dawn-mobile.webp",
+          "width": 768,
+          "height": 512,
+          "bytes": 33808
+        }
+      }
+    },
+    {
+      "id": "constellation",
+      "source": "01_Bosque_y_cristal/Fondo_11.png",
+      "originalSize": [
+        1536,
+        1024
+      ],
+      "focalPoint": "72% 30%",
+      "variants": {
+        "desktop": {
+          "file": "constellation-desktop.webp",
+          "width": 1536,
+          "height": 1024,
+          "bytes": 74274
+        },
+        "mobile": {
+          "file": "constellation-mobile.webp",
+          "width": 768,
+          "height": 512,
+          "bytes": 24202
+        }
+      }
+    },
+    {
+      "id": "lens",
+      "source": "01_Bosque_y_cristal/Fondo_07.png",
+      "originalSize": [
+        1536,
+        1024
+      ],
+      "focalPoint": "78% 50%",
+      "variants": {
+        "desktop": {
+          "file": "lens-desktop.webp",
+          "width": 1536,
+          "height": 1024,
+          "bytes": 46684
+        },
+        "mobile": {
+          "file": "lens-mobile.webp",
+          "width": 768,
+          "height": 512,
+          "bytes": 13586
+        }
+      }
+    },
+    {
+      "id": "ribbons",
+      "source": "01_Bosque_y_cristal/Fondo_12.png",
+      "originalSize": [
+        1536,
+        1024
+      ],
+      "focalPoint": "78% 40%",
+      "variants": {
+        "desktop": {
+          "file": "ribbons-desktop.webp",
+          "width": 1536,
+          "height": 1024,
+          "bytes": 38958
+        },
+        "mobile": {
+          "file": "ribbons-mobile.webp",
+          "width": 768,
+          "height": 512,
+          "bytes": 11390
+        }
+      }
+    },
+    {
+      "id": "horizon",
+      "source": "01_Bosque_y_cristal/Fondo_10.png",
+      "originalSize": [
+        1536,
+        1024
+      ],
+      "focalPoint": "80% 40%",
+      "variants": {
+        "desktop": {
+          "file": "horizon-desktop.webp",
+          "width": 1536,
+          "height": 1024,
+          "bytes": 77092
+        },
+        "mobile": {
+          "file": "horizon-mobile.webp",
+          "width": 768,
+          "height": 512,
+          "bytes": 20918
+        }
+      }
+    },
+    {
+      "id": "stone",
+      "source": "01_Bosque_y_cristal/Fondo_14.png",
+      "originalSize": [
+        1536,
+        1024
+      ],
+      "focalPoint": "78% 55%",
+      "variants": {
+        "desktop": {
+          "file": "stone-desktop.webp",
+          "width": 1536,
+          "height": 1024,
+          "bytes": 67536
+        },
+        "mobile": {
+          "file": "stone-mobile.webp",
+          "width": 768,
+          "height": 512,
+          "bytes": 17784
+        }
+      }
+    },
+    {
+      "id": "smoke",
+      "source": "01_Bosque_y_cristal/Fondo_15.png",
+      "originalSize": [
+        1536,
+        1024
+      ],
+      "focalPoint": "78% 45%",
+      "variants": {
+        "desktop": {
+          "file": "smoke-desktop.webp",
+          "width": 1536,
+          "height": 1024,
+          "bytes": 34994
+        },
+        "mobile": {
+          "file": "smoke-mobile.webp",
+          "width": 768,
+          "height": 512,
+          "bytes": 9970
+        }
+      }
+    },
+    {
+      "id": "sunrise",
+      "source": "02_Sunrise_y_sunset/Fondo_04.png",
+      "originalSize": [
+        1672,
+        941
+      ],
+      "focalPoint": "72% 35%",
+      "variants": {
+        "desktop": {
+          "file": "sunrise-desktop.webp",
+          "width": 1672,
+          "height": 941,
+          "bytes": 190066
+        },
+        "mobile": {
+          "file": "sunrise-mobile.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 56202
+        }
+      }
+    },
+    {
+      "id": "sunset",
+      "source": "02_Sunrise_y_sunset/Fondo_02.png",
+      "originalSize": [
+        1672,
+        941
+      ],
+      "focalPoint": "72% 40%",
+      "variants": {
+        "desktop": {
+          "file": "sunset-desktop.webp",
+          "width": 1672,
+          "height": 941,
+          "bytes": 155338
+        },
+        "mobile": {
+          "file": "sunset-mobile.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 41140
+        }
+      }
+    }
+  ]
+}
