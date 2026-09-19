@@ -45,12 +45,12 @@ function CuerpoSesion({ sesion, cobertura, onAbrir }:
   { sesion: SesionSemanal; cobertura: CoberturaSesion; onAbrir: () => void }) {
   const hecha = sesion.estado === 'completada' || cobertura.cumple
   const empezada = cobertura.hechos > 0 || sesion.cursor > 0
-  return <>
-    <p className="mini">{composicion(sesion)}</p>
+  return <div className="sesion-resumen">
+    <div className="sesion-evidencia"><p className="sesion-composicion">{composicion(sesion)}</p>
     <p className="mini">{cobertura.hechos} de {cobertura.pasos} pasos respondidos</p>
     <progress className="semana-progreso" aria-label={`Pasos respondidos de ${sesion.titulo}`}
-      value={cobertura.hechos} max={cobertura.pasos || 1} />
-    {hecha ? <div className="fila">
+      value={cobertura.hechos} max={cobertura.pasos || 1} /></div>
+    <div className="sesion-accion">{hecha ? <div className="fila">
       <p className="etq verde" role="status">Completada</p>
       {/* El umbral deja pasos sin responder: siguen a un clic, no se pierden al marcarse hecha. */}
       {cobertura.hechos < cobertura.pasos && <button className="btn pequeno fantasma" onClick={onAbrir}>
@@ -59,8 +59,8 @@ function CuerpoSesion({ sesion, cobertura, onAbrir }:
     </div>
       : <button className="btn principal" onClick={onAbrir}>
         {empezada ? `Continuar sesión (paso ${Math.min(sesion.cursor + 1, sesion.guion.length)} de ${sesion.guion.length})` : 'Empezar sesión'}
-      </button>}
-  </>
+      </button>}</div>
+  </div>
 }
 
 function Tarjeta({ sesion, cobertura, onAbrir }:
@@ -96,10 +96,11 @@ interface FilaProps {
 
 function Fila({ cp, hecho, sesion, cobertura, error, onMarcar, onEnfocar, onAbrirSesion }: FilaProps) {
   const minutos = MINUTOS_POR_KIND[cp.kind]
-  return <li className={`plan-fila${hecho ? ' hecha' : ''}`}>
+  return <li className={`plan-fila${hecho ? ' hecha' : ''}${sesion ? ' plan-fila-preparada' : ''}`}>
+    {sesion && <p className="editorial-eyebrow sesion-rotulo">Sesión preparada</p>}
     <label className="plan-fila-marca">
-      <input type="checkbox" checked={hecho} onChange={e => onMarcar(cp, e.currentTarget.checked)} />
-      <span>{cp.kind === 'podcast' ? '🎧 ' : ''}{cp.label}</span>
+      <input type="checkbox" checked={hecho} aria-label={sesion ? cp.label : undefined} onChange={e => onMarcar(cp, e.currentTarget.checked)} />
+      <span>{cp.kind === 'podcast' ? '🎧 ' : ''}{sesion ? sesion.titulo : cp.label}</span>
     </label>
     <div className="fila plan-fila-acciones">
       {/* El audio se escucha fuera de la app: se marca, no se cronometra. */}
@@ -255,21 +256,22 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
     const hechas = tareas.filter(hechoDe).length
     const dias = [...porDia.keys()].sort((a, b) => a - b)
 
-    return <div className="pila">
+    return <div className="pila semana-workspace">
       <header className="semana-encabezado">
-        <p className="editorial-eyebrow">Mi semana</p>
-        <h1>{titular}</h1>
+        <img className="semana-crystal" src="/images/cinematic/foreground/crystal.webp" width="760" height="760" alt="" aria-hidden="true" decoding="async" />
+        <div className="semana-heading-copy"><p className="editorial-eyebrow">Tu plan de estudio</p>
+        <h1>Mi semana</h1>
+        <p className="semana-fechas">{titular}</p>
         {resto && <p className="sutil">{resto}</p>}
+        </div>
+        <div className="semana-balance"><p className="editorial-eyebrow">Avance semanal</p>
+        <p className="semana-balance-cifra"><strong>{hechas}</strong><span> / {tareas.length}</span></p>
         <p className="mini">{hechas} de {tareas.length} hechos</p>
         <progress className="semana-progreso" aria-label="Avance del plan de esta semana"
-          value={hechas} max={tareas.length || 1} />
+          value={hechas} max={tareas.length || 1} /></div>
       </header>
 
-      {plan.nota && <details className="tarjeta semana-extra">
-        <summary>Por qué esta semana es así</summary>
-        <p className="sutil" style={{ marginTop: 12, whiteSpace: 'pre-wrap' }}>{plan.nota}</p>
-      </details>}
-
+      <div className="plan-workspace" style={{ '--plan-dias': dias.length } as React.CSSProperties}>
       {dias.map(dia => {
         const lista = porDia.get(dia)!
         const abierto = dia === diaAbierto
@@ -278,14 +280,17 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
         const pendientes = pendientesDe(dia)
         const resumen = descanso ? 'Descanso'
           : pendientes ? `${pendientes} ${pendientes === 1 ? 'pendiente' : 'pendientes'}` : 'todo hecho'
-        return <section key={dia} className={`tarjeta plan-dia${abierto ? ' abierto' : ''}${descanso ? ' descanso' : ''}`}>
-          <button className="plan-dia-titulo" aria-expanded={abierto}
+        return <section key={dia} className={`plan-dia${abierto ? ' abierto' : ''}${descanso ? ' descanso' : ''}`}>
+          <button className="plan-dia-titulo" aria-expanded={abierto} aria-controls={`plan-panel-${dia}`} id={`plan-dia-${dia}`}
             onClick={() => setDiaAbierto(d => d === dia ? null : dia)}>
-            <span aria-hidden="true">{abierto ? '▾' : '▸'}</span>
-            <b>{dia === diaDeHoy ? 'HOY · ' : ''}{DIAS[dia - 1]} {diaYMes(fecha)}</b>
-            <span className="mini">{resumen}</span>
+            <span className="plan-dia-numero" aria-hidden="true">{String(fecha.getDate()).padStart(2, '0')}</span>
+            <span className="plan-dia-copy"><b><span className="plan-dia-largo">{dia === diaDeHoy ? 'HOY · ' : ''}{DIAS[dia - 1]}</span><span className="plan-dia-corto" aria-hidden="true">{DIAS[dia - 1].slice(0, 3)}</span> <span className="sr-only">{diaYMes(fecha)}</span></b>
+            <span className="mini">{resumen}</span></span>
+            <span className="plan-dia-indicador" aria-hidden="true">{abierto ? '−' : '+'}</span>
           </button>
-          {abierto && (descanso
+          {abierto && <div className="plan-panel" id={`plan-panel-${dia}`} aria-labelledby={`plan-dia-${dia}`}>
+          <div className="plan-panel-heading"><div><p className="editorial-eyebrow">{dia === diaDeHoy ? 'Tu estudio de hoy' : 'Tu estudio del día'}</p><h2>{DIAS[dia - 1]} <span>{diaYMes(fecha)}</span></h2></div><span className="etq">{resumen}</span></div>
+          {descanso
             // Un descanso no es una tarea: ni casilla, ni cronómetro, ni cuenta en el total.
             ? <p className="sutil plan-descanso">{lista.map(cp => cp.label).join(' · ')}. Hoy no se estudia; eso también es el plan.</p>
             : <ul className="plan-lista">
@@ -297,11 +302,17 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
                   onEnfocar={setEnfoque}
                   onAbrirSesion={(punto, s) => onAbrir(s, () => { void marcar(punto, true) })} />
               })}
-            </ul>)}
+            </ul>}</div>}
         </section>
       })}
-
-      {masCosas}
+      {diaAbierto === null && <div className="plan-panel plan-panel-vacio"><p className="editorial-eyebrow">Tu plan de estudio</p><h2>Elige un día</h2><p className="sutil">Abre un día para ver sus tareas y sesiones.</p></div>}
+      </div>
+      <div className="semana-tools">
+      {plan.nota && <details className="tarjeta semana-extra">
+        <summary>Por qué esta semana es así</summary>
+        <p className="sutil" style={{ marginTop: 12, whiteSpace: 'pre-wrap' }}>{plan.nota}</p>
+      </details>}
+      {masCosas}</div>
     </div>
   }
 

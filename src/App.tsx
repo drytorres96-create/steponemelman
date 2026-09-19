@@ -30,7 +30,7 @@ import { NbmeProgress } from './nbme/NbmeProgress'
 import { deriveNbmeSession } from './nbme/model'
 import type { FiltrosBusqueda } from './lib/busqueda'
 import type { NbmeQuestionRef } from './nbme/types'
-import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, CrystalOrbit, type CinematicScene } from './components/Editorial'
+import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, type CinematicScene } from './components/Editorial'
 
 type Vista = 'semana' | 'recuperacion' | 'progreso' | 'inicio' | 'modulos' | 'repaso' | 'auditoria' | 'ajustes'
   | 'estudio' | 'preguntas' | 'sesion'
@@ -219,13 +219,13 @@ export default function App() {
       <header className="barra">
         <div className="contenedor barra-in">
           <Brand />
-          {!enConcentracion && <p className="sidebar-caption">Tu espacio de aprendizaje</p>}
+          {!enConcentracion && <p className="sidebar-caption">Espacio de estudio</p>}
           {!enConcentracion && <nav className="nav" aria-label="Navegación principal">
             {NAV.map(n => (
               <button key={n.id} onClick={() => ir(n.id)} aria-current={vista === n.id ? 'page' : undefined}><NavigationIcon name={n.id} /><span>{n.txt}</span></button>
             ))}
           </nav>}
-          {!enConcentracion && <div className="sidebar-note"><span className="editorial-eyebrow">USMLE STEP 1</span><CrystalOrbit /></div>}
+          {!enConcentracion && <div className="sidebar-note"><span className="sidebar-rule" /><span className="editorial-eyebrow">USMLE STEP 1</span></div>}
           <div className="barra-fin">
             {!enConcentracion && <MedidorIA />}
             {sincronizacionVisible && <button className="btn pequeno fantasma" title="Comprobar y sincronizar el progreso"
@@ -274,13 +274,13 @@ export default function App() {
             </div></section>}
             <Inicio embedded onIr={ir} onContinuar={continuar} onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} />
           </div>}
-          {!cargando && vista === 'modulos' && <div className="pila"><div className="fila" role="group" aria-label="Tipo de contenido">
+          {!cargando && vista === 'modulos' && <div className="section-workspace"><div className="section-toolbar fila" role="group" aria-label="Tipo de contenido">
             <button className={`btn${tipoContenido === 'conceptos' ? ' principal' : ' fantasma'}`} aria-pressed={tipoContenido === 'conceptos'} onClick={() => setTipoContenido('conceptos')}>Conceptos</button>
             <button className={`btn${tipoContenido === 'preguntas' ? ' principal' : ' fantasma'}`} aria-pressed={tipoContenido === 'preguntas'} onClick={() => setTipoContenido('preguntas')}>Preguntas</button>
           </div>{tipoContenido === 'preguntas' ? <NbmeLibrary onStart={() => ir('preguntas')} />
             : <Modulos onEstudiar={estudiarIds} seleccion={seleccionManual} onSeleccion={setSeleccionManual} filtrosIniciales={filtrosConceptos} />}</div>}
           {!cargando && vista === 'repaso' && <Repaso onEstudiar={estudiarIds} />}
-          {!cargando && vista === 'progreso' && <div className="pila"><div className="progreso-controles">
+          {!cargando && vista === 'progreso' && <div className="section-workspace"><div className="section-toolbar progreso-controles">
             <div className="fila" role="group" aria-label="Tipo de progreso">
               <button className={`btn${tipoProgreso === 'conceptos' ? ' principal' : ' fantasma'}`} aria-pressed={tipoProgreso === 'conceptos'} onClick={() => setTipoProgreso('conceptos')}>Conceptos</button>
               <button className={`btn${tipoProgreso === 'preguntas' ? ' principal' : ' fantasma'}`} aria-pressed={tipoProgreso === 'preguntas'} onClick={() => setTipoProgreso('preguntas')}>Preguntas</button>

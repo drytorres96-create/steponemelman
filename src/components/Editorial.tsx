@@ -44,8 +44,8 @@ export function CrystalOrbit() {
 
 export function Brand() {
   return <div className="marca editorial-brand"><span className="brand-mark" aria-hidden="true">
-    <svg viewBox="0 0 32 32" fill="none"><path d="M13 4h6v9h9v6h-9v9h-6v-9H4v-6h9V4Z" fill="currentColor" /></svg>
-  </span><span className="brand-wordmark">StepOne<span>Melman</span></span></div>
+    <svg viewBox="0 0 40 40" fill="none" stroke="currentColor"><circle cx="20" cy="20" r="15" strokeWidth=".75" /><ellipse cx="20" cy="20" rx="19" ry="6" transform="rotate(-35 20 20)" strokeWidth="1" /><circle cx="20" cy="20" r="2.5" fill="currentColor" stroke="none" /><circle cx="34" cy="10" r="2" fill="currentColor" stroke="none" /></svg>
+  </span><span className="brand-wordmark">Melman<span>Step One</span></span></div>
 }
 
 export function NavigationIcon({ name }: { name: string }) {
@@ -73,7 +73,6 @@ export function ScreenHeading({ eyebrow, title, description, scene = 'organic' }
   eyebrow: string; title: string; description: string; scene?: 'membrane' | 'fluid' | 'organic'
 }) {
   return <header className={`screen-heading screen-heading-${scene}`}>
-    <div><p className="editorial-eyebrow">{eyebrow}</p><h1>{title}</h1><p className="sutil">{description}</p></div>
-    <MedicalImage scene={scene} sizes="(max-width: 600px) 140px, 240px" />
+    <div className="screen-heading-copy"><p className="editorial-eyebrow">{eyebrow}</p><h1>{title}</h1><p className="sutil">{description}</p></div>
   </header>
 }

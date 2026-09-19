@@ -51,12 +51,12 @@ export function Progreso({ onEstudiar, onContinuar, ventana = 'general' }:
     { n: dominados, r: 'dominio vigente' },
   ]
 
-  return <div className="pila">
+  return <div className="pila progress-workspace">
     <ScreenHeading eyebrow="Tu recorrido de aprendizaje" title="Progreso" description="Evidencia de tu práctica dentro del material publicado. No estima tu probabilidad de aprobar Step 1." />
-    <BandaAdherencia />
+    <div className="progress-overview"><BandaAdherencia />
     <BandaDeCifras conceptos={conceptos} ventana={ventana} />
-    <div className="rejilla r3">{tarjetas.map(x => <div className="tarjeta" key={x.r}>
-      <div className="cifra">{x.n}</div><div className="rotulo">{x.r}</div><p className="mini">de {total} disponibles</p></div>)}</div>
+    <div className="rejilla r3 progress-concepts">{tarjetas.map(x => <div className="tarjeta" key={x.r}>
+      <div className="cifra">{x.n}</div><div className="rotulo">{x.r}</div><p className="mini">de {total} disponibles</p></div>)}</div></div>
     <LecturaSemana conceptos={conceptos} onEstudiar={onEstudiar} />
     <ProgresoHorizonte conceptos={conceptos} />
     <MapaProgreso conceptos={conceptos} onEstudiar={onEstudiar} onContinuar={onContinuar} />
