@@ -99,6 +99,9 @@ describe('diseño cinematográfico decorativo', () => {
         expect(ratio, `${text} sobre ${surface}`).toBeGreaterThanOrEqual(4.5)
       }
     }
+    for (const surface of ['action-start', 'action-end']) {
+      expect((luminance(colors[surface]) + .05) / (luminance(colors['action-text']) + .05), surface).toBeGreaterThanOrEqual(4.5)
+    }
     const organic = readFileSync(resolve('src/organic.css'), 'utf8')
     const glass = Object.fromEntries([...organic.matchAll(/--(glass-[\w-]+):\s*(#[\da-f]{6})\s*;/g)].map(m => [m[1], m[2]]))
     // Worst-case white artwork behind the 90%-opaque glass, before any dark overlay.

@@ -17,6 +17,7 @@
   --ancho: 1500px; --rail: 220px;
   --fuente: 'Aptos', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --editorial: var(--fuente);
+  --action-text: #13212c; --action-start: #b5c8d8; --action-end: #94acbf;
   --glass: radial-gradient(ellipse at 100% 0, #c5d9e812, transparent 60%), linear-gradient(135deg, #263341e8, #17222edb);
 }
 body { background: var(--bg); background-image: none; font-size: 15px; }
@@ -81,8 +82,8 @@ summary::marker { color: var(--texto-2); }
 .tarjeta.pulsable { transition: border-color .18s, transform .18s; }
 .tarjeta.pulsable:hover { border-color: #caced260; box-shadow: var(--sombra-alta); }
 .btn { position: relative; min-height: 44px; border: 1px solid #bdc0c460; border-radius: 999px; padding: 10px 19px; color: #e4e7ea; background: linear-gradient(135deg, #c9cfd513, #bcbfc205); box-shadow: inset 0 1px 0 #d9dee312; font-size: .81rem; font-weight: 550; transition: transform .18s, border-color .18s, background-color .18s, box-shadow .18s; }
-.btn.principal { color: #fbfcfc; border-color: #cbd6e19c; background: radial-gradient(ellipse at 85% 0, #dce4ec44, transparent 65%), linear-gradient(125deg, #728aa3, #536272); box-shadow: inset 0 1px 0 #eef2f565, 0 8px 19px #0005, 0 0 20px #86a0bb21; }
-.btn.principal:hover:not(:disabled) { border-color: #e0e7ee; background: linear-gradient(125deg, #849bb2, #657686); filter: none; }
+.btn.principal { color: var(--action-text); border-color: #cbd6e19c; background: linear-gradient(125deg, var(--action-start), var(--action-end)); box-shadow: inset 0 1px 0 #eef2f565, 0 8px 19px #0005; }
+.btn.principal:hover:not(:disabled) { border-color: #e0e7ee; background: linear-gradient(125deg, #cbd9e4, #abc0d0); filter: none; }
 .btn:hover:not(:disabled) { border-color: #d0d4d8; }
 .btn.fantasma { color: #c3c5c8; background: transparent; border-color: #bcbfc236; box-shadow: none; }
 .btn.pequeno { min-height: 40px; padding: 8px 14px; border-radius: 999px; font-size: .75rem; }
