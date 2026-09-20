@@ -1,5 +1,28 @@
+import { useEffect, useState } from 'react'
+
 /** Public, decorative scenery is independent of study content and user state. */
 export type CinematicScene = 'forest' | 'dawn' | 'constellation' | 'lens' | 'ribbons' | 'horizon' | 'stone' | 'smoke' | 'sunrise' | 'sunset' | 'luminous/ocean'
+/** Cut-out objects with real transparency: they cross the edge of a glass panel. */
+export type CinematicObject = 'crystal' | 'optical-violet' | 'neural-violet' | 'forest'
+
+/** Literal paths. A URL assembled while painting the fixed layer ends up as a 404 request. */
+const FONDOS = [
+  { id: 'constellation', ancho: '/images/cinematic/constellation-desktop.webp', estrecho: '/images/cinematic/constellation-mobile.webp' },
+  { id: 'smoke', ancho: '/images/cinematic/smoke-desktop.webp', estrecho: '/images/cinematic/smoke-mobile.webp' },
+  { id: 'lens', ancho: '/images/cinematic/lens-desktop.webp', estrecho: '/images/cinematic/lens-mobile.webp' },
+  { id: 'horizon', ancho: '/images/cinematic/horizon-desktop.webp', estrecho: '/images/cinematic/horizon-mobile.webp' },
+  { id: 'dawn', ancho: '/images/cinematic/dawn-desktop.webp', estrecho: '/images/cinematic/dawn-mobile.webp' },
+  { id: 'ribbons', ancho: '/images/cinematic/ribbons-desktop.webp', estrecho: '/images/cinematic/ribbons-mobile.webp' },
+  { id: 'stone', ancho: '/images/cinematic/stone-desktop.webp', estrecho: '/images/cinematic/stone-mobile.webp' },
+  { id: 'forest', ancho: '/images/cinematic/forest-desktop.webp', estrecho: '/images/cinematic/forest-mobile.webp' },
+] as const satisfies readonly { id: CinematicScene; ancho: string; estrecho: string }[]
+
+const OBJETOS = {
+  crystal: { src: '/images/cinematic/foreground/crystal.webp', ancho: 760, alto: 760 },
+  'optical-violet': { src: '/images/cinematic/foreground/optical-violet.webp', ancho: 860, alto: 860 },
+  'neural-violet': { src: '/images/cinematic/foreground/neural-violet.webp', ancho: 860, alto: 860 },
+  forest: { src: '/images/cinematic/foreground/forest.webp', ancho: 1100, alto: 619 },
+} as const satisfies Record<CinematicObject, { src: string; ancho: number; alto: number }>
 
 function SceneImage({ scene, className = '', priority = false, sizes = '100vw' }: {
   scene: CinematicScene; className?: string; priority?: boolean; sizes?: string
@@ -12,9 +35,39 @@ function SceneImage({ scene, className = '', priority = false, sizes = '100vw' }
   </picture>
 }
 
+/**
+ * La escena ocupa la ventana entera: las fotografías se apilan y solo cambia la opacidad,
+ * de modo que cambiar de vista funde una en otra en vez de recargar la capa. Una escena ya
+ * vista se queda montada; así el fundido de vuelta no vuelve a pedir la imagen.
+ */
 export function CinematicBackdrop({ scene, quiet = false }: { scene: CinematicScene; quiet?: boolean }) {
-  return <div className={`cinematic-backdrop${quiet ? ' cinematic-backdrop-quiet' : ''}`}
-    data-scene={scene} aria-hidden="true" />
+  const [montadas, setMontadas] = useState<CinematicScene[]>(() => [scene])
+  const [activa, setActiva] = useState<CinematicScene>(scene)
+  useEffect(() => { setMontadas(m => m.includes(scene) ? m : [...m, scene]) }, [scene])
+  useEffect(() => {
+    // La capa nueva se pinta a opacidad cero y sube en el siguiente cuadro: sin esto no hay fundido.
+    if (!montadas.includes(scene)) return
+    const cuadro = requestAnimationFrame(() => setActiva(scene))
+    return () => cancelAnimationFrame(cuadro)
+  }, [scene, montadas])
+  return <div className={`cinematic-backdrop${quiet ? ' cinematic-backdrop-quiet' : ''}`} data-scene={scene} aria-hidden="true">
+    {montadas.map(id => {
+      const fondo = FONDOS.find(f => f.id === id)
+      return fondo && <picture key={id} className="cine-escena" data-activa={id === activa ? 'true' : 'false'}>
+        <source media="(max-width: 760px)" srcSet={fondo.estrecho} />
+        <img src={fondo.ancho} alt="" aria-hidden="true" decoding="async" />
+      </picture>
+    })}
+    <div className="cine-velo" /><div className="cine-haz" /><div className="cine-niebla" />
+    <div className="cine-halo" /><div className="cine-vineta" />
+  </div>
+}
+
+/** La fotografía de la cabecera va dentro del cristal, con su propio velo para el texto. */
+export function ScenePhoto({ scene }: { scene: CinematicScene }) {
+  return <div className="panel-escena" aria-hidden="true">
+    <SceneImage scene={scene} priority sizes="(max-width: 760px) 100vw, 62vw" />
+  </div>
 }
 
 /** A complete photographic environment, contained within the access panel. */
@@ -25,11 +78,17 @@ export function AccessScene() {
 }
 
 /** A continuous environment in its own grid cell, never underneath progress or actions. */
-export function CinematicWindow({ scene = 'luminous/ocean', caption = 'Un espacio para concentrarte.' }: {
-  scene?: CinematicScene; caption?: string
+export function CinematicWindow({ scene = 'luminous/ocean', caption = 'Un espacio para concentrarte.', object }: {
+  scene?: CinematicScene; caption?: string; object?: CinematicObject
 }) {
+  const objeto = object ? OBJETOS[object] : null
   return <figure className="scene-window" data-scene={scene} aria-hidden="true">
-    <div className="scene-pan"><SceneImage scene={scene} priority sizes="(max-width: 760px) 100vw, 38vw" /></div>
+    {/* Carga perezosa: en escritorio está a la vista y baja enseguida; en el teléfono el
+        panel no se muestra y su fotografía no llega a pedirse. */}
+    <div className="scene-pan"><SceneImage scene={scene} sizes="(max-width: 760px) 100vw, 30vw" /></div>
+    {/* Solo el objeto recortado cruza el borde del panel; los paneles nunca se tocan entre sí. */}
+    {objeto && <img className="scene-object" src={objeto.src} width={objeto.ancho} height={objeto.alto}
+      alt="" aria-hidden="true" loading="lazy" decoding="async" />}
     <figcaption><span className="scene-glint" />{caption}</figcaption>
   </figure>
 }
@@ -72,16 +131,17 @@ export function NavigationIcon({ name }: { name: string }) {
 
 export function StudyHero() {
   return <header className="editorial-hero" data-depth-scene>
+    <ScenePhoto scene="dawn" />
     <div className="editorial-hero-copy"><p className="editorial-eyebrow">Plan diario clásico</p><h1>Tu estudio <em>de hoy.</em></h1><p>Puedes pausar y retomar cuando lo necesites.</p></div>
-    <CinematicWindow />
   </header>
 }
 
+/** El paisaje de la columna derecha lo pone la aplicación; aquí la foto vive dentro del cristal. */
 export function ScreenHeading({ eyebrow, title, description, scene = 'organic', landscape = 'constellation' }: {
   eyebrow: string; title: string; description: string; scene?: 'membrane' | 'fluid' | 'organic'; landscape?: CinematicScene;
 }) {
   return <header className={`screen-heading screen-heading-${scene}`} data-depth-scene>
+    <ScenePhoto scene={landscape} />
     <div className="screen-heading-copy"><p className="editorial-eyebrow">{eyebrow}</p><h1>{title}</h1><p className="sutil">{description}</p></div>
-    <CinematicWindow scene={landscape} />
   </header>
 }

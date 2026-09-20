@@ -8,6 +8,7 @@ import { NbmeProvider } from './nbme/NbmeProvider'
 import './styles.css'
 import './editorial.css'
 import './organic.css'
+import './cinema.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
