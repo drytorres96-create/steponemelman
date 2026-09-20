@@ -41,7 +41,12 @@ describe('diseño cinematográfico decorativo', () => {
     expect(host.querySelectorAll('h1')).toHaveLength(1)
     expect(host.querySelector('h1')?.textContent).toBe('Preguntas de aplicación')
     expect(host.textContent).toContain('Descripción visible.')
-    expect(host.querySelector('img')).toBeNull() // El ambiente vive en el shell, fuera del encabezado.
+    expect(host.querySelector('[data-depth-scene]')).not.toBeNull()
+    for (const image of host.querySelectorAll('img')) {
+      expect(image.alt).toBe('')
+      expect(image.getAttribute('aria-hidden')).toBe('true')
+    }
+    expect(host.querySelector('.depth-artwork button')).toBeNull()
   })
   it('conserva los recursos anteriores y respeta el presupuesto del fondo nuevo', () => {
     const directory = resolve('public/images/v170')

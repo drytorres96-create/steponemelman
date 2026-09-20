@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Vacio } from '../components/comunes'
+import { DepthArtwork } from '../components/Editorial'
 import { useAuth } from '../auth/AuthProvider'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
@@ -257,8 +258,8 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
     const dias = [...porDia.keys()].sort((a, b) => a - b)
 
     return <div className="pila semana-workspace">
-      <header className="semana-encabezado">
-        <img className="semana-crystal" src="/images/cinematic/foreground/crystal.webp" width="760" height="760" alt="" aria-hidden="true" decoding="async" />
+      <header className="semana-encabezado" data-depth-scene>
+        <DepthArtwork scene="lens" subject="optical-violet" />
         <div className="semana-heading-copy"><p className="editorial-eyebrow">Tu plan de estudio</p>
         <h1>Mi semana</h1>
         <p className="semana-fechas">{titular}</p>
@@ -324,23 +325,23 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
   const enCurso = semanas.find(s => pendientes.some(p => p.semana === s.semana)) ?? semanas[0]
 
   if (!sesiones.length) return <div className="pila">
-    <header className="semana-encabezado"><p className="editorial-eyebrow">Mi semana</p><h1>Sin sesiones preparadas</h1>
+    <header className="semana-encabezado semana-sin-plan" data-depth-scene><DepthArtwork scene="lens" subject="optical-violet" /><div className="semana-heading-copy"><p className="editorial-eyebrow">Mi semana</p><h1>Sin sesiones preparadas</h1>
       {avisoPlan}
-      <p className="sutil">Cuando haya sesiones planificadas aparecerán aquí, en orden por día.</p></header>
+      <p className="sutil">Cuando haya sesiones planificadas aparecerán aquí, en orden por día.</p></div></header>
     <Vacio titulo="Nada que estudiar ahora mismo" texto="Mientras tanto puedes ponerte al día con lo que fallaste o con lo que vence."
       accion={<button className="btn" onClick={onRecuperacion}>Ir a Recuperación</button>} />
     {masCosas}
   </div>
 
   return <div className="pila">
-    <header className="semana-encabezado">
+    <header className="semana-encabezado semana-sin-plan" data-depth-scene><DepthArtwork scene="lens" subject="optical-violet" /><div className="semana-heading-copy">
       <p className="editorial-eyebrow">Mi semana</p>
       <h1>{enCurso.semana} · {rotuloSemana(enCurso.semanaInicio)}</h1>
       {avisoPlan}
       <p className="sutil">{pendientes.length
         ? `${pendientes.length} ${pendientes.length === 1 ? 'sesión pendiente' : 'sesiones pendientes'}. Una sesión se marca completada sola cuando respondes el 85 % de sus pasos.`
         : 'Todas las sesiones planificadas están hechas.'}</p>
-    </header>
+    </div></header>
 
     {!pendientes.length && <Vacio titulo="Nada pendiente por ahora" texto="Las sesiones hechas se quedan aquí hasta la auditoría de fin de semana."
       accion={<button className="btn" onClick={onRecuperacion}>Ir a Recuperación</button>} />}

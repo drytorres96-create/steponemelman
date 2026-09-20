@@ -1,5 +1,3 @@
-import type { CSSProperties } from 'react'
-
 /** Public, decorative scenery is independent of study content and user state. */
 export type CinematicScene = 'forest' | 'dawn' | 'constellation' | 'lens' | 'ribbons' | 'horizon' | 'stone' | 'smoke' | 'sunrise' | 'sunset'
 
@@ -15,14 +13,20 @@ function SceneImage({ scene, className = '', priority = false, sizes = '100vw' }
 }
 
 export function CinematicBackdrop({ scene, quiet = false }: { scene: CinematicScene; quiet?: boolean }) {
-  const focus: Record<CinematicScene, string> = {
-    forest: '78% 38%', dawn: '76% 30%', constellation: '72% 30%', lens: '78% 50%',
-    ribbons: '78% 40%', horizon: '80% 40%', stone: '78% 55%', smoke: '78% 45%',
-    sunrise: '72% 35%', sunset: '72% 40%',
-  }
   return <div className={`cinematic-backdrop${quiet ? ' cinematic-backdrop-quiet' : ''}`}
-    style={{ '--scene-focus': focus[scene] } as CSSProperties} aria-hidden="true">
-    {!quiet && <SceneImage scene={scene} priority />}
+    data-scene={scene} aria-hidden="true" />
+}
+
+/** Motion belongs exclusively to decorative layers; reading and controls stay still. */
+export function DepthArtwork({ scene = 'lens', subject = 'optical-violet', className = '' }: {
+  scene?: CinematicScene; subject?: 'optical-violet' | 'neural-violet' | 'crystal' | 'forest'; className?: string
+}) {
+  return <div className={`depth-artwork ${className}`} aria-hidden="true">
+    <div className="depth-photo"><SceneImage scene={scene} sizes="(max-width: 760px) 140px, 360px" /></div>
+    <div className="depth-parallax"><div className="depth-float">
+      <img className="depth-subject" src={`/images/cinematic/foreground/${subject}.webp`} width="760" height="760" alt="" aria-hidden="true" loading="lazy" decoding="async" />
+    </div></div>
+    <span className="depth-orbit" />
   </div>
 }
 
@@ -63,16 +67,18 @@ export function NavigationIcon({ name }: { name: string }) {
 }
 
 export function StudyHero() {
-  return <header className="editorial-hero">
-    <MedicalImage scene="organic" sizes="(max-width: 760px) 100vw, 65vw" />
+  return <header className="editorial-hero" data-depth-scene>
+    <DepthArtwork scene="constellation" subject="neural-violet" />
     <div className="editorial-hero-copy"><p className="editorial-eyebrow">Plan diario clásico</p><h1>Tu estudio <em>de hoy.</em></h1><p>Puedes pausar y retomar cuando lo necesites.</p></div>
   </header>
 }
 
-export function ScreenHeading({ eyebrow, title, description, scene = 'organic' }: {
-  eyebrow: string; title: string; description: string; scene?: 'membrane' | 'fluid' | 'organic'
+export function ScreenHeading({ eyebrow, title, description, scene = 'organic', artwork, subject }: {
+  eyebrow: string; title: string; description: string; scene?: 'membrane' | 'fluid' | 'organic';
+  artwork?: CinematicScene; subject?: 'optical-violet' | 'neural-violet' | 'crystal' | 'forest'
 }) {
-  return <header className={`screen-heading screen-heading-${scene}`}>
+  return <header className={`screen-heading screen-heading-${scene}`} data-depth-scene>
     <div className="screen-heading-copy"><p className="editorial-eyebrow">{eyebrow}</p><h1>{title}</h1><p className="sutil">{description}</p></div>
+    <DepthArtwork scene={artwork ?? (scene === 'fluid' ? 'ribbons' : scene === 'membrane' ? 'lens' : 'constellation')} subject={subject ?? (scene === 'fluid' ? 'crystal' : 'neural-violet')} />
   </header>
 }

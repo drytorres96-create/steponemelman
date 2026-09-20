@@ -2,22 +2,22 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { authErrorMessage, useAuth } from './AuthProvider'
-import { Brand, MedicalImage } from '../components/Editorial'
+import { Brand, DepthArtwork } from '../components/Editorial'
 import { APP_VERSION } from '../release'
 import './auth.css'
 
 function AuthFrame({ children }: { children: ReactNode }) {
-  return <main className="auth-page" data-app-version={APP_VERSION}>
-    <div className="auth-art" aria-hidden="true"><MedicalImage scene="organic" priority sizes="60vw" className="auth-backdrop" /><span className="auth-art-rule" /></div>
+  return <main className="auth-page" data-app-version={APP_VERSION} data-depth-scene>
     <div className="auth-brand"><Brand /></div>
-    <section className="auth-intro" aria-label="Step 1 Melman">
+    <section className="auth-card tarjeta" aria-label="Acceso a tu cuenta"><p className="editorial-eyebrow">Tu cuenta · Tu continuidad</p>{children}</section>
+    <section className="auth-intro" aria-label="Step 1 Melman" data-depth-scene>
+      <DepthArtwork scene="lens" subject="optical-violet" />
       <div className="auth-editorial-copy">
         <span className="editorial-eyebrow">USMLE Step 1 · Aprendizaje activo</span>
         <h1>Un concepto<br /><span>a la vez.</span></h1>
         <p>Practica, repasa y retoma tus sesiones con la misma cuenta en cada dispositivo.</p>
       </div>
     </section>
-    <section className="auth-card tarjeta" aria-label="Acceso a tu cuenta"><p className="editorial-eyebrow">Tu cuenta · Tu continuidad</p>{children}</section>
     <p className="auth-footnote">MELMAN <span>Tu espacio de estudio para Step 1.</span></p>
   </main>
 }
