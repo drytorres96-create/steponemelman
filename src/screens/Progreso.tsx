@@ -52,7 +52,7 @@ export function Progreso({ onEstudiar, onContinuar, ventana = 'general' }:
   ]
 
   return <div className="pila progress-workspace">
-    <ScreenHeading eyebrow="Tu recorrido de aprendizaje" title="Progreso" artwork="horizon" subject="crystal" description="Evidencia de tu práctica dentro del material publicado. No estima tu probabilidad de aprobar Step 1." />
+    <ScreenHeading eyebrow="Tu recorrido de aprendizaje" title="Progreso" description="Evidencia de tu práctica dentro del material publicado. No estima tu probabilidad de aprobar Step 1." />
     <div className="progress-overview"><BandaAdherencia />
     <BandaDeCifras conceptos={conceptos} ventana={ventana} />
     <div className="rejilla r3 progress-concepts">{tarjetas.map(x => <div className="tarjeta" key={x.r}>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { authErrorMessage, useAuth } from './AuthProvider'
-import { Brand, DepthArtwork } from '../components/Editorial'
+import { Brand, AccessScene } from '../components/Editorial'
 import { APP_VERSION } from '../release'
 import './auth.css'
 
@@ -11,7 +11,7 @@ function AuthFrame({ children }: { children: ReactNode }) {
     <div className="auth-brand"><Brand /></div>
     <section className="auth-card tarjeta" aria-label="Acceso a tu cuenta"><p className="editorial-eyebrow">Tu cuenta · Tu continuidad</p>{children}</section>
     <section className="auth-intro" aria-label="Step 1 Melman" data-depth-scene>
-      <DepthArtwork scene="lens" subject="optical-violet" />
+      <AccessScene />
       <div className="auth-editorial-copy">
         <span className="editorial-eyebrow">USMLE Step 1 · Aprendizaje activo</span>
         <h1>Un concepto<br /><span>a la vez.</span></h1>

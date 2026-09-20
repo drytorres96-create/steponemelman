@@ -38,7 +38,7 @@ export function Repaso({ onEstudiar }: { onEstudiar: (ids: string[]) => void }) 
   return (
     <div className="pila">
       <div className="fila" style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
-        <ScreenHeading eyebrow="Lo que permanece" title="Repaso espaciado" artwork="ribbons" subject="neural-violet"
+        <ScreenHeading eyebrow="Lo que permanece" title="Repaso espaciado"
           description={cola.length ? `${cola.length} conceptos para repasar. Puedes avanzar en sesiones pequeñas.` : 'Todo al día por ahora.'} />
         {cola.length > 0 && (
           <div className="fila">
