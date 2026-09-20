@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { AccessScene, MedicalImage, ScreenHeading, StudyHero } from '../components/Editorial'
+import { AccessScene, CinematicWindow, MedicalImage, ScreenHeading, StudyHero } from '../components/Editorial'
 
 let host: HTMLDivElement, root: ReturnType<typeof createRoot>
 beforeEach(() => {
@@ -16,7 +16,8 @@ describe('diseño cinematográfico decorativo', () => {
   it('recupera la fotografía decorativa sin introducir controles ni material clínico', async () => {
     await act(async () => root.render(<StudyHero />))
     expect(host.querySelector('h1')?.textContent).toContain('Tu estudio de hoy')
-    expect(host.querySelector('.scene-window img')).not.toBeNull()
+    // La cabecera lleva su fotografía dentro del cristal; el paisaje lateral lo pone la aplicación.
+    expect(host.querySelector('.panel-escena img')).not.toBeNull()
     await act(async () => root.render(<AccessScene />))
     const image = host.querySelector('img')!
     expect(image.alt).toBe('')
@@ -44,8 +45,18 @@ describe('diseño cinematográfico decorativo', () => {
     expect(host.querySelector('h1')?.textContent).toBe('Preguntas de aplicación')
     expect(host.textContent).toContain('Descripción visible.')
     expect(host.querySelector('[data-depth-scene]')).not.toBeNull()
-    expect(host.querySelector('.scene-window img')).not.toBeNull()
+    expect(host.querySelector('.panel-escena img')).not.toBeNull()
     expect(host.querySelector('.depth-artwork')).toBeNull()
+  })
+  it('el panel fotográfico deja el objeto recortado fuera de la lectura asistida', async () => {
+    await act(async () => root.render(<CinematicWindow scene="stone" object="crystal" caption="Tu semana empieza aquí." />))
+    const objeto = host.querySelector('.scene-object') as HTMLImageElement
+    expect(host.querySelector('.scene-pan img')?.getAttribute('src')).toBe('/images/cinematic/stone-desktop.webp')
+    expect(objeto.getAttribute('src')).toBe('/images/cinematic/foreground/crystal.webp')
+    expect(objeto.alt).toBe('')
+    expect(objeto.width).toBe(760)
+    expect(host.querySelector('figure')?.getAttribute('aria-hidden')).toBe('true')
+    expect(host.querySelector('button')).toBeNull()
   })
   it('conserva los recursos anteriores y respeta el presupuesto del fondo nuevo', () => {
     const directory = resolve('public/images/v170')

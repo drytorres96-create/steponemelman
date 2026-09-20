@@ -73,7 +73,7 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi
 
 it('exports real screen DOM with synthetic providers and no network, auth bypass or medical corpus', async () => {
   const out = process.env.MELMAN_DESIGN_EXPORT
-  const styles = ['nbme/nbme.css', 'auth/auth.css', 'styles.css', 'editorial.css', 'organic.css']
+  const styles = ['nbme/nbme.css', 'auth/auth.css', 'styles.css', 'editorial.css', 'organic.css', 'cinema.css']
   if (out) {
     mkdirSync(resolve(out, 'styles'), { recursive: true })
     for (const file of styles) writeFileSync(resolve(out, 'styles', file.replaceAll('/', '-')), readFileSync(resolve('src', file)))
@@ -100,5 +100,5 @@ it('exports real screen DOM with synthetic providers and no network, auth bypass
     }
   }
   expect(network).not.toHaveBeenCalled()
-  if (out) writeFileSync(resolve(out, 'README.txt'), 'QA reproducible: MELMAN_DESIGN_EXPORT=../qa/melman-review npm test -- src/__tests__/design-export.test.tsx\nHTML estático de componentes REALES: App, Semana, Modulos, Progreso, Recuperacion, AuthGate. Solo movimiento decorativo; sin acceso a sesión/corpus/red.\nDatos sintéticos y reloj 16-sep-2026. CSS copiado en orden real verificado en el build (nbme, auth, styles, editorial, organic).\nRecursos públicos: /images/cinematic/, incluido luminous/ocean-desktop.webp. El host de revisión puede remapear ese prefijo sin cambiar el DOM de componentes.\n')
+  if (out) writeFileSync(resolve(out, 'README.txt'), 'QA reproducible: MELMAN_DESIGN_EXPORT=../qa/melman-review npm test -- src/__tests__/design-export.test.tsx\nHTML estático de componentes REALES: App, Semana, Modulos, Progreso, Recuperacion, AuthGate. Solo movimiento decorativo; sin acceso a sesión/corpus/red.\nDatos sintéticos y reloj 16-sep-2026. CSS copiado en orden real verificado en el build (nbme, auth, styles, editorial, organic, cinema).\nRecursos públicos: /images/cinematic/, incluido luminous/ocean-desktop.webp. El host de revisión puede remapear ese prefijo sin cambiar el DOM de componentes.\n')
 })

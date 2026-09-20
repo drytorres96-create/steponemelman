@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Vacio } from '../components/comunes'
-import { CinematicWindow } from '../components/Editorial'
+import { ScenePhoto } from '../components/Editorial'
 import { useAuth } from '../auth/AuthProvider'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
@@ -259,7 +259,7 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
 
     return <div className="pila semana-workspace">
       <header className="semana-encabezado" data-depth-scene>
-        <CinematicWindow caption="Tu semana empieza aquí." />
+        <ScenePhoto scene="ribbons" />
 
         <div className="semana-heading-copy"><p className="editorial-eyebrow">Tu plan de estudio</p>
         <h1>Mi semana</h1>
@@ -326,7 +326,7 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
   const enCurso = semanas.find(s => pendientes.some(p => p.semana === s.semana)) ?? semanas[0]
 
   if (!sesiones.length) return <div className="pila">
-    <header className="semana-encabezado semana-sin-plan" data-depth-scene><CinematicWindow caption="Tu semana empieza aquí." /><div className="semana-heading-copy"><p className="editorial-eyebrow">Mi semana</p><h1>Sin sesiones preparadas</h1>
+    <header className="semana-encabezado semana-sin-plan" data-depth-scene><ScenePhoto scene="ribbons" /><div className="semana-heading-copy"><p className="editorial-eyebrow">Mi semana</p><h1>Sin sesiones preparadas</h1>
       {avisoPlan}
       <p className="sutil">Cuando haya sesiones planificadas aparecerán aquí, en orden por día.</p></div></header>
     <Vacio titulo="Nada que estudiar ahora mismo" texto="Mientras tanto puedes ponerte al día con lo que fallaste o con lo que vence."
@@ -335,7 +335,7 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
   </div>
 
   return <div className="pila">
-    <header className="semana-encabezado semana-sin-plan" data-depth-scene><CinematicWindow caption="Tu semana empieza aquí." /><div className="semana-heading-copy">
+    <header className="semana-encabezado semana-sin-plan" data-depth-scene><ScenePhoto scene="ribbons" /><div className="semana-heading-copy">
       <p className="editorial-eyebrow">Mi semana</p>
       <h1>{enCurso.semana} · {rotuloSemana(enCurso.semanaInicio)}</h1>
       {avisoPlan}

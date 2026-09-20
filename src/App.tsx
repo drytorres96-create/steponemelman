@@ -30,7 +30,7 @@ import { NbmeProgress } from './nbme/NbmeProgress'
 import { deriveNbmeSession } from './nbme/model'
 import type { FiltrosBusqueda } from './lib/busqueda'
 import type { NbmeQuestionRef } from './nbme/types'
-import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, type CinematicScene } from './components/Editorial'
+import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, CinematicWindow, type CinematicObject, type CinematicScene } from './components/Editorial'
 
 type Vista = 'semana' | 'recuperacion' | 'progreso' | 'inicio' | 'modulos' | 'repaso' | 'auditoria' | 'ajustes'
   | 'estudio' | 'preguntas' | 'sesion'
@@ -44,11 +44,28 @@ const SECUNDARIAS: { id: Vista; txt: string }[] = [
 /** Las vistas de concentración no llevan navegación ni migas. */
 const CONCENTRACION: Vista[] = ['estudio', 'preguntas', 'sesion']
 
-/** Section scenery is stable; answering uses an image-free atmosphere. */
-const SCENES: Record<Vista, CinematicScene> = {
-  semana: 'constellation', recuperacion: 'lens', progreso: 'horizon', inicio: 'dawn',
-  modulos: 'ribbons', repaso: 'lens', auditoria: 'stone', ajustes: 'smoke',
-  estudio: 'smoke', preguntas: 'smoke', sesion: 'smoke',
+/**
+ * Cada vista tiene su escena estable: la fotografía del fondo, la del panel lateral y el
+ * objeto recortado que cruza su borde. Cambiar de vista funde la escena entera.
+ */
+const SCENES: Record<Vista, { fondo: CinematicScene; ventana: CinematicScene; objeto: CinematicObject }> = {
+  semana: { fondo: 'constellation', ventana: 'dawn', objeto: 'crystal' },
+  recuperacion: { fondo: 'lens', ventana: 'stone', objeto: 'optical-violet' },
+  progreso: { fondo: 'horizon', ventana: 'ribbons', objeto: 'forest' },
+  inicio: { fondo: 'dawn', ventana: 'forest', objeto: 'crystal' },
+  modulos: { fondo: 'ribbons', ventana: 'constellation', objeto: 'crystal' },
+  repaso: { fondo: 'lens', ventana: 'stone', objeto: 'optical-violet' },
+  auditoria: { fondo: 'stone', ventana: 'lens', objeto: 'neural-violet' },
+  ajustes: { fondo: 'smoke', ventana: 'stone', objeto: 'optical-violet' },
+  estudio: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
+  preguntas: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
+  sesion: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
+}
+/** El paisaje acompaña a las vistas de lectura corta; las herramientas anchas se quedan la pantalla. */
+const CON_PAISAJE: Vista[] = ['semana', 'recuperacion', 'progreso', 'inicio']
+const PIES_ESCENA: Partial<Record<Vista, string>> = {
+  semana: 'Tu semana empieza aquí.', recuperacion: 'Lo que vuelve, se queda.',
+  progreso: 'El horizonte se mide en semanas.', inicio: 'Un espacio para concentrarte.',
 }
 
 // A session queue is restored from the saved study state, never from the URL alone.
@@ -214,7 +231,7 @@ export default function App() {
 
   return (
     <div className={`app editorial-app${enConcentracion ? ' study-focus' : ''}`} data-app-version={APP_VERSION} data-view={vista}>
-      <CinematicBackdrop scene={SCENES[vista]} quiet={enConcentracion} />
+      <CinematicBackdrop scene={SCENES[vista].fondo} quiet={enConcentracion} />
       <a className="saltar-contenido" href="#contenido" onClick={e => { e.preventDefault(); contenido.current?.focus() }}>Saltar al contenido</a>
       <header className="barra">
         <div className="contenedor barra-in">
@@ -242,6 +259,9 @@ export default function App() {
       <main id="contenido" ref={contenido} tabIndex={-1}>
         <div className="contenedor">
           {!enConcentracion && <div className="workspace-topline"><span>Mi espacio <span aria-hidden="true">/</span> {[...NAV, ...SECUNDARIAS].find(n => n.id === vista)?.txt}</span><span className="workspace-edition">Medicina · Aprendizaje activo</span></div>}
+          {/* La rejilla es la que recibe el paralaje: cada capa lo consume con un factor distinto. */}
+          <div className="cine-escenario" data-depth-scene data-depth-calm={enConcentracion ? 'true' : undefined}>
+          <div className="cine-columna">
           {error && <div className="aviso" style={{ marginBottom: 16 }}><span>⚠</span><div>{error}</div></div>}
           {cargando && <div className="vacio">Preparando la sesión…</div>}
 
@@ -294,6 +314,10 @@ export default function App() {
             : <Progreso ventana={ventanaProgreso} onEstudiar={estudiarIds} onContinuar={continuar} />}</div>}
           {!cargando && vista === 'auditoria' && <Auditoria />}
           {!cargando && vista === 'ajustes' && <Ajustes />}
+          </div>
+          {!enConcentracion && CON_PAISAJE.includes(vista) &&
+            <CinematicWindow scene={SCENES[vista].ventana} object={SCENES[vista].objeto} caption={PIES_ESCENA[vista]} />}
+          </div>
         </div>
       </main>
     </div>

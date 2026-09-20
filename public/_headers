@@ -16,6 +16,10 @@
 /images/v171/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Tipografía propia: la política de seguridad solo admite recursos de este origen.
+/fonts/*
+  Cache-Control: public, max-age=604800
+
 /icon-192.png
   Cache-Control: public, max-age=604800
 /icon-512.png
