@@ -1,13 +1,13 @@
 /** Public, decorative scenery is independent of study content and user state. */
-export type CinematicScene = 'forest' | 'dawn' | 'constellation' | 'lens' | 'ribbons' | 'horizon' | 'stone' | 'smoke' | 'sunrise' | 'sunset'
+export type CinematicScene = 'forest' | 'dawn' | 'constellation' | 'lens' | 'ribbons' | 'horizon' | 'stone' | 'smoke' | 'sunrise' | 'sunset' | 'luminous/ocean'
 
 function SceneImage({ scene, className = '', priority = false, sizes = '100vw' }: {
   scene: CinematicScene; className?: string; priority?: boolean; sizes?: string
 }) {
-  const warm = scene === 'sunrise' || scene === 'sunset'
+  const wide = scene === 'sunrise' || scene === 'sunset' || scene === 'luminous/ocean'
   return <picture className={`medical-image ${className}`} aria-hidden="true">
     <source media="(max-width: 760px)" srcSet={`/images/cinematic/${scene}-mobile.webp`} />
-    <img src={`/images/cinematic/${scene}-desktop.webp`} sizes={sizes} width={warm ? 1672 : 1536} height={warm ? 941 : 1024}
+    <img src={`/images/cinematic/${scene}-desktop.webp`} sizes={sizes} width={wide ? 1672 : 1536} height={wide ? 941 : 1024}
       alt="" aria-hidden="true" loading={priority ? 'eager' : 'lazy'} decoding="async" />
   </picture>
 }
@@ -20,8 +20,18 @@ export function CinematicBackdrop({ scene, quiet = false }: { scene: CinematicSc
 /** A complete photographic environment, contained within the access panel. */
 export function AccessScene() {
   return <div className="access-scene" aria-hidden="true">
-    <SceneImage scene="horizon" priority sizes="(max-width: 760px) 120px, 48vw" />
+    <SceneImage scene="luminous/ocean" priority sizes="(max-width: 760px) 100vw, 48vw" />
   </div>
+}
+
+/** A continuous environment in its own grid cell, never underneath progress or actions. */
+export function CinematicWindow({ scene = 'luminous/ocean', caption = 'Un espacio para concentrarte.' }: {
+  scene?: CinematicScene; caption?: string
+}) {
+  return <figure className="scene-window" data-scene={scene} aria-hidden="true">
+    <div className="scene-pan"><SceneImage scene={scene} priority sizes="(max-width: 760px) 100vw, 38vw" /></div>
+    <figcaption><span className="scene-glint" />{caption}</figcaption>
+  </figure>
 }
 
 export function MedicalImage({ scene, className = '', priority = false, sizes }: {
@@ -63,13 +73,15 @@ export function NavigationIcon({ name }: { name: string }) {
 export function StudyHero() {
   return <header className="editorial-hero" data-depth-scene>
     <div className="editorial-hero-copy"><p className="editorial-eyebrow">Plan diario clásico</p><h1>Tu estudio <em>de hoy.</em></h1><p>Puedes pausar y retomar cuando lo necesites.</p></div>
+    <CinematicWindow />
   </header>
 }
 
-export function ScreenHeading({ eyebrow, title, description, scene = 'organic' }: {
-  eyebrow: string; title: string; description: string; scene?: 'membrane' | 'fluid' | 'organic';
+export function ScreenHeading({ eyebrow, title, description, scene = 'organic', landscape = 'constellation' }: {
+  eyebrow: string; title: string; description: string; scene?: 'membrane' | 'fluid' | 'organic'; landscape?: CinematicScene;
 }) {
   return <header className={`screen-heading screen-heading-${scene}`} data-depth-scene>
     <div className="screen-heading-copy"><p className="editorial-eyebrow">{eyebrow}</p><h1>{title}</h1><p className="sutil">{description}</p></div>
+    <CinematicWindow scene={landscape} />
   </header>
 }
