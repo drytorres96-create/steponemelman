@@ -74,7 +74,7 @@ export function Auditoria() {
       {dialogo}
       {errorNotas && <div className="aviso" role="alert">{errorNotas}{!notasListas && <button className="btn pequeno" onClick={() => setReintento(n => n + 1)}>Reintentar notas</button>}</div>}
       <div className="fila" style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
-        <ScreenHeading eyebrow="Revisión del material" title="Panel de auditoría" artwork="stone" subject="crystal" description="El corpus necesita revisión continua. Aquí se ve la fuente y el concepto lado a lado, con sus alertas." />
+        <ScreenHeading eyebrow="Revisión del material" title="Panel de auditoría" description="El corpus necesita revisión continua. Aquí se ve la fuente y el concepto lado a lado, con sus alertas." />
         <div className="fila">
           <button className="btn pequeno fantasma" onClick={() => setVerCuarentena(true)}>Cuarentena ({cuarentena.length})</button>
           <button className="btn pequeno" disabled={!notasListas} onClick={exportarCSV}>CSV con propuestas</button>

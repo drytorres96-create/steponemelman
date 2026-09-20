@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { MedicalImage, ScreenHeading, StudyHero } from '../components/Editorial'
+import { AccessScene, MedicalImage, ScreenHeading, StudyHero } from '../components/Editorial'
 
 let host: HTMLDivElement, root: ReturnType<typeof createRoot>
 beforeEach(() => {
@@ -13,15 +13,17 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove() })
 
 describe('diseño cinematográfico decorativo', () => {
-  it('conserva títulos y texto reales; el arte es decorativo y no contiene controles', async () => {
+  it('separa el contenido de estudio del ambiente fotográfico contenido del acceso', async () => {
     await act(async () => root.render(<StudyHero />))
     expect(host.querySelector('h1')?.textContent).toContain('Tu estudio de hoy')
+    expect(host.querySelector('img')).toBeNull()
+    await act(async () => root.render(<AccessScene />))
     const image = host.querySelector('img')!
     expect(image.alt).toBe('')
     expect(image.getAttribute('aria-hidden')).toBe('true')
-    expect(image.getAttribute('loading')).toBe('lazy')
-    expect(image.getAttribute('src')).toBe('/images/cinematic/constellation-desktop.webp')
-    expect(host.querySelector('source')?.getAttribute('srcset')).toBe('/images/cinematic/constellation-mobile.webp')
+    expect(image.getAttribute('loading')).toBe('eager')
+    expect(image.getAttribute('src')).toBe('/images/cinematic/horizon-desktop.webp')
+    expect(host.querySelector('source')?.getAttribute('srcset')).toBe('/images/cinematic/horizon-mobile.webp')
     expect(host.querySelector('source')?.getAttribute('media')).toBe('(max-width: 760px)')
     expect(image.width).toBe(1536)
     expect(image.height).toBe(1024)
@@ -42,11 +44,8 @@ describe('diseño cinematográfico decorativo', () => {
     expect(host.querySelector('h1')?.textContent).toBe('Preguntas de aplicación')
     expect(host.textContent).toContain('Descripción visible.')
     expect(host.querySelector('[data-depth-scene]')).not.toBeNull()
-    for (const image of host.querySelectorAll('img')) {
-      expect(image.alt).toBe('')
-      expect(image.getAttribute('aria-hidden')).toBe('true')
-    }
-    expect(host.querySelector('.depth-artwork button')).toBeNull()
+    expect(host.querySelector('img')).toBeNull()
+    expect(host.querySelector('.depth-artwork')).toBeNull()
   })
   it('conserva los recursos anteriores y respeta el presupuesto del fondo nuevo', () => {
     const directory = resolve('public/images/v170')
