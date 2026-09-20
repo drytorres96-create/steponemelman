@@ -13,20 +13,20 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove() })
 
 describe('diseño cinematográfico decorativo', () => {
-  it('separa el contenido de estudio del ambiente fotográfico contenido del acceso', async () => {
+  it('recupera la fotografía decorativa sin introducir controles ni material clínico', async () => {
     await act(async () => root.render(<StudyHero />))
     expect(host.querySelector('h1')?.textContent).toContain('Tu estudio de hoy')
-    expect(host.querySelector('img')).toBeNull()
+    expect(host.querySelector('.scene-window img')).not.toBeNull()
     await act(async () => root.render(<AccessScene />))
     const image = host.querySelector('img')!
     expect(image.alt).toBe('')
     expect(image.getAttribute('aria-hidden')).toBe('true')
     expect(image.getAttribute('loading')).toBe('eager')
-    expect(image.getAttribute('src')).toBe('/images/cinematic/horizon-desktop.webp')
-    expect(host.querySelector('source')?.getAttribute('srcset')).toBe('/images/cinematic/horizon-mobile.webp')
+    expect(image.getAttribute('src')).toBe('/images/cinematic/luminous/ocean-desktop.webp')
+    expect(host.querySelector('source')?.getAttribute('srcset')).toBe('/images/cinematic/luminous/ocean-mobile.webp')
     expect(host.querySelector('source')?.getAttribute('media')).toBe('(max-width: 760px)')
-    expect(image.width).toBe(1536)
-    expect(image.height).toBe(1024)
+    expect(image.width).toBe(1672)
+    expect(image.height).toBe(941)
     expect(host.querySelector('button')).toBeNull()
   })
   it('reserva el espacio y ofrece imágenes ligeras para diferentes pantallas', async () => {
@@ -44,7 +44,7 @@ describe('diseño cinematográfico decorativo', () => {
     expect(host.querySelector('h1')?.textContent).toBe('Preguntas de aplicación')
     expect(host.textContent).toContain('Descripción visible.')
     expect(host.querySelector('[data-depth-scene]')).not.toBeNull()
-    expect(host.querySelector('img')).toBeNull()
+    expect(host.querySelector('.scene-window img')).not.toBeNull()
     expect(host.querySelector('.depth-artwork')).toBeNull()
   })
   it('conserva los recursos anteriores y respeta el presupuesto del fondo nuevo', () => {

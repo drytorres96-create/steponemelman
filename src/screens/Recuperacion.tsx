@@ -93,7 +93,7 @@ export function Recuperacion({ onEstudiar, onPreguntas, onMezclar }: {
   </section>
 
   return <div className="pila recovery-workspace">
-    <ScreenHeading eyebrow="Lo que te debe la memoria" title="Recuperación" scene="fluid"
+    <ScreenHeading landscape="forest" eyebrow="Lo que te debe la memoria" title="Recuperación" scene="fluid"
       description="Lo que fallaste y lo que vence, en un solo sitio. Empieza por lo que está a un acierto de consolidarse." />
 
     {esperando.length > 0 && cerca.length === 0 && <div className="aviso" role="status"><span>ⓘ</span><div>

@@ -42,7 +42,7 @@ export function Ajustes() {
   return (
     <div className="pila" style={{ maxWidth: 760 }}>
       {dialogo}
-      <ScreenHeading eyebrow="Tu espacio personal" title="Ajustes" description="Respaldo, preferencias y material de consulta." />
+      <ScreenHeading landscape="stone" eyebrow="Tu espacio personal" title="Ajustes" description="Respaldo, preferencias y material de consulta." />
 
       <details className="tarjeta"><summary>Criterios de dominio (avanzado)</summary>
         <form className="pila" style={{ marginTop: 16 }} noValidate onSubmit={e => { e.preventDefault(); aplicar() }}>
