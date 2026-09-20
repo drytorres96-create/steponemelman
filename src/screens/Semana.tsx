@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Vacio } from '../components/comunes'
+import { DepthArtwork } from '../components/Editorial'
 import { useAuth } from '../auth/AuthProvider'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
@@ -257,8 +258,8 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
     const dias = [...porDia.keys()].sort((a, b) => a - b)
 
     return <div className="pila semana-workspace">
-      <header className="semana-encabezado">
-        <img className="semana-crystal" src="/images/cinematic/foreground/crystal.webp" width="760" height="760" alt="" aria-hidden="true" decoding="async" />
+      <header className="semana-encabezado" data-depth-scene>
+        <DepthArtwork scene="lens" subject="optical-violet" />
         <div className="semana-heading-copy"><p className="editorial-eyebrow">Tu plan de estudio</p>
         <h1>Mi semana</h1>
         <p className="semana-fechas">{titular}</p>

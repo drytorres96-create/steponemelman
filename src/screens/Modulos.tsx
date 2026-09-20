@@ -91,7 +91,7 @@ export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion, 
 
   return (
     <div className="pila library-workspace">
-      <ScreenHeading eyebrow="Biblioteca de conceptos" title="Elige qué estudiar" description="Combina disciplina y sistema para crear una sesión a tu medida. Puedes practicar conceptos nuevos o ya estudiados." />
+      <ScreenHeading eyebrow="Biblioteca de conceptos" title="Elige qué estudiar" artwork="constellation" subject="neural-violet" description="Combina disciplina y sistema para crear una sesión a tu medida. Puedes practicar conceptos nuevos o ya estudiados." />
 
       <div className="tarjeta pila library-composer">
         <div className="library-composer-heading"><span className="editorial-eyebrow">Preparar una sesión</span><h2>Sesión personalizada</h2><p className="mini">Ejemplos: Farmacología + Endocrino; Fisiología + Cardiovascular; Patología + Hematológico y oncológico. Cada concepto debe cumplir todos los filtros elegidos.</p></div>
