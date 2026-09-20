@@ -11,13 +11,13 @@
   --magenta: #d6afe9; --oro: #e1ad8b; --oro-tenue: #d694681a;
   --verde: #a7d7b9; --ambar: #e6c28c; --rojo: #f3aaa0; --cian: #a5d5de;
   --radio: 30px; --radio-s: 14px;
-  --sombra: inset 0 1px 0 #f4d8ff27, inset -1px 0 0 #e3bfff10, 0 24px 44px -22px #000c, 0 7px 13px -8px #000;
-  --sombra-alta: inset 0 1px 0 #f4d8ff50, 0 30px 60px -22px #000e, 0 0 40px -20px #a976e5;
+  --sombra: inset 0 1px 0 #f5d2bc3d, inset -1px 0 0 #e3bfff26, inset -18px 14px 30px -25px #dfb5ff28, 0 24px 44px -22px #000c, 0 7px 13px -8px #000;
+  --sombra-alta: inset 0 1px 0 #ffe0c875, inset -1px 0 0 #e5bcff40, inset -25px 20px 48px -30px #bf91e52b, 0 30px 60px -22px #000e, 0 0 40px -20px #a976e5;
   --glass-text: #f5efff; --glass-muted: #d0c3df; --glass-floor: #241b31;
   --ancho: 1500px; --rail: 220px;
   --fuente: 'Aptos', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --editorial: var(--fuente);
-  --glass: radial-gradient(ellipse at 100% 0, #b893dc1d, transparent 65%), linear-gradient(135deg, #2b2135f5, #1c1427f2);
+  --glass: radial-gradient(ellipse at 100% 0, #dfad8933, transparent 36%), linear-gradient(125deg, transparent 54%, #dfbbff0c 57%, transparent 62%), radial-gradient(ellipse at 93% 12%, #a879cb2b, transparent 65%), linear-gradient(135deg, #291f32dc, #18111ed9);
 }
 body { background: var(--bg); background-image: none; font-size: 15px; }
 ::selection { background: #c5bdcd44; color: #fff; }
@@ -35,7 +35,7 @@ summary::marker { color: var(--texto-2); }
 /* The room is dark plum; photography belongs to individual panels. */
 .editorial-app { position: relative; isolation: isolate; background: transparent; }
 .cinematic-backdrop { position: fixed; inset: 0; z-index: -2; overflow: hidden; pointer-events: none; background: radial-gradient(ellipse at 91% 0, #54366345, transparent 55%), radial-gradient(ellipse at 30% 80%, #301d452b, transparent 65%), #100c18; }
-.cinematic-backdrop::before, .auth-page::before { content: ''; position: absolute; pointer-events: none; top: -310px; right: -210px; width: 600px; height: 1500px; transform: rotate(36deg); transform-origin: top center; background: linear-gradient(90deg, transparent, #dab4f908 28%, #d8b7ef16 49%, #e6c4ff09 60%, transparent 75%); filter: blur(15px); }
+.cinematic-backdrop::before, .auth-page::before { content: ''; position: absolute; z-index: -1; pointer-events: none; top: -170px; right: -65px; width: 230px; height: 1700px; transform: rotate(34deg); transform-origin: top center; background: linear-gradient(90deg, transparent 3%, #bb8cf30d 20%, #c9a0ed30 36%, #f1c4a858 47%, #f2d5fa66 50%, #d4a9f23b 55%, #bd8bea15 72%, transparent 94%); mask-image: linear-gradient(180deg, #000 0%, #000e 36%, #0007 65%, transparent 96%); filter: blur(5px); }
 .cinematic-backdrop::after { content: ''; position: absolute; right: -100px; top: -100px; width: 500px; height: 350px; background: radial-gradient(ellipse, #ead0fa24, transparent 65%); }
 .cinematic-backdrop-quiet::before, .cinematic-backdrop-quiet::after { opacity: .15; }
 .editorial-app:not(.study-focus) > main { width: calc(100% - var(--rail)); margin-left: var(--rail); padding: 0 0 64px; background: transparent; }
@@ -108,7 +108,8 @@ select option { background: #21162b; color: #efecf1; }
 
 /* Rounded header planes leave enough room for their photographic subjects. */
 .screen-heading, .semana-encabezado, .editorial-hero { position: relative; isolation: isolate; min-height: 230px; margin: 6px 0 12px; padding: 32px 36px; border: 1px solid #d4b8ec39; border-top-color: #efd6ff69; border-right-color: #e7caff59; border-radius: 34px; box-shadow: var(--sombra-alta); background: var(--glass); overflow: visible; }
-.screen-heading { display: flex; align-items: center; }
+.screen-heading { display: flex; align-items: center; width: 100%; }
+.semana-encabezado.semana-sin-plan { display: block; }
 .screen-heading > .screen-heading-copy, .editorial-hero-copy { position: relative; z-index: 2; max-width: 64%; padding: 0; }
 .screen-heading h1, .semana-encabezado h1, .editorial-hero h1 { font-size: clamp(2.5rem, 3.8vw, 4rem); font-weight: 300; line-height: 1.05; margin: 0 0 16px; letter-spacing: -.055em; }
 .screen-heading .editorial-eyebrow, .semana-encabezado .editorial-eyebrow { margin: 0 0 12px; color: #d5b8e9; }

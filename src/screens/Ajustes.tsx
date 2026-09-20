@@ -3,6 +3,7 @@ import { useApp } from '../store/estado'
 import { CRITERIOS_POR_DEFECTO } from '../srs/mastery'
 import { useDescarga } from '../components/descarga'
 import { APP_VERSION } from '../release'
+import { ScreenHeading } from '../components/Editorial'
 
 const CAMPOS = [
   { clave: 'recuperaciones', titulo: 'Respuestas independientes correctas mínimas', min: 1, max: 10 },
@@ -41,7 +42,7 @@ export function Ajustes() {
   return (
     <div className="pila" style={{ maxWidth: 760 }}>
       {dialogo}
-      <div><h1>Ajustes</h1><p className="sutil">Respaldo, preferencias y material de consulta.</p></div>
+      <ScreenHeading eyebrow="Tu espacio personal" title="Ajustes" description="Respaldo, preferencias y material de consulta." artwork="smoke" subject="optical-violet" />
 
       <details className="tarjeta"><summary>Criterios de dominio (avanzado)</summary>
         <form className="pila" style={{ marginTop: 16 }} noValidate onSubmit={e => { e.preventDefault(); aplicar() }}>

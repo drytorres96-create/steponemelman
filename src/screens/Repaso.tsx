@@ -5,6 +5,7 @@ import type { Concepto } from '../schema/concept'
 import { NOMBRE_INTERACCION } from '../schema/concept'
 import { estaVencido, prioridad, retencion, DIA } from '../srs/fsrs'
 import { EtiquetaEstado, Vacio } from '../components/comunes'
+import { ScreenHeading } from '../components/Editorial'
 
 export function Repaso({ onEstudiar }: { onEstudiar: (ids: string[]) => void }) {
   const { indice, estado } = useApp()
@@ -37,12 +38,8 @@ export function Repaso({ onEstudiar }: { onEstudiar: (ids: string[]) => void }) 
   return (
     <div className="pila">
       <div className="fila" style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
-        <div>
-          <h1>Repaso espaciado</h1>
-          <p className="sutil" style={{ margin: 0 }}>
-            {cola.length ? `${cola.length} conceptos para repasar. Puedes avanzar en sesiones pequeñas.` : 'Todo al día por ahora.'}
-          </p>
-        </div>
+        <ScreenHeading eyebrow="Lo que permanece" title="Repaso espaciado" artwork="ribbons" subject="neural-violet"
+          description={cola.length ? `${cola.length} conceptos para repasar. Puedes avanzar en sesiones pequeñas.` : 'Todo al día por ahora.'} />
         {cola.length > 0 && (
           <div className="fila">
             <label htmlFor="limite-repaso">Carga de la sesión</label>
