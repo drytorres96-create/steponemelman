@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Cronometro } from '../components/Cronometro'
+import { BotonPiel, usePielEstudio } from '../components/PielEstudio'
 import { tiempoLegible } from '../lib/tiempo'
 
 /**
@@ -17,6 +18,7 @@ export function Enfoque({ minutos, etiqueta, onTerminar }:
   const [pausado, setPausado] = useState(false)
   const desde = useRef(Date.now())
   const acumulado = useRef(0)
+  const pielEstudio = usePielEstudio()
 
   useEffect(() => {
     if (pausado) return
@@ -32,10 +34,13 @@ export function Enfoque({ minutos, etiqueta, onTerminar }:
   const cumplido = ms >= presupuesto * 60000
 
   return <section className="tarjeta pila plan-enfoque" aria-labelledby="plan-enfoque-titulo">
-    <div>
-      <p className="editorial-eyebrow">En marcha</p>
-      <h2 id="plan-enfoque-titulo" style={{ marginTop: 6 }}>{etiqueta}</h2>
-      <p className="sutil">{presupuesto} minutos previstos · {tiempoLegible(ms)} en marcha{pausado ? ' · en pausa' : ''}</p>
+    <div className="fila" style={{ width: '100%', gap: 12, alignItems: 'flex-start', justifyContent: 'space-between' }}>
+      <div>
+        <p className="editorial-eyebrow">En marcha</p>
+        <h2 id="plan-enfoque-titulo" style={{ marginTop: 6 }}>{etiqueta}</h2>
+        <p className="sutil">{presupuesto} minutos previstos · {tiempoLegible(ms)} en marcha{pausado ? ' · en pausa' : ''}</p>
+      </div>
+      <BotonPiel piel={pielEstudio.piel} alternar={pielEstudio.alternar} />
     </div>
     <Cronometro msVisibles={ms} presupuesto={presupuesto} sinLimite={false} />
     {cumplido

@@ -9,6 +9,7 @@ import './styles.css'
 import './editorial.css'
 import './organic.css'
 import './cinema.css'
+import './piel-estudio.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
