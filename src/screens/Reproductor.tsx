@@ -16,6 +16,7 @@ import { ExamenIA } from '../components/ExamenIA'
 import { ConfusionIA } from '../components/ConfusionIA'
 import { ChatConcepto } from '../components/ChatConcepto'
 import { Cronometro } from '../components/Cronometro'
+import { BotonPiel, usePielEstudio } from '../components/PielEstudio'
 import { tiempoLegible } from '../lib/tiempo'
 import { buscarIntentoPaso, conAyuda, diasParaCalificacion, identificarPregunta, necesitaReintento, resumirCorrecciones, resumirIntentos, RelojActividad, siguienteCola, versionPregunta } from './sesion'
 
@@ -38,6 +39,7 @@ const etiquetaResultado = (r: Intento['resultado']) => r === 'correcta' ? 'Corre
 export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto }:
   { cola: Cola; onSalir: () => void; indiceInicial?: number; onTramoCompleto?: () => void }) {
   const { registrarIntento, progresoDe, estado, guardarReanudable, iniciarSesion, cerrarSesion } = useApp()
+  const pielEstudio = usePielEstudio()
   const guardada = cola.sessionId && estado.reanudable?.sessionId === cola.sessionId ? estado.reanudable : null
   const [versionFormato] = useState<1 | 2>(guardada ? guardada.versionFormato ?? 1 : 2)
   const [presupuesto] = useState(guardada?.presupuestoMinutos ?? cola.presupuestoMinutos)
@@ -442,7 +444,10 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
         <span className="etq violeta">{NOMBRE_INTERACCION[c.interaccion.recomendada]}</span>
         {!examenSinAyuda && <EtiquetaEstado estado={p.estado} />}
       </div>
-      <button className="btn pequeno fantasma" onClick={pausar}>Necesito una pausa</button>
+      <div className="fila" style={{ gap: 8 }}>
+        <BotonPiel piel={pielEstudio.piel} alternar={pielEstudio.alternar} />
+        <button className="btn pequeno fantasma" onClick={pausar}>Necesito una pausa</button>
+      </div>
     </div>
     <div className="fila" style={{ justifyContent: 'space-between' }}><span className="mini">{reintento
       ? `Corrección · ${orden.length - i} pendientes, incluida esta`

@@ -1,0 +1,331 @@
+/* Melman · piel de concentración.
+   Mientras están abiertos el reproductor de sesión y el panel de foco, la ventana
+   cambia a una paleta propia: «papel y tinta» de día y «noche cálida» de noche.
+   Superficies planas, una sola familia de acento y ningún efecto atmosférico: lo
+   que se mira durante una hora seguida no debe pedir atención.
+
+   Todo cuelga de `[data-piel-estudio]` en <html>, que solo existe mientras esas dos
+   pantallas están montadas. Fuera de ellas la aplicación mantiene su aspecto y esta
+   hoja no pinta nada. */
+
+:root[data-piel-estudio='claro'] {
+  color-scheme: light;
+  --piel-fondo: #fbf8f3;
+  --piel-superficie: #ffffff;
+  --piel-superficie-2: #f3ede3;
+  --piel-superficie-3: #f6f1e7;
+  --piel-linea: #e6ded2;
+  --piel-linea-fuerte: #d9cfbe;
+  --piel-texto: #1e2422;
+  --piel-texto-2: #545c59;
+  --piel-texto-3: #6b7370;
+  --piel-acento: #b4502e;
+  --piel-acento-fuerte: #93401f;
+  --piel-acento-grafico: #d2603a;
+  --piel-acento-suave: #fbeae1;
+  --piel-acento-borde: #edcbb9;
+  --piel-accion-texto: #fff8f3;
+  --piel-verde: #1f6f55;
+  --piel-verde-grafico: #2e8b6b;
+  --piel-verde-suave: #e6f4ec;
+  --piel-verde-borde: #c2e0d3;
+  --piel-ambar: #8a5a12;
+  --piel-ambar-grafico: #c08520;
+  --piel-ambar-suave: #fdf3e0;
+  --piel-ambar-borde: #ecd6ac;
+  --piel-rojo: #a8382b;
+  --piel-rojo-suave: #fbeceb;
+  --piel-rojo-borde: #eec9c3;
+  --piel-sombra: 0 1px 2px rgba(31, 36, 34, .05), 0 18px 40px -32px rgba(31, 36, 34, .30);
+  --piel-sombra-alta: 0 2px 6px rgba(31, 36, 34, .07), 0 26px 56px -34px rgba(31, 36, 34, .38);
+  --piel-radio: 16px;
+  --piel-radio-s: 10px;
+}
+
+:root[data-piel-estudio='oscuro'] {
+  color-scheme: dark;
+  --piel-fondo: #15171e;
+  --piel-superficie: #1c1f28;
+  --piel-superficie-2: #23272f;
+  --piel-superficie-3: #21252e;
+  --piel-linea: #2a2f3a;
+  --piel-linea-fuerte: #363c48;
+  --piel-texto: #f3f5f8;
+  --piel-texto-2: #a7b0bf;
+  --piel-texto-3: #8f99a9;
+  --piel-acento: #ff8a5b;
+  --piel-acento-fuerte: #ff9d75;
+  --piel-acento-grafico: #ff8a5b;
+  --piel-acento-suave: #2a1d16;
+  --piel-acento-borde: #4a3328;
+  --piel-accion-texto: #1a0e08;
+  --piel-verde: #4fd6ae;
+  --piel-verde-grafico: #4fd6ae;
+  --piel-verde-suave: #14261f;
+  --piel-verde-borde: #1f4539;
+  --piel-ambar: #ffc46b;
+  --piel-ambar-grafico: #ffc46b;
+  --piel-ambar-suave: #2a2113;
+  --piel-ambar-borde: #4a3b1c;
+  --piel-rojo: #ff7a73;
+  --piel-rojo-suave: #2a1717;
+  --piel-rojo-borde: #4a2b28;
+  --piel-sombra: 0 1px 2px rgba(0, 0, 0, .40), 0 20px 44px -30px rgba(0, 0, 0, .70);
+  --piel-sombra-alta: 0 2px 6px rgba(0, 0, 0, .46), 0 28px 58px -32px rgba(0, 0, 0, .78);
+  --piel-radio: 18px;
+  --piel-radio-s: 12px;
+}
+
+/* Los componentes siguen leyendo los mismos nombres de siempre: aquí solo cambia
+   a qué apuntan mientras dura la sesión. */
+:root[data-piel-estudio] {
+  --bg: var(--piel-fondo); --bg-2: var(--piel-fondo);
+  --panel: var(--piel-superficie); --panel-2: var(--piel-superficie-2);
+  --fondo-0: var(--piel-fondo); --fondo-1: var(--piel-fondo);
+  --fondo-2: var(--piel-fondo); --fondo-3: var(--piel-fondo);
+  --tinte-petroleo: var(--piel-superficie-2);
+  --texto: var(--piel-texto); --texto-2: var(--piel-texto-2);
+  --texto-3: var(--piel-texto-3); --texto-4: var(--piel-texto-3);
+  --linea: var(--piel-linea); --linea-suave: var(--piel-linea); --linea-fuerte: var(--piel-linea-fuerte);
+  --linea-interactiva: var(--piel-linea-fuerte); --linea-interactiva-viva: var(--piel-acento);
+  --acento: var(--piel-acento); --acento-2: var(--piel-acento);
+  --calido: var(--piel-ambar); --calido-2: var(--piel-ambar);
+  --violeta: var(--piel-acento); --violeta-2: var(--piel-acento); --violeta-tenue: var(--piel-acento-suave);
+  --magenta: var(--piel-acento); --cian: var(--piel-acento);
+  --oro: var(--piel-ambar); --oro-tenue: var(--piel-ambar-suave);
+  --verde: var(--piel-verde); --ambar: var(--piel-ambar); --rojo: var(--piel-rojo);
+  --glass: var(--piel-superficie); --glass-floor: var(--piel-superficie);
+  --glass-text: var(--piel-texto); --glass-muted: var(--piel-texto-2);
+  --vidrio-alto: var(--piel-superficie); --vidrio-medio: var(--piel-superficie);
+  --vidrio-bajo: var(--piel-superficie); --vidrio-barra: var(--piel-superficie);
+  --vidrio-lectura: var(--piel-superficie);
+  --relleno-suave: var(--piel-superficie-2);
+  --action-text: var(--piel-accion-texto);
+  --action-start: var(--piel-acento); --action-end: var(--piel-acento);
+  --sombra: var(--piel-sombra); --sombra-alta: var(--piel-sombra-alta);
+  --sombra-panel: var(--piel-sombra); --sombra-accion: var(--piel-sombra-alta);
+  --reflejo: none;
+  --radio: var(--piel-radio); --radio-s: var(--piel-radio-s);
+}
+
+:root[data-piel-estudio] body {
+  background: var(--piel-fondo);
+  background-image: none;
+  color: var(--piel-texto);
+}
+:root[data-piel-estudio] ::selection { background: var(--piel-acento-suave); color: var(--piel-texto); }
+:root[data-piel-estudio] :focus-visible { outline: 2px solid var(--piel-acento); outline-offset: 3px; }
+:root[data-piel-estudio] a { color: var(--piel-acento); }
+:root[data-piel-estudio] a:hover { color: var(--piel-acento-fuerte); }
+
+/* La atmósfera se apaga entera: sin fotografía, sin haz, sin niebla ni viñeta. */
+:root[data-piel-estudio] .cine-escena,
+:root[data-piel-estudio] .cine-velo,
+:root[data-piel-estudio] .cine-haz,
+:root[data-piel-estudio] .cine-niebla,
+:root[data-piel-estudio] .cine-halo,
+:root[data-piel-estudio] .cine-vineta { display: none; }
+:root[data-piel-estudio] .cinematic-backdrop { background: var(--piel-fondo); }
+
+/* Barra superior: una línea, no una píldora de cristal. */
+:root[data-piel-estudio] .editorial-app .barra-in,
+:root[data-piel-estudio] .editorial-app:not(.study-focus) .barra-in {
+  border: 1px solid var(--piel-linea);
+  border-radius: var(--piel-radio);
+  background: var(--piel-superficie);
+  box-shadow: var(--piel-sombra);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+
+/* Superficies de lectura y respuesta. */
+:root[data-piel-estudio] .tarjeta,
+:root[data-piel-estudio] .tarea,
+:root[data-piel-estudio] .nbme-question,
+:root[data-piel-estudio] .nbme-feedback,
+:root[data-piel-estudio] .modal,
+:root[data-piel-estudio] .modal-cab,
+:root[data-piel-estudio] .study-focus .tarjeta,
+:root[data-piel-estudio] .study-focus .tarea,
+:root[data-piel-estudio] .study-focus .nbme-question {
+  border: 1px solid var(--piel-linea);
+  border-radius: var(--piel-radio);
+  background: var(--piel-superficie);
+  box-shadow: var(--piel-sombra);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+:root[data-piel-estudio] .pregunta,
+:root[data-piel-estudio] .nbme-stem { color: var(--piel-texto); }
+:root[data-piel-estudio] .rotulo,
+:root[data-piel-estudio] .editorial-eyebrow { color: var(--piel-acento); }
+
+/* Controles. */
+:root[data-piel-estudio] .btn {
+  color: var(--piel-texto);
+  border: 1px solid var(--piel-linea-fuerte);
+  border-radius: var(--piel-radio-s);
+  background: var(--piel-superficie);
+  box-shadow: none;
+}
+:root[data-piel-estudio] .btn:hover:not(:disabled) {
+  border-color: var(--piel-acento-borde);
+  background: var(--piel-superficie-2);
+}
+:root[data-piel-estudio] .btn.principal {
+  color: var(--piel-accion-texto);
+  border: 0;
+  background: var(--piel-acento);
+  box-shadow: none;
+}
+:root[data-piel-estudio] .btn.principal:hover:not(:disabled) {
+  background: var(--piel-acento-fuerte);
+  box-shadow: none;
+}
+:root[data-piel-estudio] .btn.fantasma {
+  color: var(--piel-texto-2);
+  border-color: var(--piel-linea);
+  background: transparent;
+}
+:root[data-piel-estudio] .btn.fantasma:hover:not(:disabled) { color: var(--piel-texto); background: var(--piel-superficie-2); }
+
+:root[data-piel-estudio] .etq {
+  color: var(--piel-texto-2);
+  border: 1px solid var(--piel-linea);
+  background: var(--piel-superficie-2);
+}
+:root[data-piel-estudio] .etq.violeta {
+  color: var(--piel-acento); border-color: var(--piel-acento-borde); background: var(--piel-acento-suave);
+}
+:root[data-piel-estudio] .etq.verde {
+  color: var(--piel-verde); border-color: var(--piel-verde-borde); background: var(--piel-verde-suave);
+}
+:root[data-piel-estudio] .etq.ambar,
+:root[data-piel-estudio] .etq.oro {
+  color: var(--piel-ambar); border-color: var(--piel-ambar-borde); background: var(--piel-ambar-suave);
+}
+:root[data-piel-estudio] .etq.rojo {
+  color: var(--piel-rojo); border-color: var(--piel-rojo-borde); background: var(--piel-rojo-suave);
+}
+
+/* Opciones de respuesta: el estado se lee por color de borde y fondo, no por brillo. */
+:root[data-piel-estudio] .opcion,
+:root[data-piel-estudio] .nbme-option,
+:root[data-piel-estudio] .ficha,
+:root[data-piel-estudio] .zona,
+:root[data-piel-estudio] .escalera button,
+:root[data-piel-estudio] .flecha-fila,
+:root[data-piel-estudio] .flecha-ops button {
+  color: var(--piel-texto);
+  border: 1px solid var(--piel-linea);
+  border-radius: var(--piel-radio-s);
+  background: var(--piel-superficie);
+}
+:root[data-piel-estudio] .opcion:hover:not(:disabled),
+:root[data-piel-estudio] .nbme-option:hover:not(:has(input:disabled)),
+:root[data-piel-estudio] .escalera button:hover {
+  border-color: var(--piel-acento-borde);
+  background: var(--piel-superficie-3);
+}
+:root[data-piel-estudio] .opcion.elegida,
+:root[data-piel-estudio] .ficha.sel,
+:root[data-piel-estudio] .flecha-ops button.sel,
+:root[data-piel-estudio] .nbme-option.selected {
+  border-color: var(--piel-acento); background: var(--piel-acento-suave);
+}
+:root[data-piel-estudio] .opcion.acierto,
+:root[data-piel-estudio] .ficha.ok,
+:root[data-piel-estudio] .flecha-ops button.ok,
+:root[data-piel-estudio] .nbme-option.correct {
+  border-color: var(--piel-verde-borde); background: var(--piel-verde-suave);
+}
+:root[data-piel-estudio] .opcion.fallo,
+:root[data-piel-estudio] .ficha.mal,
+:root[data-piel-estudio] .flecha-ops button.mal {
+  border-color: var(--piel-rojo-borde); background: var(--piel-rojo-suave);
+}
+:root[data-piel-estudio] .nbme-option.incorrect {
+  border-color: var(--piel-ambar-borde); background: var(--piel-ambar-suave);
+}
+:root[data-piel-estudio] .opcion .letra {
+  color: var(--piel-texto-2); background: var(--piel-superficie-2);
+}
+
+/* Pistas, patrones y retroalimentación. */
+:root[data-piel-estudio] .pista,
+:root[data-piel-estudio] .patron {
+  color: var(--piel-texto-2);
+  border-left-color: var(--piel-acento-grafico);
+  background: var(--piel-acento-suave);
+}
+:root[data-piel-estudio] .retro { border-radius: var(--piel-radio-s); }
+:root[data-piel-estudio] .retro.ok { border-color: var(--piel-verde-borde); background: var(--piel-verde-suave); }
+:root[data-piel-estudio] .retro.parcial { border-color: var(--piel-ambar-borde); background: var(--piel-ambar-suave); }
+:root[data-piel-estudio] .retro.no { border-color: var(--piel-rojo-borde); background: var(--piel-rojo-suave); }
+:root[data-piel-estudio] .aviso,
+:root[data-piel-estudio] .nbme-error {
+  color: var(--piel-ambar); border-color: var(--piel-ambar-borde);
+  background: var(--piel-ambar-suave); border-radius: var(--piel-radio-s);
+}
+:root[data-piel-estudio] .decisiva {
+  background: var(--piel-ambar-suave); box-shadow: inset 0 -1px 0 var(--piel-ambar-borde);
+}
+:root[data-piel-estudio] .fragmento {
+  color: var(--piel-texto-2); border-color: var(--piel-linea);
+  background: var(--piel-superficie-2); border-radius: var(--piel-radio-s);
+}
+:root[data-piel-estudio] .chat-burbuja {
+  border-color: var(--piel-linea); background: var(--piel-superficie-2); border-radius: var(--piel-radio-s);
+}
+:root[data-piel-estudio] .chat-chip {
+  color: var(--piel-texto-2); border-color: var(--piel-linea); background: var(--piel-superficie-2);
+}
+:root[data-piel-estudio] .veredicto-ia { border-color: var(--piel-linea-fuerte); }
+
+/* Avance de la sesión y cronómetro: verde lo cerrado, acento lo que toca ahora. */
+:root[data-piel-estudio] .reproductor .avance i { background: var(--piel-linea); }
+:root[data-piel-estudio] .reproductor .avance i.hecho { background: var(--piel-verde-grafico); }
+:root[data-piel-estudio] .reproductor .avance i.actual { background: var(--piel-acento-grafico); box-shadow: none; }
+:root[data-piel-estudio] .cronometro-anillo { filter: none; }
+:root[data-piel-estudio] .cronometro-pista { stroke: var(--piel-linea); }
+:root[data-piel-estudio] .cronometro-avance { stroke: var(--piel-acento-grafico); }
+:root[data-piel-estudio] .cronometro.excedido .cronometro-anillo { filter: none; }
+:root[data-piel-estudio] .cronometro.excedido .cronometro-avance { stroke: var(--piel-ambar-grafico); }
+:root[data-piel-estudio] .cronometro-aviso { color: var(--piel-ambar); }
+:root[data-piel-estudio] progress,
+:root[data-piel-estudio] .semana-progreso,
+:root[data-piel-estudio] .sesion-mixta-progreso,
+:root[data-piel-estudio] .barras .pista-b,
+:root[data-piel-estudio] .barra-prog { background: var(--piel-linea); }
+:root[data-piel-estudio] .barras .pista-b > span,
+:root[data-piel-estudio] .barra-prog > span { background: var(--piel-acento-grafico); }
+:root[data-piel-estudio] progress::-webkit-progress-bar { background: var(--piel-linea); }
+:root[data-piel-estudio] progress::-webkit-progress-value { background: var(--piel-acento-grafico); }
+:root[data-piel-estudio] progress::-moz-progress-bar { background: var(--piel-acento-grafico); }
+
+/* Campos de escritura libre. */
+:root[data-piel-estudio] input[type='text'],
+:root[data-piel-estudio] input[type='search'],
+:root[data-piel-estudio] input[type='number'],
+:root[data-piel-estudio] select,
+:root[data-piel-estudio] textarea {
+  color: var(--piel-texto);
+  border: 1px solid var(--piel-linea-fuerte);
+  border-radius: var(--piel-radio-s);
+  background: var(--piel-superficie);
+  box-shadow: none;
+}
+:root[data-piel-estudio] input::placeholder,
+:root[data-piel-estudio] textarea::placeholder { color: var(--piel-texto-3); }
+:root[data-piel-estudio] input:focus,
+:root[data-piel-estudio] select:focus,
+:root[data-piel-estudio] textarea:focus { border-color: var(--piel-acento); }
+:root[data-piel-estudio] input[type='checkbox'],
+:root[data-piel-estudio] input[type='radio'] { accent-color: var(--piel-acento); }
+:root[data-piel-estudio] label { color: var(--piel-texto-2); }
+:root[data-piel-estudio] .vacio { color: var(--piel-texto-2); }
+
+/* El conmutador de la piel. */
+.piel-boton { display: inline-flex; align-items: center; gap: 7px; }
+.piel-boton svg { width: 15px; height: 15px; flex-shrink: 0; }
+@media (max-width: 720px) {
+  .piel-boton-texto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
