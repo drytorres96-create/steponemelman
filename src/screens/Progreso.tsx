@@ -15,7 +15,7 @@ import { ProgresoHorizonte } from './ProgresoHorizonte'
 import { LecturaSemana } from './LecturaSemana'
 import { lunesDe } from '../lib/tiempo'
 
-export function Progreso({ onEstudiar, onContinuar, ventana = 'general' }:
+export function Progreso({ onEstudiar, onContinuar, ventana = 'semana' }:
   { onContinuar?: () => void; ventana?: Ventana; onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void }) {
   const { indice, estado } = useApp()
   const [conceptos, setConceptos] = useState<Concepto[] | null>(null)
@@ -35,7 +35,6 @@ export function Progreso({ onEstudiar, onContinuar, ventana = 'general' }:
   const total = conceptos.length
   const publicados = new Set(conceptos.map(c => c.concept_id))
   const progresos = Object.values(estado.progreso).filter(p => publicados.has(p.concept_id))
-  const dominados = progresos.filter(p => dominioVigente(p, estado.criterios)).length
   const semanal = ventana === 'semana'
   const desde = lunesDe().getTime()
   const sesiones = [...estado.sesiones].reverse()
@@ -48,18 +47,18 @@ export function Progreso({ onEstudiar, onContinuar, ventana = 'general' }:
   ] : [
     { n: progresos.filter(p => p.intentos.length).length, r: 'conceptos trabajados' },
     { n: progresos.filter(p => estaVencido(p)).length, r: 'para repasar' },
-    { n: dominados, r: 'dominio vigente' },
   ]
 
   return <div className="pila progress-workspace">
     <ScreenHeading landscape="stone" eyebrow="Tu recorrido de aprendizaje" title="Progreso" description="Evidencia de tu práctica dentro del material publicado. No estima tu probabilidad de aprobar Step 1." />
-    <div className="progress-overview"><BandaAdherencia />
-    <BandaDeCifras conceptos={conceptos} ventana={ventana} />
-    <div className="rejilla r3 progress-concepts">{tarjetas.map(x => <div className="tarjeta" key={x.r}>
-      <div className="cifra">{x.n}</div><div className="rotulo">{x.r}</div><p className="mini">de {total} disponibles</p></div>)}</div></div>
-    <LecturaSemana conceptos={conceptos} onEstudiar={onEstudiar} />
-    <ProgresoHorizonte conceptos={conceptos} />
     <MapaProgreso conceptos={conceptos} onEstudiar={onEstudiar} onContinuar={onContinuar} />
+    <div className="progress-overview">
+    <BandaDeCifras conceptos={conceptos} ventana={ventana} />
+    <details className="tarjeta"><summary>Plan de las semanas anteriores</summary><BandaAdherencia /></details>
+    <details className="tarjeta"><summary>Conceptos trabajados y repasos</summary><div className="rejilla r3 progress-concepts">{tarjetas.map(x => <div className="tarjeta" key={x.r}>
+      <div className="cifra">{x.n}</div><div className="rotulo">{x.r}</div><p className="mini">de {total} disponibles</p></div>)}</div></details></div>
+    <LecturaSemana conceptos={conceptos} onEstudiar={onEstudiar} />
+    <details className="tarjeta"><summary>Reparto del corpus completo; no es el plan semanal</summary><ProgresoHorizonte conceptos={conceptos} /></details>
     <details className="tarjeta"><summary>Ver historial de sesiones</summary><p className="mini">Las cifras cuentan respuestas e incluyen reintentos. Se muestran {semanal ? 'las sesiones de esta semana' : 'las 12 sesiones más recientes'}.</p>
       {!sesiones.length ? <Vacio titulo={semanal ? 'Sin sesiones esta semana' : 'Sin sesiones aún'} texto="Verás lo que trabajaste, las respuestas correctas y el tiempo activo registrado." />
         : <div className="scroll-x"><table className="tabla">

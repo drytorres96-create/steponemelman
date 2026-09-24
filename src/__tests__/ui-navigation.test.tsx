@@ -61,10 +61,10 @@ afterEach(async () => {
 const boton = (texto: string) => [...host.querySelectorAll('button')].find(b => b.textContent?.includes(texto))!
 
 describe('continuidad y navegación accesible', () => {
-  it('la navegación principal son tres secciones y «Mi semana» es la vista por defecto', async () => {
+  it('el contenido está a un clic y «Mi semana» es la vista por defecto', async () => {
     await act(async () => { root.render(<App />) })
     const nav = host.querySelector('nav')!
-    expect([...nav.querySelectorAll('button')].map(b => b.textContent)).toEqual(['Mi semana', 'Recuperación', 'Progreso'])
+    expect([...nav.querySelectorAll('button')].map(b => b.textContent)).toEqual(['Mi semana', 'Recuperación', 'Progreso', 'Elegir contenido'])
     expect(host.textContent).toContain('Sin sesiones preparadas')
     // Lo retirado sigue accesible desde el menú discreto, sin borrarse.
     expect(boton('Elegir contenido')).toBeTruthy()
@@ -139,13 +139,14 @@ describe('continuidad y navegación accesible', () => {
     await act(async () => { root.render(<App />) })
     const ventana = [...host.querySelectorAll('[aria-label="Ventana del progreso"] button')] as HTMLButtonElement[]
     expect(ventana.map(b => b.textContent)).toEqual(['Esta semana', 'General'])
-    expect(ventana[1].getAttribute('aria-pressed')).toBe('true')
-    const rotulos = () => [...host.querySelectorAll('.rejilla.r3 .rotulo')].map(n => n.textContent)
-    expect(rotulos()).toEqual(['conceptos trabajados', 'para repasar', 'dominio vigente'])
-
-    await act(async () => { ventana[0].click() })
     expect(ventana[0].getAttribute('aria-pressed')).toBe('true')
+    const rotulos = () => [...host.querySelectorAll('.rejilla.r3 .rotulo')].map(n => n.textContent)
     expect(rotulos()).toEqual(['conceptos respondidos esta semana', 'respuestas de concepto esta semana', 'nuevos dominios esta semana'])
+
+    await act(async () => { ventana[1].click() })
+    expect(ventana[1].getAttribute('aria-pressed')).toBe('true')
+    expect(rotulos()).toEqual(['conceptos trabajados', 'para repasar'])
+    expect(host.querySelectorAll('.progress-ring-layer')).toHaveLength(3)
     expect(host.textContent).toContain('Cubrir el material en 10 semanas')
   })
 

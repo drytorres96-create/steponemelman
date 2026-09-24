@@ -35,10 +35,10 @@ import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, CinematicWindow, t
 type Vista = 'semana' | 'recuperacion' | 'progreso' | 'inicio' | 'modulos' | 'repaso' | 'auditoria' | 'ajustes'
   | 'estudio' | 'preguntas' | 'sesion'
 const NAV: { id: Vista; txt: string }[] = [
-  { id: 'semana', txt: 'Mi semana' }, { id: 'recuperacion', txt: 'Recuperación' }, { id: 'progreso', txt: 'Progreso' },
+  { id: 'semana', txt: 'Mi semana' }, { id: 'recuperacion', txt: 'Recuperación' }, { id: 'progreso', txt: 'Progreso' }, { id: 'modulos', txt: 'Elegir contenido' },
 ]
 const SECUNDARIAS: { id: Vista; txt: string }[] = [
-  { id: 'modulos', txt: 'Elegir contenido' }, { id: 'ajustes', txt: 'Ajustes y respaldo' },
+  { id: 'ajustes', txt: 'Ajustes y respaldo' },
   { id: 'auditoria', txt: 'Calidad del material' }, { id: 'inicio', txt: 'Plan diario clásico' },
 ]
 /** Las vistas de concentración no llevan navegación ni migas. */
@@ -88,7 +88,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [tipoContenido, setTipoContenido] = useState<'conceptos' | 'preguntas'>('conceptos')
   const [tipoProgreso, setTipoProgreso] = useState<'conceptos' | 'preguntas'>('conceptos')
-  const [ventanaProgreso, setVentanaProgreso] = useState<'semana' | 'general'>('general')
+  const [ventanaProgreso, setVentanaProgreso] = useState<'semana' | 'general'>('semana')
   const [sesionSemanal, setSesionSemanal] = useState<{ sesion: SesionSemanal; efimera: boolean; alCompletar?: () => void } | null>(null)
   const [filtrosConceptos, setFiltrosConceptos] = useState<Partial<FiltrosBusqueda> | undefined>()
   const contenido = useRef<HTMLElement>(null)
@@ -278,7 +278,9 @@ export default function App() {
             onEstudiar={ids => { nbme.pauseSession(); void estudiarIds(ids) }}
             onBuscar={q => { nbme.pauseSession(); setFiltrosConceptos({ sistema: q.systems[0] ?? '', disciplina: q.disciplines[0] ?? '' }); setTipoContenido('conceptos'); ir('modulos') }} />}
           {!cargando && vista === 'semana' && <Semana onAbrir={abrirSesionSemanal} onRecuperacion={() => ir('recuperacion')}
-            onBiblioteca={tipo => { setTipoContenido(tipo); ir('modulos') }} />}
+            onBiblioteca={tipo => { setTipoContenido(tipo); ir('modulos') }}
+            continuaciones={<>{estado.reanudable && <section className="tarjeta home-session"><div className="pila"><p className="editorial-eyebrow">Retomar sesión guardada fuera del plan</p><h2>{estado.reanudable.titulo || 'Conceptos'}</h2><button className="btn principal" onClick={() => void continuar()}>Continuar conceptos</button></div></section>}
+              {sesionPreguntasPendiente && <section className="tarjeta home-session"><div className="pila"><p className="editorial-eyebrow">Retomar sesión guardada fuera del plan</p><h2>{sesionPreguntasPendiente.title}</h2><button className="btn" disabled={nbme.loading || nbme.busy} onClick={() => void continuarPreguntas()}>Continuar preguntas</button>{nbme.error && <p role="alert">{nbme.error}</p>}</div></section>}</>} />}
           {!cargando && vista === 'sesion' && sesionSemanal && <SesionMixta key={sesionSemanal.sesion.id}
             sesion={sesionSemanal.sesion} efimera={sesionSemanal.efimera}
             onCompletada={sesionSemanal.alCompletar} onSalir={() => ir('semana')} />}

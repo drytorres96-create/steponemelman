@@ -105,6 +105,8 @@ export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion, 
           {sistemas.map(s => <option key={s} value={s}>{s}</option>)}
         </select></div>
         </div>
+        <div><label htmlFor="modulos-texto">Palabra o concepto (opcional)</label><input id="modulos-texto" type="search" maxLength={200} value={filtros.texto}
+          placeholder="Ej.: tiroides, hemostasia…" onChange={e => cambiarFiltro({ texto: e.target.value })} /></div>
         <details><summary>Más filtros y modo de práctica</summary><div className="rejilla filtros-conceptos" style={{ marginTop: 12 }}>
         <div><label htmlFor="modulos-tema">Tema</label><select id="modulos-tema" value={filtros.tema} onChange={e => cambiarFiltro({ tema: e.target.value })} aria-label="Filtrar por tema" disabled={!conceptos}>
           <option value="">Todos los temas</option>{temas.map(t => <option key={t} value={t}>{t}</option>)}
@@ -114,8 +116,6 @@ export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion, 
           {Object.entries(NOMBRES_ESTADOS_BUSQUEDA).map(([valor, etiqueta]) => <option key={valor} value={valor}>{etiqueta}</option>)}
         </select></div>
         </div>
-        <div><label htmlFor="modulos-texto">Palabra o concepto (opcional)</label><input id="modulos-texto" type="search" maxLength={200} value={filtros.texto}
-          placeholder="Ej.: tiroides, hemostasia…" onChange={e => cambiarFiltro({ texto: e.target.value })} /></div>
         <div><label htmlFor="modo-practica">Modo de práctica</label><select id="modo-practica" value={ruta} onChange={e => { setRuta(e.target.value as RutaId); setAviso('') }}>
           <option value="guiada">Práctica general</option>{RUTAS.filter(r => !['guiada', 'sistemas', 'disciplinas'].includes(r.id)).map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
         </select><p className="mini">{RUTAS.find(r => r.id === ruta)?.descripcion}</p></div>

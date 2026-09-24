@@ -131,3 +131,15 @@ export async function cargarAdherencia(token: string, semanas = 5): Promise<Adhe
   for (const plan of planes) if (plan) porEvento.set(plan.eventoId, adherenciaDe(plan))
   return [...porEvento.values()].sort((a, b) => a.inicio.localeCompare(b.inicio))
 }
+
+/** Estado del plan para etiquetar la evidencia, con la misma autorización. */
+export async function cargarTopics(token: string): Promise<import('../lib/retencion-observada').TopicEstado[] | null> {
+  if (!token) return null
+  try {
+    const r = await pedir('/api/plan/topics', token)
+    if (!r.ok) return null
+    const rows: unknown = await r.json()
+    if (!Array.isArray(rows)) return null
+    return rows.filter((t): t is import('../lib/retencion-observada').TopicEstado => !!t && typeof t.id === 'number' && typeof t.name === 'string' && [0, 1, 2].includes(t.status))
+  } catch { return null }
+}

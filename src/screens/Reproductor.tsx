@@ -464,9 +464,10 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
         {c.patron && <div className="pista"><b>Patrón:</b> {c.patron}</div>}
         {c.confusiones.length > 0 && <p className="mini">Se confunde con: {c.confusiones.join(' · ')}</p>}
         <p className="mini">Esta primera respuesta contará como práctica con explicación previa.</p>
-        <button className="btn principal" style={{ marginTop: 12 }} onClick={() => { setFase('tarea'); guardarPaso({ ensenanzaAbierta: false }) }}>Ahora recupéralo</button>
+        <button className="btn principal" style={{ marginTop: 12 }} onClick={() => { setFase('tarea'); guardarPaso({ ensenanzaAbierta: false }) }}>{c.clasificacion.disciplina_primaria === 'Bioquímica' ? 'Ocultar y reconstruir la cadena' : 'Ahora recupéralo'}</button>
       </div>}
       <div hidden={fase === 'ensenanza'}>
+        {fase === 'tarea' && explicacionPrevia && !examenSinAyuda && c.clasificacion.disciplina_primaria === 'Bioquímica' && <p className="aviso">Con la explicación oculta, di en voz alta: qué cambió → qué proceso afecta → qué consecuencia esperas y por qué. Después completa esta misma pregunta. Esto sustituye releer; cuenta como práctica con ayuda previa.</p>}
         <div className="pregunta">{c.evaluacion.pregunta}</div>
         {fase === 'tarea' && <details key={`confianza-${preguntaId}`} className="mini" style={{ marginBottom: 14 }}><summary>Registrar confianza (opcional)</summary><div className="fila" style={{ gap: 6, marginTop: 8 }}>
           {([[1, 'Poca'], [2, 'Media'], [3, 'Mucha']] as const).map(([v, t]) => <button key={v} className={`btn pequeno ${confianza === v ? 'principal' : 'fantasma'}`}

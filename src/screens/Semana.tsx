@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Vacio } from '../components/comunes'
 import { ScenePhoto } from '../components/Editorial'
 import { useAuth } from '../auth/AuthProvider'
@@ -119,10 +119,11 @@ function Fila({ cp, hecho, sesion, cobertura, error, onMarcar, onEnfocar, onAbri
   </li>
 }
 
-export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
+export function Semana({ onAbrir, onRecuperacion, onBiblioteca, continuaciones }: {
   onAbrir: (s: SesionSemanal, alCompletar?: () => void) => void
   onRecuperacion: () => void
   onBiblioteca: (tipo: 'conceptos' | 'preguntas') => void
+  continuaciones?: ReactNode
 }) {
   const { estado } = useApp()
   const { session } = useAuth()
@@ -273,6 +274,7 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
           value={hechas} max={tareas.length || 1} /></div>
       </header>
 
+      {continuaciones}
       <div className="plan-workspace" style={{ '--plan-dias': dias.length } as React.CSSProperties}>
       {dias.map(dia => {
         const lista = porDia.get(dia)!
@@ -331,6 +333,7 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
       <p className="sutil">Cuando haya sesiones planificadas aparecerán aquí, en orden por día.</p></div></header>
     <Vacio titulo="Nada que estudiar ahora mismo" texto="Mientras tanto puedes ponerte al día con lo que fallaste o con lo que vence."
       accion={<button className="btn" onClick={onRecuperacion}>Ir a Recuperación</button>} />
+    {continuaciones}
     {masCosas}
   </div>
 
@@ -355,6 +358,7 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca }: {
       </div>
     </section>)}
 
+    {continuaciones}
     {masCosas}
   </div>
 }
