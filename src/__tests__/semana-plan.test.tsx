@@ -103,7 +103,8 @@ describe('la portada muestra el plan de la semana', () => {
   it('cuenta lo hecho sin meter el descanso en el total', async () => {
     await pintar()
     // Cuatro tareas y un descanso; una hecha.
-    expect(host.textContent).toContain('1 de 4 hechos')
+    expect(host.textContent).toContain('1 de 4 compromisos de esta semana')
+    expect(host.querySelector('.semana-balance-radial [role="img"]')?.getAttribute('aria-label')).toBe('tareas hechas: 1 de 4')
     expect(seccionDe('martes').textContent).toContain('1 pendiente')
     expect(seccionDe('jueves').textContent).toContain('Descanso')
   })
