@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Vacio } from '../components/comunes'
+import { Anillo, Vacio } from '../components/comunes'
 import { ScenePhoto } from '../components/Editorial'
 import { useAuth } from '../auth/AuthProvider'
 import { useApp } from '../store/estado'
@@ -259,7 +259,7 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca, continuaciones }
     const dias = [...porDia.keys()].sort((a, b) => a - b)
 
     return <div className="pila semana-workspace">
-      <header className="semana-encabezado" data-depth-scene>
+      <header className="semana-encabezado semana-con-anillo" data-depth-scene>
         <ScenePhoto scene="ribbons" />
 
         <div className="semana-heading-copy"><p className="editorial-eyebrow">Tu plan de estudio</p>
@@ -267,11 +267,11 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca, continuaciones }
         <p className="semana-fechas">{titular}</p>
         {resto && <p className="sutil">{resto}</p>}
         </div>
-        <div className="semana-balance"><p className="editorial-eyebrow">Avance semanal</p>
-        <p className="semana-balance-cifra"><strong>{hechas}</strong><span> / {tareas.length}</span></p>
-        <p className="mini">{hechas} de {tareas.length} hechos</p>
-        <progress className="semana-progreso" aria-label="Avance del plan de esta semana"
-          value={hechas} max={tareas.length || 1} /></div>
+        <div className="semana-balance semana-balance-radial">
+          <Anillo valor={hechas} total={tareas.length} tam={152} etiqueta="tareas hechas" />
+          <p className="mini">{hechas} de {tareas.length} compromisos de esta semana</p>
+          <a className="btn pequeno fantasma" href="#progreso">Ver mi progreso</a>
+        </div>
       </header>
 
       {continuaciones}

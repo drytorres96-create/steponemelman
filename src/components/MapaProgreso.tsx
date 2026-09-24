@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { DISCIPLINAS, SISTEMAS, type Concepto } from '../schema/concept'
 import { useApp } from '../store/estado'
 import { construirMapa, METRICAS_MAPA, type MetricaMapa } from '../lib/mapa-progreso'
@@ -6,7 +6,7 @@ import { construirSesionPersonalizada, type OpcionesSesionPersonalizada } from '
 import { construirPlanDiario } from '../lib/plan-estudio'
 import { cargaPorTiempo } from '../lib/tiempo'
 
-export function MapaProgreso({ conceptos, onEstudiar, onContinuar }: { conceptos: Concepto[]; onContinuar?: () => void; onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void }) {
+export function MapaProgreso({ conceptos, onEstudiar, onContinuar, resumen }: { resumen?: ReactNode; conceptos: Concepto[]; onContinuar?: () => void; onEstudiar: (ids: string[], opciones?: OpcionesSesionPersonalizada) => void }) {
   const { estado } = useApp()
   const [ahora, setAhora] = useState(Date.now())
   const [metrica, setMetrica] = useState<MetricaMapa>('vencidos')
@@ -20,15 +20,20 @@ export function MapaProgreso({ conceptos, onEstudiar, onContinuar }: { conceptos
   const cs = grupo === 'todos' ? celda.conceptos : celda.grupos[grupo]
   const sesion = construirSesionPersonalizada(cs, estado.progreso, tamano, ahora)
   const lanzar = (lista: Concepto[], titulo: string, opciones: OpcionesSesionPersonalizada = {}) => onEstudiar(lista.map(c => c.concept_id), { titulo, subtitulo: 'Practica esta selección y conserva tus respuestas.', ...opciones })
-  const siguiente = <><p>{plan.explicacion}</p><p className="mini">{plan.vencidos} de repaso · {plan.errores} para reforzar · {plan.nuevos} nuevos</p>
-    <button className="btn principal" disabled={!plan.conceptos.length} onClick={() => lanzar(plan.conceptos, 'Tu siguiente sesión', { ruta: 'guiada', presupuestoMinutos: 20 })}>Estudiar 20 minutos</button></>
+  const siguiente = <><button className="btn principal" disabled={!plan.conceptos.length} onClick={() => lanzar(plan.conceptos, 'Tu siguiente sesión', { ruta: 'guiada', presupuestoMinutos: 20 })}>Estudiar 20 minutos</button>
+    <p className="mini">{plan.vencidos} de repaso · {plan.errores} para reforzar · {plan.nuevos} nuevos</p>
+    <details><summary>Por qué esta sesión</summary><p>{plan.explicacion}</p></details></>
   return <>
-    <section className="tarjeta pila" aria-labelledby="prioridades-titulo">
-      <h2 id="prioridades-titulo">Tu siguiente sesión</h2>
-      {estado.reanudable ? <><p>{estado.reanudable.titulo || 'Tu sesión guardada'}</p>
-        <button className="btn principal" onClick={onContinuar ?? (() => { location.hash = 'inicio' })}>Continuar sesión guardada</button>
-        <details><summary>Empezar una sesión nueva</summary>{siguiente}</details></> : siguiente}
-      <p className="mini">El mismo plan que en Hoy. Puedes elegir otra combinación en el mapa.</p>
+    <section className="tarjeta pila progress-next-session" aria-labelledby="prioridades-titulo">
+      <div className={resumen ? 'progress-next-layout' : undefined}>
+        {resumen}
+        <div className="pila progress-next-action">
+          <h2 id="prioridades-titulo">Tu siguiente sesión</h2>
+          {estado.reanudable ? <><p>{estado.reanudable.titulo || 'Tu sesión guardada'}</p>
+            <button className="btn principal" onClick={onContinuar ?? (() => { location.hash = 'inicio' })}>Continuar sesión guardada</button>
+            <details><summary>Empezar una sesión nueva</summary>{siguiente}</details></> : siguiente}
+        </div>
+      </div>
     </section>
     <details className="tarjeta"><summary>Explorar mapa por sistema y disciplina</summary><section className="pila" style={{ marginTop: 16 }} aria-labelledby="mapa-titulo">
       <div><h2 id="mapa-titulo">Tu mapa por sistema y disciplina</h2><p className="sutil">Elige una casilla para preparar una sesión.</p></div>

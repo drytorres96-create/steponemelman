@@ -343,3 +343,32 @@
 .progress-ring-legend { flex: 1 1 240px; }
 .progress-ring-legend p { margin: 0; }
 @media (prefers-reduced-motion: reduce) { .progress-rings circle { transition: none !important; } }
+
+/* El avance y la acción caben juntos: no hay que bajar una pantalla para encontrarlos. */
+.semana-encabezado.semana-con-anillo { display: grid; grid-template-columns: minmax(0, 1fr) 180px; align-items: center; gap: 20px; }
+.semana-encabezado .semana-balance-radial { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.semana-balance-radial .mini { display: block; position: static; width: auto; height: auto; overflow: visible; clip-path: none; margin: 0; text-align: center; }
+.progress-next-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 24px; }
+.progress-next-session .progress-radial-compact { padding: 0; margin: 0; background: none; border: 0; box-shadow: none; min-width: 0; }
+.progress-radial-compact .progress-rings { width: 168px; height: 168px; flex-basis: 168px; }
+.progress-radial-compact .progress-ring-center { inset: 44px; }
+.progress-radial-compact .progress-ring-center strong { font-size: 2rem; }
+.progress-radial-compact .progress-radial-summary { justify-content: center; }
+.progress-radial-compact .progress-ring-legend { flex-basis: 100%; gap: 8px; }
+.progress-radial-compact .progress-ring-legend p { font-size: .8rem; }
+.progress-radial-compact .progress-ring-legend br { display: none; }
+.progress-radial-compact .progress-ring-legend b::after { content: ' · '; }
+.progress-workspace > .screen-heading { padding-block: 16px; }
+.progress-workspace > .screen-heading .editorial-eyebrow,
+.progress-workspace > .screen-heading .sutil { display: none; }
+@media (max-width: 760px) {
+  .semana-encabezado.semana-con-anillo { grid-template-columns: minmax(0, 1fr) 152px; gap: 12px; }
+  .semana-con-anillo .semana-heading-copy > .sutil { display: none; }
+  .progress-next-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .progress-radial-compact .progress-ring-legend { flex-basis: 120px; }
+  .progress-radial-compact .progress-radial-summary { flex-wrap: nowrap; gap: 12px; }
+}
+@media (max-width: 360px) {
+  .semana-encabezado.semana-con-anillo { grid-template-columns: minmax(0, 1fr); }
+  .progress-radial-compact .progress-radial-summary { flex-wrap: wrap; }
+}

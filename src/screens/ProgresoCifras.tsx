@@ -49,7 +49,7 @@ export function calcularRitmo(sesiones: SesionSemanal[], ahora = Date.now()): Ri
 
 const fraccion = (f: Fraccion) => f.n ? `${porcentajeObservado(f)} % · ${f.favorables}/${f.n}` : 'Sin dato · n=0'
 
-export function BandaDeCifras({ conceptos, ventana }: { conceptos: Concepto[]; ventana: Ventana }) {
+export function BandaDeCifras({ conceptos, ventana, compacta = false }: { conceptos: Concepto[]; ventana: Ventana; compacta?: boolean }) {
   const { estado } = useApp()
   const { session } = useAuth()
   const nbme = useNbme()
@@ -73,23 +73,24 @@ export function BandaDeCifras({ conceptos, ventana }: { conceptos: Concepto[]; v
   const periodo = (sesiones ?? []).filter(s => fechaDeSesion(s).getTime() >= desde && fechaDeSesion(s).getTime() < hasta)
   const plan = { n: periodo.length, favorables: periodo.filter(hecha).length }
   const anillos = [
-    { label: ventana === 'semana' ? 'Sesiones de esta semana' : 'Sesiones registradas', ...plan, tam: 236 },
-    { label: 'Acierto inicial en preguntas locales', ...preguntas, tam: 194 },
-    { label: 'Recuperación sin ayuda tras ≥30 días', ...evidencia.retencion, tam: 152 },
+    { label: ventana === 'semana' ? 'Sesiones de esta semana' : 'Sesiones registradas', ...plan, tam: compacta ? 168 : 236 },
+    { label: 'Acierto inicial en preguntas locales', ...preguntas, tam: compacta ? 136 : 194 },
+    { label: 'Recuperación sin ayuda tras ≥30 días', ...evidencia.retencion, tam: compacta ? 104 : 152 },
   ]
-  return <section className="tarjeta pila" aria-label={ventana === 'semana' ? 'Resumen de esta semana' : 'Resumen general'}>
+  return <section className={`tarjeta pila${compacta ? ' progress-radial-compact' : ''}`} aria-label={ventana === 'semana' ? 'Resumen de esta semana' : 'Resumen general'}>
     <div className="fila progress-radial-summary">
       <div className="progress-rings" aria-label="Tres dimensiones independientes; no se promedian">
         {anillos.map(a => <div key={a.label} className="progress-ring-layer"><Anillo valor={a.favorables} total={a.n} tam={a.tam} etiqueta={a.label} /></div>)}
-        <div className="progress-ring-center"><strong>{sesiones ? plan.favorables : '—'}</strong><span>sesiones hechas</span><small>{plan.n ? `de ${plan.n} registradas` : 'sin plan registrado'}</small></div>
+        <div className="progress-ring-center"><strong>{sesiones ? plan.favorables : '—'}</strong><span>{compacta ? 'sesiones' : 'sesiones hechas'}</span>{!compacta && <small>{plan.n ? `de ${plan.n} registradas` : 'sin plan registrado'}</small>}</div>
       </div>
-      <div className="pila progress-ring-legend"><h2>{ventana === 'semana' ? 'Tu semana, en tres anillos' : 'Tu práctica registrada'}</h2>
-        {anillos.map((a, i) => <p key={a.label}><b>{i === 0 ? 'Exterior' : i === 1 ? 'Medio' : 'Interior'} · {a.label}</b><br />{fraccion(a)}</p>)}
+      <div className="pila progress-ring-legend">{!compacta && <h2>{ventana === 'semana' ? 'Tu semana, en tres anillos' : 'Tu práctica registrada'}</h2>}
+        {anillos.map((a, i) => <p key={a.label}><b>{compacta ? ['Sesiones', 'Acierto inicial', 'Recuperación ≥30 d'][i] : `${i === 0 ? 'Exterior' : i === 1 ? 'Medio' : 'Interior'} · ${a.label}`}</b><br />{fraccion(a)}</p>)}
         {fallo && <p role="status">No se pudieron leer las sesiones. Los otros registros se conservan.</p>}
-        <p className="mini">Cada anillo conserva su denominador. Las preguntas locales son práctica; estas cifras no estiman aprobación.</p>
+        {!compacta && <p className="mini">Cada anillo conserva su denominador. Las preguntas locales son práctica; estas cifras no estiman aprobación.</p>}
       </div>
     </div>
-    <details><summary>Retención observada y repetición del error</summary>
+    <details><summary>Qué muestran los anillos y su evidencia</summary>
+      <p className="mini">Exterior: sesiones completadas del periodo. Medio: acierto en preguntas locales respondidas por primera vez. Interior: recuperación sin ayuda después de 30 días. Cada uno conserva su denominador; no se promedian ni estiman aprobación.</p>
       <p><b>Recuperación tras ≥30 días:</b> {fraccion(evidencia.retencion)}</p>
       <p><b>Errores repetidos tras ≥24 h:</b> {fraccion(evidencia.repeticion)}</p>
       <p className="mini">Correctas/intentadas tras 30 días; falladas/reexaminadas tras un fallo separado al menos 24 h. Parcial cuenta como fallo. Se excluyen ayudas, revisiones y condiciones o versiones no verificables. El intervalo parte del intento inmediatamente anterior.</p>

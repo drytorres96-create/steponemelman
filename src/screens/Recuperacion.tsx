@@ -93,8 +93,8 @@ export function Recuperacion({ onEstudiar, onPreguntas, onMezclar }: {
   </section>
 
   return <div className="pila recovery-workspace">
-    <ScreenHeading landscape="lens" eyebrow="Lo que te debe la memoria" title="Recuperación" scene="fluid"
-      description="Lo que fallaste y lo que vence, en un solo sitio. Empieza por lo que está a un acierto de consolidarse." />
+    <ScreenHeading landscape="lens" eyebrow="Tu siguiente recuperación" title="Recuperación" scene="fluid"
+      description={cerca.length ? 'Empieza por Consolidar ahora: estos conceptos están a un acierto independiente del umbral.' : paraConceptos.length ? 'Empieza por Recuperar ahora: reúne tus repasos y errores de conceptos.' : preguntas.length ? 'Empieza por Corregir ahora: retoma las preguntas pendientes.' : 'Tu práctica registrada y las próximas oportunidades de recuperación.'} />
 
     {esperando.length > 0 && cerca.length === 0 && <div className="aviso" role="status"><span>ⓘ</span><div>
       {esperando.length === 1 ? 'Un concepto tiene' : `${esperando.length} conceptos tienen`} ya todos los aciertos que pide el umbral;
@@ -136,14 +136,14 @@ export function Recuperacion({ onEstudiar, onPreguntas, onMezclar }: {
     </section>}
 
     {grupo('conceptos', 'Conceptos', 'Repasos vencidos por el planificador y errores de los últimos siete días.', paraConceptos.length,
-      <button className="btn principal" style={{ alignSelf: 'flex-start' }}
+      <button className={cerca.length ? 'btn' : 'btn principal'} style={{ alignSelf: 'flex-start' }}
         onClick={() => onEstudiar(paraConceptos.slice(0, limite).map(c => c.concept_id), { titulo: 'Recuperación de conceptos', subtitulo: 'Vencidos y errores recientes.', ruta: 'repaso', modulo: 'recuperacion' })}>
         Recuperar ahora ({Math.min(limite, paraConceptos.length)})
       </button>)}
 
     {grupo('preguntas', 'Preguntas', 'Preguntas NBME cuyo último intento sigue sin corregir.', preguntas.length,
       <div className="pila">
-        <button className="btn principal" style={{ alignSelf: 'flex-start' }} disabled={nbme.busy || nbme.loading}
+        <button className={cerca.length || paraConceptos.length ? 'btn' : 'btn principal'} style={{ alignSelf: 'flex-start' }} disabled={nbme.busy || nbme.loading}
           onClick={() => onPreguntas(preguntas.slice(0, Math.min(limite, 20)), 'Recuperación de preguntas')}>
           Corregir ahora ({Math.min(limite, preguntas.length, 20)})
         </button>
@@ -153,7 +153,7 @@ export function Recuperacion({ onEstudiar, onPreguntas, onMezclar }: {
     {(idsMezcla.length > 0 && refsMezcla.length > 0) && <section className="tarjeta pila" aria-labelledby="recuperacion-mezcla">
       <div><h2 id="recuperacion-mezcla">Mezclar</h2>
         <p className="sutil">Una sesión mixta al vuelo con lo que haya de ambos: una pregunta cada tres conceptos.</p></div>
-      <button className="btn principal" style={{ alignSelf: 'flex-start' }} disabled={nbme.busy || nbme.loading}
+      <button className="btn" style={{ alignSelf: 'flex-start' }} disabled={nbme.busy || nbme.loading}
         onClick={() => onMezclar(idsMezcla, refsMezcla, 'Recuperación mixta')}>
         Mezclar {idsMezcla.length} conceptos y {refsMezcla.length} preguntas
       </button>
