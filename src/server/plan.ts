@@ -75,9 +75,10 @@ async function cuentaAutorizada(authorization: string): Promise<Response | null>
 export async function handlePlan(request: Request, env: PlanEnv): Promise<Response> {
   const url = new URL(request.url)
   const semana = url.pathname === '/api/plan/semana'
+  const topics = url.pathname === '/api/plan/topics'
   const checkpointId = /^\/api\/plan\/checkpoint\/(.+)$/.exec(url.pathname)?.[1]
-  if (!semana && !checkpointId) return json({ error: 'No encontrado.' }, 404)
-  if (request.method !== (semana ? 'GET' : 'PATCH')) return json({ error: 'Método no permitido.' }, 405)
+  if (!semana && !topics && !checkpointId) return json({ error: 'No encontrado.' }, 404)
+  if (request.method !== (semana || topics ? 'GET' : 'PATCH')) return json({ error: 'Método no permitido.' }, 405)
   if (request.headers.get('origin') && request.headers.get('origin') !== url.origin) return json({ error: 'Origen no permitido.' }, 403)
   const authorization = request.headers.get('authorization') ?? ''
   if (!/^Bearer [^\s]{20,8192}$/.test(authorization)) return json({ error: 'Inicia sesión para ver tu plan.' }, 401)
@@ -107,6 +108,11 @@ export async function handlePlan(request: Request, env: PlanEnv): Promise<Respon
   const suyo = `user_id=eq.${encodeURIComponent(usuario)}`
 
   try {
+    if (topics) {
+      const r = await plan(`topics?select=id,name,status&${suyo}&order=id`)
+      if (!r.ok) return json({ error: 'No se pudo leer el estado de los temas.' }, 503)
+      return json(await r.json())
+    }
     if (checkpointId) {
       const marcado = deseado
         ? `{"done":true,"done_at":"${new Date().toISOString()}"}`

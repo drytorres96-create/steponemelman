@@ -5,7 +5,10 @@ import { progresoPorForma } from '../nbme/formas'
 import { cargarHistorialSesiones } from '../semana/api'
 import type { SesionSemanal } from '../semana/tipos'
 import type { Concepto } from '../schema/concept'
-import { dominioVigente } from '../srs/mastery'
+import { Anillo } from '../components/comunes'
+import { useAuth } from '../auth/AuthProvider'
+import { cargarTopics } from '../plan/api'
+import { evidenciaDiferida, evidenciaPorTopic, porcentajeObservado, type Fraccion, type TopicEstado } from '../lib/retencion-observada'
 import { lunesDe } from '../lib/tiempo'
 
 /** El examen es el lunes 21 de diciembre de 2026: todo el ritmo se mide contra esa fecha. */
@@ -44,81 +47,56 @@ export function calcularRitmo(sesiones: SesionSemanal[], ahora = Date.now()): Ri
   }
 }
 
-const decimal = (n: number) => n.toLocaleString('es', { maximumFractionDigits: 1 })
+const fraccion = (f: Fraccion) => f.n ? `${porcentajeObservado(f)} % · ${f.favorables}/${f.n}` : 'Sin dato · n=0'
 
-function Dato({ cifra, de, rotulo, nota }: { cifra: number | string; de?: number | string; rotulo: string; nota: string }) {
-  return <div className="banda-dato">
-    <div className="cifra">{cifra}{de !== undefined && <span className="banda-de"> / {de}</span>}</div>
-    <div className="rotulo">{rotulo}</div>
-    <p className="mini">{nota}</p>
-  </div>
-}
-
-/**
- * Banda de cifras con dos ventanas. **General** mide todo el historial contra el
- * corpus completo; **Esta semana** mide sólo lo hecho desde el lunes, que es la
- * unidad con la que se planifica el estudio. Números y una línea que los explique.
- */
 export function BandaDeCifras({ conceptos, ventana }: { conceptos: Concepto[]; ventana: Ventana }) {
   const { estado } = useApp()
+  const { session } = useAuth()
   const nbme = useNbme()
   const [sesiones, setSesiones] = useState<SesionSemanal[] | null>(null)
+  const [topics, setTopics] = useState<TopicEstado[] | null>(null)
   const [fallo, setFallo] = useState(false)
-
   useEffect(() => {
     let vivo = true
     cargarHistorialSesiones().then(s => { if (vivo) setSesiones(s) }).catch(() => { if (vivo) setFallo(true) })
+    cargarTopics(session?.access_token ?? '').then(t => { if (vivo) setTopics(t) }).catch(() => { if (vivo) setTopics(null) })
     return () => { vivo = false }
-  }, [])
-
-  const desde = ventana === 'semana' ? lunesDe().getTime() : 0
+  }, [session?.access_token])
+  const ahora = Date.now(), desde = ventana === 'semana' ? lunesDe().getTime() : 0
+  const hasta = ventana === 'semana' ? lunesDe().getTime() + SEMANA_MS : ahora + 1
   const formas = useMemo(() => progresoPorForma(nbme.state, nbme.catalog, desde), [nbme.state, nbme.catalog, desde])
-  const preguntas = formas.reduce((suma, f) => ({
-    total: suma.total + f.total, vistas: suma.vistas + f.vistas,
-    nuevas: suma.nuevas + f.nuevas, primeraVez: suma.primeraVez + f.primeraVez,
-    reincidentes: suma.reincidentes + f.reincidentes,
-  }), { total: 0, vistas: 0, nuevas: 0, primeraVez: 0, reincidentes: 0 })
-
-  const total = conceptos.length
+  const preguntas = formas.reduce((n, f) => ({ n: n.n + f.nuevas, favorables: n.favorables + f.primeraVez }), { n: 0, favorables: 0 })
   const publicados = new Set(conceptos.map(c => c.concept_id))
   const progresos = Object.values(estado.progreso).filter(p => publicados.has(p.concept_id))
-  const dominados = progresos.filter(p => dominioVigente(p, estado.criterios)).length
-  const tocados = progresos.filter(p => p.intentos.length).length
-  const trabajadosSemana = progresos.filter(p => p.intentos.some(t => t.ts >= desde)).length
-  const dominadosSemana = progresos.filter(p => dominioVigente(p, estado.criterios) && (p.dominado_en ?? 0) >= desde).length
-
-  const delaSemana = (sesiones ?? []).filter(s => fechaDeSesion(s).getTime() >= desde)
-  const ritmo = sesiones ? calcularRitmo(sesiones) : null
-  const alDia = ritmo ? ritmo.porSemana >= ritmo.necesarioPorSemana : false
-  const notaSesiones = fallo ? 'No se pudo leer el plan de sesiones ahora mismo.'
-    : !sesiones ? 'Leyendo el plan de sesiones…' : null
-
-  if (ventana === 'semana') return <section className="banda-cifras" aria-label="Resumen de esta semana">
-    <Dato cifra={dominadosSemana} rotulo="conceptos que cruzaron a dominio esta semana"
-      nota={`${dominados} con dominio vigente en total, de ${total} publicados.`} />
-    <Dato cifra={trabajadosSemana} rotulo="conceptos respondidos esta semana"
-      nota={`${tocados} trabajados alguna vez de ${total} publicados.`} />
-    <Dato cifra={preguntas.vistas} rotulo="preguntas NBME respondidas esta semana"
-      nota={preguntas.vistas
-        ? `${preguntas.nuevas} nuevas · ${preguntas.primeraVez} acertadas a la primera · ${preguntas.reincidentes} reincidentes.`
-        : 'Aún no has respondido preguntas esta semana.'} />
-    <Dato cifra={delaSemana.filter(hecha).length} de={delaSemana.length} rotulo="sesiones de esta semana completadas"
-      nota={notaSesiones ?? (delaSemana.length
-        ? `${delaSemana.length - delaSemana.filter(hecha).length} pendientes en el plan de esta semana.`
-        : 'No hay sesiones planificadas para esta semana.')} />
-  </section>
-
-  return <section className="banda-cifras" aria-label="Resumen general del avance">
-    <Dato cifra={dominados} de={total} rotulo="conceptos con dominio vigente"
-      nota={`${tocados} trabajados alguna vez de ${total} publicados.`} />
-    <Dato cifra={preguntas.primeraVez} de={preguntas.vistas} rotulo="preguntas NBME acertadas a la primera"
-      nota={preguntas.vistas
-        ? `${preguntas.vistas} respondidas de ${preguntas.total} publicadas · ${preguntas.reincidentes} reincidentes.`
-        : 'Todavía no hay preguntas respondidas.'} />
-    <Dato cifra={ritmo ? ritmo.completadas : '—'} de={ritmo ? ritmo.planificadas : '—'} rotulo="sesiones de la semana completadas"
-      nota={notaSesiones ?? `${ritmo!.planificadas - ritmo!.completadas} pendientes en el plan.`} />
-    <Dato cifra={ritmo ? decimal(ritmo.porSemana) : '—'} de={ritmo ? decimal(ritmo.necesarioPorSemana) : '—'}
-      rotulo="sesiones por semana: tuyo frente al necesario"
-      nota={notaSesiones ?? `Ritmo de las últimas cuatro semanas frente al que pide lo que queda hasta el 21-dic-2026 (${ritmo!.semanasRestantes} semanas). ${alDia ? 'Vas al día.' : 'Hoy vas por debajo.'}`} />
+  const evidencia = evidenciaDiferida(progresos, desde, ahora)
+  const detalle = evidenciaPorTopic(conceptos, estado.progreso, topics ?? [], desde, ahora)
+  const periodo = (sesiones ?? []).filter(s => fechaDeSesion(s).getTime() >= desde && fechaDeSesion(s).getTime() < hasta)
+  const plan = { n: periodo.length, favorables: periodo.filter(hecha).length }
+  const anillos = [
+    { label: ventana === 'semana' ? 'Sesiones de esta semana' : 'Sesiones registradas', ...plan, tam: 236 },
+    { label: 'Acierto inicial en preguntas locales', ...preguntas, tam: 194 },
+    { label: 'Recuperación sin ayuda tras ≥30 días', ...evidencia.retencion, tam: 152 },
+  ]
+  return <section className="tarjeta pila" aria-label={ventana === 'semana' ? 'Resumen de esta semana' : 'Resumen general'}>
+    <div className="fila progress-radial-summary">
+      <div className="progress-rings" aria-label="Tres dimensiones independientes; no se promedian">
+        {anillos.map(a => <div key={a.label} className="progress-ring-layer"><Anillo valor={a.favorables} total={a.n} tam={a.tam} etiqueta={a.label} /></div>)}
+        <div className="progress-ring-center"><strong>{sesiones ? plan.favorables : '—'}</strong><span>sesiones hechas</span><small>{plan.n ? `de ${plan.n} registradas` : 'sin plan registrado'}</small></div>
+      </div>
+      <div className="pila progress-ring-legend"><h2>{ventana === 'semana' ? 'Tu semana, en tres anillos' : 'Tu práctica registrada'}</h2>
+        {anillos.map((a, i) => <p key={a.label}><b>{i === 0 ? 'Exterior' : i === 1 ? 'Medio' : 'Interior'} · {a.label}</b><br />{fraccion(a)}</p>)}
+        {fallo && <p role="status">No se pudieron leer las sesiones. Los otros registros se conservan.</p>}
+        <p className="mini">Cada anillo conserva su denominador. Las preguntas locales son práctica; estas cifras no estiman aprobación.</p>
+      </div>
+    </div>
+    <details><summary>Retención observada y repetición del error</summary>
+      <p><b>Recuperación tras ≥30 días:</b> {fraccion(evidencia.retencion)}</p>
+      <p><b>Errores repetidos tras ≥24 h:</b> {fraccion(evidencia.repeticion)}</p>
+      <p className="mini">Correctas/intentadas tras 30 días; falladas/reexaminadas tras un fallo separado al menos 24 h. Parcial cuenta como fallo. Se excluyen ayudas, revisiones y condiciones o versiones no verificables. El intervalo parte del intento inmediatamente anterior.</p>
+      <h3>Temas cerrados en el plan</h3>
+      {topics === null ? <p className="mini">No se pudo consultar el estado de los temas; no se supone que estén cerrados.</p>
+        : <div className="scroll-x"><table className="tabla"><thead><tr><th>Tema</th><th>Recuperación ≥30 d</th><th>Error repetido ≥24 h</th></tr></thead><tbody>{detalle.map(t => <tr key={t.nombre}><th scope="row">{t.nombre}</th><td>{fraccion(t.retencion)}</td><td>{fraccion(t.repeticion)}</td></tr>)}</tbody></table></div>}
+      <p className="mini">La correspondencia usa la disciplina o el sistema principal del concepto. Cerrado describe el plan; no demuestra dominio.</p>
+    </details>
   </section>
 }

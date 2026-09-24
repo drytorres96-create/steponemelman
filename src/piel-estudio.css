@@ -329,3 +329,17 @@
 @media (max-width: 720px) {
   .piel-boton-texto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
+
+/* Reagrupa los anillos existentes; el centro conserva un único dato principal. */
+.progress-radial-summary { gap: 28px; align-items: center; flex-wrap: wrap; }
+.progress-rings { position: relative; width: 236px; height: 236px; flex: 0 0 236px; }
+.progress-ring-layer { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.progress-ring-layer .centro { display: none; }
+.progress-ring-layer:nth-child(2) { opacity: .8; }
+.progress-ring-layer:nth-child(3) { opacity: .6; }
+.progress-ring-center { position: absolute; inset: 60px; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; line-height: 1.3; }
+.progress-ring-center strong { font-size: 3rem; font-variant-numeric: tabular-nums; }
+.progress-ring-center span, .progress-ring-center small { font-size: .72rem; }
+.progress-ring-legend { flex: 1 1 240px; }
+.progress-ring-legend p { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .progress-rings circle { transition: none !important; } }

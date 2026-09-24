@@ -22,7 +22,7 @@ vi.mock('../nbme/NbmeProvider', () => ({ useNbme: mock.nbme }))
 vi.mock('../lib/supabase', () => ({ supabase: { auth: {}, from: () => { throw new Error('El harness no permite consultar Supabase') } } }))
 vi.mock('../data/corpus', () => ({ cargarTodo: mock.concepts, cargarConceptos: vi.fn(), cargarModulo: vi.fn() }))
 vi.mock('../semana/api', () => ({ cargarSesionesSemana: mock.sessions, cargarHistorialSesiones: mock.sessions, guardarAvance: vi.fn() }))
-vi.mock('../plan/api', () => ({ cargarPlanSemana: mock.plan, cargarAdherencia: async () => [
+vi.mock('../plan/api', () => ({ cargarTopics: async () => [], cargarPlanSemana: mock.plan, cargarAdherencia: async () => [
   { eventoId: 'DEMO-S1', titulo: 'S1 · Demostración', hechas: 12, tareas: 15 },
   { eventoId: 'DEMO-S2', titulo: 'S2 · Demostración', hechas: 7, tareas: 15 },
 ], marcarCheckpoint: vi.fn(), PlanEscrituraError: class extends Error {} }))
@@ -73,7 +73,7 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi
 
 it('exports real screen DOM with synthetic providers and no network, auth bypass or medical corpus', async () => {
   const out = process.env.MELMAN_DESIGN_EXPORT
-  const styles = ['nbme/nbme.css', 'auth/auth.css', 'styles.css', 'editorial.css', 'organic.css', 'cinema.css']
+  const styles = ['nbme/nbme.css', 'auth/auth.css', 'styles.css', 'editorial.css', 'organic.css', 'cinema.css', 'piel-estudio.css']
   if (out) {
     mkdirSync(resolve(out, 'styles'), { recursive: true })
     for (const file of styles) writeFileSync(resolve(out, 'styles', file.replaceAll('/', '-')), readFileSync(resolve('src', file)))
