@@ -245,6 +245,7 @@ describe('proxy al plan de la semana', () => {
     expect((await pedir()).status).toBe(200)
     expect(remoto).toHaveBeenCalledTimes(6)
     expect(remoto.mock.calls.filter(c => String(c[0]).startsWith(secretos.PLAN_SUPABASE_URL))).toHaveLength(2)
+    expect(remoto.mock.calls[3][0]).toContain('retired_at=is.null')
   })
 
   it('el PATCH devuelve lo releído de la base, no lo que se envió', async () => {
@@ -259,8 +260,10 @@ describe('proxy al plan de la semana', () => {
     // La escritura y la relectura van filtradas por el usuario del plan.
     const escritura = remoto.mock.calls[2]
     expect(escritura[0]).toContain(`user_id=eq.${encodeURIComponent(secretos.PLAN_USER_ID)}`)
+    expect(escritura[0]).toContain('retired_at=is.null')
     expect(JSON.parse(escritura[1].body).done).toBe(true)
     expect(remoto.mock.calls[3][0]).toContain('user_id=eq.')
+    expect(remoto.mock.calls[3][0]).toContain('retired_at=is.null')
   })
 
   it('el PATCH rechaza un id que es de otro user_id', async () => {

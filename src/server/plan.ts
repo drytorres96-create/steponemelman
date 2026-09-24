@@ -111,7 +111,7 @@ export async function handlePlan(request: Request, env: PlanEnv): Promise<Respon
       const marcado = deseado
         ? `{"done":true,"done_at":"${new Date().toISOString()}"}`
         : '{"done":false,"done_at":null}'
-      const escrito = await plan(`week_checkpoints?id=eq.${checkpointId}&${suyo}`, {
+      const escrito = await plan(`week_checkpoints?id=eq.${checkpointId}&${suyo}&retired_at=is.null`, {
         method: 'PATCH', body: marcado,
         headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       })
@@ -120,7 +120,7 @@ export async function handlePlan(request: Request, env: PlanEnv): Promise<Respon
         return json({ error: 'No se pudo guardar la marca en tu plan.' }, 503)
       }
       // El sitio es la fuente de verdad: se devuelve lo releído, nunca lo enviado.
-      const releido = await plan(`week_checkpoints?select=${CAMPOS}&id=eq.${checkpointId}&${suyo}`)
+      const releido = await plan(`week_checkpoints?select=${CAMPOS}&id=eq.${checkpointId}&${suyo}&retired_at=is.null`)
       if (!releido.ok) return json({ error: 'No se pudo releer el checkpoint.' }, 503)
       const fila = leerCheckpoint((await releido.json() as unknown[])[0])
       // Una fila de otro usuario no se escribe ni se lee: el filtro la deja fuera de las dos.
@@ -155,7 +155,7 @@ export async function handlePlan(request: Request, env: PlanEnv): Promise<Respon
     if (!Array.isArray(filas) || !filas.length) return json({ error: 'Sin semana en el plan.' }, 404)
 
     const ids = filas.map(f => `"${f.id}"`).join(',')
-    const marcas = await plan(`week_checkpoints?select=event_id,${CAMPOS}&${suyo}&event_id=in.(${ids})&order=idx.asc`)
+    const marcas = await plan(`week_checkpoints?select=event_id,${CAMPOS}&${suyo}&event_id=in.(${ids})&retired_at=is.null&order=idx.asc`)
     if (!marcas.ok) {
       registrar('plan/checkpoints', `la base del plan respondió ${marcas.status}`)
       return json({ error: 'No se pudo leer tu plan ahora mismo.' }, 503)
