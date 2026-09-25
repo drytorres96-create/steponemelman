@@ -1,0 +1,29 @@
+/* Hoy · una sola pantalla: el anillo doble, una línea con lo que toca y dos bloques con su techo.
+   Nada compite con el botón: sin acordeones de días ni cifras de deuda. */
+.hoy { max-width:880px; width:100%; margin:0 auto; gap:18px; }
+.editorial-app:not(.study-focus) .hoy-cabecera { display:grid; grid-template-columns:auto minmax(0,1fr); gap:32px; align-items:center; }
+.hoy-anillo { position:relative; z-index:2; display:grid; place-items:center; }
+.editorial-app:not(.study-focus) .hoy-cabecera h1 { font-size:clamp(36px,4.4vw,56px); }
+.hoy-tema { position:relative; margin:10px 0 0; font-size:18px; line-height:1.45; color:var(--texto); }
+.editorial-app:not(.study-focus) .hoy-leyenda { margin:12px 0 0; max-width:48ch; line-height:1.5; }
+/* La línea de lo que toca va sobre cristal: encima de la fotografía el contraste cambiaría palabra a palabra. */
+.hoy-ahora { margin:0; padding:14px 20px; border-radius:14px; background:var(--vidrio-barra); font-size:18px; line-height:1.55; color:var(--texto); text-wrap:pretty; }
+.hoy-bloques { display:grid; gap:12px; }
+.editorial-app:not(.study-focus) .hoy-bloque { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:20px; align-items:center; padding:18px 22px; border-radius:18px; }
+.hoy-bloque h2 { margin:0; font-size:21px; font-weight:500; }
+.hoy-cuenta { margin:4px 0 2px; font-size:16px; font-variant-numeric:tabular-nums; color:var(--texto-2); }
+.hoy-bloque .mini { margin:0; }
+.hoy-bloque .btn { min-width:200px; }
+.hoy-bloque-hecho { display:flex; align-items:center; gap:12px; margin:0; min-height:52px; padding:12px 20px; border:1px solid var(--linea); border-radius:14px; background:var(--vidrio-barra); color:var(--texto-2); font-variant-numeric:tabular-nums; }
+.hoy-marca { color:var(--oro); font-weight:700; font-size:18px; }
+/* El centro del anillo doble: la cifra del día, grande y sin adornos. */
+.anillo-doble .centro b { display:block; font-size:30px; font-weight:400; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.anillo-doble .centro b span { font-size:16px; color:var(--texto-3); }
+.anillo-doble.cerrado .centro b { font-size:24px; }
+@media(max-width:650px) {
+  .editorial-app:not(.study-focus) .hoy-cabecera { grid-template-columns:minmax(0,1fr); justify-items:center; text-align:center; gap:18px; }
+  .editorial-app:not(.study-focus) .hoy-leyenda { margin-inline:auto; }
+  .hoy-ahora { font-size:16px; padding:12px 16px; }
+  .editorial-app:not(.study-focus) .hoy-bloque { grid-template-columns:auto minmax(0,1fr); gap:14px; padding:16px; }
+  .hoy-bloque .btn { grid-column:1/-1; min-width:0; width:100%; }
+}

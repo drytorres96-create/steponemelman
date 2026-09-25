@@ -117,6 +117,7 @@ export function Brand() {
 
 export function NavigationIcon({ name }: { name: string }) {
   const paths: Record<string, string> = {
+    hoy: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z',
     inicio: 'M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10Z',
     modulos: 'M12 5v16M12 5C9 3 5 3 2 4v15c4-1 7-1 10 2 3-3 6-3 10-2V4c-3-1-7-1-10 1Z',
     progreso: 'M4 3v17h17M9 15v-4m5 4V7m5 8V4',

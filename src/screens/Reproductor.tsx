@@ -36,8 +36,22 @@ const formatoIntervalo = (dias: number | null) => dias === null ? 'Pendiente de 
 const etiquetaResultado = (r: Intento['resultado']) => r === 'correcta' ? 'Correcto' : r === 'parcial' ? 'Parcialmente correcto'
   : r === 'ortografia' ? 'Concepto correcto, revisa la escritura' : r === 'revision' ? 'Respuesta por revisar' : 'Incorrecto'
 
-export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto }:
-  { cola: Cola; onSalir: () => void; indiceInicial?: number; onTramoCompleto?: () => void }) {
+/**
+ * Un paso de la escalera de cajas. Quien orquesta decide las reinserciones, así que
+ * el reproductor no repite fallos por su cuenta y devuelve el control al terminar,
+ * sin resumen intermedio. Cada paso llega con su propia `sessionId`: así cada
+ * presentación tiene un identificador distinto y retomarla desde otra pantalla
+ * encuentra la respuesta ya dada.
+ */
+export interface ModoCaja {
+  /** El paso es una reinserción tras un fallo: se presenta y se registra como corrección con explicación previa. */
+  reintento: boolean
+  /** Lo que se dice tras un fallo, en lugar de «volverá al final de la cola». */
+  avisoFallo: string
+}
+
+export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto, modoCaja }:
+  { cola: Cola; onSalir: () => void; indiceInicial?: number; onTramoCompleto?: () => void; modoCaja?: ModoCaja }) {
   const { registrarIntento, progresoDe, estado, guardarReanudable, iniciarSesion, cerrarSesion } = useApp()
   const pielEstudio = usePielEstudio()
   const guardada = cola.sessionId && estado.reanudable?.sessionId === cola.sessionId ? estado.reanudable : null
@@ -66,6 +80,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
   const calificando = useRef(false)
   const abortoIA = useRef(new AbortController())
   const vivoIA = useRef(true)
+  const devuelto = useRef(false)
   const [explicacionPrevia, setExplicacionPrevia] = useState(false)
   const [sesionLista, setSesionLista] = useState(false)
   const sesionId = useRef<string | null>(cola.sessionId ?? null)
@@ -75,7 +90,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
   const vistaActual = useRef({ fase, verFuente })
   vistaActual.current = { fase, verFuente }
   const examen = cola.ruta === 'examen'
-  const reintento = i >= cantidadInicial
+  const reintento = !!modoCaja?.reintento || i >= cantidadInicial
   const examenSinAyuda = examen && !reintento
   const revisionExamen = examen && reintento && i < orden.length && !revisionInicialHecha
   const modoRegistro = examenSinAyuda ? 'examen' : cola.ruta === 'repaso' || reintento ? 'repaso' : 'aprendizaje'
@@ -218,7 +233,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
     ultimaAccion.current = preguntaId
     reloj.current.activar(false)
     const siguiente = reintentarRevision && intentoActual.current?.resultado === 'revision'
-      ? [...orden, orden[i]] : siguienteCola(orden, i, intentoActual.current?.resultado)
+      ? [...orden, orden[i]] : modoCaja ? orden : siguienteCola(orden, i, intentoActual.current?.resultado)
     if (i + 1 >= siguiente.length) relojSesion.activar(false)
     const vencio = !!presupuesto && !tiempoRef.current.sinLimite && relojSesion.leer() >= presupuesto * 60000 && i + 1 < siguiente.length
     if (vencio) { tiempoRef.current.pausa = true; relojSesion.activar(false); setPausaTiempo(true) }
@@ -384,6 +399,16 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
       cantidadInicial, revisionInicialHecha: true, ...metadata() })
   }
 
+  // En una caja no hay resumen intermedio: terminar el paso devuelve el control a quien orquesta.
+  const pasoTerminado = !!modoCaja && sesionLista && !c && !pausaTiempo
+  useEffect(() => {
+    if (!pasoTerminado || devuelto.current) return
+    devuelto.current = true
+    salir()
+    // `salir` cambia en cada render; lo que decide es que el paso haya terminado, y una sola vez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pasoTerminado])
+
   if (!sesionLista) return <p role="status">Preparando tu sesión…</p>
   if (!estado.reanudable || estado.reanudable.sessionId !== sesionId.current || estado.reanudable.indice !== i || estado.reanudable.conceptIds?.join('|') !== orden.map(x => x.concept_id).join('|')) return <div className="tarjeta pila" role="status">
     <h2>Tu sesión cambió en otra ventana</h2><p>Las respuestas registradas se conservan. Vuelve a tu plan para abrir el punto de continuación más reciente.</p>
@@ -404,6 +429,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
         <button className="btn fantasma" onClick={pausar}>Necesito una pausa</button></div>
     </div>{revisiones(cantidadInicial)}
   </div>
+  if (!c && modoCaja) return <div className="vacio" role="status">Guardando tu respuesta…</div>
   if (!c) {
     const resumen = datosSesion()
     return <div className="reproductor pila">
@@ -449,13 +475,13 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
         <button className="btn pequeno fantasma" onClick={pausar}>Necesito una pausa</button>
       </div>
     </div>
-    <div className="fila" style={{ justifyContent: 'space-between' }}><span className="mini">{reintento
+    {!modoCaja && <><div className="fila" style={{ justifyContent: 'space-between' }}><span className="mini">{reintento
       ? `Corrección · ${orden.length - i} pendientes, incluida esta`
       : `Primera vuelta · Pregunta ${i + 1} de ${cantidadInicial}${!examenSinAyuda && orden.length > cantidadInicial ? ` · ${orden.length - cantidadInicial} errores para corregir` : ''}`}</span>
       <span className="mini">{examenSinAyuda ? 'Sin ayuda · Revisión al terminar la primera vuelta' : 'Puedes pausar y retomar'}</span></div>
     <div className="avance" aria-label={`Pregunta ${i + 1} de ${examenSinAyuda ? cantidadInicial : orden.length}`}>
       {orden.slice(0, examenSinAyuda ? cantidadInicial : orden.length).map((_, k) => <i key={k} className={k < i ? 'hecho' : k === i ? 'actual' : ''} />)}
-    </div>
+    </div></>}
     <div className="tarea">
       {reintento && <p className="mini">Volvemos a un concepto de esta sesión. Este acierto contará como corrección con explicación previa.</p>}
       {fase === 'ensenanza' && !examenSinAyuda && <div>
@@ -508,7 +534,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto 
         {res.veredicto === 'revision' && res.respuestaDada.trim() && usaTextoLibre(c) && !presentacionCambio
           && <button className="btn pequeno" disabled={juzgandoIA} onClick={() => void juzgarConIA()}>
             {juzgandoIA ? 'Corrigiendo con IA…' : 'Que la IA juzgue mi respuesta'}</button>}
-        {necesitaReintento(res.veredicto) && <p>Este concepto volverá al final de la cola hasta que lo aciertes.</p>}
+        {necesitaReintento(res.veredicto) && <p>{modoCaja ? modoCaja.avisoFallo : 'Este concepto volverá al final de la cola hasta que lo aciertes.'}</p>}
         {(res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que) && <p className="sutil">{res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que}</p>}
         {/* Solo con respuesta escrita: en un formato de opciones ya se sabe qué se eligió. */}
         {res.veredicto !== 'correcta' && res.veredicto !== 'revision' && usaTextoLibre(c) && res.respuestaDada.trim()

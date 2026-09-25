@@ -10,6 +10,7 @@ import './editorial.css'
 import './organic.css'
 import './cinema.css'
 import './studio.css'
+import './hoy.css'
 import './piel-estudio.css'
 
 createRoot(document.getElementById('root')!).render(

@@ -10,7 +10,7 @@ const mock = vi.hoisted(() => ({ app: vi.fn(), cargarTodo: vi.fn(), cargarConcep
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ signOut: vi.fn() }) }))
 vi.mock('../nbme/NbmeProvider', () => ({ useNbme: () => ({
-  state: { sessions: {}, attempts: {}, activeSessionId: null }, catalog: null, pauseSession: vi.fn(),
+  state: { sessions: {}, attempts: {}, activeSessionId: null }, catalog: { questions: [] }, pauseSession: vi.fn(),
   syncNow: vi.fn().mockResolvedValue(true), startSession: vi.fn().mockResolvedValue(true),
   resumeSession: vi.fn().mockResolvedValue(true), nextQuestion: vi.fn(), loading: false, busy: false,
   syncStatus: { message: 'Preguntas sincronizadas' },
@@ -61,15 +61,21 @@ afterEach(async () => {
 const boton = (texto: string) => [...host.querySelectorAll('button')].find(b => b.textContent?.includes(texto))!
 
 describe('continuidad y navegación accesible', () => {
-  it('el contenido está a un clic y «Mi semana» es la vista por defecto', async () => {
+  it('«Hoy» es la vista por defecto y la única entrada de la navegación principal', async () => {
     await act(async () => { root.render(<App />) })
+    await act(async () => { await Promise.resolve() })
     const nav = host.querySelector('nav')!
-    expect([...nav.querySelectorAll('button')].map(b => b.textContent)).toEqual(['Mi semana', 'Recuperación', 'Progreso', 'Elegir contenido'])
+    expect([...nav.querySelectorAll('button')].map(b => b.textContent)).toEqual(['Hoy'])
+    expect(host.textContent).toContain('Mi espacio / Hoy')
+    // Un día sin material se ve cerrado, no vacío.
+    expect(host.textContent).toContain('Hoy ya está')
+    // Lo demás sigue en el menú discreto, sin borrarse: estudiar más es ir ahí a propósito.
+    const menu = [...host.querySelectorAll('.menu-cuenta-opciones button')].map(b => b.textContent)
+    expect(menu).toEqual(expect.arrayContaining(['Elegir contenido', 'Mi semana', 'Recuperación', 'Progreso',
+      'Ajustes y respaldo', 'Calidad del material', 'Plan diario clásico']))
+    await act(async () => { boton('Mi semana').click() })
     expect(host.textContent).toContain('Sin sesiones preparadas')
-    // Lo retirado sigue accesible desde el menú discreto, sin borrarse.
-    expect(boton('Elegir contenido')).toBeTruthy()
-    expect(boton('Calidad del material')).toBeTruthy()
-    expect(boton('Plan diario clásico')).toBeTruthy()
+    expect(window.location.hash).toBe('#semana')
   })
 
   it('#repaso resuelve hacia Recuperación para no romper enlaces guardados', async () => {
@@ -79,14 +85,14 @@ describe('continuidad y navegación accesible', () => {
     expect(host.textContent).toContain('Mi espacio / Recuperación')
   })
 
-  it('recargar #estudio muestra la semana y el plan clásico permite recuperar el resumen pendiente', async () => {
+  it('recargar #estudio aterriza en Hoy y el plan clásico permite recuperar el resumen pendiente', async () => {
     window.history.replaceState(null, '', '/#estudio')
     app.estado = { ...ESTADO_INICIAL, reanudable: {
       modulo: 'modulo-1', sesion: 'guiada', indice: 1, ts: 1, conceptIds: ['concepto-1'], titulo: 'Bioquímica',
     } }
     await act(async () => { root.render(<App />) })
     // Una cola nunca se restaura desde la URL: se aterriza en la portada.
-    expect(host.textContent).toContain('Mi semana')
+    expect(host.textContent).toContain('Mi espacio / Hoy')
     expect(host.textContent).not.toContain('Sesión restaurada')
     // Fuera de la sesión la barra sí navega.
     expect(host.querySelector('nav')).not.toBeNull()
