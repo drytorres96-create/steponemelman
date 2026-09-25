@@ -83,6 +83,11 @@
 .semana-tarjeta h3 { font-size:20px; line-height:1.35; font-weight:500; }
 .semana-tarjeta .semana-dia { color:var(--texto-3); font-size:12px; letter-spacing:.06em; }
 .semana-tarjeta .sutil { margin-block:10px; }
+@media(min-width:850px) {
+  .semana-grid>.semana-tarjeta:only-child { display:grid; grid-template-columns:minmax(0,1fr) minmax(260px,.65fr); gap:10px 32px; }
+  .semana-grid>.semana-tarjeta:only-child>.sesion-resumen { grid-column:2; grid-row:1/span 3; align-self:center; margin:0; gap:16px; }
+  .semana-grid>.semana-tarjeta:only-child>:is(.semana-dia,h3,.sutil) { grid-column:1; margin:0; }
+}
 .semana-historial>summary { font-size:15px; font-weight:500; }
 .semana-historial[open]>.semana-grid { margin-top:18px; }
 .semana-extra { border-radius:16px; padding:14px 20px; }
@@ -92,6 +97,13 @@
 .progress-overview { border-radius:20px; }
 .progress-next-session { border-color:#68877e; padding:26px; }
 .progress-next-layout { gap:28px; align-items:center; }
+.editorial-app:not(.study-focus) .progress-next-session .progress-radial-compact { background:none; border:0; box-shadow:none; padding:0; }
+.progress-next-action .btn.principal { width:100%; max-width:340px; }
+@media(min-width:1050px) {
+  .progress-next-session .progress-radial-summary { flex-wrap:nowrap; gap:20px; }
+  .progress-next-session .progress-ring-legend { flex:1 1 180px; }
+  .progress-next-session .progress-ring-legend p { font-size:14px; }
+}
 .editorial-app:not(.study-focus) .tarjeta .tarjeta { box-shadow:none; border-radius:12px; background:#142229; }
 .library-composer { border-radius:18px; }
 .scroll-x { max-width:100%; overflow:auto; }
