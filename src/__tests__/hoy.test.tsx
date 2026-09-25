@@ -9,22 +9,31 @@ import type { Intento, ProgresoConcepto } from '../srs/tipos'
 import type { NbmeAttempt, NbmeQuestionMeta } from '../nbme/types'
 import type { PlanCheckpoint, PlanSemana } from '../plan/tipos'
 import type { SesionSemanal } from '../semana/tipos'
+import type { Concepto } from '../schema/concept'
 
 /**
  * La portada pone el techo. Lo que se comprueba es lo que decide si Yoel cierra el
- * portátil tranquilo: con el día hecho no queda ningún botón de estudiar, un día
- * sin material se ve cerrado y no roto, y el anillo exterior nunca desaparece.
+ * portátil tranquilo: con el día hecho no queda ningún botón de estudiar ni la tabla
+ * de por qué, un día sin material se ve cerrado y no roto, el anillo exterior nunca
+ * desaparece, y lo que antes eran Mi semana, Recuperación y Progreso sólo aparece
+ * al abrir su desplegable.
  */
 const mock = vi.hoisted(() => ({
   app: vi.fn(), nbme: vi.fn(), historial: vi.fn(), plan: vi.fn(),
+  corpus: vi.fn(), conceptos: vi.fn(), adherencia: vi.fn(),
 }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ session: { access_token: 'x'.repeat(30) } }) }))
 vi.mock('../nbme/NbmeProvider', () => ({ useNbme: mock.nbme }))
 vi.mock('../semana/api', () => ({ cargarHistorialSesiones: mock.historial }))
-vi.mock('../plan/api', () => ({ cargarPlanSemana: mock.plan }))
+vi.mock('../plan/api', () => ({
+  cargarPlanSemana: mock.plan, cargarAdherencia: mock.adherencia, cargarTopics: async () => [],
+  marcarCheckpoint: vi.fn(), PlanEscrituraError: class extends Error {},
+}))
+vi.mock('../data/corpus', () => ({ cargarTodo: mock.corpus, cargarConceptos: mock.conceptos, cargarModulo: vi.fn() }))
 
 import { Hoy } from '../screens/Hoy'
+import { vistaDesdeHash } from '../App'
 
 /** Viernes 25 de septiembre de 2026, 10:00. La semana va del lunes 21 al domingo 27. */
 const HOY = (h: number, m = 0) => new Date(2026, 8, 25, h, m).getTime()
@@ -85,6 +94,9 @@ beforeEach(() => {
   mock.nbme.mockImplementation(() => nbme)
   mock.historial.mockResolvedValue([])
   mock.plan.mockResolvedValue(null)
+  mock.corpus.mockResolvedValue([])
+  mock.conceptos.mockResolvedValue(new Map())
+  mock.adherencia.mockResolvedValue([])
 })
 afterEach(async () => {
   await act(async () => { root.unmount() })
@@ -93,22 +105,53 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-const pintar = async (props: { onNuevo?: () => void; onCajas?: () => void } = {}) => {
-  await act(async () => { root.render(<Hoy onNuevo={props.onNuevo ?? vi.fn()} onCajas={props.onCajas ?? vi.fn()} />) })
+const pintar = async (props: { onNuevo?: () => void; onCajas?: () => void; onBiblioteca?: () => void } = {}) => {
+  await act(async () => {
+    root.render(<Hoy onNuevo={props.onNuevo ?? vi.fn()} onCajas={props.onCajas ?? vi.fn()} onBiblioteca={props.onBiblioteca ?? vi.fn()} />)
+  })
   await act(async () => { await Promise.resolve() })
 }
 const botones = () => [...host.querySelectorAll<HTMLElement>('button, [role="button"]')]
+const boton = (texto: string) => botones().find(b => b.textContent === texto)!
 const anillo = () => host.querySelector('.anillo-doble')!
+const resumenes = () => [...host.querySelectorAll('summary')].map(s => s.textContent)
+/** Abre un desplegable de la portada y deja que su contenido termine de cargar. */
+const abrir = async (titulo: string) => {
+  const resumen = [...host.querySelectorAll('summary')].find(s => s.textContent === titulo)!
+  await act(async () => { resumen.click() })
+  await act(async () => { await Promise.resolve() })
+}
+
+/** Diez conceptos nuevos y cinco preguntas vistos hoy: las dos vías cerradas. */
+function diaCompleto() {
+  const semana = ids('C', 10)
+  datos({
+    progresos: Object.fromEntries(semana.map((id, i) => [id, progreso(id, [intento(HOY(8, i))])])),
+    respuestas: ids('Q', 5).map((id, i) => respuesta(id, HOY(9, i), i !== 2)),
+    preguntas: ids('Q', 5),
+  })
+  mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, semana, ids('Q', 5))])
+}
+
+/** Un día a medias: un concepto y una pregunta fallados el martes vuelven hoy en sus cajas. */
+function diaConCajas() {
+  const semana = ids('C', 12)
+  datos({
+    progresos: { X1: progreso('X1', [fallo(new Date(2026, 8, 22, 9).getTime())]) },
+    respuestas: [respuesta('Q9', new Date(2026, 8, 22, 10).getTime(), false)],
+    conceptos: semana, preguntas: ['Q9'],
+  })
+  mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, semana)])
+}
+const conceptoX1 = {
+  concept_id: 'X1', objetivo: 'Objetivo sintético de la caja X1',
+  clasificacion: { disciplina_primaria: 'Fisiología', tema: 'Tema sintético' },
+  interaccion: { recomendada: 'recuperacion_libre' },
+} as unknown as Concepto
 
 describe('portada Hoy', () => {
   it('con el día completo no se renderiza ningún botón de estudiar', async () => {
-    const semana = ids('C', 10)
-    datos({
-      progresos: Object.fromEntries(semana.map((id, i) => [id, progreso(id, [intento(HOY(8, i))])])),
-      respuestas: ids('Q', 5).map((id, i) => respuesta(id, HOY(9, i), i !== 2)),
-      preguntas: ids('Q', 5),
-    })
-    mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, semana, ids('Q', 5))])
+    diaCompleto()
     const onNuevo = vi.fn(), onCajas = vi.fn()
     await pintar({ onNuevo, onCajas })
 
@@ -119,6 +162,83 @@ describe('portada Hoy', () => {
     expect(host.textContent).toContain('Hoy ya está: 10 conceptos nuevos y 5 preguntas.')
     expect(onNuevo).not.toHaveBeenCalled()
     expect(onCajas).not.toHaveBeenCalled()
+  })
+
+  it('con el día completo no aparece la tabla de detalle', async () => {
+    diaCompleto()
+    await pintar()
+    // Sólo queda «Cómo va todo»: ni el porqué de las cajas ni otra puerta al estudio.
+    expect(resumenes()).toEqual(['Cómo va todo'])
+    expect(host.textContent).not.toContain('Lo que estoy cerrando')
+    expect(host.textContent).not.toContain('Quiero hacer algo más')
+    expect(host.textContent).not.toContain('Caja de hoy')
+    expect(mock.conceptos).not.toHaveBeenCalled()
+  })
+
+  it('con el día abierto, «Lo que estoy cerrando» explica cada caja al abrirse, y no antes', async () => {
+    diaConCajas()
+    mock.conceptos.mockResolvedValue(new Map([['X1', conceptoX1]]))
+    await pintar()
+    expect(resumenes()).toEqual(['Cómo va todo', 'Lo que estoy cerrando', 'Quiero hacer algo más'])
+    // Plegado no carga ni pinta nada: la tabla es para mirar por qué, no para decidir.
+    expect(mock.conceptos).not.toHaveBeenCalled()
+    expect(host.querySelector('table')).toBeNull()
+
+    await abrir('Lo que estoy cerrando')
+    expect(mock.conceptos).toHaveBeenCalledWith(['X1'], expect.anything())
+    const filas = [...host.querySelectorAll('tbody tr')]
+    expect(filas).toHaveLength(2)
+    const concepto = filas.find(f => f.textContent?.includes('Objetivo sintético de la caja X1'))!
+    expect(concepto.textContent).toContain('caja 1')
+    expect(concepto.textContent).toContain('Por hacer')
+    expect(concepto.textContent).toContain('3 respuestas correctas independientes')
+    const pregunta = filas.find(f => f.textContent?.includes('NBME 27 · pregunta 1'))!
+    expect(pregunta.textContent).toContain('caja 1')
+    expect(pregunta.textContent).toContain('3 aciertos en días distintos')
+  })
+
+  it('«Quiero hacer algo más» lleva a la biblioteca sólo cuando se abre a propósito', async () => {
+    diaConCajas()
+    const onBiblioteca = vi.fn()
+    await pintar({ onBiblioteca })
+    expect(host.textContent).not.toContain('Elegir preguntas')
+    await abrir('Quiero hacer algo más')
+    await act(async () => { boton('Elegir preguntas').click() })
+    expect(onBiblioteca).toHaveBeenCalledExactlyOnceWith('preguntas')
+    await act(async () => { boton('Elegir conceptos').click() })
+    expect(onBiblioteca).toHaveBeenLastCalledWith('conceptos')
+  })
+
+  it('«Cómo va todo» reúne las cifras, la adherencia y el plan de la semana, también con el día cerrado', async () => {
+    mock.adherencia.mockResolvedValue([{ eventoId: 'S2', titulo: 'S2 · 14–19 sep · Reproductivo', inicio: '2026-09-14', hechas: 3, tareas: 4 }])
+    mock.plan.mockResolvedValue({
+      eventoId: 'S3', titulo: 'S3 · 21–26 sep · Renal y ácido-base', inicio: '2026-09-21', fin: '2026-09-26', nota: null,
+      checkpoints: [cp({ id: 1, idx: 1, dia: 5, label: 'AMBOSS Renal · 20 preguntas' })],
+    } satisfies PlanSemana)
+    await pintar()
+    expect(anillo().classList.contains('cerrado')).toBe(true)
+    // Nada de esto se carga mientras el desplegable siga cerrado.
+    expect(mock.corpus).not.toHaveBeenCalled()
+    expect(mock.adherencia).not.toHaveBeenCalled()
+
+    await abrir('Cómo va todo')
+    expect(host.querySelector('[aria-label="Resumen de esta semana"]')).not.toBeNull()
+    expect(host.querySelector('#horizonte-titulo')?.textContent).toContain('Cubrir el material en')
+    expect(host.querySelector('.plan-adherencia')?.textContent).toContain('75 %')
+    // El calendario de la semana va aquí dentro, con el día de hoy abierto.
+    expect(host.querySelector('.plan-dia-titulo[aria-expanded="true"]')?.textContent).toContain('HOY · viernes')
+    expect(host.textContent).toContain('AMBOSS Renal · 20 preguntas')
+  })
+
+  it('los hashes antiguos resuelven a Hoy', () => {
+    for (const hash of ['#semana', '#recuperacion', '#progreso', '#repaso']) {
+      window.history.replaceState(null, '', `/${hash}`)
+      expect(vistaDesdeHash()).toBe('hoy')
+    }
+    // Lo que sigue en el menú discreto conserva su propio enlace.
+    window.history.replaceState(null, '', '/#modulos')
+    expect(vistaDesdeHash()).toBe('modulos')
+    window.history.replaceState(null, '', '/')
   })
 
   it('un día sin material se presenta cerrado, no vacío ni con error', async () => {

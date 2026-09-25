@@ -4,7 +4,6 @@ import { nuevoProgreso } from '../srs/fsrs'
 import { ESTADO_INICIAL, combinarEstados, leerEstadoDesconocido } from '../store/model'
 import type { Intento } from '../srs/tipos'
 import { aplicarVariante, aplicacionComprobada, priorizarVariantes, resumenTransferencia } from './variantes'
-import { construirMapa, METRICAS_MAPA } from './mapa-progreso'
 const c = ConceptoZ.parse({ concept_id: 'QA-001', source: { doc: 'QA', doc_title: 'QA', page: 1, item_id: 'I1', fragment: 'Alfa es el primer elemento sintético.' }, objetivo: 'Identificar alfa', afirmacion: 'Alfa es primero.', respuesta_canonica: 'alfa', explicacion: 'Alfa es el primer elemento.', clasificacion: { disciplina_primaria: 'Fisiología', disciplinas_secundarias: ['Farmacología'], sistema_primario: 'Cardiovascular', sistemas_secundarios: ['Endocrino'], tema: 'QA', tipo_conocimiento: 'Asociación', dificultad: 1 }, step: 'step1', interaccion: { recomendada: 'recuperacion_libre' }, evaluacion: { pregunta: '¿Cuál es el primer elemento?' }, pistas: ['uno', 'dos', 'tres'], calidad: { estado: 'aprobado', confianza: 1 }, variantes: [{ variant_id: 'QA-001-a1', nivel: 'aplicacion', pregunta: 'En un caso sintético, ¿qué elemento ocupa el primer lugar?', opciones: [{ texto: 'alfa', correcta: true }, { texto: 'beta', correcta: false }, { texto: 'gamma', correcta: false }], explicacion: 'La regla sitúa alfa primero.' }] })
 const attempt = (extra: Partial<Intento> = {}): Intento => ({ ts: 1000, ms: 20000, pistas_usadas: 0, interaccion: 'caso_clinico', resultado: 'correcta', tipo_error: 'correcta', recuperacion_activa: false, respuesta_dada: 'alfa', fuente_consultada: false, explicacion_previa: false, variante_id: 'QA-001-a1', primera_presentacion: true, ...extra } as Intento)
 const progress = (ts: Intento[]) => ({ ...nuevoProgreso(c.concept_id), intentos: ts })
@@ -24,13 +23,6 @@ describe('variantes y mapa accionable', () => {
     const p = progress([attempt({ resultado: 'incorrecta' }), attempt({ ts: 2000, primera_presentacion: false })])
     expect(aplicacionComprobada(c, p)).toBe(false)
     expect(resumenTransferencia([c], { [c.concept_id]: p })).toMatchObject({ disponibles: 1, vistos: 1, evaluados: 1, correctos: 0 })
-  })
-  it('cruza etiquetas primarias y secundarias sin duplicar conceptos ni atribuir aplicación a todo el corpus', () => {
-    const state = { ...ESTADO_INICIAL, progreso: {} }
-    const cells = construirMapa([c, c], state)
-    expect(cells.find(x => x.id === 'Endocrino:Farmacología')!.grupos.nuevos).toEqual([c])
-    expect(cells.find(x => x.id === 'Renal:Farmacología')!.conceptos).toEqual([])
-    expect(METRICAS_MAPA).not.toHaveProperty('aplicacion')
   })
   it('una copia antigua de la misma sesión no borra la versión de presentación conocida', () => {
     const resume = { modulo: 'M', sesion: 'repaso', indice: 2, ts: 1000, sessionId: 'S', conceptIds: ['A', 'B', 'C'], versionFormato: 2 as const }

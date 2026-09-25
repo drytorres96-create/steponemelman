@@ -5,8 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ESTADO_INICIAL } from '../store/model'
 import type { Concepto } from '../schema/concept'
 
-const mock = vi.hoisted(() => ({ app: vi.fn(), cargarTodo: vi.fn(), cargarConceptos: vi.fn(), reproductor: vi.fn(),
-  sesionesSemana: vi.fn() }))
+const mock = vi.hoisted(() => ({ app: vi.fn(), cargarTodo: vi.fn(), cargarConceptos: vi.fn(), reproductor: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ signOut: vi.fn() }) }))
 vi.mock('../nbme/NbmeProvider', () => ({ useNbme: () => ({
@@ -16,7 +15,6 @@ vi.mock('../nbme/NbmeProvider', () => ({ useNbme: () => ({
   syncStatus: { message: 'Preguntas sincronizadas' },
 }) }))
 vi.mock('../semana/api', () => ({
-  cargarSesionesSemana: mock.sesionesSemana,
   cargarHistorialSesiones: vi.fn().mockResolvedValue([]),
   guardarAvance: vi.fn().mockResolvedValue({ ok: true }),
 }))
@@ -25,8 +23,8 @@ vi.mock('../screens/Reproductor', () => ({ Reproductor: (props: { indiceInicial:
   mock.reproductor(props)
   return <div>Sesión restaurada</div>
 } }))
-vi.mock('../screens/Recuperacion', () => ({ Recuperacion: (props: { onEstudiar: (ids: string[]) => void }) =>
-  <button onClick={() => props.onEstudiar(['concepto-1'])}>Abrir recuperación de prueba</button> }))
+vi.mock('../screens/Modulos', () => ({ Modulos: (props: { onEstudiar: (ids: string[]) => void }) =>
+  <button onClick={() => props.onEstudiar(['concepto-1'])}>Estudiar selección de prueba</button> }))
 
 import App from '../App'
 import { Modal } from '../components/comunes'
@@ -48,7 +46,6 @@ beforeEach(() => {
   }
   mock.app.mockImplementation(() => app)
   mock.cargarTodo.mockResolvedValue([])
-  mock.sesionesSemana.mockResolvedValue([])
   mock.cargarConceptos.mockResolvedValue(new Map([['concepto-1', { concept_id: 'concepto-1' } as Concepto]]))
 })
 
@@ -59,30 +56,39 @@ afterEach(async () => {
 })
 
 const boton = (texto: string) => [...host.querySelectorAll('button')].find(b => b.textContent?.includes(texto))!
+const pintar = async () => {
+  await act(async () => { root.render(<App />) })
+  await act(async () => { await Promise.resolve() })
+}
+const abrirDesplegable = async (titulo: string) => {
+  const resumen = [...host.querySelectorAll('summary')].find(s => s.textContent === titulo)!
+  await act(async () => { resumen.click() })
+  await act(async () => { await Promise.resolve() })
+}
 
 describe('continuidad y navegación accesible', () => {
   it('«Hoy» es la vista por defecto y la única entrada de la navegación principal', async () => {
-    await act(async () => { root.render(<App />) })
-    await act(async () => { await Promise.resolve() })
+    await pintar()
     const nav = host.querySelector('nav')!
     expect([...nav.querySelectorAll('button')].map(b => b.textContent)).toEqual(['Hoy'])
     expect(host.textContent).toContain('Mi espacio / Hoy')
     // Un día sin material se ve cerrado, no vacío.
     expect(host.textContent).toContain('Hoy ya está')
-    // Lo demás sigue en el menú discreto, sin borrarse: estudiar más es ir ahí a propósito.
+    // Mi semana, Recuperación y Progreso viven ya dentro de Hoy: el menú discreto guarda
+    // lo demás, y estudiar más es ir a «Elegir contenido» a propósito.
     const menu = [...host.querySelectorAll('.menu-cuenta-opciones button')].map(b => b.textContent)
-    expect(menu).toEqual(expect.arrayContaining(['Elegir contenido', 'Mi semana', 'Recuperación', 'Progreso',
-      'Ajustes y respaldo', 'Calidad del material', 'Plan diario clásico']))
-    await act(async () => { boton('Mi semana').click() })
-    expect(host.textContent).toContain('Sin sesiones preparadas')
-    expect(window.location.hash).toBe('#semana')
+    expect(menu).toEqual(['Elegir contenido', 'Ajustes y respaldo', 'Calidad del material', 'Plan diario clásico', 'Salir'])
+    await act(async () => { boton('Elegir contenido').click() })
+    expect(window.location.hash).toBe('#modulos')
+    expect(host.textContent).toContain('Mi espacio / Elegir contenido')
   })
 
-  it('#repaso resuelve hacia Recuperación para no romper enlaces guardados', async () => {
-    window.history.replaceState(null, '', '/#repaso')
-    await act(async () => { root.render(<App />) })
-    expect(boton('Abrir recuperación de prueba')).toBeTruthy()
-    expect(host.textContent).toContain('Mi espacio / Recuperación')
+  it.each(['#semana', '#recuperacion', '#progreso', '#repaso'])('el enlace guardado %s aterriza en Hoy', async hash => {
+    window.history.replaceState(null, '', `/${hash}`)
+    await pintar()
+    expect(host.textContent).toContain('Mi espacio / Hoy')
+    expect(host.querySelector('.anillo-doble')).not.toBeNull()
+    expect([...host.querySelectorAll('summary')].map(s => s.textContent)).toContain('Cómo va todo')
   })
 
   it('recargar #estudio aterriza en Hoy y el plan clásico permite recuperar el resumen pendiente', async () => {
@@ -122,43 +128,40 @@ describe('continuidad y navegación accesible', () => {
     expect(host.textContent).toContain('El servidor no pudo guardar ahora.')
   })
 
-  it('un error al preparar recuperación deja una salida para reintentar', async () => {
-    window.history.replaceState(null, '', '/#recuperacion')
+  it('un error al preparar el estudio elegido deja una salida para reintentar', async () => {
+    window.history.replaceState(null, '', '/#modulos')
     mock.cargarConceptos.mockRejectedValueOnce(new Error('offline'))
     await act(async () => { root.render(<App />) })
-    await act(async () => { boton('Abrir recuperación de prueba').click() })
+    await act(async () => { boton('Estudiar selección de prueba').click() })
     expect(host.textContent).toContain('No se pudo preparar el repaso')
     expect(host.textContent).not.toContain('Preparando la sesión')
-    expect(boton('Abrir recuperación de prueba')).toBeTruthy()
+    expect(boton('Estudiar selección de prueba')).toBeTruthy()
   })
 
   it('saltar al contenido conserva la pantalla actual', async () => {
-    window.history.replaceState(null, '', '/#recuperacion')
+    window.history.replaceState(null, '', '/#modulos')
     await act(async () => { root.render(<App />) })
     await act(async () => { (host.querySelector('.saltar-contenido') as HTMLAnchorElement).click() })
-    expect(window.location.hash).toBe('#recuperacion')
+    expect(window.location.hash).toBe('#modulos')
     expect(document.activeElement).toBe(host.querySelector('main'))
   })
 
-  it('el progreso separa la ventana semanal de la general', async () => {
+  it('las cifras de Progreso siguen dentro de Hoy, plegadas en «Cómo va todo»', async () => {
     window.history.replaceState(null, '', '/#progreso')
-    await act(async () => { root.render(<App />) })
-    const ventana = [...host.querySelectorAll('[aria-label="Ventana del progreso"] button')] as HTMLButtonElement[]
-    expect(ventana.map(b => b.textContent)).toEqual(['Esta semana', 'General'])
-    expect(ventana[0].getAttribute('aria-pressed')).toBe('true')
-    const rotulos = () => [...host.querySelectorAll('.rejilla.r3 .rotulo')].map(n => n.textContent)
-    expect(rotulos()).toEqual(['conceptos respondidos esta semana', 'respuestas de concepto esta semana', 'nuevos dominios esta semana'])
-
-    await act(async () => { ventana[1].click() })
-    expect(ventana[1].getAttribute('aria-pressed')).toBe('true')
-    expect(rotulos()).toEqual(['conceptos trabajados', 'para repasar'])
+    await pintar()
+    // Plegado no se pinta ni se carga: el corpus entero sólo se pide al abrirlo.
+    expect(host.querySelector('[aria-label="Resumen de esta semana"]')).toBeNull()
+    expect(mock.cargarTodo).not.toHaveBeenCalled()
+    await abrirDesplegable('Cómo va todo')
+    expect(host.querySelector('[aria-label="Resumen de esta semana"]')).not.toBeNull()
     expect(host.querySelectorAll('.progress-ring-layer')).toHaveLength(3)
     expect(host.textContent).toContain('Cubrir el material en 10 semanas')
   })
 
   it('ya no quedan las secciones retiradas del progreso', async () => {
     window.history.replaceState(null, '', '/#progreso')
-    await act(async () => { root.render(<App />) })
+    await pintar()
+    await abrirDesplegable('Cómo va todo')
     expect(host.textContent).not.toContain('Respuestas por revisar')
     expect(host.textContent).not.toContain('¿Puedes aplicarlo en una pregunta nueva?')
     expect(host.querySelector('[aria-labelledby="revision-titulo"]')).toBeNull()

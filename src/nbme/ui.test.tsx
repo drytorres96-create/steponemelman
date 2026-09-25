@@ -9,7 +9,6 @@ const mock = vi.hoisted(() => ({ context: vi.fn() }))
 vi.mock('./NbmeProvider', () => ({ useNbme: mock.context }))
 import { NbmeLibrary } from './NbmeLibrary'
 import { NbmePlayer } from './NbmePlayer'
-import { NbmeProgress } from './NbmeProgress'
 
 const question: NbmeQuestion = {
   id: 'QA-one', revision: 'r1', form: '27', section: 1, item: 1, page: 1,
@@ -129,19 +128,5 @@ describe('NBME study interface', () => {
     await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true })))
     expect(context.selectAnswer).not.toHaveBeenCalled()
     expect(context.checkAnswer).not.toHaveBeenCalled()
-  })
-
-  it('reports the first response separately from later correct retries', async () => {
-    prepareSession()
-    context.state = submitNbmeAnswer(context.state, 'QA-session', 0, question, 'A', 10, 200)
-    context.state.attempts['QA-session:0'].reviewedAt = 201
-    context.state = submitNbmeAnswer(context.state, 'QA-session', 1, question, 'I', 10, 300)
-    await act(async () => root.render(<NbmeProgress />))
-    const values = [...host.querySelectorAll('dd')].map(item => item.textContent)
-    // Totales y forma 27: vistas, correctas, incorrectas, a la primera, reincidentes.
-    // Corregir el fallo la deja como correcta, pero el primer intento fallado no se reescribe.
-    expect(values.slice(0, 5)).toEqual(['1/1', '1', '0', '0', '0'])
-    expect(values.slice(5, 10)).toEqual(['1', '1', '0', '0', '0'])
-    expect(host.textContent).toContain('«A la primera» cuenta el primer intento registrado')
   })
 })
