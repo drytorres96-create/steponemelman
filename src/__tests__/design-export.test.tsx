@@ -73,7 +73,7 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi
 
 it('exports real screen DOM with synthetic providers and no network, auth bypass or medical corpus', async () => {
   const out = process.env.MELMAN_DESIGN_EXPORT
-  const styles = ['nbme/nbme.css', 'auth/auth.css', 'styles.css', 'editorial.css', 'organic.css', 'cinema.css', 'piel-estudio.css']
+  const styles = ['nbme/nbme.css', 'auth/auth.css', 'styles.css', 'editorial.css', 'organic.css', 'cinema.css', 'studio.css', 'piel-estudio.css']
   if (out) {
     mkdirSync(resolve(out, 'styles'), { recursive: true })
     for (const file of styles) writeFileSync(resolve(out, 'styles', file.replaceAll('/', '-')), readFileSync(resolve('src', file)))
