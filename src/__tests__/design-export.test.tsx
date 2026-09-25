@@ -15,13 +15,13 @@ import type { ProgresoConcepto } from '../srs/tipos'
 import type { SesionSemanal } from '../semana/tipos'
 import type { PlanSemana } from '../plan/tipos'
 
-const mock = vi.hoisted(() => ({ app: vi.fn(), auth: vi.fn(), nbme: vi.fn(), concepts: vi.fn(), plan: vi.fn(), sessions: vi.fn() }))
+const mock = vi.hoisted(() => ({ app: vi.fn(), auth: vi.fn(), nbme: vi.fn(), concepts: vi.fn(), conceptsById: vi.fn(), plan: vi.fn(), sessions: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../auth/AuthProvider', () => ({ useAuth: mock.auth, authErrorMessage: () => 'Error de demostración' }))
 vi.mock('../nbme/NbmeProvider', () => ({ useNbme: mock.nbme }))
 vi.mock('../lib/supabase', () => ({ supabase: { auth: {}, from: () => { throw new Error('El harness no permite consultar Supabase') } } }))
-vi.mock('../data/corpus', () => ({ cargarTodo: mock.concepts, cargarConceptos: vi.fn(), cargarModulo: vi.fn() }))
-vi.mock('../semana/api', () => ({ cargarSesionesSemana: mock.sessions, cargarHistorialSesiones: mock.sessions, guardarAvance: vi.fn() }))
+vi.mock('../data/corpus', () => ({ cargarTodo: mock.concepts, cargarConceptos: mock.conceptsById, cargarModulo: vi.fn() }))
+vi.mock('../semana/api', () => ({ cargarHistorialSesiones: mock.sessions, guardarAvance: vi.fn() }))
 vi.mock('../plan/api', () => ({ cargarTopics: async () => [], cargarPlanSemana: mock.plan, cargarAdherencia: async () => [
   { eventoId: 'DEMO-S1', titulo: 'S1 · Demostración', hechas: 12, tareas: 15 },
   { eventoId: 'DEMO-S2', titulo: 'S2 · Demostración', hechas: 7, tareas: 15 },
@@ -68,24 +68,34 @@ beforeEach(() => {
   mock.auth.mockReturnValue({ user: null, session: null, loading: false, signOut: vi.fn() })
   mock.nbme.mockReturnValue({ state: emptyNbmeState(), catalog: { schemaVersion: 1, bankVersion: 'demo', total: 0, questions: [] }, loading: false, busy: false, syncStatus: { state: 'synced' }, pauseSession: vi.fn() })
   mock.concepts.mockResolvedValue(conceptos); mock.sessions.mockResolvedValue(sesiones); mock.plan.mockResolvedValue(plan)
+  mock.conceptsById.mockImplementation(async (ids: string[]) => new Map(conceptos.filter(c => ids.includes(c.concept_id)).map(c => [c.concept_id, c])))
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); vi.unstubAllGlobals() })
 
 it('exports real screen DOM with synthetic providers and no network, auth bypass or medical corpus', async () => {
   const out = process.env.MELMAN_DESIGN_EXPORT
-  const styles = ['nbme/nbme.css', 'auth/auth.css', 'styles.css', 'editorial.css', 'organic.css', 'cinema.css', 'studio.css', 'piel-estudio.css']
+  const styles = ['nbme/nbme.css', 'auth/auth.css', 'styles.css', 'editorial.css', 'organic.css', 'cinema.css', 'studio.css', 'hoy.css', 'piel-estudio.css']
   if (out) {
     mkdirSync(resolve(out, 'styles'), { recursive: true })
     for (const file of styles) writeFileSync(resolve(out, 'styles', file.replaceAll('/', '-')), readFileSync(resolve('src', file)))
   }
-  for (const [file, route] of [['semana', 'semana'], ['biblioteca', 'modulos'], ['progreso', 'progreso'], ['recuperacion', 'recuperacion'], ['acceso', 'auth']] as const) {
+  // `hoy-detalle` es la misma portada con sus tres desplegables abiertos: lo que antes eran
+  // Mi semana, Recuperación y Progreso sigue teniendo revisión visual.
+  for (const [file, route] of [['hoy', 'hoy'], ['hoy-detalle', 'hoy'], ['biblioteca', 'modulos'], ['acceso', 'auth']] as const) {
     window.history.replaceState(null, '', `/#${route}`)
-    await act(async () => { root.render(route === 'auth' ? <AuthGate>{() => <div>Unexpected private session</div>}</AuthGate> : <App key={route} />) })
+    await act(async () => { root.render(route === 'auth' ? <AuthGate>{() => <div>Unexpected private session</div>}</AuthGate> : <App key={file} />) })
     await act(async () => { await Promise.resolve() })
+    if (file === 'hoy-detalle') {
+      for (const resumen of [...host.querySelectorAll<HTMLElement>('.hoy-desplegable > summary')]) {
+        await act(async () => { resumen.click() })
+        await act(async () => { await Promise.resolve() })
+      }
+      expect(host.querySelectorAll('.hoy-desplegable[open]')).toHaveLength(3)
+      expect(host.querySelectorAll('.plan-dia')).not.toHaveLength(0)
+    }
     expect(host.querySelector('h1')).not.toBeNull()
     expect(host.textContent).not.toContain('Cargando')
     expect(host.textContent).not.toContain('Unexpected private session')
-    if (route === 'semana') expect(host.querySelectorAll('.plan-panel')).toHaveLength(1)
     if (out) {
       // React's submit handler is absent after serialization. Keep QA forms inert too,
       // so a password typed into this static preview cannot become a native GET query.
@@ -100,5 +110,5 @@ it('exports real screen DOM with synthetic providers and no network, auth bypass
     }
   }
   expect(network).not.toHaveBeenCalled()
-  if (out) writeFileSync(resolve(out, 'README.txt'), 'QA reproducible: MELMAN_DESIGN_EXPORT=../qa/melman-review npm test -- src/__tests__/design-export.test.tsx\nHTML estático de componentes REALES: App, Semana, Modulos, Progreso, Recuperacion, AuthGate. Solo movimiento decorativo; sin acceso a sesión/corpus/red.\nDatos sintéticos y reloj 16-sep-2026. CSS copiado en orden real verificado en el build (nbme, auth, styles, editorial, organic, cinema).\nRecursos públicos: /images/cinematic/, incluido luminous/ocean-desktop.webp. El host de revisión puede remapear ese prefijo sin cambiar el DOM de componentes.\n')
+  if (out) writeFileSync(resolve(out, 'README.txt'), 'QA reproducible: MELMAN_DESIGN_EXPORT=../qa/melman-review npm test -- src/__tests__/design-export.test.tsx\nHTML estático de componentes REALES: App, Hoy (plegada y con sus desplegables abiertos), Modulos, AuthGate. Solo movimiento decorativo; sin acceso a sesión/corpus/red.\nDatos sintéticos y reloj 16-sep-2026. CSS copiado en orden real verificado en el build (nbme, auth, styles, editorial, organic, cinema, studio, hoy, piel-estudio).\nRecursos públicos: /images/cinematic/, incluido luminous/ocean-desktop.webp. El host de revisión puede remapear ese prefijo sin cambiar el DOM de componentes.\n')
 })

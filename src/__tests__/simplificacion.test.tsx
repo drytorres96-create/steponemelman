@@ -3,9 +3,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConceptoZ, IndiceZ } from '../schema/concept'
 import { ESTADO_INICIAL, type EstadoApp } from '../store/model'
-import { nuevoProgreso } from '../srs/fsrs'
-import { construirPlanDiario } from '../lib/plan-estudio'
-import { cargaPorTiempo } from '../lib/tiempo'
 import { csvAuditoria, celdaCSV, jsonNotas } from '../lib/exportar-auditoria'
 
 const mock = vi.hoisted(() => ({ app: vi.fn(), cargar: vi.fn(), leer: vi.fn(), escribir: vi.fn(), descargar: vi.fn() }))
@@ -14,7 +11,6 @@ vi.mock('../store/db', () => ({ leer: mock.leer, escribir: mock.escribir }))
 vi.mock('../data/corpus', () => ({ cargarTodo: mock.cargar, cargarCuarentena: async () => ({ conceptos: [] }) }))
 vi.mock('../components/descarga', () => ({ useDescarga: () => ({ entregar: mock.descargar, dialogo: null }) }))
 import { Ajustes } from '../screens/Ajustes'
-import { MapaProgreso } from '../components/MapaProgreso'
 import { Auditoria } from '../screens/Auditoria'
 
 const c = ConceptoZ.parse({ concept_id: 'QA-uno', source: { doc: 'QA', doc_title: 'Documento sintético', page: 1, item_id: 'I', fragment: 'Ejemplo sintético.' },
@@ -24,7 +20,7 @@ const c = ConceptoZ.parse({ concept_id: 'QA-uno', source: { doc: 'QA', doc_title
 const cs = [c, ...['dos', 'tres', 'cuatro'].map(x => ConceptoZ.parse({ ...c, concept_id: `QA-${x}` }))]
 const indice = IndiceZ.parse({ schema_version: '1.0.0', corpus_version: '1.0.5', n_conceptos: 0, modulos: [], documentos: ['QA'], glosario: [], cuarentena: 0 })
 let host: HTMLDivElement, root: Root, estado: EstadoApp
-const guardar = vi.fn(), estudiar = vi.fn(), continuar = vi.fn()
+const guardar = vi.fn()
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.clearAllMocks()
@@ -74,37 +70,6 @@ describe('simplificación con datos conservados', () => {
     await click('Recargar valores')
     expect(host.querySelector<HTMLInputElement>('#criterio-recuperaciones')?.value).toBe('7')
     expect(guardar).not.toHaveBeenCalled()
-  })
-
-  it('Progreso recomienda el plan diario exacto, excluye material al día y empieza con el mapa plegado', async () => {
-    const now = Date.now()
-    const intento = { ts: now - 10000, resultado: 'correcta' as const, ms: 10000, tipo_error: 'ninguno' as const, calificacion: 3 as const,
-      interaccion: 'recuperacion_libre' as const, recuperacion_activa: true, pistas_usadas: 0, confianza_declarada: null }
-    estado.progreso = {
-      'QA-uno': { ...nuevoProgreso('QA-uno'), intentos: [intento], proxima: now - 1000 },
-      'QA-dos': { ...nuevoProgreso('QA-dos'), intentos: [{ ...intento, resultado: 'incorrecta' }], proxima: now + 86400000 },
-      'QA-cuatro': { ...nuevoProgreso('QA-cuatro'), intentos: [intento], proxima: now + 86400000 },
-    }
-    const plan = construirPlanDiario(cs, estado.progreso, cargaPorTiempo(20, estado.sesiones), now)
-    await act(async () => root.render(<MapaProgreso conceptos={cs} onEstudiar={estudiar} />))
-    expect(host.querySelector('details')?.open).toBe(false)
-    expect(host.textContent).not.toContain('Tres próximos pasos')
-    expect([...host.querySelectorAll('option')].some(o => o.value === 'aplicacion')).toBe(false)
-    await click('Estudiar 20 minutos')
-    expect(estudiar).toHaveBeenCalledWith(plan.conceptos.map(c => c.concept_id), expect.objectContaining({ ruta: 'guiada', presupuestoMinutos: 20 }))
-    expect(estudiar.mock.calls[0][0]).not.toContain('QA-cuatro')
-    const secundaria = host.querySelector<HTMLButtonElement>('[aria-label^="Endocrino, Farmacología:"]')!
-    await act(async () => secundaria.click())
-    await click('Practicar 4 conceptos')
-    expect(new Set(estudiar.mock.calls.at(-1)![0])).toEqual(new Set(cs.map(c => c.concept_id)))
-  })
-
-  it('la recomendación prioriza continuar y deja iniciar otra sesión como opción secundaria', async () => {
-    estado.reanudable = { modulo: 'M', sesion: 'repaso', indice: 0, ts: 1, titulo: 'Pendiente', conceptIds: ['QA-uno'] }
-    await act(async () => root.render(<MapaProgreso conceptos={cs} onEstudiar={estudiar} onContinuar={continuar} />))
-    expect(boton('Estudiar 20 minutos').closest('details')?.open).toBe(false)
-    await click('Continuar sesión guardada')
-    expect(continuar).toHaveBeenCalledOnce(); expect(estudiar).not.toHaveBeenCalled()
   })
 
   it('conserva una nota al cerrar con Escape y exporta también las que están fuera del filtro', async () => {

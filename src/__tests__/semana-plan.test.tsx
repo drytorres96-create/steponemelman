@@ -2,41 +2,28 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ESTADO_INICIAL } from '../store/model'
 import type { PlanCheckpoint, PlanSemana } from '../plan/tipos'
-import type { SesionSemanal } from '../semana/tipos'
 
 /**
- * La portada es el plan de la semana. Lo que se comprueba aquí es lo que decide
- * si Yoel empieza o no: un solo día abierto, el descanso sin casilla, la sesión
- * preparada dentro de su día, y una marca que la base no aceptó deshecha en
- * pantalla. Y que sin plan la pantalla siga sirviendo.
+ * El plan de la semana vive ahora dentro de «Cómo va todo», en Hoy. Lo que se
+ * comprueba es lo que ya decidía si se usaba: un solo día abierto, el descanso sin
+ * casilla, una marca que la base no aceptó deshecha en pantalla, y que una sesión
+ * preparada sea una fila más, sin puerta propia al estudio: su material entra por
+ * lo nuevo de Hoy.
  */
 
-const mock = vi.hoisted(() => ({
-  sesiones: vi.fn(), plan: vi.fn(), marcar: vi.fn(),
-}))
-vi.mock('../store/estado', () => ({ useApp: () => ({ estado: { ...ESTADO_INICIAL } }) }))
+const mock = vi.hoisted(() => ({ plan: vi.fn(), marcar: vi.fn() }))
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ session: { access_token: 'x'.repeat(30) } }) }))
-vi.mock('../nbme/NbmeProvider', () => ({ useNbme: () => ({ state: { attempts: {} } }) }))
-vi.mock('../semana/api', () => ({ cargarSesionesSemana: mock.sesiones }))
 vi.mock('../plan/api', () => ({
   cargarPlanSemana: mock.plan,
   marcarCheckpoint: mock.marcar,
   PlanEscrituraError: class extends Error {},
 }))
 
-import { Semana } from '../screens/Semana'
+import { CalendarioSemana } from '../screens/CalendarioSemana'
 
 const cp = (extra: Partial<PlanCheckpoint>): PlanCheckpoint =>
   ({ id: 1, idx: 1, dia: 1, kind: 'qbank', label: 'AMBOSS', done: false, doneAt: null, ...extra })
-
-const SESION: SesionSemanal = {
-  id: 'sesion-1', semana: 'S2', semanaInicio: '2026-09-14', dia: 1, orden: 1,
-  titulo: 'Farmacología endocrina 1/4 · Tiroides y suprarrenal', subtitulo: 'Antitiroideos y Wolff-Chaikoff.',
-  guion: [{ kind: 'concepto', id: 'CPT-1' }, { kind: 'concepto', id: 'CPT-2' }],
-  presupuestoMin: 30, estado: 'pendiente', cursor: 0, nbmeSessionId: null, completadaEn: null,
-}
 
 const PLAN: PlanSemana = {
   eventoId: 'S2', titulo: 'S2 · 14–19 sep · Reproductivo (1/2) + banco de Psiquiatría',
@@ -63,7 +50,6 @@ beforeEach(() => {
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
-  mock.sesiones.mockResolvedValue([SESION])
   mock.plan.mockResolvedValue(PLAN)
 })
 afterEach(async () => {
@@ -73,12 +59,9 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-const pintar = async (onAbrir = vi.fn()) => {
-  await act(async () => {
-    root.render(<Semana onAbrir={onAbrir} onRecuperacion={vi.fn()} onBiblioteca={vi.fn()} />)
-  })
+const pintar = async () => {
+  await act(async () => { root.render(<CalendarioSemana />) })
   await act(async () => { await Promise.resolve() })
-  return onAbrir
 }
 const dias = () => [...host.querySelectorAll<HTMLButtonElement>('.plan-dia-titulo')]
 const diaDe = (texto: string) => dias().find(b => b.textContent?.includes(texto))!
@@ -86,7 +69,7 @@ const seccionDe = (texto: string) => diaDe(texto).closest('.plan-dia')!
 const boton = (texto: string) => [...host.querySelectorAll('button')].find(b => b.textContent?.includes(texto))!
 const botonExacto = (texto: string) => [...host.querySelectorAll('button')].find(b => b.textContent?.trim() === texto)!
 
-describe('la portada muestra el plan de la semana', () => {
+describe('el plan de la semana dentro de Hoy', () => {
   it('abre el día de hoy y deja el resto plegado', async () => {
     await pintar()
     expect(host.textContent).toContain('S2 · 14–19 sep')
@@ -104,7 +87,6 @@ describe('la portada muestra el plan de la semana', () => {
     await pintar()
     // Cuatro tareas y un descanso; una hecha.
     expect(host.textContent).toContain('1 de 4 compromisos de esta semana')
-    expect(host.querySelector('.semana-balance-radial [role="img"]')?.getAttribute('aria-label')).toBe('tareas hechas: 1 de 4')
     expect(seccionDe('martes').textContent).toContain('1 pendiente')
     expect(seccionDe('jueves').textContent).toContain('Descanso')
   })
@@ -119,19 +101,15 @@ describe('la portada muestra el plan de la semana', () => {
     expect(dias().filter(b => b.getAttribute('aria-expanded') === 'true')).toHaveLength(1)
   })
 
-  it('la sesión preparada es una fila más de su día, con su tarjeta dentro', async () => {
-    const onAbrir = await pintar()
-    // No hay sección aparte de sesiones: la tarjeta vive dentro de la fila del checkpoint.
-    expect(host.querySelectorAll('.semana-grid')).toHaveLength(0)
-    const fila = host.querySelector('.plan-fila-sesion')!
-    expect(fila.textContent).toContain('Antitiroideos y Wolff-Chaikoff.')
-    expect(fila.textContent).toContain('2 conceptos · ~30 min')
-    await act(async () => { boton('Empezar sesión').click() })
-    expect(onAbrir).toHaveBeenCalledWith(SESION, expect.any(Function))
-
-    // Completar la sesión marca su checkpoint del plan: se acabó marcar dos veces.
+  it('una sesión preparada es una fila más, con su casilla y sin puerta propia al estudio', async () => {
+    await pintar()
+    const fila = [...host.querySelectorAll('.plan-fila')].find(f => f.textContent?.includes('Sesión de la semana 1/4'))!
+    expect(fila.querySelector('input[type="checkbox"]')).not.toBeNull()
+    // Ni «Empezar sesión» ni cronómetro: su material ya entra por lo nuevo de Hoy.
+    expect(fila.querySelectorAll('button')).toHaveLength(0)
+    expect(host.textContent).not.toContain('Empezar sesión')
     mock.marcar.mockResolvedValue({ ...PLAN.checkpoints[1], done: true })
-    await act(async () => { await onAbrir.mock.calls[0][1]() })
+    await act(async () => { (fila.querySelector('input[type="checkbox"]') as HTMLInputElement).click() })
     expect(mock.marcar).toHaveBeenCalledWith(64, true, 'x'.repeat(30))
   })
 
@@ -164,32 +142,17 @@ describe('la portada muestra el plan de la semana', () => {
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('No se pudo guardar')
   })
 
-  it('sin plan cae a las sesiones preparadas y lo dice en una línea', async () => {
+  it('sin plan lo dice en una línea y no inventa días', async () => {
     mock.plan.mockResolvedValue(null)
     await pintar()
-    expect(host.textContent).toContain('El plan no está disponible ahora mismo. Estas son las sesiones de la semana.')
-    expect(host.querySelectorAll('.semana-grid')).toHaveLength(1)
-    expect(host.textContent).toContain('Farmacología endocrina 1/4 · Tiroides y suprarrenal')
+    expect(host.textContent).toContain('El plan de la semana no está disponible ahora mismo.')
     expect(host.querySelectorAll('.plan-dia')).toHaveLength(0)
   })
 
-  it('la nota de la semana va plegada, no ocupando la primera pantalla', async () => {
+  it('la nota de la semana va plegada', async () => {
     await pintar()
     const nota = [...host.querySelectorAll('details')].find(d => d.textContent?.includes('Por qué esta semana es así'))!
     expect(nota.open).toBe(false)
     expect(nota.textContent).toContain('el banco de Psiquiatría cierra')
-  })
-
-  it('sin plan muestra primero las pendientes y conserva las completadas en un histórico plegable', async () => {
-    mock.plan.mockResolvedValue(null)
-    mock.sesiones.mockResolvedValue([{ ...SESION, id: 'hecha', titulo: 'Sesión anterior', estado: 'completada' }, SESION])
-    const abrir = await pintar()
-    const archivo = host.querySelector<HTMLDetailsElement>('.semana-historial')!
-    expect(archivo.open).toBe(false)
-    expect(archivo.textContent).toContain('Sesión anterior')
-    expect(host.querySelector('.semana-grid')?.textContent).toContain(SESION.titulo)
-    expect(host.querySelector('.semana-grid')?.textContent).not.toContain('Sesión anterior')
-    await act(async () => { boton('Empezar sesión').click() })
-    expect(abrir).toHaveBeenCalledWith(SESION)
   })
 })

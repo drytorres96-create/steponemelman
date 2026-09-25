@@ -32,7 +32,7 @@ vi.mock('../lib/supabase', () => ({
   },
 }))
 
-const { cargarSesionesSemana, guardarAvance, leerSesionSemanal } = await import('../semana/api')
+const { cargarHistorialSesiones, guardarAvance, leerSesionSemanal } = await import('../semana/api')
 
 const fila = (extra: Record<string, unknown> = {}) => ({
   id: '11111111-1111-4111-8111-111111111111',
@@ -61,7 +61,7 @@ afterEach(() => vi.restoreAllMocks())
 describe('lectura de las sesiones de la semana', () => {
   it('mapea entera una fila válida', async () => {
     respuesta = { data: [fila()], error: null }
-    const [sesion] = await cargarSesionesSemana()
+    const [sesion] = await cargarHistorialSesiones()
     expect(sesion).toEqual({
       id: '11111111-1111-4111-8111-111111111111',
       semana: 'S2', semanaInicio: '2026-09-14', dia: 3, orden: 1,
@@ -81,7 +81,7 @@ describe('lectura de las sesiones de la semana', () => {
       ],
       error: null,
     }
-    const sesiones = await cargarSesionesSemana()
+    const sesiones = await cargarHistorialSesiones()
     expect(sesiones).toHaveLength(1)
     expect(sesiones[0].id).toBe('11111111-1111-4111-8111-111111111111')
     expect(console.warn).toHaveBeenCalledTimes(3)
@@ -95,7 +95,7 @@ describe('lectura de las sesiones de la semana', () => {
 
   it('avisa cuando la consulta falla en lugar de devolver una semana vacía', async () => {
     respuesta = { data: null, error: { message: 'offline' } }
-    await expect(cargarSesionesSemana()).rejects.toThrow(/sesiones de la semana/)
+    await expect(cargarHistorialSesiones()).rejects.toThrow(/historial de sesiones/)
   })
 })
 

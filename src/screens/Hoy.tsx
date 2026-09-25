@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Anillo, AnilloDoble, type SegmentoAnillo } from '../components/comunes'
 import { ScenePhoto } from '../components/Editorial'
 import { useAuth } from '../auth/AuthProvider'
@@ -20,6 +20,13 @@ import {
 import type { CriteriosDominio } from '../srs/mastery'
 import type { ProgresoConcepto } from '../srs/tipos'
 import { fechaISO } from '../lib/tiempo'
+import { cargarTodo } from '../data/corpus'
+import type { Concepto } from '../schema/concept'
+import { BandaDeCifras } from './ProgresoCifras'
+import { ProgresoHorizonte } from './ProgresoHorizonte'
+import { BandaAdherencia } from './ProgresoAdherencia'
+import { CalendarioSemana } from './CalendarioSemana'
+import { TablaPlanificador } from './TablaPlanificador'
 
 export interface MaterialNuevo {
   conceptIds: string[]
@@ -115,6 +122,44 @@ function sesionNuevoReutilizable(state: NbmeState, titulo: string, desde: number
   return null
 }
 
+/**
+ * Un desplegable cerrado por defecto que sólo monta su contenido al abrirse: lo que
+ * hay dentro carga el corpus, el plan o la adherencia, y nada de eso debe pagarse
+ * —ni verse— mientras nadie lo mira.
+ */
+function Desplegable({ titulo, children }: { titulo: string; children: () => ReactNode }) {
+  const [abierto, setAbierto] = useState(false)
+  return <details className="hoy-desplegable" open={abierto}>
+    <summary onClick={e => { e.preventDefault(); setAbierto(a => !a) }}>{titulo}</summary>
+    {abierto && <div className="hoy-desplegable-cuerpo">{children()}</div>}
+  </details>
+}
+
+/** «Cómo va todo»: las cifras de Progreso tal como estaban, la adherencia y el plan de la semana. */
+function ComoVaTodo() {
+  const { indice } = useApp()
+  const [conceptos, setConceptos] = useState<Concepto[] | null>(null)
+  const [fallo, setFallo] = useState(false)
+  const [reintento, setReintento] = useState(0)
+  useEffect(() => {
+    if (!indice) return
+    let vivo = true
+    setFallo(false)
+    cargarTodo(indice.modulos).then(cs => { if (vivo) setConceptos(cs) }).catch(() => { if (vivo) setFallo(true) })
+    return () => { vivo = false }
+  }, [indice, reintento])
+  return <div className="pila">
+    {conceptos ? <>
+      <BandaDeCifras conceptos={conceptos} ventana="semana" />
+      <ProgresoHorizonte conceptos={conceptos} />
+    </> : fallo ? <div className="pila"><p className="mini" role="alert">No se pudieron cargar las cifras del material. Tu progreso está a salvo.</p>
+      <div><button className="btn pequeno fantasma" onClick={() => setReintento(v => v + 1)}>Volver a intentar</button></div></div>
+      : <p className="mini" role="status">Cargando las cifras…</p>}
+    <BandaAdherencia />
+    <CalendarioSemana />
+  </div>
+}
+
 /** Repinta cada minuto: el día cambia a las 3:00 aunque la pestaña siga abierta. */
 function useTic(cada = 60_000): void {
   const [, setTic] = useState(0)
@@ -125,14 +170,17 @@ function useTic(cada = 60_000): void {
 }
 
 /**
- * La portada. Todo cabe en una pantalla y el techo lo pone el sitio: dos vías con
- * su cuenta y su botón, cajas primero y lo nuevo después. Cuando las dos se
- * cierran, los botones desaparecen y la pantalla dice qué se hizo hoy. Ningún
- * número de deuda: los techos ya dicen lo que hay que hacer.
+ * La portada, y la única pantalla. Todo cabe en ella y el techo lo pone el sitio:
+ * dos vías con su cuenta y su botón, cajas primero y lo nuevo después. Cuando las
+ * dos se cierran, los botones desaparecen y la pantalla dice qué se hizo hoy.
+ * Debajo, plegado, lo que antes vivía en Mi semana, Recuperación y Progreso.
+ * Ningún número de deuda fuera de los desplegables: los techos ya dicen lo que hay
+ * que hacer.
  */
-export function Hoy({ onNuevo, onCajas }: {
+export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
   onNuevo: (material: MaterialNuevo) => void
   onCajas: (items: ItemCaja[], titulo: string) => void
+  onBiblioteca: (tipo: 'conceptos' | 'preguntas') => void
 }) {
   const { indice, estado, sincronizacion } = useApp()
   const { session } = useAuth()
@@ -286,5 +334,16 @@ export function Hoy({ onNuevo, onCajas }: {
             </button>
           </section>}
     </div>
+
+    <Desplegable titulo="Cómo va todo">{() => <ComoVaTodo />}</Desplegable>
+    {/* Con el día cerrado no hay nada que mirar por qué ni otra puerta al estudio: el cierre no enlaza a más. */}
+    {!completo && <Desplegable titulo="Lo que estoy cerrando">{() => <TablaPlanificador items={cajas.items} ahora={ahora} />}</Desplegable>}
+    {!completo && <Desplegable titulo="Quiero hacer algo más">{() => <>
+      <p className="sutil">Puedes abrir la biblioteca y estudiar por tu cuenta lo que necesites.</p>
+      <div className="fila">
+        <button className="btn fantasma" onClick={() => onBiblioteca('conceptos')}>Elegir conceptos</button>
+        <button className="btn fantasma" onClick={() => onBiblioteca('preguntas')}>Elegir preguntas</button>
+      </div>
+    </>}</Desplegable>}
   </div>
 }

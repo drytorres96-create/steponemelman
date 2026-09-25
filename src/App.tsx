@@ -4,9 +4,6 @@ import { cargarConceptos, cargarModulo } from './data/corpus'
 import type { Concepto } from './schema/concept'
 import { Inicio } from './screens/Inicio'
 import { Modulos } from './screens/Modulos'
-import { Repaso } from './screens/Repaso'
-import { Recuperacion } from './screens/Recuperacion'
-import { Semana } from './screens/Semana'
 import { Hoy, type MaterialNuevo } from './screens/Hoy'
 import { SesionCajas, TITULO_NBME_CAJAS } from './screens/SesionCajas'
 import type { ItemCaja } from './lib/cajas'
@@ -15,7 +12,6 @@ import { SesionMixta } from './semana/SesionMixta'
 import { construirGuion } from './semana/guion'
 import type { SesionSemanal } from './semana/tipos'
 import { crearUUID } from './store/model'
-import { Progreso } from './screens/Progreso'
 import { Auditoria } from './screens/Auditoria'
 import { Ajustes } from './screens/Ajustes'
 import { Reproductor, type Cola } from './screens/Reproductor'
@@ -30,22 +26,20 @@ import { aplicarVariante, siguienteVariante } from './lib/variantes'
 import { useNbme } from './nbme/NbmeProvider'
 import { NbmeLibrary } from './nbme/NbmeLibrary'
 import { NbmePlayer } from './nbme/NbmePlayer'
-import { NbmeProgress } from './nbme/NbmeProgress'
 import { deriveNbmeSession } from './nbme/model'
 import type { FiltrosBusqueda } from './lib/busqueda'
-import type { NbmeQuestionRef } from './nbme/types'
 import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, type CinematicObject, type CinematicScene } from './components/Editorial'
 
-type Vista = 'hoy' | 'semana' | 'recuperacion' | 'progreso' | 'inicio' | 'modulos' | 'repaso' | 'auditoria' | 'ajustes'
+type Vista = 'hoy' | 'inicio' | 'modulos' | 'auditoria' | 'ajustes'
   | 'estudio' | 'preguntas' | 'sesion' | 'cajas'
 /**
- * Una sola entrada: la portada pone el techo del día. Para estudiar más hay que
- * abrir el menú discreto y elegir contenido a propósito.
+ * Una sola entrada: la portada pone el techo del día y absorbe lo que antes eran Mi
+ * semana, Recuperación y Progreso. Para estudiar más hay que abrir el menú discreto
+ * y elegir contenido a propósito.
  */
 const NAV: { id: Vista; txt: string }[] = [{ id: 'hoy', txt: 'Hoy' }]
 const SECUNDARIAS: { id: Vista; txt: string }[] = [
   { id: 'modulos', txt: 'Elegir contenido' },
-  { id: 'semana', txt: 'Mi semana' }, { id: 'recuperacion', txt: 'Recuperación' }, { id: 'progreso', txt: 'Progreso' },
   { id: 'ajustes', txt: 'Ajustes y respaldo' },
   { id: 'auditoria', txt: 'Calidad del material' }, { id: 'inicio', txt: 'Plan diario clásico' },
 ]
@@ -60,12 +54,8 @@ const CON_PREGUNTAS: Vista[] = ['preguntas', 'sesion', 'cajas']
  */
 const SCENES: Record<Vista, { fondo: CinematicScene; ventana: CinematicScene; objeto: CinematicObject }> = {
   hoy: { fondo: 'dawn', ventana: 'constellation', objeto: 'crystal' },
-  semana: { fondo: 'constellation', ventana: 'dawn', objeto: 'crystal' },
-  recuperacion: { fondo: 'lens', ventana: 'stone', objeto: 'optical-violet' },
-  progreso: { fondo: 'horizon', ventana: 'ribbons', objeto: 'forest' },
   inicio: { fondo: 'dawn', ventana: 'forest', objeto: 'crystal' },
   modulos: { fondo: 'ribbons', ventana: 'constellation', objeto: 'crystal' },
-  repaso: { fondo: 'lens', ventana: 'stone', objeto: 'optical-violet' },
   auditoria: { fondo: 'stone', ventana: 'lens', objeto: 'neural-violet' },
   ajustes: { fondo: 'smoke', ventana: 'stone', objeto: 'optical-violet' },
   estudio: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
@@ -73,11 +63,13 @@ const SCENES: Record<Vista, { fondo: CinematicScene; ventana: CinematicScene; ob
   sesion: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
   cajas: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
 }
+/** Pantallas que Hoy absorbió: los enlaces guardados siguen llegando, ahora a la portada. */
+const ABSORBIDAS = ['semana', 'recuperacion', 'progreso', 'repaso']
+
 // A session queue is restored from the saved study state, never from the URL alone.
-function vistaDesdeHash(): Vista {
+export function vistaDesdeHash(): Vista {
   const value = location.hash.slice(1)
-  // `repaso` ya no está en la navegación, pero los enlaces guardados siguen llegando a su relevo.
-  if (value === 'repaso') return 'recuperacion'
+  if (ABSORBIDAS.includes(value)) return 'hoy'
   return [...NAV, ...SECUNDARIAS].some(n => n.id === value) ? value as Vista : 'hoy'
 }
 
@@ -92,10 +84,7 @@ export default function App() {
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tipoContenido, setTipoContenido] = useState<'conceptos' | 'preguntas'>('conceptos')
-  const [tipoProgreso, setTipoProgreso] = useState<'conceptos' | 'preguntas'>('conceptos')
-  const [ventanaProgreso, setVentanaProgreso] = useState<'semana' | 'general'>('semana')
-  // `vuelta` es la pantalla desde la que se abrió: al terminar la sesión se vuelve ahí.
-  const [sesionSemanal, setSesionSemanal] = useState<{ sesion: SesionSemanal; efimera: boolean; alCompletar?: () => void; vuelta: Vista } | null>(null)
+  const [sesionSemanal, setSesionSemanal] = useState<SesionSemanal | null>(null)
   const [cajasHoy, setCajasHoy] = useState<{ items: ItemCaja[]; titulo: string } | null>(null)
   const [filtrosConceptos, setFiltrosConceptos] = useState<Partial<FiltrosBusqueda> | undefined>()
   const contenido = useRef<HTMLElement>(null)
@@ -135,17 +124,6 @@ export default function App() {
   }
 
   /**
-   * Abre una sesión de la semana tal como viene planificada, sin recalcular su guion.
-   * `alCompletar` lo pone la pantalla de inicio para marcar el checkpoint del plan
-   * en cuanto la sesión se da por completada.
-   */
-  const abrirSesionSemanal = useCallback((sesion: SesionSemanal, alCompletar?: () => void) => {
-    setCola(null); setError(null)
-    setSesionSemanal({ sesion, efimera: false, alCompletar, vuelta: 'semana' })
-    setVista('sesion'); location.hash = 'sesion'
-  }, [])
-
-  /**
    * Lo nuevo de hoy: tres conceptos y una pregunta hasta el techo. Se arma al vuelo
    * desde lo que falta y no se guarda como sesión de la semana; lo estudiado se
    * registra igual, y eso es lo que cierra la vía.
@@ -154,11 +132,11 @@ export default function App() {
     const guion = construirGuion(conceptIds, preguntas, 3)
     if (!guion.length) return
     setCola(null); setError(null)
-    setSesionSemanal({ efimera: true, vuelta: 'hoy', sesion: {
+    setSesionSemanal({
       id: crearUUID(), semana: 'Hoy', semanaInicio: fechaISO(new Date()), dia: 1, orden: 1, titulo,
       subtitulo: 'Lo nuevo de hoy: tres conceptos y una pregunta.',
       guion, presupuestoMin: 30, estado: 'en_curso', cursor: 0, nbmeSessionId, completadaEn: null,
-    } })
+    })
     setVista('sesion'); location.hash = 'sesion'
   }, [])
 
@@ -168,27 +146,6 @@ export default function App() {
     setCola(null); setError(null); setSesionSemanal(null)
     setCajasHoy({ items, titulo })
     setVista('cajas'); location.hash = 'cajas'
-  }, [])
-
-  /** Recuperación en bloque de preguntas: una sesión NBME nueva con lo que quedó sin corregir. */
-  const abrirPreguntas = useCallback(async (refs: NbmeQuestionRef[], titulo: string) => {
-    if (!refs.length) return
-    if (await nbme.startSession(refs, { title: titulo, budgetMinutes: null })) ir('preguntas')
-  }, [nbme.startSession, ir])
-
-  /** Recuperación mixta al vuelo: el guion se construye aquí y no se guarda como sesión de la semana. */
-  const abrirMezcla = useCallback((conceptIds: string[], refs: NbmeQuestionRef[], titulo: string) => {
-    const guion = construirGuion(conceptIds, refs)
-    if (!guion.length) return
-    const hoy = new Date()
-    const iso = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
-    setCola(null); setError(null)
-    setSesionSemanal({ efimera: true, vuelta: 'recuperacion', sesion: {
-      id: crearUUID(), semana: 'Recuperación', semanaInicio: iso, dia: 1, orden: 1, titulo,
-      subtitulo: 'Sesión de recuperación armada con lo que tenías pendiente.',
-      guion, presupuestoMin: 30, estado: 'en_curso', cursor: 0, nbmeSessionId: null, completadaEn: null,
-    } })
-    setVista('sesion'); location.hash = 'sesion'
   }, [])
 
   const abrir = useCallback(async (moduloId: string, ruta: RutaId, limite: number, sesionId?: string, desde = 0, presupuestoMinutos?: 10 | 20 | 30) => {
@@ -310,23 +267,16 @@ export default function App() {
           {!cargando && vista === 'preguntas' && <NbmePlayer onSalir={() => { setTipoContenido('preguntas'); ir('modulos') }}
             onEstudiar={ids => { nbme.pauseSession(); void estudiarIds(ids) }}
             onBuscar={q => { nbme.pauseSession(); setFiltrosConceptos({ sistema: q.systems[0] ?? '', disciplina: q.disciplines[0] ?? '' }); setTipoContenido('conceptos'); ir('modulos') }} />}
-          {!cargando && vista === 'hoy' && <Hoy onNuevo={abrirNuevo} onCajas={abrirCajas} />}
+          {!cargando && vista === 'hoy' && <Hoy onNuevo={abrirNuevo} onCajas={abrirCajas}
+            onBiblioteca={tipo => { setTipoContenido(tipo); ir('modulos') }} />}
           {!cargando && vista === 'cajas' && cajasHoy && <SesionCajas key={cajasHoy.titulo + cajasHoy.items.length}
             items={cajasHoy.items} titulo={cajasHoy.titulo} onSalir={() => ir('hoy')} />}
           {!cargando && vista === 'cajas' && !cajasHoy && <div className="vacio"><p>Estas cajas ya no están abiertas.</p>
             <button className="btn" onClick={() => ir('hoy')}>Volver a Hoy</button></div>}
-          {!cargando && vista === 'semana' && <Semana onAbrir={abrirSesionSemanal} onRecuperacion={() => ir('recuperacion')}
-            onBiblioteca={tipo => { setTipoContenido(tipo); ir('modulos') }}
-            continuaciones={<>{estado.reanudable && <section className="tarjeta home-session"><div className="pila"><p className="editorial-eyebrow">Retomar sesión guardada fuera del plan</p><h2>{estado.reanudable.titulo || 'Conceptos'}</h2><button className="btn principal" onClick={() => void continuar()}>Continuar conceptos</button></div></section>}
-              {sesionPreguntasPendiente && <section className="tarjeta home-session"><div className="pila"><p className="editorial-eyebrow">Retomar sesión guardada fuera del plan</p><h2>{sesionPreguntasPendiente.title}</h2><button className="btn" disabled={nbme.loading || nbme.busy} onClick={() => void continuarPreguntas()}>Continuar preguntas</button>{nbme.error && <p role="alert">{nbme.error}</p>}</div></section>}</>} />}
-          {!cargando && vista === 'sesion' && sesionSemanal && <SesionMixta key={sesionSemanal.sesion.id}
-            sesion={sesionSemanal.sesion} efimera={sesionSemanal.efimera}
-            onCompletada={sesionSemanal.alCompletar} onSalir={() => ir(sesionSemanal.vuelta)}
-            etiquetaSalida={sesionSemanal.vuelta === 'hoy' ? 'Volver a Hoy' : sesionSemanal.vuelta === 'recuperacion' ? 'Volver a Recuperación' : undefined} />}
+          {!cargando && vista === 'sesion' && sesionSemanal && <SesionMixta key={sesionSemanal.id}
+            sesion={sesionSemanal} efimera onSalir={() => ir('hoy')} etiquetaSalida="Volver a Hoy" />}
           {!cargando && vista === 'sesion' && !sesionSemanal && <div className="vacio"><p>Esta sesión ya no está abierta.</p>
             <button className="btn" onClick={() => ir('hoy')}>Volver a Hoy</button></div>}
-          {!cargando && vista === 'recuperacion' && <Recuperacion onEstudiar={estudiarIds}
-            onPreguntas={(refs, titulo) => { void abrirPreguntas(refs, titulo) }} onMezclar={abrirMezcla} />}
           {!cargando && vista === 'inicio' && <div className="pila"><StudyHero />
             {sesionPreguntasPendiente && <section className="tarjeta home-session"><div className="pila">
               <p className="editorial-eyebrow">Tu sesión guardada</p><h2>Continúa tus preguntas</h2><p className="sutil">{sesionPreguntasPendiente.title}</p>
@@ -340,19 +290,6 @@ export default function App() {
             <button className={`btn${tipoContenido === 'preguntas' ? ' principal' : ' fantasma'}`} aria-pressed={tipoContenido === 'preguntas'} onClick={() => setTipoContenido('preguntas')}>Preguntas</button>
           </div>{tipoContenido === 'preguntas' ? <NbmeLibrary onStart={() => ir('preguntas')} />
             : <Modulos onEstudiar={estudiarIds} seleccion={seleccionManual} onSeleccion={setSeleccionManual} filtrosIniciales={filtrosConceptos} />}</div>}
-          {!cargando && vista === 'repaso' && <Repaso onEstudiar={estudiarIds} />}
-          {!cargando && vista === 'progreso' && <div className="section-workspace"><div className="section-toolbar progreso-controles">
-            <div className="fila" role="group" aria-label="Tipo de progreso">
-              <button className={`btn${tipoProgreso === 'conceptos' ? ' principal' : ' fantasma'}`} aria-pressed={tipoProgreso === 'conceptos'} onClick={() => setTipoProgreso('conceptos')}>Conceptos</button>
-              <button className={`btn${tipoProgreso === 'preguntas' ? ' principal' : ' fantasma'}`} aria-pressed={tipoProgreso === 'preguntas'} onClick={() => setTipoProgreso('preguntas')}>Preguntas</button>
-            </div>
-            <div className="fila" role="group" aria-label="Ventana del progreso">
-              <button className={`btn${ventanaProgreso === 'semana' ? ' principal' : ' fantasma'}`} aria-pressed={ventanaProgreso === 'semana'} onClick={() => setVentanaProgreso('semana')}>Esta semana</button>
-              <button className={`btn${ventanaProgreso === 'general' ? ' principal' : ' fantasma'}`} aria-pressed={ventanaProgreso === 'general'} onClick={() => setVentanaProgreso('general')}>General</button>
-            </div>
-          </div>{tipoProgreso === 'preguntas'
-            ? <NbmeProgress ventana={ventanaProgreso} onContinuar={() => { setTipoContenido('preguntas'); ir('modulos') }} />
-            : <Progreso ventana={ventanaProgreso} onEstudiar={estudiarIds} onContinuar={continuar} />}</div>}
           {!cargando && vista === 'auditoria' && <Auditoria />}
           {!cargando && vista === 'ajustes' && <Ajustes />}
           </div>

@@ -59,23 +59,6 @@ export function leerSesionSemanal(fila: unknown): SesionSemanal | null {
   }
 }
 
-/** Todas las sesiones del usuario que siguen vivas, en orden de calendario. */
-export async function cargarSesionesSemana(): Promise<SesionSemanal[]> {
-  const { data, error } = await supabase.from('weekly_sessions').select('*')
-    .neq('estado', 'auditada')
-    .order('semana_inicio', { ascending: true })
-    .order('dia', { ascending: true })
-    .order('orden', { ascending: true })
-  if (error) throw new Error('No se pudieron cargar tus sesiones de la semana. Revisa la conexión y vuelve a intentarlo.')
-  const sesiones: SesionSemanal[] = []
-  for (const fila of data ?? []) {
-    const sesion = leerSesionSemanal(fila)
-    if (sesion) sesiones.push(sesion)
-    else console.warn('Sesión semanal descartada: el guion no tiene un formato válido.', (fila as { id?: unknown })?.id)
-  }
-  return sesiones
-}
-
 export interface ResultadoAvance { ok: boolean; aviso?: string }
 
 /**
@@ -97,8 +80,8 @@ export async function guardarAvance(id: string, avance: AvanceSesion): Promise<R
 }
 
 /**
- * Todas las sesiones planificadas, auditadas incluidas. La portada las oculta en
- * cuanto se auditan; Progreso las necesita para medir el ritmo real de la semana.
+ * Todas las sesiones planificadas, auditadas incluidas, en orden de calendario. Hoy
+ * saca de ellas el tema de la semana y las cifras miden con ellas el ritmo real.
  */
 export async function cargarHistorialSesiones(): Promise<SesionSemanal[]> {
   const { data, error } = await supabase.from('weekly_sessions').select('*')
@@ -106,5 +89,11 @@ export async function cargarHistorialSesiones(): Promise<SesionSemanal[]> {
     .order('dia', { ascending: true })
     .order('orden', { ascending: true })
   if (error) throw new Error('No se pudo cargar el historial de sesiones planificadas.')
-  return (data ?? []).map(leerSesionSemanal).filter((s): s is SesionSemanal => s !== null)
+  const sesiones: SesionSemanal[] = []
+  for (const fila of data ?? []) {
+    const sesion = leerSesionSemanal(fila)
+    if (sesion) sesiones.push(sesion)
+    else console.warn('Sesión semanal descartada: el guion no tiene un formato válido.', (fila as { id?: unknown })?.id)
+  }
+  return sesiones
 }

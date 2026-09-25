@@ -20,10 +20,21 @@
 .anillo-doble .centro b { display:block; font-size:30px; font-weight:400; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
 .anillo-doble .centro b span { font-size:16px; color:var(--texto-3); }
 .anillo-doble.cerrado .centro b { font-size:24px; }
+/* Los tres desplegables van debajo, cerrados y discretos: una barra de cristal con su título.
+   Abiertos, lo de dentro conserva sus propias tarjetas; el desplegable no añade otra capa encima. */
+.hoy-desplegable { border:1px solid var(--linea); border-radius:14px; background:var(--vidrio-barra); }
+.editorial-app .hoy-desplegable > summary { min-height:52px; padding:12px 20px; align-content:center; font-size:16px; color:var(--texto-2); }
+.hoy-desplegable[open] > summary { color:var(--texto); }
+.hoy-desplegable > summary:hover { color:var(--texto); }
+/* Una sola columna que puede encoger: las tablas anchas se desplazan dentro, no empujan la página. */
+.hoy-desplegable-cuerpo { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; padding:0 14px 14px; }
+.hoy-desplegable-cuerpo > .pila { gap:14px; }
 @media(max-width:650px) {
   .editorial-app:not(.study-focus) .hoy-cabecera { grid-template-columns:minmax(0,1fr); justify-items:center; text-align:center; gap:18px; }
   .editorial-app:not(.study-focus) .hoy-leyenda { margin-inline:auto; }
   .hoy-ahora { font-size:16px; padding:12px 16px; }
   .editorial-app:not(.study-focus) .hoy-bloque { grid-template-columns:auto minmax(0,1fr); gap:14px; padding:16px; }
   .hoy-bloque .btn { grid-column:1/-1; min-width:0; width:100%; }
+  .editorial-app .hoy-desplegable > summary { padding:12px 16px; }
+  .hoy-desplegable-cuerpo { padding:0 8px 8px; }
 }
