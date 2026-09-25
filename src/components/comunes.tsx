@@ -27,6 +27,66 @@ export function Anillo({ valor, total, tam = 108, etiqueta, oro = false }:
   )
 }
 
+export interface SegmentoAnillo { valor: number; total: number }
+export interface MedidaAnillo { valor: number; total: number; etiqueta: string }
+
+const fraccion = (valor: number, total: number) => total ? Math.min(1, Math.max(0, valor / total)) : 0
+
+/**
+ * Anillo dentro de anillo. El interior es el día y se cierra en oro cuando el día
+ * está completo; el exterior es el tema de la semana, partido en un tramo por
+ * sesión, como los segmentos de los anillos de bioquímica.
+ *
+ * La pista es una línea fina en `--linea-interactiva` (más de 3:1 sobre el fondo)
+ * y el avance un trazo grueso encima: así el borde del avance contrasta con el
+ * fondo y no depende de distinguirse de la pista. Un solo `role="img"` lleva las
+ * dos cifras; el SVG es decorativo.
+ */
+export function AnilloDoble({ interior, exterior, segmentos, cerrado = false, tam = 196 }: {
+  interior: MedidaAnillo; exterior: MedidaAnillo; segmentos: SegmentoAnillo[]; cerrado?: boolean; tam?: number
+}) {
+  const gradiente = useId()
+  const c = tam / 2
+  const rExt = c - 7, rInt = c - 29
+  const circExt = 2 * Math.PI * rExt, circInt = 2 * Math.PI * rInt
+  const tramos = segmentos.length ? segmentos : [{ valor: exterior.valor, total: exterior.total }]
+  const paso = circExt / tramos.length
+  const hueco = tramos.length > 1 ? Math.min(8, paso * 0.18) : 0
+  const avanceInt = cerrado ? 1 : fraccion(interior.valor, interior.total)
+  const transicion = { transition: 'stroke-dasharray .6s cubic-bezier(.2,.8,.2,1)' }
+  return (
+    <div className={`anillo anillo-doble${cerrado ? ' cerrado' : ''}`} style={{ width: tam, height: tam }} role="img"
+      aria-label={`${interior.etiqueta}: ${interior.valor} de ${interior.total}. ${exterior.etiqueta}: ${exterior.valor} de ${exterior.total}.`}>
+      <svg width={tam} height={tam} aria-hidden="true">
+        <defs>
+          <linearGradient id={gradiente} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={cerrado ? 'var(--oro)' : 'var(--violeta)'} />
+            <stop offset="100%" stopColor={cerrado ? 'var(--oro)' : 'var(--magenta)'} />
+          </linearGradient>
+        </defs>
+        {tramos.map((t, i) => {
+          const largo = paso - hueco
+          const desplazamiento = -(i * paso + hueco / 2)
+          return <g key={i}>
+            <circle cx={c} cy={c} r={rExt} fill="none" stroke="var(--linea-interactiva)" strokeWidth="2"
+              strokeDasharray={`${largo} ${circExt - largo}`} strokeDashoffset={desplazamiento} />
+            <circle cx={c} cy={c} r={rExt} fill="none" stroke="var(--violeta)" strokeWidth="9" strokeLinecap="butt"
+              strokeDasharray={`${largo * fraccion(t.valor, t.total)} ${circExt}`} strokeDashoffset={desplazamiento} style={transicion} />
+          </g>
+        })}
+        <circle cx={c} cy={c} r={rInt} fill="none" stroke="var(--linea-interactiva)" strokeWidth="2" />
+        {/* Sin avance no se pinta nada: el extremo redondeado de un trazo vacío dejaría un punto. */}
+        {avanceInt > 0 && <circle cx={c} cy={c} r={rInt} fill="none" strokeWidth="13" strokeLinecap="round" stroke={`url(#${gradiente})`}
+          strokeDasharray={`${circInt * avanceInt} ${circInt}`} style={transicion} />}
+      </svg>
+      <div className="centro">
+        {cerrado ? <b style={{ color: 'var(--oro)' }}>Listo</b> : <b>{interior.valor}<span>/{interior.total}</span></b>}
+        <small>hoy</small>
+      </div>
+    </div>
+  )
+}
+
 export function Barra({ valor, total, oro = false, etiqueta = 'Progreso' }: { valor: number; total: number; oro?: boolean; etiqueta?: string }) {
   const pct = total ? Math.min(100, Math.max(0, Math.round((valor / total) * 100))) : 0
   return <div className={`barra-prog${oro ? ' oro' : ''}`} role="progressbar"

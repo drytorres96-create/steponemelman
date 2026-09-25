@@ -1,7 +1,7 @@
 {
   "name": "steponemelman",
   "private": true,
-  "version": "1.18.0",
+  "version": "1.19.0",
   "type": "module",
   "description": "Plataforma adaptativa de estudio para USMLE Step 1 construida sobre un corpus m\u00e9dico en revisi\u00f3n",
   "scripts": {

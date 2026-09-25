@@ -18,8 +18,8 @@ import type { EstadoSesion, SesionSemanal } from './tipos'
  * sigue viviendo en `study_state` y `nbme_state`; `weekly_sessions` sólo guarda
  * por dónde va, así que un fallo al guardar la posición no borra nada estudiado.
  */
-export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada }:
-  { sesion: SesionSemanal; onSalir: () => void; efimera?: boolean; onCompletada?: () => void }) {
+export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, etiquetaSalida = 'Volver a mis sesiones' }:
+  { sesion: SesionSemanal; onSalir: () => void; efimera?: boolean; onCompletada?: () => void; etiquetaSalida?: string }) {
   const { indice, estado, guardarReanudable } = useApp()
   const nbme = useNbme()
   const nbmeRef = useRef(nbme)
@@ -174,7 +174,7 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada }:
   </div>
 
   if (error) return <div className="tarjeta pila" role="alert"><h2>No se pudo abrir la sesión</h2><p>{error}</p>
-    <button className="btn principal" onClick={onSalir}>Volver a mis sesiones</button></div>
+    <button className="btn principal" onClick={onSalir}>{etiquetaSalida}</button></div>
 
   if (cursor >= sesion.guion.length) return <section className="tarjeta pila" aria-labelledby="sesion-mixta-fin">
     <div><span className={`etq ${cobertura.cumple ? 'verde' : 'ambar'}`}>{cobertura.cumple ? 'Sesión completada' : 'Recorrido terminado'}</span>
@@ -183,13 +183,14 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada }:
     <p>Respondiste {cobertura.hechos} de {cobertura.pasos} pasos: {cobertura.conceptos.hechos} de {cobertura.conceptos.total} conceptos y {cobertura.preguntas.hechas} de {cobertura.preguntas.total} preguntas.</p>
     <p>{resumen.independientes} de {resumen.vistos} respuestas de concepto resueltas sin ayuda.</p>
     {vista && <p>{vista.firstCorrect} de {sinConflicto} preguntas NBME acertadas en primera vuelta.</p>}
-    {vista && vista.pendingErrors > 0 && <p className="sutil">{vista.pendingErrors} preguntas quedan pendientes de corregir; las encontrarás en Recuperación.</p>}
-    {!cobertura.cumple && <p className="sutil">La sesión no queda marcada como completada hasta que respondas al menos {Math.ceil(cobertura.pasos * 0.85)} de sus {cobertura.pasos} pasos. Acertar no hace falta; responder sí.</p>}
+    {vista && vista.pendingErrors > 0 && <p className="sutil">{vista.pendingErrors} preguntas quedan pendientes de corregir; vuelven en las cajas de los próximos días.</p>}
+    {/* Una sesión armada al vuelo no tiene fila que marcar: el umbral no le dice nada. */}
+    {!cobertura.cumple && !efimera && <p className="sutil">La sesión no queda marcada como completada hasta que respondas al menos {Math.ceil(cobertura.pasos * 0.85)} de sus {cobertura.pasos} pasos. Acertar no hace falta; responder sí.</p>}
     {aviso && <p className="mini">{aviso}</p>}
     <div className="fila">
       {!cobertura.cumple && cobertura.primeroPendiente >= 0 && <button className="btn principal"
         onClick={() => avanzarA(cobertura.primeroPendiente)}>Volver a los pasos que faltan</button>}
-      <button className={`btn${cobertura.cumple ? ' principal' : ''}`} onClick={onSalir}>Volver a mis sesiones</button>
+      <button className={`btn${cobertura.cumple ? ' principal' : ''}`} onClick={onSalir}>{etiquetaSalida}</button>
     </div>
   </section>
 
@@ -199,7 +200,7 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada }:
     if (!cola) return <div className="tarjeta pila" role="alert"><h2>Este tramo no está disponible</h2>
       <p>Los conceptos de este tramo no están en el corpus publicado ahora mismo. Puedes seguir con el resto de la sesión.</p>
       <div className="fila"><button className="btn principal" onClick={() => avanzarA((tramo?.inicio ?? cursor) + (tramo?.ids.length ?? 1))}>Continuar la sesión</button>
-        <button className="btn fantasma" onClick={onSalir}>Volver a mis sesiones</button></div></div>
+        <button className="btn fantasma" onClick={onSalir}>{etiquetaSalida}</button></div></div>
     if (tramoListo !== claveTramo) return <div className="vacio" role="status">Preparando el tramo de conceptos…</div>
     return <div className="pila">{encabezado}
       {aviso && <p className="mini">{aviso}</p>}
@@ -211,7 +212,7 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada }:
   return <div className="pila">{encabezado}
     {aviso && <p className="mini">{aviso}</p>}
     {!nbmeId && nbme.error && <div className="tarjeta" role="alert"><p>{nbme.error}</p></div>}
-    <NbmePlayer modoPaso etiquetaSalida="Volver a mis sesiones" onSalir={onSalir}
+    <NbmePlayer modoPaso etiquetaSalida={etiquetaSalida} onSalir={onSalir}
       onPasoCompleto={() => { nbme.nextQuestion(); avanzarA(cursor + 1) }} />
   </div>
 }
