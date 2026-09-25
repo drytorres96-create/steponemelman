@@ -179,4 +179,17 @@ describe('la portada muestra el plan de la semana', () => {
     expect(nota.open).toBe(false)
     expect(nota.textContent).toContain('el banco de Psiquiatría cierra')
   })
+
+  it('sin plan muestra primero las pendientes y conserva las completadas en un histórico plegable', async () => {
+    mock.plan.mockResolvedValue(null)
+    mock.sesiones.mockResolvedValue([{ ...SESION, id: 'hecha', titulo: 'Sesión anterior', estado: 'completada' }, SESION])
+    const abrir = await pintar()
+    const archivo = host.querySelector<HTMLDetailsElement>('.semana-historial')!
+    expect(archivo.open).toBe(false)
+    expect(archivo.textContent).toContain('Sesión anterior')
+    expect(host.querySelector('.semana-grid')?.textContent).toContain(SESION.titulo)
+    expect(host.querySelector('.semana-grid')?.textContent).not.toContain('Sesión anterior')
+    await act(async () => { boton('Empezar sesión').click() })
+    expect(abrir).toHaveBeenCalledWith(SESION)
+  })
 })

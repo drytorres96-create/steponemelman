@@ -350,13 +350,18 @@ export function Semana({ onAbrir, onRecuperacion, onBiblioteca, continuaciones }
     {!pendientes.length && <Vacio titulo="Nada pendiente por ahora" texto="Las sesiones hechas se quedan aquí hasta la auditoría de fin de semana."
       accion={<button className="btn" onClick={onRecuperacion}>Ir a Recuperación</button>} />}
 
-    {semanas.map(bloque => <section key={bloque.semana} className="pila" aria-labelledby={`semana-${bloque.semana}`}>
+    {semanas.filter(bloque => pendientes.some(s => s.semana === bloque.semana)).map(bloque => <section key={bloque.semana} className="pila" aria-labelledby={`semana-${bloque.semana}`}>
       <h2 id={`semana-${bloque.semana}`} className="rotulo">{bloque.semana} · {rotuloSemana(bloque.semanaInicio)}</h2>
       <div className="semana-grid">
-        {sesiones.filter(s => s.semana === bloque.semana).map(s =>
+        {pendientes.filter(s => s.semana === bloque.semana).map(s =>
           <Tarjeta key={s.id} sesion={s} cobertura={coberturaDe(s)} onAbrir={abrir} />)}
       </div>
     </section>)}
+    {sesiones.some(hecha) && <details className="tarjeta semana-historial">
+      <summary>Sesiones completadas · {sesiones.filter(hecha).length}</summary>
+      <div className="semana-grid">{sesiones.filter(hecha).map(s =>
+        <Tarjeta key={s.id} sesion={s} cobertura={coberturaDe(s)} onAbrir={abrir} />)}</div>
+    </details>}
 
     {continuaciones}
     {masCosas}

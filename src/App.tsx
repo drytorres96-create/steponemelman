@@ -30,7 +30,7 @@ import { NbmeProgress } from './nbme/NbmeProgress'
 import { deriveNbmeSession } from './nbme/model'
 import type { FiltrosBusqueda } from './lib/busqueda'
 import type { NbmeQuestionRef } from './nbme/types'
-import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, CinematicWindow, type CinematicObject, type CinematicScene } from './components/Editorial'
+import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, type CinematicObject, type CinematicScene } from './components/Editorial'
 
 type Vista = 'semana' | 'recuperacion' | 'progreso' | 'inicio' | 'modulos' | 'repaso' | 'auditoria' | 'ajustes'
   | 'estudio' | 'preguntas' | 'sesion'
@@ -61,13 +61,6 @@ const SCENES: Record<Vista, { fondo: CinematicScene; ventana: CinematicScene; ob
   preguntas: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
   sesion: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
 }
-/** El paisaje acompaña a las vistas de lectura corta; las herramientas anchas se quedan la pantalla. */
-const CON_PAISAJE: Vista[] = ['semana', 'recuperacion', 'progreso', 'inicio']
-const PIES_ESCENA: Partial<Record<Vista, string>> = {
-  semana: 'Tu semana empieza aquí.', recuperacion: 'Lo que vuelve, se queda.',
-  progreso: 'El horizonte se mide en semanas.', inicio: 'Un espacio para concentrarte.',
-}
-
 // A session queue is restored from the saved study state, never from the URL alone.
 function vistaDesdeHash(): Vista {
   const value = location.hash.slice(1)
@@ -259,7 +252,7 @@ export default function App() {
       <main id="contenido" ref={contenido} tabIndex={-1}>
         <div className="contenedor">
           {!enConcentracion && <div className="workspace-topline"><span>Mi espacio <span aria-hidden="true">/</span> {[...NAV, ...SECUNDARIAS].find(n => n.id === vista)?.txt}</span><span className="workspace-edition">Medicina · Aprendizaje activo</span></div>}
-          {/* La rejilla es la que recibe el paralaje: cada capa lo consume con un factor distinto. */}
+          {/* El fondo conserva la escena; la zona de trabajo ocupa el ancho disponible. */}
           <div className="cine-escenario" data-depth-scene data-depth-calm={enConcentracion ? 'true' : undefined}>
           <div className="cine-columna">
           {error && <div className="aviso" style={{ marginBottom: 16 }}><span>⚠</span><div>{error}</div></div>}
@@ -317,8 +310,6 @@ export default function App() {
           {!cargando && vista === 'auditoria' && <Auditoria />}
           {!cargando && vista === 'ajustes' && <Ajustes />}
           </div>
-          {!enConcentracion && CON_PAISAJE.includes(vista) &&
-            <CinematicWindow scene={SCENES[vista].ventana} object={SCENES[vista].objeto} caption={PIES_ESCENA[vista]} />}
           </div>
         </div>
       </main>
