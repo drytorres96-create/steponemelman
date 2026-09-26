@@ -16,6 +16,7 @@ const SUSTITUTOS: Record<string, string> = {
   'src/semana/api.ts': 'falso-semana-api.ts',
   'src/plan/api.ts': 'falso-plan-api.ts',
   'src/data/corpus.ts': 'falso-corpus.ts',
+  'src/vinetas/api.ts': 'falso-vinetas-api.ts',
 }
 
 export default defineConfig({
