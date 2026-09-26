@@ -100,6 +100,23 @@ describe('reproductor en una caja', () => {
     expect(document.activeElement?.textContent).toBe('Siguiente pregunta')
   })
 
+  it('Intro corrige y se consume: la misma pulsación no llega a «Siguiente pregunta» y la corrección se ve', async () => {
+    await pintar({ reintento: false, avisoFallo: 'Vuelve dentro de unos pasos.' })
+    const input = host.querySelector<HTMLInputElement>('input[type="text"]')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'beta')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const intro = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    await act(async () => { input.dispatchEvent(intro) })
+    await act(async () => { await Promise.resolve() })
+    // Sin cancelar, el navegador entrega el keypress al botón que acaba de recibir el foco y la corrección se salta.
+    expect(intro.defaultPrevented).toBe(true)
+    expect(mock.intentos).toHaveLength(1)
+    expect(document.activeElement?.textContent).toBe('Siguiente pregunta')
+    expect(host.textContent).toContain('Vuelve dentro de unos pasos.')
+  })
+
   it('una reinserción se presenta y se registra como corrección con explicación previa', async () => {
     await pintar({ reintento: true, avisoFallo: 'Por hoy ya está.' })
     expect(host.textContent).toContain('Volvemos a un concepto de esta sesión')
