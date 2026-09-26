@@ -159,7 +159,7 @@ describe('continuidad y navegación accesible', () => {
     await abrirDesplegable('Cómo va todo')
     expect(host.querySelector('[aria-label="Resumen de esta semana"]')).not.toBeNull()
     expect(host.querySelectorAll('.progress-ring-layer')).toHaveLength(3)
-    expect(host.textContent).toContain('Cubrir el material en 10 semanas')
+    expect(host.textContent).toContain('Meta de 60 días')
   })
 
   it('ya no quedan las secciones retiradas del progreso', async () => {

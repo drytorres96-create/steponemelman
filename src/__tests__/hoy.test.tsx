@@ -209,7 +209,7 @@ describe('portada Hoy', () => {
     expect(onBiblioteca).toHaveBeenLastCalledWith('conceptos')
   })
 
-  it('«Cómo va todo» reúne las cifras, la adherencia y el plan de la semana, también con el día cerrado', async () => {
+  it('«Cómo va todo» reúne las cifras, la meta de 60 días, la adherencia y el plan de la semana, también con el día cerrado', async () => {
     mock.adherencia.mockResolvedValue([{ eventoId: 'S2', titulo: 'S2 · 14–19 sep · Reproductivo', inicio: '2026-09-14', hechas: 3, tareas: 4 }])
     mock.plan.mockResolvedValue({
       eventoId: 'S3', titulo: 'S3 · 21–26 sep · Renal y ácido-base', inicio: '2026-09-21', fin: '2026-09-26', nota: null,
@@ -223,7 +223,7 @@ describe('portada Hoy', () => {
 
     await abrir('Cómo va todo')
     expect(host.querySelector('[aria-label="Resumen de esta semana"]')).not.toBeNull()
-    expect(host.querySelector('#horizonte-titulo')?.textContent).toContain('Cubrir el material en')
+    expect(host.querySelector('#meta-titulo')?.textContent).toContain('Meta de 60 días')
     expect(host.querySelector('.plan-adherencia')?.textContent).toContain('75 %')
     // El calendario de la semana va aquí dentro, con el día de hoy abierto.
     expect(host.querySelector('.plan-dia-titulo[aria-expanded="true"]')?.textContent).toContain('HOY · jueves')

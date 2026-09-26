@@ -339,9 +339,9 @@ summary::marker { color: var(--violeta); }
 .semana-progreso, .nbme-forma-barra { width: 100%; height: 4px; }
 .semana-tarjeta .semana-progreso { margin-bottom: 2px; }
 
-.horizonte-tabla th[scope="row"] { white-space: nowrap; font-weight: 560; }
-.horizonte-tabla .horizonte-actual { background: var(--violeta-tenue); }
-.horizonte-tabla .horizonte-actual th[scope="row"] { color: var(--violeta-2); }
+.meta-tabla th[scope="row"] { white-space: nowrap; font-weight: 560; }
+.meta-tabla .meta-actual { background: var(--violeta-tenue); }
+.meta-tabla .meta-actual th[scope="row"] { color: var(--violeta-2); }
 
 /* ---------- Progreso por forma NBME ---------- */
 .nbme-formas { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); }

@@ -23,7 +23,7 @@ import { fechaISO } from '../lib/tiempo'
 import { cargarTodo } from '../data/corpus'
 import type { Concepto } from '../schema/concept'
 import { BandaDeCifras } from './ProgresoCifras'
-import { ProgresoHorizonte } from './ProgresoHorizonte'
+import { ProgresoMeta } from './ProgresoMeta'
 import { BandaAdherencia } from './ProgresoAdherencia'
 import { CalendarioSemana } from './CalendarioSemana'
 import { TablaPlanificador } from './TablaPlanificador'
@@ -135,7 +135,7 @@ function Desplegable({ titulo, children }: { titulo: string; children: () => Rea
   </details>
 }
 
-/** «Cómo va todo»: las cifras de Progreso tal como estaban, la adherencia y el plan de la semana. */
+/** «Cómo va todo»: las cifras de la semana, la meta de 60 días, la adherencia y el plan de la semana. */
 function ComoVaTodo() {
   const { indice } = useApp()
   const [conceptos, setConceptos] = useState<Concepto[] | null>(null)
@@ -151,7 +151,7 @@ function ComoVaTodo() {
   return <div className="pila">
     {conceptos ? <>
       <BandaDeCifras conceptos={conceptos} ventana="semana" />
-      <ProgresoHorizonte conceptos={conceptos} />
+      <ProgresoMeta conceptos={conceptos} />
     </> : fallo ? <div className="pila"><p className="mini" role="alert">No se pudieron cargar las cifras del material. Tu progreso está a salvo.</p>
       <div><button className="btn pequeno fantasma" onClick={() => setReintento(v => v + 1)}>Volver a intentar</button></div></div>
       : <p className="mini" role="status">Cargando las cifras…</p>}
