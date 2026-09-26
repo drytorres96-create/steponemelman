@@ -37,6 +37,10 @@ Guardar `state`, `revision` y `generation` juntos, bajo una clave local específ
 
 La base valida la estructura superior de `EstadoApp`, versión `1`, tamaño máximo de 16 MiB y revisiones dentro del rango entero seguro de JavaScript. El cliente valida el contenido profundo antes de leer o importar progreso. La cuenta del Dashboard de Supabase y las cuentas Auth de esta aplicación son identidades distintas: entrar al Dashboard no inscribe automáticamente un usuario en `app_members`.
 
+## Viñetas de mecanismo (piloto)
+
+`vinetas-schema.sql` crea `ai_vignettes`: viñetas de práctica generadas por IA, sin revisión clínica, para el piloto de 1.25.0. Cada fila lleva `set_id`, `position` y un `payload` JSON (enunciado y opciones en inglés; explicación en español con claves, mecanismo, distractores y patrón) que el cliente valida entera antes de enseñarla (`src/vinetas/modelo.ts`). RLS: sólo los miembros leen; ningún rol de la aplicación escribe. El contenido se carga por administración y no se guarda en el repositorio. No alimenta `study_state` ni `nbme_state`: lo que se responde se queda en el navegador.
+
 ## Verificación
 
 `verify.sql` prueba membresía, aislamiento entre usuarios, acceso anónimo, permisos, conflictos de revisión, cambio de generación, forma y tamaño del estado. Crea fixtures dentro de una transacción que termina con `ROLLBACK`; no envía mensajes. Un fallo detiene la transacción y debe acompañarse de `ROLLBACK`. El archivo incluye al final el procedimiento de dos sesiones para verificar concurrencia real; los conflictos secuenciales por sí solos no prueban carreras simultáneas.

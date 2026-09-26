@@ -1,0 +1,15 @@
+/* Viñetas de mecanismo (piloto 1.25.0). Reutiliza las clases del reproductor NBME. */
+.vinetas-disciplinas { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.vinetas-disciplina { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--linea); border-radius: 11px; background: var(--bg-2); }
+.vinetas-disciplina p { margin: 0; }
+.vinetas-disciplina .btn { align-self: flex-start; }
+.vinetas-cabecera { justify-content: space-between; align-items: center; }
+.vinetas-cabecera p { margin: 0; }
+.vinetas-lista, .vinetas-cadena { margin: 0; padding-left: 1.2em; line-height: 1.6; }
+.vinetas-lista li + li, .vinetas-cadena li + li { margin-top: 4px; }
+.vinetas-cadena { list-style: none; padding-left: 0; }
+.vinetas-cadena li { position: relative; padding-left: 1.6em; }
+.vinetas-cadena li::before { content: '→'; position: absolute; left: 0; color: var(--violeta-2); font-weight: 650; }
+.vinetas-cadena li:first-child::before { content: '•'; }
+.vinetas-patron { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--violeta-tenue); line-height: 1.55; }
+.vinetas-tu-opcion { margin: 0; line-height: 1.55; }

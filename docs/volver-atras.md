@@ -30,12 +30,14 @@ El rollback no toca GitHub: la próxima fusión a `main` vuelve a desplegar lo q
 
 - El progreso vive en Supabase (`study_state`, `nbme_state`) y en cada navegador. Ninguna
   versión de la aplicación lo guarda en el Worker, así que volver atrás no lo toca.
-- **No volver a una versión anterior a un cambio de `CORPUS_VERSION` ni de
-  `database/*.sql`.** Una versión no puede leer un progreso escrito con un
-  `CORPUS_VERSION` más nuevo, ni usar tablas que aún no existían.
-  - `CORPUS_VERSION` sigue en 1.0.5 desde la primera versión.
-  - El último cambio de `database/*.sql` fue el 11 de septiembre (el banco NBME):
-    cualquier versión posterior sirve.
+- **`CORPUS_VERSION` sigue en 1.0.5 desde la primera versión.** Una versión no puede leer
+  un progreso escrito con un `CORPUS_VERSION` más nuevo: si algún día cambia, no volver
+  a una versión anterior a ese cambio.
+- **Los cambios de la base han sido siempre aditivos**: tablas nuevas, nunca columnas
+  quitadas ni renombradas (`weekly_sessions` el 13 de septiembre, `ai_vignettes` en
+  1.25.0). Una versión anterior ignora las tablas que no conoce, así que sigue
+  funcionando con la base actual. Si algún día un cambio quita o renombra algo, las
+  versiones anteriores a él dejan de servir.
 - Desde 1.24.0, si una copia local no se puede leer, la aplicación la aparta sin borrarla
   y recupera el progreso de la cuenta, en vez de quedarse bloqueada.
 
