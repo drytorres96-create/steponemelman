@@ -185,11 +185,14 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
   const [checking, setChecking] = useState(false)
   const [membershipError, setMembershipError] = useState<string | null>(null)
   const checkGeneration = useRef(0)
+  /** El último acceso confirmado por el servidor, por cuenta. */
+  const verified = useRef<{ userId: string; allowed: boolean } | null>(null)
   const userId = user?.id
 
   const checkMembership = useCallback(async () => {
     const generation = ++checkGeneration.current
     if (!userId) {
+      verified.current = null
       setMembership(null)
       return
     }
@@ -198,9 +201,16 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
     try {
       const { data, error } = await supabase.from('app_members').select('user_id').eq('user_id', userId).maybeSingle()
       if (error) throw error
-      if (generation === checkGeneration.current) setMembership({ userId, allowed: data !== null })
+      if (generation === checkGeneration.current) {
+        verified.current = { userId, allowed: data !== null }
+        setMembership(verified.current)
+      }
     } catch {
       if (generation === checkGeneration.current) {
+        // Se comprueba otra vez al volver a la pestaña y al renovar la sesión. Si la red falla
+        // entonces, quien ya tenía acceso sigue estudiando: desmontar la aplicación cortaría
+        // la sesión a mitad, y el acceso real lo deciden las políticas RLS en cada petición.
+        if (verified.current?.userId === userId && verified.current.allowed) return
         setMembership(null)
         setMembershipError('No pudimos comprobar tu acceso. Revisa la conexión y vuelve a intentarlo.')
       }

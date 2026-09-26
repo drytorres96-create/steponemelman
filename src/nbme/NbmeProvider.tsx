@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { leer, escribir } from '../store/db'
+import { apartarCopia } from '../store/apartar'
 import { crearUUID } from '../store/model'
 import { createNbmeApi, parseNbmeCatalog, parseNbmeQuestion, questionRefKey, NbmeAccessError } from './api'
 import { preguntaConLecturasDudosas } from './texto'
@@ -33,6 +34,9 @@ interface NbmeContextValue {
   budgetReached: boolean
   error: string | null
   storageWarning: string | null
+  /** Aviso de arranque que no depende de guardar: la copia local estaba dañada y se apartó. */
+  localNotice: string | null
+  dismissLocalNotice(): void
   syncStatus: NbmeSyncStatus
   /**
    * `reuseRecentCatalog` evita volver a pedir el catálogo (~180 KB) si esta pestaña lo
@@ -88,6 +92,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [storageWarning, setStorageWarning] = useState<string | null>(null)
+  const [localNotice, setLocalNotice] = useState<string | null>(null)
   const [syncStatus, setSyncStatus] = useState<NbmeSyncStatus>({ state: 'initializing', message: 'Preparando tus preguntas…', lastSyncedAt: null })
   const [change, setChange] = useState(0)
   const [contentChange, setContentChange] = useState(0)
@@ -288,6 +293,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     setState(actual.current)
     setCatalog(null)
     setShownSessionId(null)
+    setLocalNotice(null)
     setLoading(true)
     questions.current.clear()
     const isCurrent = () => !stopped && mounted.current && epoch === aliveEpoch.current
@@ -302,12 +308,15 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       try { backup = JSON.parse(rawBackup || 'null') } catch { corruptBackup = true }
       const principal = parseSavedState(stored, userId)
       const fallback = parseSavedState(backup, userId)
-      if (corruptBackup && !principal) throw new Error('El respaldo de preguntas no es válido. No se ha sobrescrito.')
-      if ((stored !== null && !principal) || (backup !== null && !fallback)) {
-        if (!principal && !fallback) throw new Error('La copia local de preguntas no es válida. No se ha sobrescrito.')
+      // Como en el progreso de conceptos: una copia ilegible se aparta entera y las preguntas
+      // se recuperan de la cuenta, en vez de dejar el banco bloqueado.
+      const discarded = !principal && !fallback && (corruptBackup || stored !== null || backup !== null)
+      if (discarded && !await apartarCopia(key, `step1-backup:${key}`, { copia: stored, respaldo: corruptBackup ? rawBackup : backup })) {
+        throw new Error('La copia local de preguntas no es válida y no pudo apartarse.')
       }
       const saved = principal && fallback ? (principal.savedAt >= fallback.savedAt ? principal : fallback) : principal ?? fallback
       if (!isCurrent()) return
+      if (discarded) setLocalNotice('La copia de preguntas NBME de este dispositivo estaba dañada. Se apartó sin borrarla y tus preguntas se recuperaron de tu cuenta.')
       if (readFailure) setStorageWarning('No se pudo leer uno de los respaldos locales. Sincroniza para recuperar el progreso de tu cuenta.')
       actual.current = principal && fallback ? mergeNbmeStates(principal.state, fallback.state) : saved?.state ?? emptyNbmeState()
       setState(actual.current)
@@ -323,6 +332,14 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
           const snapshot = parseNbmeSnapshot(data)
           if (!snapshot || snapshot.user_id !== userId) throw new Error('El progreso remoto no es válido.')
           return snapshot
+        },
+        peek: async () => {
+          check()
+          const { data, error: failure } = await supabase.from('nbme_state').select('revision, generation').eq('user_id', userId).maybeSingle()
+          check()
+          if (failure) throw failure
+          return data && Number.isSafeInteger(data.revision) && typeof data.generation === 'string'
+            ? { revision: data.revision as number, generation: data.generation } : null
         },
         save: async ({ state: candidate, expectedRevision, generation }) => {
           check()
@@ -594,6 +611,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
   const value: NbmeContextValue = { catalog, state, currentSession, sessionView, currentQuestion, sessionQuestions,
     selectedOption, currentFeedback: sessionView?.attempt ?? null, filters: state.filters, loading, questionLoading, busy,
     elapsedMs, budgetReached, error: error ?? storageWarning, storageWarning, syncStatus, catalogStale,
+    localNotice, dismissLocalNotice: () => setLocalNotice(null),
     startSession, selectAnswer, checkAnswer, nextQuestion,
     pauseSession, resumeSession, discardSession, attemptsInSession, continueSession,
     continueWithoutBudget: continueSession, setFilters, syncNow, reloadCatalog, retryQuestionLoad, loadFigure }

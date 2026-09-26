@@ -334,3 +334,10 @@ label { font-size: .85rem; color: var(--texto-2); }
 .menu-cuenta-opciones{position:absolute;right:0;top:100%;z-index:20;display:grid;min-width:210px;max-width:calc(100vw - 32px);gap:6px;padding:10px;border:1px solid var(--linea);border-radius:12px;background:var(--panel);box-shadow:0 10px 30px #0005}
 .menu-cuenta-opciones .btn{text-align:left;white-space:normal}
 .reproductor [hidden]{display:none!important}.retro>details>summary{cursor:pointer;min-height:36px;align-content:center}.retro>details[open]{padding-bottom:8px}
+
+/* Avisos de arranque que se cierran y resguardos ante fallos (1.24.0). */
+.aviso-local { align-items: center; }
+.aviso-local > div { flex: 1; }
+.fallo-general { padding-top: 96px; max-width: 640px; }
+.fallo-general h1 { font-size: 1.4rem; }
+.fallo-detalle { white-space: pre-wrap; word-break: break-word; margin: 8px 0 0; }

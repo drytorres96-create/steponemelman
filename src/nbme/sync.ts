@@ -16,6 +16,8 @@ export interface NbmeSyncReply {
 export interface NbmeSyncTransport {
   load(): Promise<NbmeSnapshot | null>
   save(input: { state: NbmeState; expectedRevision: number; generation: string | null }): Promise<NbmeSyncReply>
+  /** Only the row's revision and generation; when they match the known snapshot there is nothing to download. */
+  peek?(): Promise<{ revision: number; generation: string } | null>
 }
 export function stableNbmeJson(value: unknown): string {
   return JSON.stringify(value, (_key, current: unknown) => {
@@ -63,6 +65,12 @@ export class NbmeSyncEngine {
   }
   fetchAndMerge(): Promise<void> {
     return this.enqueue(async () => {
+      if (this.remote && this.transport.peek) {
+        const version = await this.transport.peek()
+        // The local state already contains this revision: it was merged when it arrived.
+        if (version && this.remote && version.revision === this.remote.revision
+          && version.generation === this.remote.generation) return
+      }
       const response = await this.transport.load()
       if (response === null) {
         if (this.remote) throw new Error('El progreso remoto ya no existe; no se recreó con una copia antigua.')

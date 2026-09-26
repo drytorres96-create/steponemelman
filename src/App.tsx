@@ -29,6 +29,7 @@ import { NbmePlayer } from './nbme/NbmePlayer'
 import { deriveNbmeSession } from './nbme/model'
 import type { FiltrosBusqueda } from './lib/busqueda'
 import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, type CinematicObject, type CinematicScene } from './components/Editorial'
+import { Resguardo, FalloPantalla } from './components/Resguardo'
 
 type Vista = 'hoy' | 'inicio' | 'modulos' | 'auditoria' | 'ajustes'
   | 'estudio' | 'preguntas' | 'sesion' | 'cajas'
@@ -74,7 +75,7 @@ export function vistaDesdeHash(): Vista {
 }
 
 export default function App() {
-  const { listo, indice, estado, errorCarga, sincronizacion, sincronizarAhora } = useApp()
+  const { listo, indice, estado, errorCarga, sincronizacion, sincronizarAhora, avisoLocal, descartarAvisoLocal } = useApp()
   const { signOut } = useAuth()
   const nbme = useNbme()
   const [vista, setVista] = useState<Vista>(vistaDesdeHash)
@@ -87,6 +88,8 @@ export default function App() {
   const [sesionSemanal, setSesionSemanal] = useState<SesionSemanal | null>(null)
   const [cajasHoy, setCajasHoy] = useState<{ items: ItemCaja[]; titulo: string } | null>(null)
   const [filtrosConceptos, setFiltrosConceptos] = useState<Partial<FiltrosBusqueda> | undefined>()
+  /** Cambia la `key` del resguardo para volver a montar una pantalla que falló. */
+  const [reintento, setReintento] = useState(0)
   const contenido = useRef<HTMLElement>(null)
   const vistaAnterior = useRef(vista)
   const estudiando = CONCENTRACION.includes(vista)
@@ -253,8 +256,13 @@ export default function App() {
           <div className="cine-escenario" data-depth-scene data-depth-calm={enConcentracion ? 'true' : undefined}>
           <div className="cine-columna">
           {error && <div className="aviso" style={{ marginBottom: 16 }}><span>⚠</span><div>{error}</div></div>}
+          {!enConcentracion && [{ texto: avisoLocal, cerrar: descartarAvisoLocal }, { texto: nbme.localNotice, cerrar: nbme.dismissLocalNotice }]
+            .filter(a => a.texto).map(a => <div key={a.texto} className="aviso aviso-local" role="status" style={{ marginBottom: 16 }}>
+              <span>ℹ</span><div>{a.texto}</div><button className="btn pequeno fantasma" onClick={a.cerrar}>Entendido</button></div>)}
           {cargando && <div className="vacio">Preparando la sesión…</div>}
 
+          <Resguardo key={`${vista}:${reintento}`} alFallar={fallo => <FalloPantalla error={fallo}
+            onHoy={() => { setReintento(n => n + 1); ir('hoy') }} />}>
           {!cargando && vista === 'estudio' && cola && (
             <>
               <div style={{ maxWidth: 800, margin: '0 auto 14px' }}>
@@ -292,6 +300,7 @@ export default function App() {
             : <Modulos onEstudiar={estudiarIds} seleccion={seleccionManual} onSeleccion={setSeleccionManual} filtrosIniciales={filtrosConceptos} />}</div>}
           {!cargando && vista === 'auditoria' && <Auditoria />}
           {!cargando && vista === 'ajustes' && <Ajustes />}
+          </Resguardo>
           </div>
           </div>
         </div>

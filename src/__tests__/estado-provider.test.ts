@@ -5,14 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ESTADO_INICIAL, type EstadoApp } from '../store/model'
 import type { CloudSnapshot, SyncReply } from '../store/sync'
 
-const mocks = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), load: vi.fn(), rpc: vi.fn() }))
-vi.mock('../store/db', () => ({ leer: mocks.read, escribir: mocks.write }))
+const mocks = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn(), load: vi.fn(), rpc: vi.fn(), select: vi.fn() }))
+vi.mock('../store/db', () => ({ leer: mocks.read, escribir: mocks.write, borrar: mocks.remove }))
 vi.mock('../data/corpus', () => ({ cargarIndice: async () => null, cargarMigraciones: async () => ({}) }))
 vi.mock('../lib/supabase', () => ({ supabase: {
-  from: () => ({ select: () => ({ eq: () => ({ maybeSingle: mocks.load }) }) }), rpc: mocks.rpc,
+  from: () => ({ select: (columnas: string) => { mocks.select(columnas); return { eq: () => ({ maybeSingle: mocks.load }) } } }),
+  rpc: mocks.rpc,
 } }))
 
-import { ProveedorEstado, useApp } from '../store/estado'
+import { ProveedorEstado, useApp, AVISO_COPIA_APARTADA } from '../store/estado'
+import { nuevoProgreso, programar } from '../srs/fsrs'
+import { leerEstadoDesconocido } from '../store/model'
 
 let root: Root
 let host: HTMLDivElement
@@ -44,6 +47,7 @@ beforeEach(() => {
   root = createRoot(host)
   mocks.read.mockResolvedValue(null)
   mocks.write.mockResolvedValue(undefined)
+  mocks.remove.mockResolvedValue(undefined)
   mocks.load.mockImplementation(async () => ({ data: clone(row), error: failure ? new Error('offline') : null }))
   mocks.rpc.mockImplementation(async (_name: string, params: { p_state: EstadoApp; p_generation: string | null }) => {
     if (failure) return { data: null, error: new Error('offline') }
@@ -92,6 +96,8 @@ describe('proveedor de progreso', () => {
 
   it('comparte una sincronización concurrente y devuelve false cuando falla la red', async () => {
     await render()
+    // Un cambio que subir: sin cambios la sincronización ya no llama al servidor.
+    await act(async () => { api.iniciarSesion('M', 'repaso') })
     const original = mocks.rpc.mock.calls.length
     await act(async () => {
       const first = api.sincronizarAhora()
@@ -121,12 +127,75 @@ describe('proveedor de progreso', () => {
     root = createRoot(host)
   })
 
-  it('no transforma una generación de caché corrupta en un progreso nuevo', async () => {
+  it('aparta una copia local dañada y recupera el progreso de la cuenta sin mezclarla', async () => {
+    // La copia local trae un progreso legible con una revisión corrupta: no se aprovecha a medias.
+    const soloLocal = conIntento(ESTADO_INICIAL, 'LOCAL', 'intento-local')
+    const danada = { state: soloLocal, snapshot: { state: ESTADO_INICIAL, revision: -1 }, savedAt: 100 }
+    mocks.read.mockResolvedValue(danada)
+    localStorage.setItem('step1-respaldo:cuenta:user-a', '{ roto')
+    row = { state: conIntento(ESTADO_INICIAL, 'NUBE', 'intento-nube'), generation: 'generation-2', revision: 7,
+      user_id: 'user-a', updated_at: '2026-09-26T00:00:00Z' }
+    await render()
+    expect(api.errorCarga).toBeNull()
+    expect(api.listo).toBe(true)
+    expect(api.avisoLocal).toBe(AVISO_COPIA_APARTADA)
+    const apartada = mocks.write.mock.calls.find(([clave]) => String(clave).startsWith('apartada:cuenta:user-a:'))
+    expect(apartada?.[1]).toMatchObject({ copia: danada, respaldo: null })
+    expect(mocks.remove).toHaveBeenCalledWith(['cuenta:user-a'])
+    expect(Object.keys(api.estado.progreso)).toEqual(['NUBE'])
+    // Nada de la copia dañada llega a la nube.
+    expect(mocks.rpc.mock.calls.every(([, { p_state }]) => !('LOCAL' in p_state.progreso))).toBe(true)
+    expect(row?.state.progreso).not.toHaveProperty('LOCAL')
+    expect(api.sincronizacion.estado).toBe('sincronizado')
+    await act(async () => { api.descartarAvisoLocal() })
+    expect(api.avisoLocal).toBeNull()
+  })
+
+  it('si la copia dañada no puede apartarse, no se sustituye', async () => {
     mocks.read.mockResolvedValue({ state: ESTADO_INICIAL, snapshot: { state: ESTADO_INICIAL, revision: -1 }, savedAt: 100 })
+    mocks.write.mockRejectedValue(new Error('sin espacio'))
     await render()
     expect(api.errorCarga).not.toBeNull()
+    expect(mocks.remove).not.toHaveBeenCalled()
     expect(mocks.load).not.toHaveBeenCalled()
     expect(mocks.rpc).not.toHaveBeenCalled()
-    expect(mocks.write).not.toHaveBeenCalled()
+  })
+
+  it('sin cambios, sincronizar sólo consulta la revisión: ni baja ni sube el progreso', async () => {
+    await render()
+    await act(async () => { api.registrarIntento('A', intento('intento-a', Date.now())) })
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
+    const [subidas, escrituras] = [mocks.rpc.mock.calls.length, mocks.write.mock.calls.length]
+    mocks.select.mockClear()
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
+    expect(mocks.select.mock.calls.map(([columnas]) => columnas)).toEqual(['revision, generation'])
+    expect(mocks.rpc.mock.calls.length).toBe(subidas)
+    expect(mocks.write.mock.calls.length).toBe(escrituras)
+    // Si otro dispositivo guarda, la revisión cambia y entonces sí se baja y se fusiona.
+    row = { ...clone(row!), revision: row!.revision + 1, state: conIntento(row!.state, 'B', 'intento-b') }
+    mocks.select.mockClear()
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
+    expect(mocks.select.mock.calls.map(([columnas]) => columnas)).toEqual(['revision, generation', '*'])
+    expect(Object.keys(api.estado.progreso).sort()).toEqual(['A', 'B'])
+  })
+
+  it('exporta el progreso NBME junto al de conceptos y el archivo sigue siendo importable', async () => {
+    await render()
+    await act(async () => { api.registrarIntento('A', intento('intento-a', Date.now())) })
+    const archivo = JSON.parse(api.exportar({ nbme: { schemaVersion: 1, marca: 'preguntas' } }))
+    expect(archivo.nbme).toEqual({ schemaVersion: 1, marca: 'preguntas' })
+    expect(typeof archivo.exportado).toBe('string')
+    expect(leerEstadoDesconocido(archivo)?.progreso.A.intentos).toHaveLength(1)
+    expect(api.importar(JSON.stringify(archivo)).ok).toBe(true)
   })
 })
+
+function intento(attempt_id: string, ts: number) {
+  return { attempt_id, session_id: 'sesion-qa', ts, resultado: 'correcta' as const, calificacion: 3 as const,
+    interaccion: 'recuperacion_libre', recuperacion_activa: true, pistas_usadas: 0, ms: 100,
+    tipo_error: 'ninguno' as const, confianza_declarada: 2 as const }
+}
+function conIntento(estado: EstadoApp, id: string, attempt_id: string): EstadoApp {
+  const p = programar(estado.progreso[id] ?? nuevoProgreso(id), intento(attempt_id, 1_000), 1_000)
+  return { ...clone(estado), progreso: { ...clone(estado.progreso), [id]: p }, vistoAlguna: true }
+}
