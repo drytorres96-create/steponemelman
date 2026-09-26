@@ -59,12 +59,13 @@ vi.mock('../screens/Reproductor', () => ({ Reproductor: (props: {
   mock.reproductor({ id: props.cola.conceptos[0].concept_id, sessionId: props.cola.sessionId, ...props.modoCaja })
   return <div><p>Reproductor de conceptos {props.cola.conceptos[0].concept_id}</p><button onClick={props.onTramoCompleto}>Terminar paso</button></div>
 } }))
-vi.mock('../nbme/NbmePlayer', () => ({ NbmePlayer: (props: { onPasoCompleto: () => void }) => {
-  mock.jugador()
+vi.mock('../nbme/NbmePlayer', () => ({ NbmePlayer: (props: { onPasoCompleto: () => void; avisoFallo?: string }) => {
+  mock.jugador({ avisoFallo: props.avisoFallo })
   return <div><p>Reproductor de preguntas</p><button onClick={props.onPasoCompleto}>Continuar</button></div>
 } }))
 
 import { SesionCajas } from '../screens/SesionCajas'
+import { ATRIBUTO_PIEL } from '../lib/piel-estudio'
 
 const item = (tipo: ItemCaja['tipo'], id: string): ItemCaja => ({ tipo, id, caja: 2, vence: 0, hecho: false })
 const concepto = (id: string) => ({ concept_id: id } as Concepto)
@@ -142,19 +143,20 @@ describe('recorrido de las cajas', () => {
     await act(async () => { root.render(<SesionCajas items={items} titulo="Cajas de hoy · 25 sep" onSalir={vi.fn()} />) })
     await esperar()
     expect(host.textContent).toContain('Reproductor de conceptos A')
-    expect(host.textContent).toContain('Paso 1 de 5')
+    expect(host.textContent).toContain('1 de 5 · caja 2')
     expect(mock.reproductor.mock.calls.at(-1)![0]).toMatchObject({ id: 'A', reintento: false })
     expect(mock.reproductor.mock.calls.at(-1)![0].sessionId).toMatch(/:0$/)
 
     await terminarConcepto('incorrecta')
-    expect(host.textContent).toContain('Paso 2 de 6')
+    // La cuenta es de cajas de hoy: el fallo que volverá no añade ninguna.
+    expect(host.textContent).toContain('2 de 5 · caja 2')
     for (const id of ['B', 'C', 'D']) {
       expect(host.textContent).toContain(`Reproductor de conceptos ${id}`)
       await terminarConcepto('correcta')
     }
     // Cuatro pasos después del fallo vuelve A, marcado como reintento y con su propia sesión de paso.
     expect(host.textContent).toContain('Reproductor de conceptos A')
-    expect(host.textContent).toContain('vuelve tras un fallo')
+    expect(host.textContent).toContain('Repaso de un fallo · caja 1 · 4 de 5 hechas')
     expect(mock.reproductor.mock.calls.at(-1)![0]).toMatchObject({ id: 'A', reintento: true })
     expect(mock.reproductor.mock.calls.at(-1)![0].sessionId).toMatch(/:4$/)
     await terminarConcepto('correcta')
@@ -215,5 +217,60 @@ describe('recorrido de las cajas', () => {
     await act(async () => { boton('Continuar').click() })
     await esperar()
     expect(host.textContent).toContain('Cajas hechas')
+  })
+
+  it('el progreso cuenta cajas de hoy y nunca retrocede, aunque un fallo vuelva', async () => {
+    const items = ['A', 'B', 'C', 'D', 'E'].map(id => item('concepto', id))
+    await act(async () => { root.render(<SesionCajas items={items} titulo="Cajas" onSalir={vi.fn()} />) })
+    await esperar()
+    const barra = () => host.querySelector<HTMLProgressElement>('progress[aria-label="Cajas hechas"]')!
+    const vistos: number[] = []
+    for (const resultado of ['incorrecta', 'correcta', 'correcta', 'correcta', 'correcta', 'correcta'] as const) {
+      expect(barra().max).toBe(5)
+      vistos.push(barra().value)
+      await terminarConcepto(resultado)
+    }
+    expect(vistos).toEqual([0, 1, 2, 3, 4, 4])
+    expect(host.textContent).toContain('Cajas hechas')
+  })
+
+  it('cada veinte pasos seguidos sugiere un respiro que se salta con «Seguir»', async () => {
+    const onSalir = vi.fn()
+    const items = Array.from({ length: 21 }, (_, n) => item('concepto', `C${n + 1}`))
+    await act(async () => { root.render(<SesionCajas items={items} titulo="Cajas" onSalir={onSalir} />) })
+    await esperar()
+    for (let n = 1; n <= 20; n++) await terminarConcepto('correcta')
+    expect(host.textContent).toContain('Llevas 20 seguidos')
+    expect(host.textContent).not.toContain('Reproductor de conceptos')
+    expect(document.activeElement?.textContent).toBe('Seguir')
+    // La cuenta sigue a la vista y no cambia con el respiro.
+    expect(host.textContent).toContain('21 de 21')
+    await act(async () => { boton('Seguir').click() })
+    await esperar()
+    expect(host.textContent).toContain('Reproductor de conceptos C21')
+    expect(onSalir).not.toHaveBeenCalled()
+  })
+
+  it('la última caja no pide respiro: si no queda nada, se cierra sin pausa', async () => {
+    const items = Array.from({ length: 20 }, (_, n) => item('concepto', `C${n + 1}`))
+    await act(async () => { root.render(<SesionCajas items={items} titulo="Cajas" onSalir={vi.fn()} />) })
+    await esperar()
+    for (let n = 1; n <= 20; n++) await terminarConcepto('correcta')
+    expect(host.textContent).not.toContain('Llevas 20 seguidos')
+    expect(host.textContent).toContain('Cajas hechas')
+  })
+
+  it('toda la sesión lleva la piel de estudio, también las preguntas, y dice adónde va un fallo', async () => {
+    const items = [item('concepto', 'A'), item('pregunta', 'Q1')]
+    await act(async () => { root.render(<SesionCajas items={items} titulo="Cajas" onSalir={vi.fn()} />) })
+    await esperar()
+    expect(document.documentElement.hasAttribute(ATRIBUTO_PIEL)).toBe(true)
+    await terminarConcepto('correcta')
+    expect(host.textContent).toContain('Reproductor de preguntas')
+    // El reproductor de conceptos ya no está montado y la pantalla no cambia de color.
+    expect(document.documentElement.hasAttribute(ATRIBUTO_PIEL)).toBe(true)
+    expect(mock.jugador.mock.calls.at(-1)![0].avisoFallo).toContain('dentro de unos pasos')
+    await act(async () => { root.render(<div />) })
+    expect(document.documentElement.hasAttribute(ATRIBUTO_PIEL)).toBe(false)
   })
 })

@@ -372,3 +372,18 @@
   .semana-encabezado.semana-con-anillo { grid-template-columns: minmax(0, 1fr); }
   .progress-radial-compact .progress-radial-summary { flex-wrap: wrap; }
 }
+
+/* Letra de estudio: se lee con sueño a las cinco de la mañana o al salir del trabajo.
+   El enunciado no va en trazo fino y el texto de apoyo no baja de 14 px. */
+:root[data-piel-estudio] .pregunta { font-weight: 400; }
+:root[data-piel-estudio] .nbme-stem { font-size: 18px; font-weight: 400; }
+:root[data-piel-estudio] .sutil { font-weight: 400; }
+:root[data-piel-estudio] .mini { font-size: 14px; }
+:root[data-piel-estudio] .rotulo { font-size: 12px; letter-spacing: .18em; }
+
+/* Tras responder, una sola decisión a la vista; lo demás, plegado en «Más sobre esta pregunta». */
+.retro-mas { margin-top: 14px; }
+.retro-mas > .pila { gap: 10px; margin-top: 10px; padding-left: 14px; border-left: 1px solid var(--linea); }
+.autoevaluacion { gap: 10px; margin-top: 4px; }
+.autoevaluacion .btn { flex: 1 1 120px; }
+.pausa-sugerida h2 { margin: 6px 0 0; }

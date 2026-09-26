@@ -379,30 +379,48 @@ describe('integración de estudio antes de publicar', () => {
     expect(api.estado.progreso['QA-001'].intentos).toEqual(antes.intentos)
   })
 
-  it('mantiene una respuesta ambigua por revisar sin aumentar aciertos ni fallos', async () => {
+  it('una respuesta que el corrector no decide no cuenta hasta que decides tú, con un toque', async () => {
     await render(nuevaCola())
     await responder('Una explicación distinta que el corrector debe revisar')
-    const p = api.estado.progreso['QA-001']
-    expect(p.intentos[0].resultado).toBe('revision')
-    expect(p.aciertos).toBe(0)
-    expect(p.fallos).toBe(0)
-    expect(host.textContent).toContain('no se contará como acierto ni fallo')
-    await click('Continuar con respuesta pendiente de revisión')
-    expect(host.textContent).toContain('1 respuestas por revisar. No se contaron como aciertos ni fallos.')
+    const antes = api.estado.progreso['QA-001']
+    expect(antes.intentos[0].resultado).toBe('revision')
+    expect(antes.aciertos).toBe(0)
+    expect(antes.fallos).toBe(0)
+    expect(host.textContent).toContain('decide tú')
+    // Una sola decisión: ni volver a responder ni seguir sin decidir.
+    expect(host.textContent).not.toContain('Continuar con respuesta pendiente de revisión')
+    expect(host.textContent).not.toContain('Volver a responder')
+    await click('No la sabía')
+    const despues = api.estado.progreso['QA-001']
+    // Reescribe el mismo intento: no saberla no es una confusión y no bloquea el dominio.
+    expect(despues.intentos).toHaveLength(1)
+    expect(despues.intentos[0]).toMatchObject({ attempt_id: antes.intentos[0].attempt_id, resultado: 'incorrecta',
+      calificacion: 1, tipo_error: 'desconocimiento', correccion_manual: true })
+    expect(despues.fallos).toBe(1)
+    // Fuera de un recorrido, lo fallado vuelve al final de la cola.
+    expect(api.estado.reanudable?.conceptIds).toEqual(['QA-001', 'QA-001'])
   })
 
-  it('permite resolver una escritura no reconocida dentro de la sesión sin convertirla en un fallo', async () => {
+  it('una escritura que el corrector no reconoce se resuelve con «La sabía» sin convertirla en un fallo', async () => {
     await render(nuevaCola())
     await responder('alfaa')
-    await click('Volver a responder', true)
-    expect(api.estado.reanudable?.conceptIds).toEqual(['QA-001', 'QA-001'])
-    await responder('alfa')
-    await click('Siguiente pregunta')
+    expect(api.estado.progreso['QA-001'].intentos[0].resultado).toBe('revision')
+    await click('La sabía')
     const p = api.estado.progreso['QA-001']
-    expect(p.intentos.map(t => t.resultado)).toEqual(['revision', 'correcta'])
+    expect(p.intentos.map(t => t.resultado)).toEqual(['correcta'])
+    expect(p.intentos[0]).toMatchObject({ calificacion: 3, tipo_error: 'ninguno', correccion_manual: true })
     expect(p.fallos).toBe(0)
-    expect(p.intentos[1].explicacion_previa).toBe(true)
+    expect(p.aciertos).toBe(1)
+    // Un toque decide y pasa: fuera de un recorrido, la sesión termina con su resumen.
     expect(host.textContent).toContain('Sesión terminada')
+  })
+
+  it('decidir «La sabía» tras usar una pista sigue contando como práctica con ayuda', async () => {
+    await render(nuevaCola())
+    await click('Necesito una pista')
+    await responder('alfaa')
+    await click('La sabía')
+    expect(api.estado.progreso['QA-001'].intentos[0]).toMatchObject({ resultado: 'correcta', tipo_error: 'correcta_con_pistas', pistas_usadas: 1 })
   })
 
   it('restaura una sesión finalizada en el resumen y salir elimina su reanudación', async () => {

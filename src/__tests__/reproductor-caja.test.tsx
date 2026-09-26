@@ -117,10 +117,72 @@ describe('reproductor en una caja', () => {
     expect(host.textContent).toContain('Vuelve dentro de unos pasos.')
   })
 
+  it('si el corrector no decide, «La sabía» cuenta como acierto y pasa con un solo toque', async () => {
+    const { onTramoCompleto } = await pintar({ reintento: false, avisoFallo: 'Vuelve dentro de unos pasos.' })
+    await responder('gamma')
+    expect(mock.intentos.at(-1)).toMatchObject({ resultado: 'revision' })
+    // Una sola decisión a la vista: ni «Siguiente pregunta» ni volver a responder.
+    expect(host.textContent).not.toContain('Siguiente pregunta')
+    expect(host.textContent).not.toContain('Volver a responder')
+    await act(async () => [...host.querySelectorAll('button')].find(b => b.textContent === 'La sabía')!.click())
+    expect(mock.intentos.at(-1)).toMatchObject({ resultado: 'correcta', calificacion: 3, tipo_error: 'ninguno', correccion_manual: true,
+      pregunta_id: mock.intentos[0].pregunta_id })
+    expect(onTramoCompleto).toHaveBeenCalledOnce()
+  })
+
+  it('tras responder hay una acción principal y lo demás espera plegado en «Más sobre esta pregunta»', async () => {
+    await pintar({ reintento: false, avisoFallo: 'Vuelve dentro de unos pasos.' })
+    await responder('beta')
+    // A la vista: lo que no está dentro de un desplegable cerrado.
+    const principales = [...host.querySelectorAll('.retro .btn.principal')].filter(b => !b.closest('details')).map(b => b.textContent)
+    expect(principales).toEqual(['Siguiente pregunta'])
+    const mas = [...host.querySelectorAll('details.retro-mas')]
+    expect(mas).toHaveLength(1)
+    const dentro = [...mas[0].querySelectorAll('summary')].map(x => x.textContent)
+    expect(dentro).toEqual(['Más sobre esta pregunta', 'Sigo sin entender', 'Profundizar', 'Cómo caería en el examen',
+      'Preguntar sobre esta pregunta', 'Ajustar dificultad (opcional)'])
+    expect(mas[0].textContent).toContain('Abrir la fuente')
+    // En un recorrido sobran el formato y el estado del concepto.
+    expect(host.textContent).not.toContain('Recuperación libre')
+    expect(host.querySelector('.etq.rojo')).toBeNull()
+  })
+
   it('una reinserción se presenta y se registra como corrección con explicación previa', async () => {
     await pintar({ reintento: true, avisoFallo: 'Por hoy ya está.' })
     expect(host.textContent).toContain('Volvemos a un concepto de esta sesión')
     await responder('alfa')
     expect(mock.intentos[0]).toMatchObject({ resultado: 'correcta', pregunta_id: 'caja-1:3:0:QA-1', explicacion_previa: true, modo: 'repaso' })
+  })
+})
+
+describe('reproductor en un tramo de lo nuevo', () => {
+  const segundo = ConceptoZ.parse({ ...concepto, concept_id: 'QA-2', respuesta_canonica: 'delta', evaluacion: { pregunta: '¿Cuál es el cuarto?' } })
+  const pintarTramo = async (onTramoCompleto = vi.fn()) => {
+    estado = { ...ESTADO_INICIAL, progreso: {}, reanudable: {
+      modulo: 'semana:S', sesion: 'repaso', indice: 0, ts: 1, sessionId: 'S', conceptIds: ['QA-1', 'QA-2'], cantidadInicial: 2,
+    } }
+    const cola = { titulo: 'Nuevo', subtitulo: '', ruta: 'repaso', modulo: 'semana:S', conceptos: [concepto, segundo], sessionId: 'S' }
+    const pintarla = () => act(async () => root.render(<Reproductor cola={cola} onSalir={vi.fn()} onTramoCompleto={onTramoCompleto} />))
+    await pintarla()
+    return { onTramoCompleto, repintar: pintarla }
+  }
+  const siguiente = () => act(async () => [...host.querySelectorAll('button')].find(b => b.textContent === 'Siguiente pregunta')!.click())
+
+  it('acabado el tramo sigue la sesión sin «Sesión terminada» ni resumen intermedio', async () => {
+    const { onTramoCompleto, repintar } = await pintarTramo()
+    // Sin contador propio: la cuenta la pone el recorrido.
+    expect(host.textContent).not.toContain('Primera vuelta')
+    await responder('alfa'); await siguiente(); await repintar()
+    await responder('delta'); await siguiente(); await repintar()
+    expect(host.textContent).not.toContain('Sesión terminada')
+    expect(host.textContent).not.toContain('Continuar la sesión')
+    expect(onTramoCompleto).toHaveBeenCalledOnce()
+  })
+
+  it('también en lo nuevo las manos no salen del teclado', async () => {
+    await pintarTramo()
+    expect(document.activeElement).toBe(host.querySelector('input[type="text"]'))
+    await responder('alfa')
+    expect(document.activeElement?.textContent).toBe('Siguiente pregunta')
   })
 })
