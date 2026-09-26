@@ -42,3 +42,44 @@ export function aplicarPiel(piel: PielEstudio | null): void {
   if (piel) raiz.setAttribute(ATRIBUTO_PIEL, piel)
   else raiz.removeAttribute(ATRIBUTO_PIEL)
 }
+
+/*
+ * Una sola piel para toda la sesión. La montan a la vez el recorrido (cajas o lo
+ * nuevo) y, dentro, cada reproductor de conceptos; al pasar de un concepto a una
+ * pregunta NBME el reproductor se desmonta, y si se llevara la piel consigo la
+ * pantalla cambiaría de color a mitad de sesión. Por eso se cuenta cuántas pantallas
+ * la tienen montada y sólo se retira al salir la última, y todas leen la misma piel.
+ */
+let elegida: PielEstudio | null = null
+let montajes = 0
+const oyentes = new Set<() => void>()
+
+/** La piel que se ve: la elegida en esta sesión o, si no se ha tocado, la inicial. */
+export function pielVigente(): PielEstudio {
+  return elegida ??= pielInicial()
+}
+
+export function suscribirPiel(oyente: () => void): () => void {
+  oyentes.add(oyente)
+  return () => { oyentes.delete(oyente) }
+}
+
+export function elegirPiel(piel: PielEstudio): void {
+  elegida = piel
+  guardarPiel(piel)
+  if (montajes) aplicarPiel(piel)
+  oyentes.forEach(oyente => oyente())
+}
+
+/** Viste la ventana mientras la pantalla esté montada; devuelve la función que la desmonta. */
+export function montarPiel(): () => void {
+  montajes++
+  aplicarPiel(pielVigente())
+  return () => {
+    montajes = Math.max(0, montajes - 1)
+    if (montajes) return
+    aplicarPiel(null)
+    // La próxima sesión vuelve a mirar la preferencia guardada o la del dispositivo.
+    elegida = null
+  }
+}

@@ -67,12 +67,13 @@ vi.mock('../screens/Reproductor', () => ({ Reproductor: (props: { cola: { concep
   mock.reproductor({ ids: props.cola.conceptos.map(c => c.concept_id), indiceInicial: props.indiceInicial })
   return <div><p>Reproductor de conceptos</p><button onClick={props.onTramoCompleto}>Terminar tramo</button></div>
 } }))
-vi.mock('../nbme/NbmePlayer', () => ({ NbmePlayer: (props: { modoPaso?: boolean; onPasoCompleto?: () => void }) => {
-  mock.jugadorPreguntas({ modoPaso: props.modoPaso })
+vi.mock('../nbme/NbmePlayer', () => ({ NbmePlayer: (props: { modoPaso?: boolean; onPasoCompleto?: () => void; avisoFallo?: string }) => {
+  mock.jugadorPreguntas({ modoPaso: props.modoPaso, ...(props.avisoFallo ? { avisoFallo: props.avisoFallo } : {}) })
   return <div><p>Reproductor de preguntas</p><button onClick={props.onPasoCompleto}>Revisar y continuar</button></div>
 } }))
 
 import { SesionMixta } from '../semana/SesionMixta'
+import { ATRIBUTO_PIEL } from '../lib/piel-estudio'
 
 const concepto = (id: string) => ({ concept_id: id } as Concepto)
 const sesion: SesionSemanal = {
@@ -128,7 +129,7 @@ describe('orquestador de la sesión mixta', () => {
     await act(async () => { boton('Terminar tramo').click() })
     expect(host.textContent).toContain('Reproductor de preguntas')
     expect(host.textContent).not.toContain('Reproductor de conceptos')
-    expect(mock.jugadorPreguntas.mock.calls.at(-1)?.[0]).toEqual({ modoPaso: true })
+    expect(mock.jugadorPreguntas.mock.calls.at(-1)?.[0]).toEqual({ modoPaso: true, avisoFallo: 'Vuelve en las cajas de los próximos días.' })
     // El cursor y el estado se guardan por separado: moverse no es haber estudiado.
     expect(mock.guardarAvance).toHaveBeenCalledWith('semana-1', { cursor: 3 })
     expect(mock.guardarAvance).toHaveBeenCalledWith('semana-1', { estado: 'en_curso' })
@@ -173,4 +174,47 @@ describe('orquestador de la sesión mixta', () => {
     expect(host.textContent).toContain('Reproductor de preguntas')
     expect(mock.guardarAvance).not.toHaveBeenCalled()
   })
+
+  it('la cuenta avanza con cada respuesta y la piel de estudio dura toda la sesión', async () => {
+    await act(async () => { root.render(<SesionMixta sesion={sesion} onSalir={vi.fn()} />) })
+    expect(host.textContent).toContain('0 de 4 · 3 conceptos y 1 preguntas')
+    expect(document.documentElement.hasAttribute(ATRIBUTO_PIEL)).toBe(true)
+    await act(async () => { mock.editar(p => ({ ...p, progreso: evidencia(['C1', 'C2']) })) })
+    expect(host.textContent).toContain('2 de 4')
+    await act(async () => { boton('Terminar tramo').click() })
+    // En la pregunta el reproductor de conceptos ya no está, y la pantalla no cambia de color.
+    expect(host.textContent).toContain('Reproductor de preguntas')
+    expect(document.documentElement.hasAttribute(ATRIBUTO_PIEL)).toBe(true)
+    await act(async () => { root.render(<div />) })
+    expect(document.documentElement.hasAttribute(ATRIBUTO_PIEL)).toBe(false)
+  })
+
+  it('tras veinte respuestas seguidas sugiere un respiro entre pasos, nunca a mitad de un tramo', async () => {
+    const ids = Array.from({ length: 21 }, (_, n) => `C${n + 1}`)
+    const guion = ids.flatMap((id, n) => (n + 1) % 3 === 0
+      ? [{ kind: 'concepto' as const, id }, { kind: 'pregunta' as const, id: 'NBME27-P0009', revision: 'rev-1' }]
+      : [{ kind: 'concepto' as const, id }])
+    mock.cargarConceptos.mockResolvedValue(new Map(ids.map(id => [id, concepto(id)])))
+    await act(async () => { root.render(<SesionMixta sesion={{ ...sesion, guion }} onSalir={vi.fn()} />) })
+    for (let tramo = 0; tramo < 7; tramo++) {
+      await act(async () => { mock.editar(p => ({ ...p, progreso: evidencia(ids.slice(0, (tramo + 1) * 3)) })) })
+      expect(host.textContent).not.toContain('Llevas')
+      await act(async () => { boton('Terminar tramo').click() })
+      if (tramo < 6) await act(async () => { boton('Revisar y continuar').click() })
+    }
+    expect(host.textContent).toContain('Llevas 21 seguidos')
+    expect(host.textContent).not.toContain('Reproductor de preguntas')
+    expect(document.activeElement?.textContent).toBe('Seguir')
+    await act(async () => { boton('Seguir').click() })
+    expect(host.textContent).toContain('Reproductor de preguntas')
+  })
 })
+
+/** Un intento registrado en la sesión por cada concepto: es la evidencia que mueve la cuenta. */
+function evidencia(ids: string[]) {
+  return Object.fromEntries(ids.map(id => [id, {
+    concept_id: id, estado: 'en_aprendizaje', dificultad: 5, estabilidad: 0, ultimo: 1, proxima: null,
+    aciertos: 1, fallos: 0, dominado_en: null,
+    intentos: [{ resultado: 'correcta', ts: 1, ms: 1, tipo_error: 'ninguno', session_id: 'semana-1' }],
+  }]))
+}

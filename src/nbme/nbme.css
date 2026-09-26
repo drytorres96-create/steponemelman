@@ -25,6 +25,7 @@
 .nbme-player { width: 100%; max-width: 850px; margin: 0 auto; }
 .nbme-player-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .nbme-player-header .btn { min-height: 44px; }
+.nbme-player-header.paso { justify-content: flex-end; }
 .nbme-question { padding: 26px 28px; }
 .nbme-question-heading { font-size: 1.1rem; margin-bottom: 6px; }
 .nbme-question-heading:focus { outline: none; }

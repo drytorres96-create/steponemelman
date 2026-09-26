@@ -1,26 +1,15 @@
-import { useEffect, useState } from 'react'
-import { aplicarPiel, contraria, guardarPiel, pielInicial, type PielEstudio } from '../lib/piel-estudio'
+import { useEffect, useSyncExternalStore } from 'react'
+import { contraria, elegirPiel, montarPiel, pielVigente, suscribirPiel, type PielEstudio } from '../lib/piel-estudio'
 
 /**
  * Aplica la piel de concentración mientras la pantalla esté montada y la retira al
- * salir. Lo montan el reproductor de sesión y el panel de foco; ninguna otra vista.
+ * salir la última que la usa. La montan el recorrido de las cajas y de lo nuevo, el
+ * reproductor de conceptos y el panel de foco; ninguna otra vista.
  */
 export function usePielEstudio() {
-  const [piel, setPiel] = useState<PielEstudio>(pielInicial)
-
-  useEffect(() => {
-    aplicarPiel(piel)
-    return () => aplicarPiel(null)
-  }, [piel])
-
-  return {
-    piel,
-    alternar: () => setPiel(actual => {
-      const siguiente = contraria(actual)
-      guardarPiel(siguiente)
-      return siguiente
-    }),
-  }
+  const piel = useSyncExternalStore(suscribirPiel, pielVigente, pielVigente)
+  useEffect(() => montarPiel(), [])
+  return { piel, alternar: () => elegirPiel(contraria(pielVigente())) }
 }
 
 const Luna = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"

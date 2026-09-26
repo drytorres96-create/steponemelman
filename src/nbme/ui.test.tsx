@@ -106,6 +106,46 @@ describe('NBME study interface', () => {
     expect(Object.keys(context.state.attempts)).toHaveLength(1)
   })
 
+  it('as a session step it leaves counting to the session, says where a miss goes and keeps the keyboard flow', async () => {
+    prepareSession()
+    context.selectedOption = 'I'
+    const onPaso = vi.fn()
+    const aviso = 'Vuelve a la caja 1 y aparecerá otra vez dentro de unos pasos.'
+    const pintar = () => act(async () => root.render(<NbmePlayer modoPaso avisoFallo={aviso} etiquetaSalida="Volver a Hoy" onSalir={exit} onPasoCompleto={onPaso} />))
+    await pintar()
+    expect(host.textContent).not.toContain('Correcciones pendientes')
+    expect(host.textContent).not.toContain('Primera vuelta')
+    expect(host.querySelector('.nbme-session-progress')).toBeNull()
+    expect(host.querySelector('#nbme-question-title')?.textContent).toBe('Pregunta NBME')
+    // Intro checks the option picked by letter, and the key press is consumed there.
+    const intro = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    await act(async () => { document.dispatchEvent(intro) })
+    expect(context.checkAnswer).toHaveBeenCalledOnce()
+    expect(intro.defaultPrevented).toBe(true)
+
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 0, question, 'A', 10, 200)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    context.currentFeedback = context.sessionView!.attempt
+    context.selectedOption = 'A'
+    await pintar()
+    expect(host.textContent).toContain(aviso)
+    expect(host.textContent).not.toContain('volverá durante la práctica')
+    expect(document.activeElement?.textContent).toBe('Continuar')
+    await click('Continuar')
+    expect(onPaso).toHaveBeenCalledOnce()
+    expect(context.nextQuestion).not.toHaveBeenCalled()
+  })
+
+  it('Enter on a focused button activates that button instead of checking the answer', async () => {
+    prepareSession()
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    const pausar = button('Pausar y guardar')
+    pausar.focus()
+    await act(async () => { pausar.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })) })
+    expect(context.checkAnswer).not.toHaveBeenCalled()
+  })
+
   it('prevents grading when a required figure is unavailable and exposes storage problems', async () => {
     prepareSession()
     context.currentQuestion = { ...question, figureRequired: true, figures: [] }

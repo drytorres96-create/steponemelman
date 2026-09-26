@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Enfoque } from '../plan/Enfoque'
+import { BotonPiel, usePielEstudio } from '../components/PielEstudio'
 import { ATRIBUTO_PIEL, guardarPiel, pielGuardada, pielInicial } from '../lib/piel-estudio'
 
 let host: HTMLDivElement
@@ -55,6 +56,28 @@ describe('piel de las pantallas de concentración', () => {
     expect(document.documentElement.getAttribute(ATRIBUTO_PIEL)).toBe('oscuro')
     expect(pielGuardada()).toBe('oscuro')
     expect(conmutador().getAttribute('aria-label')).toBe('Cambiar al modo día')
+  })
+
+  it('una sesión y su reproductor comparten la piel: salir del reproductor no la quita, salir de la sesión sí', async () => {
+    guardarPiel('claro')
+    function Reproductor() {
+      const piel = usePielEstudio()
+      return <BotonPiel piel={piel.piel} alternar={piel.alternar} />
+    }
+    function Sesion({ conReproductor }: { conReproductor: boolean }) {
+      const piel = usePielEstudio()
+      return <div><p className="piel-sesion">{piel.piel}</p>{conReproductor && <Reproductor />}</div>
+    }
+    await act(async () => { root.render(<Sesion conReproductor />) })
+    expect(document.documentElement.getAttribute(ATRIBUTO_PIEL)).toBe('claro')
+    // Cambiarla en el reproductor la cambia para toda la sesión.
+    await act(async () => { conmutador().click() })
+    expect(host.querySelector('.piel-sesion')?.textContent).toBe('oscuro')
+    // Como al pasar de un concepto a una pregunta NBME: el reproductor se va y la piel se queda.
+    await act(async () => { root.render(<Sesion conReproductor={false} />) })
+    expect(document.documentElement.getAttribute(ATRIBUTO_PIEL)).toBe('oscuro')
+    await act(async () => { root.render(<div />) })
+    expect(document.documentElement.hasAttribute(ATRIBUTO_PIEL)).toBe(false)
   })
 
   it('sin preferencia guardada decide el dispositivo: claro de día, oscuro de noche', () => {

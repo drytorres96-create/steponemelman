@@ -10,7 +10,7 @@ import { resumenDominio } from '../srs/mastery'
 import { cercaniaDominio } from '../srs/cercania'
 import { crearUUID } from '../store/model'
 import { EVALUADOR_VERSION } from '../lib/normalize'
-import { esRespuestaBreve, prepararConcepto } from '../lib/formatos'
+import { prepararConcepto } from '../lib/formatos'
 import { AyudaIA } from '../components/AyudaIA'
 import { ExamenIA } from '../components/ExamenIA'
 import { ConfusionIA } from '../components/ConfusionIA'
@@ -54,6 +54,8 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
   { cola: Cola; onSalir: () => void; indiceInicial?: number; onTramoCompleto?: () => void; modoCaja?: ModoCaja }) {
   const { registrarIntento, progresoDe, estado, guardarReanudable, iniciarSesion, cerrarSesion } = useApp()
   const pielEstudio = usePielEstudio()
+  /** Un paso dentro de un recorrido (cajas o lo nuevo): quien orquesta pone la cuenta y decide qué sigue. */
+  const enSesion = !!modoCaja || !!onTramoCompleto
   const guardada = cola.sessionId && estado.reanudable?.sessionId === cola.sessionId ? estado.reanudable : null
   const [versionFormato] = useState<1 | 2>(guardada ? guardada.versionFormato ?? 1 : 2)
   const [presupuesto] = useState(guardada?.presupuestoMinutos ?? cola.presupuestoMinutos)
@@ -363,6 +365,27 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     setRes({ ...res, veredicto, tipoError: tipo, detalle: undefined })
   }
 
+  /**
+   * Decidir tú una respuesta que el corrector no supo juzgar. Reescribe el mismo intento,
+   * como rectificar a la IA, y pasa a la siguiente con un solo toque. «No la sabía» es no
+   * saberla, no una confusión: no bloquea el dominio siete días ni acorta más el repaso.
+   * La ayuda usada antes de responder sigue contando como ayuda.
+   */
+  const autocalificar = (correcta: boolean) => {
+    const intento = intentoActual.current
+    if (!c || !intento || intento.resultado !== 'revision' || ultimaAccion.current === preguntaId) return
+    const ayuda = intento.pistas_usadas > 0 || intento.fuente_consultada || intento.explicacion_previa
+    const tipo: TipoError = correcta
+      ? ayuda ? 'correcta_con_pistas' : intento.confianza_declarada === 1 ? 'correcta_baja_confianza' : 'ninguno'
+      : intento.confianza_declarada === 3 ? 'incorrecta_exceso_confianza' : 'desconocimiento'
+    const actualizado: Intento = { ...intento, resultado: correcta ? 'correcta' : 'incorrecta', tipo_error: tipo,
+      calificacion: correcta ? 3 : 1, correccion_manual: true,
+      calificacion_actualizada_en: Math.max(Date.now(), (intento.calificacion_actualizada_en ?? intento.ts) + 1) }
+    intentoActual.current = actualizado
+    registrarIntento(c.concept_id, actualizado)
+    avanzar()
+  }
+
   const calificar = (calificacion: 1 | 2 | 3 | 4) => {
     const intento = intentoActual.current
     if (!c || !intento || ultimaAccion.current === preguntaId || intento.resultado === 'revision') return
@@ -401,8 +424,9 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
       cantidadInicial, revisionInicialHecha: true, ...metadata() })
   }
 
-  // En una caja no hay resumen intermedio: terminar el paso devuelve el control a quien orquesta.
-  const pasoTerminado = !!modoCaja && sesionLista && !c && !pausaTiempo
+  // Dentro de un recorrido no hay resumen intermedio: terminar el paso o el tramo devuelve el
+  // control a quien orquesta. Un «Sesión terminada» a mitad de lo nuevo invitaba a dejarlo ahí.
+  const pasoTerminado = enSesion && sesionLista && !c && !pausaTiempo
   useEffect(() => {
     if (!pasoTerminado || devuelto.current) return
     devuelto.current = true
@@ -411,15 +435,13 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pasoTerminado])
 
-  // En una caja las manos no salen del teclado: la respuesta escrita recibe el foco al
-  // aparecer y, corregida, «Siguiente pregunta» también. Nada se desplaza por ello.
+  // Dentro de un recorrido las manos no salen del teclado: la respuesta escrita recibe el foco
+  // al aparecer y, corregida, «Siguiente pregunta» también. Nada se desplaza por ello.
   useEffect(() => {
-    if (!modoCaja || !sesionLista) return
+    if (!enSesion || !sesionLista) return
     if (fase === 'tarea') tareaRef.current?.querySelector<HTMLElement>('input[type="text"], textarea')?.focus({ preventScroll: true })
     else if (fase === 'retro') siguienteRef.current?.focus({ preventScroll: true })
-    // `modoCaja` es un objeto nuevo en cada render; lo que cuenta es que exista.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fase, preguntaId, sesionLista, !!modoCaja])
+  }, [fase, preguntaId, sesionLista, enSesion])
 
   if (!sesionLista) return <p role="status">Preparando tu sesión…</p>
   if (!estado.reanudable || estado.reanudable.sessionId !== sesionId.current || estado.reanudable.indice !== i || estado.reanudable.conceptIds?.join('|') !== orden.map(x => x.concept_id).join('|')) return <div className="tarjeta pila" role="status">
@@ -441,7 +463,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
         <button className="btn fantasma" onClick={pausar}>Necesito una pausa</button></div>
     </div>{revisiones(cantidadInicial)}
   </div>
-  if (!c && modoCaja) return <div className="vacio" role="status">Guardando tu respuesta…</div>
+  if (!c && enSesion) return <div className="vacio" role="status">Guardando tu respuesta…</div>
   if (!c) {
     const resumen = datosSesion()
     return <div className="reproductor pila">
@@ -466,12 +488,6 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
   const dominio = resumenDominio(p, estado.criterios)
   const cercania = cercaniaDominio(p, estado.criterios)
   const modo = modoEnsenanza(c)
-  const alternativa = res?.veredicto === 'revision' && original ? prepararConcepto(original, {
-    semilla: identificarPregunta(sesionId.current!, orden.length, original.concept_id), indice: orden.length,
-    ruta: cola.ruta, forzarReconocimiento: true, version: versionFormato,
-  }) : null
-  const puedeRevisarConOpciones = alternativa && ['opcion_multiple', 'caso_clinico', 'verdadero_falso'].includes(alternativa.interaccion.recomendada)
-  const puedeResponderDeNuevo = puedeRevisarConOpciones || (alternativa && esRespuestaBreve(alternativa.respuesta_canonica))
 
   return <div className="reproductor pila">
     {presupuesto && <Cronometro msVisibles={msVisibles} presupuesto={presupuesto} sinLimite={sinLimite} />}
@@ -479,15 +495,16 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     <div className="fila" style={{ justifyContent: 'space-between' }}>
       <div className="fila" style={{ gap: 8 }}>
         <span className="etq">{c.clasificacion.disciplina_primaria}</span><span className="etq">{c.clasificacion.sistema_primario}</span>
-        <span className="etq violeta">{NOMBRE_INTERACCION[c.interaccion.recomendada]}</span>
-        {!examenSinAyuda && <EtiquetaEstado estado={p.estado} />}
+        {/* En un recorrido sobran el formato y el estado: la caja ya dice por dónde va, y un «Requiere repaso» en rojo sólo presiona. */}
+        {!enSesion && <span className="etq violeta">{NOMBRE_INTERACCION[c.interaccion.recomendada]}</span>}
+        {!examenSinAyuda && !enSesion && <EtiquetaEstado estado={p.estado} />}
       </div>
       <div className="fila" style={{ gap: 8 }}>
         <BotonPiel piel={pielEstudio.piel} alternar={pielEstudio.alternar} />
         <button className="btn pequeno fantasma" onClick={pausar}>Necesito una pausa</button>
       </div>
     </div>
-    {!modoCaja && <><div className="fila" style={{ justifyContent: 'space-between' }}><span className="mini">{reintento
+    {!enSesion && <><div className="fila" style={{ justifyContent: 'space-between' }}><span className="mini">{reintento
       ? `Corrección · ${orden.length - i} pendientes, incluida esta`
       : `Primera vuelta · Pregunta ${i + 1} de ${cantidadInicial}${!examenSinAyuda && orden.length > cantidadInicial ? ` · ${orden.length - cantidadInicial} errores para corregir` : ''}`}</span>
       <span className="mini">{examenSinAyuda ? 'Sin ayuda · Revisión al terminar la primera vuelta' : 'Puedes pausar y retomar'}</span></div>
@@ -541,11 +558,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
         {presentacionCambio && <p className="aviso">La pregunta guardada pertenece a otra presentación. Tu respuesta y su resultado original se conservan; el texto mostrado es el actual.</p>}
         <p>Tu respuesta: <b>{res.respuestaDada || 'Respuesta registrada'}</b></p>
         {res.veredicto !== 'correcta' && <p>Respuesta de referencia: <b>{c.respuesta_canonica}</b></p>}
-        {res.veredicto === 'revision' && <p>El corrector no puede decidir esta respuesta con seguridad. Compárala con la referencia; no se contará como acierto ni fallo.</p>}
-        {/* Una respuesta escrita que nadie juzga no acredita nada: la IA puede decidirla. */}
-        {res.veredicto === 'revision' && res.respuestaDada.trim() && usaTextoLibre(c) && !presentacionCambio
-          && <button className="btn pequeno" disabled={juzgandoIA} onClick={() => void juzgarConIA()}>
-            {juzgandoIA ? 'Corrigiendo con IA…' : 'Que la IA juzgue mi respuesta'}</button>}
+        {res.veredicto === 'revision' && <p>El corrector no puede decidir esta respuesta con seguridad. Compárala con la referencia y decide tú: contará como acierto o como fallo.</p>}
         {necesitaReintento(res.veredicto) && <p>{modoCaja ? modoCaja.avisoFallo : 'Este concepto volverá al final de la cola hasta que lo aciertes.'}</p>}
         {(res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que) && <p className="sutil">{res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que}</p>}
         {/* Solo con respuesta escrita: en un formato de opciones ya se sabe qué se eligió. */}
@@ -555,35 +568,47 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
         {c.patron && <p className="patron"><b>Si ves esto → piensa:</b> {c.patron}</p>}
         {c.confusiones.length > 0 && <p className="mini">No lo confundas con: {c.confusiones.join(' · ')}</p>}
         {c.revision_editorial && <p className="aviso">{c.revision_editorial.nota}</p>}
-        {res.veredicto !== 'revision' && <button ref={siguienteRef} className="btn principal" onClick={avanzar}>Siguiente pregunta</button>}
-        <details style={{ marginTop: 14 }}><summary>Profundizar</summary>
-          {c.contexto && <p>{c.contexto}</p>}
-          <p className="mini">Clasificación para el planificador: {NOMBRE_ERROR[res.tipoError]}</p>
-          {c.evaluacion.opciones?.filter(o => !o.correcta && o.texto !== res.respuestaDada && o.por_que).map(o => <p className="mini" key={o.texto}><b>{o.texto}:</b> {o.por_que}</p>)}
-          {c.relacionados.length > 0 && <p className="mini">Conecta con: {c.relacionados.join(' · ')}</p>}
-          <p className="mini">{dominio.texto}</p>
-          {/* Acertar de nuevo no adelanta la separación: decirlo aquí evita repetirlo en balde. */}
-          {cercania.esperandoSeparacion && cercania.disponibleDesde !== null
-            ? <p className="mini">Ya tiene los aciertos que pide el umbral. Falta que estén separados {estado.criterios.separacionHoras} h:
-              se acredita a partir del {new Date(cercania.disponibleDesde).toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'short' })}.
-              Repetirlo antes no adelanta ese reloj.</p>
-            : dominio.pendientes.length > 0 && <ul className="mini">{dominio.pendientes.map(criterio => <li key={criterio}>{criterio}</li>)}</ul>}
+        {/* Una sola decisión tras responder: seguir o, si el corrector no supo, decir tú si la sabías. */}
+        {res.veredicto === 'revision'
+          ? <div className="fila autoevaluacion">
+            <button className="btn principal" onClick={() => autocalificar(true)}>La sabía</button>
+            <button className="btn principal" onClick={() => autocalificar(false)}>No la sabía</button>
+          </div>
+          : <button ref={siguienteRef} className="btn principal" onClick={avanzar}>Siguiente pregunta</button>}
+        {/* Una respuesta escrita que nadie juzga no acredita nada: la IA puede decidirla si lo prefieres. */}
+        {res.veredicto === 'revision' && res.respuestaDada.trim() && usaTextoLibre(c) && !presentacionCambio
+          && <div><button className="btn pequeno fantasma" disabled={juzgandoIA} onClick={() => void juzgarConIA()}>
+            {juzgandoIA ? 'Corrigiendo con IA…' : 'Que la IA juzgue mi respuesta'}</button></div>}
+        {res.veredicto === 'ortografia' && c.escritura_correctiva.elegible && c.escritura_correctiva.termino && <div><button className="btn pequeno fantasma" onClick={() => setFase('ortografia')}>Practicar escritura (opcional)</button></div>}
+        {/* Lo demás espera plegado en un solo sitio: está cuando se busca y no compite con seguir. */}
+        <details className="retro-mas"><summary>Más sobre esta pregunta</summary>
+          <div className="pila">
+            {res.veredicto !== 'correcta' && !presentacionCambio && <details><summary>Sigo sin entender</summary><AyudaIA key={preguntaId} concepto={c} respuesta={res.respuestaDada} preguntaId={preguntaId} indice={i} ruta={cola.ruta} reintento={reintento} versionFormato={versionFormato} /></details>}
+            <details><summary>Profundizar</summary>
+              {c.contexto && <p>{c.contexto}</p>}
+              <p className="mini">Clasificación para el planificador: {NOMBRE_ERROR[res.tipoError]}</p>
+              {c.evaluacion.opciones?.filter(o => !o.correcta && o.texto !== res.respuestaDada && o.por_que).map(o => <p className="mini" key={o.texto}><b>{o.texto}:</b> {o.por_que}</p>)}
+              {c.relacionados.length > 0 && <p className="mini">Conecta con: {c.relacionados.join(' · ')}</p>}
+              <p className="mini">{dominio.texto}</p>
+              {/* Acertar de nuevo no adelanta la separación: decirlo aquí evita repetirlo en balde. */}
+              {cercania.esperandoSeparacion && cercania.disponibleDesde !== null
+                ? <p className="mini">Ya tiene los aciertos que pide el umbral. Falta que estén separados {estado.criterios.separacionHoras} h:
+                  se acredita a partir del {new Date(cercania.disponibleDesde).toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'short' })}.
+                  Repetirlo antes no adelanta ese reloj.</p>
+                : dominio.pendientes.length > 0 && <ul className="mini">{dominio.pendientes.map(criterio => <li key={criterio}>{criterio}</li>)}</ul>}
+            </details>
+            {/* A diferencia de la ayuda, esto no espera a que falles: sirve igual cuando aciertas. */}
+            {!presentacionCambio && <details><summary>Cómo caería en el examen</summary><ExamenIA key={c.concept_id} concepto={c} /></details>}
+            {/* Solo después de responder: preguntar antes sería pedirle la respuesta. */}
+            {!presentacionCambio && <details><summary>Preguntar sobre esta pregunta</summary><ChatConcepto key={c.concept_id} concepto={c} /></details>}
+            {res.veredicto !== 'revision' && <details><summary>Ajustar dificultad (opcional)</summary><p className="mini">El resultado ya programó tu repaso. Puedes ajustar cómo te resultó y avanzar.</p>
+              <div className="escalera">{(res.veredicto === 'incorrecta' ? [[1, 'Volver a practicar']] as const
+                : res.veredicto === 'parcial' || res.veredicto === 'ortografia' ? [[1, 'Volver a practicar'], [2, 'Difícil']] as const
+                : [[2, 'Difícil'], [3, 'Bien'], [4, 'Fácil']] as const).map(([g, txt]) => <button key={g} onClick={() => calificar(g)}>
+                  <b>{txt}</b><small>{intentoActual.current && formatoIntervalo(diasParaCalificacion(p, intentoActual.current, g))}</small></button>)}</div></details>}
+            <div><button className="btn pequeno fantasma" onClick={() => setVerFuente(true)}>Abrir la fuente</button></div>
+          </div>
         </details>
-        {/* A diferencia de la ayuda, esto no espera a que falles: sirve igual cuando aciertas. */}
-        {!presentacionCambio && <details style={{ marginTop: 12 }}><summary>Cómo caería en el examen</summary><ExamenIA key={c.concept_id} concepto={c} /></details>}
-        {/* Solo después de responder: preguntar antes sería pedirle la respuesta. */}
-        {!presentacionCambio && <details style={{ marginTop: 12 }}><summary>Preguntar sobre esta pregunta</summary><ChatConcepto key={c.concept_id} concepto={c} /></details>}
-        {res.veredicto !== 'correcta' && !presentacionCambio && <details style={{ marginTop: 12 }}><summary>Sigo sin entender</summary><AyudaIA key={preguntaId} concepto={c} respuesta={res.respuestaDada} preguntaId={preguntaId} indice={i} ruta={cola.ruta} reintento={reintento} versionFormato={versionFormato} /></details>}
-        <button className="btn pequeno fantasma" style={{ marginTop: 10 }} onClick={() => setVerFuente(true)}>Abrir la fuente</button>
-        {res.veredicto === 'ortografia' && c.escritura_correctiva.elegible && c.escritura_correctiva.termino && <button className="btn pequeno fantasma" onClick={() => setFase('ortografia')}>Practicar escritura (opcional)</button>}
-        {res.veredicto === 'revision' ? <div className="fila" style={{ marginTop: 12 }}>
-          {puedeResponderDeNuevo && <button className="btn principal" onClick={() => avanzarPaso(true)}>{puedeRevisarConOpciones ? 'Practicar de nuevo con opciones' : 'Volver a responder'}</button>}
-          <button className={`btn ${puedeResponderDeNuevo ? 'fantasma' : 'principal'}`} onClick={avanzar}>Continuar con respuesta pendiente de revisión</button></div>
-          : <details style={{ marginTop: 12 }}><summary>Ajustar dificultad (opcional)</summary><p className="mini">El resultado ya programó tu repaso. Puedes ajustar cómo te resultó y avanzar.</p>
-            <div className="escalera">{(res.veredicto === 'incorrecta' ? [[1, 'Volver a practicar']] as const
-              : res.veredicto === 'parcial' || res.veredicto === 'ortografia' ? [[1, 'Volver a practicar'], [2, 'Difícil']] as const
-              : [[2, 'Difícil'], [3, 'Bien'], [4, 'Fácil']] as const).map(([g, txt]) => <button key={g} onClick={() => calificar(g)}>
-                <b>{txt}</b><small>{intentoActual.current && formatoIntervalo(diasParaCalificacion(p, intentoActual.current, g))}</small></button>)}</div></details>}
       </div>}
       {fase === 'ortografia' && c.escritura_correctiva.termino && <div className="pila"><EscrituraCorrectiva termino={c.escritura_correctiva.termino} onHecho={avanzar} /><button className="btn" onClick={avanzar}>Continuar sin practicar escritura</button></div>}
     </div>

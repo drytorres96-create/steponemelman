@@ -69,11 +69,14 @@ function useQuestionFigures(question: NbmeQuestion | null) {
 /**
  * `modoPaso` presenta UNA pregunta y devuelve el control: el orquestador de la
  * sesión mixta decide qué viene después y es quien llama a `nbme.nextQuestion()`
- * antes de volver a montar el reproductor. Sin esa prop nada cambia.
+ * antes de volver a montar el reproductor. En ese modo la cuenta y el progreso los
+ * pone quien orquesta, así que aquí no se repiten, y `avisoFallo` dice adónde va un
+ * fallo. Corregida la respuesta, el foco va a «Continuar»: con el teclado basta con
+ * la letra, Intro, leer, Intro.
  */
-export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, onPasoCompleto, etiquetaSalida }:
+export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, onPasoCompleto, etiquetaSalida, avisoFallo }:
   { onSalir: () => void; onEstudiar?: (ids: string[]) => void; onBuscar?: (question: NbmeQuestion) => void
-    modoPaso?: boolean; onPasoCompleto?: () => void; etiquetaSalida?: string }) {
+    modoPaso?: boolean; onPasoCompleto?: () => void; etiquetaSalida?: string; avisoFallo?: string }) {
   const {
     catalog, currentSession, sessionView, currentQuestion, selectedOption, currentFeedback, questionLoading,
     loading, busy, error, storageWarning, syncStatus, selectAnswer, checkAnswer, nextQuestion, pauseSession,
@@ -82,6 +85,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   const [expandedFigure, setExpandedFigure] = useState<LoadedFigure | null>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
   const feedbackRef = useRef<HTMLHeadingElement>(null)
+  const continuarRef = useRef<HTMLButtonElement>(null)
   const figures = useQuestionFigures(currentQuestion)
   const feedback = sessionView?.phase === 'feedback' ? currentFeedback : null
   const currentReady = !!currentQuestion && currentQuestion.status === 'ready' && currentQuestion.id === sessionView?.current?.id
@@ -93,19 +97,27 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   useEffect(() => {
     setExpandedFigure(null)
     if (!questionLoading && sessionView?.phase === 'question') titleRef.current?.focus()
-    if (sessionView?.phase === 'feedback') feedbackRef.current?.focus()
-  }, [sessionView?.current?.position, sessionView?.phase, currentQuestion?.id, questionLoading])
+    if (sessionView?.phase === 'feedback') (modoPaso ? continuarRef : feedbackRef).current?.focus({ preventScroll: modoPaso })
+  }, [sessionView?.current?.position, sessionView?.phase, currentQuestion?.id, questionLoading, modoPaso])
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey || event.repeat || feedback || questionLoading || busy || !currentReady) return
       if (event.target instanceof Element && event.target.closest('textarea, input:not([type="radio"]), select, [contenteditable="true"], [role="dialog"]')) return
+      // Intro comprueba lo elegido con la letra. Se consume aquí: si no, la misma pulsación
+      // activaría «Continuar», que recibe el foco al corregir. Sobre un botón manda el botón.
+      if (event.key === 'Enter') {
+        if (!canAnswer || (event.target instanceof Element && event.target.closest('button, a, summary'))) return
+        event.preventDefault()
+        checkAnswer()
+        return
+      }
       const option = currentQuestion?.options.find(item => item.id.toLocaleLowerCase() === event.key.toLocaleLowerCase())
       if (option) { event.preventDefault(); selectAnswer(option.id) }
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
-  }, [currentQuestion, feedback, questionLoading, busy, currentReady, selectAnswer])
+  }, [currentQuestion, feedback, questionLoading, busy, currentReady, selectAnswer, canAnswer, checkAnswer])
 
   const pause = () => { pauseSession(); onSalir() }
   const syncText = storageWarning ? (syncStatus.state === 'synced' ? 'Progreso sincronizado; revisa el aviso de almacenamiento local.' : 'Revisa el aviso de guardado antes de cerrar la página.')
@@ -143,11 +155,11 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   const suggestedLinks = conceptIds.length > 0 && !reviewedLinks.length
 
   return <div className="nbme-player pila">
-    <header className="nbme-player-header">
-      <div><p className="mini">{currentSession.title}</p><p className="sutil">Primera vuelta: {sessionView.firstAnswered}/{sessionView.initialCount} · Correcciones pendientes: {sessionView.pendingErrors}</p></div>
+    <header className={`nbme-player-header${modoPaso ? ' paso' : ''}`}>
+      {!modoPaso && <div><p className="mini">{currentSession.title}</p><p className="sutil">Primera vuelta: {sessionView.firstAnswered}/{sessionView.initialCount} · Correcciones pendientes: {sessionView.pendingErrors}</p></div>}
       <button className="btn fantasma" onClick={pause}>{etiquetaSalida ?? 'Pausar y guardar'}</button>
     </header>
-    <progress className="nbme-session-progress" aria-label="Preguntas respondidas en primera vuelta" value={sessionView.firstAnswered} max={sessionView.initialCount || 1} />
+    {!modoPaso && <progress className="nbme-session-progress" aria-label="Preguntas respondidas en primera vuelta" value={sessionView.firstAnswered} max={sessionView.initialCount || 1} />}
     {budgetReached && !feedback && <section className="tarjeta pila" aria-label="Aviso de pausa"><div><h2>Un momento para decidir</h2>
       <p className="sutil">Llegaste al tiempo que elegiste. Puedes pausar o continuar esta sesión.</p></div>
       <div className="nbme-actions"><button className="btn" onClick={pause}>Pausar y guardar</button><button className="btn principal" onClick={continueWithoutBudget}>Continuar sin aviso de tiempo</button></div>
@@ -161,7 +173,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
           : <>
             <section className="tarjeta nbme-question" aria-labelledby="nbme-question-title">
               <h1 id="nbme-question-title" className="nbme-question-heading" tabIndex={-1} ref={titleRef}>
-                {sessionView.current?.round ? 'Vuelve a intentarlo' : `Pregunta ${(sessionView.current?.position ?? 0) + 1} de ${sessionView.initialCount}`}
+                {sessionView.current?.round ? 'Vuelve a intentarlo' : modoPaso ? 'Pregunta NBME' : `Pregunta ${(sessionView.current?.position ?? 0) + 1} de ${sessionView.initialCount}`}
               </h1>
               <p className="mini">{source}</p>
               <Enunciado texto={currentQuestion.stem} />
@@ -196,7 +208,9 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
             {feedback && <section className={`tarjeta nbme-feedback pila ${feedback.correct ? 'correct' : 'incorrect'}`} aria-labelledby="nbme-feedback-title">
               <div><h2 ref={feedbackRef} tabIndex={-1} id="nbme-feedback-title">{feedback.conflict ? 'Respuesta por revisar' : feedback.correct ? 'Respuesta correcta' : 'Vamos a repasarla'}</h2>
                 <p className="sutil" role="status">{feedback.conflict ? 'Se recibieron respuestas distintas desde varios dispositivos. Este intento no cuenta como acierto inicial.'
-                  : feedback.correct ? 'Tu respuesta quedó registrada.' : 'Esta pregunta volverá durante la práctica. Puedes pausar cuando lo necesites.'}</p></div>
+                  : feedback.correct ? 'Tu respuesta quedó registrada.'
+                    : modoPaso ? avisoFallo ?? 'Vuelve en las cajas de los próximos días.'
+                      : 'Esta pregunta volverá durante la práctica. Puedes pausar cuando lo necesites.'}</p></div>
               {!feedback.conflict && <p className="nbme-respuesta"><b>Respuesta: {currentQuestion.answer}.</b> <span lang="en">{normalizarTexto(currentQuestion.options.find(option => option.id === currentQuestion.answer)?.text ?? '')}</span></p>}
               {briefExplanation && <div><h3>Fundamento de la respuesta</h3>{explanationSource !== briefExplanation && <p className="mini">Extracto del texto fuente.</p>}<TextoFuente texto={briefExplanation} /></div>}
               {currentQuestion.objective && explanationSource !== briefExplanation && <details className="nbme-details"><summary>Leer fundamento completo</summary><TextoFuente texto={currentQuestion.objective} /></details>}
@@ -206,7 +220,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
               </details>}
               <p className="mini">Fuente: {source}. Explicación procedente del material importado.</p>
               {suggestedLinks && <p className="mini">Relación sugerida; confirma que corresponde al fundamento.</p>}
-              <div className="nbme-actions"><button className="btn principal" disabled={busy}
+              <div className="nbme-actions"><button ref={continuarRef} className="btn principal" disabled={busy}
                 onClick={modoPaso && onPasoCompleto ? onPasoCompleto : nextQuestion}>Continuar</button>
                 {conceptIds.length > 0 && onEstudiar && <button className="btn fantasma" onClick={() => { pauseSession(); onEstudiar(conceptIds) }}>{suggestedLinks ? 'Explorar conceptos relacionados' : 'Repasar fundamento'}</button>}
                 {conceptIds.length === 0 && onBuscar && <button className="btn fantasma" onClick={() => { pauseSession(); onBuscar(currentQuestion) }}>Explorar fundamentos</button>}
