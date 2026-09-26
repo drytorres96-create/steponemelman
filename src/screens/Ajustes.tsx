@@ -5,6 +5,9 @@ import { useDescarga } from '../components/descarga'
 import { APP_VERSION } from '../release'
 import { ScreenHeading } from '../components/Editorial'
 import { useNbme } from '../nbme/NbmeProvider'
+import { useAuth } from '../auth/AuthProvider'
+import { cargarHistorialSesiones } from '../semana/api'
+import { cargarPlanSemana } from '../plan/api'
 import { nombreRespaldo } from '../lib/respaldo'
 
 const CAMPOS = [
@@ -13,11 +16,18 @@ const CAMPOS = [
   { clave: 'separacionHoras', titulo: 'Separación temporal mínima (horas)', min: 0, max: 168 },
   { clave: 'ventanaConfusionDias', titulo: 'Ventana sin confusiones (días)', min: 0, max: 90 },
 ] as const
+/** Lo que no viaja con el progreso sincronizado: si tarda o falla, el respaldo sale sin ello. */
+export const LIMITE_EXTRAS_MS = 4_000
+function conLimite<T>(promesa: Promise<T>): Promise<T | null> {
+  return Promise.race([promesa.catch(() => null), new Promise<null>(listo => setTimeout(() => listo(null), LIMITE_EXTRAS_MS))])
+}
 const textos = (c: typeof CRITERIOS_POR_DEFECTO) => Object.fromEntries(CAMPOS.map(f => [f.clave, String(c[f.clave])])) as Record<typeof CAMPOS[number]['clave'], string>
 
 export function Ajustes() {
   const { estado, actualizarCriterios, exportar, importar, reiniciar, indice } = useApp()
   const nbme = useNbme()
+  const { session } = useAuth()
+  const [preparando, setPreparando] = useState(false)
   const [msg, setMsg] = useState('')
   const archivo = useRef<HTMLInputElement>(null)
   const { entregar, dialogo } = useDescarga()
@@ -41,7 +51,15 @@ export function Ajustes() {
   }
   // Un solo archivo con todo: conceptos arriba, en el formato que lee «Importar progreso», y
   // las preguntas NBME en `nbme`, que viven en tu cuenta y no se importan desde aquí.
-  const descargar = () => entregar(nombreRespaldo(), exportar({ nbme: nbme.state }), 'application/json')
+  // Además van las sesiones de la semana y el plan de esta semana, que viven fuera del progreso.
+  const descargar = async () => {
+    setPreparando(true)
+    try {
+      const [semanas, plan] = await Promise.all([conLimite(cargarHistorialSesiones()),
+        conLimite(cargarPlanSemana(session?.access_token ?? ''))])
+      entregar(nombreRespaldo(), exportar({ nbme: nbme.state, semanas, plan }), 'application/json')
+    } finally { setPreparando(false) }
+  }
 
   return (
     <div className="pila" style={{ maxWidth: 760 }}>
@@ -66,9 +84,9 @@ export function Ajustes() {
       <div className="tarjeta pila">
         <h2>Tu progreso</h2>
         <p className="sutil">Tu progreso se sincroniza con tu cuenta. Inicia sesión con el mismo correo en otro dispositivo para continuar. También puedes importar el progreso de la versión anterior o guardar una copia.</p>
-        <p className="mini">La copia incluye los conceptos y las preguntas NBME. Importar recupera los conceptos; las preguntas se recuperan de tu cuenta.</p>
+        <p className="mini">La copia incluye los conceptos, las preguntas NBME, las sesiones de la semana y el plan de esta semana. Importar recupera los conceptos; lo demás vive en tu cuenta.</p>
         <div className="fila">
-          <button className="btn" onClick={descargar}>Exportar progreso</button>
+          <button className="btn" disabled={preparando} onClick={() => void descargar()}>{preparando ? 'Preparando la copia…' : 'Exportar progreso'}</button>
           <button className="btn fantasma" onClick={() => archivo.current?.click()}>Importar progreso</button>
           <input ref={archivo} type="file" accept="application/json" style={{ display: 'none' }}
             onChange={async e => {
