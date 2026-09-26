@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type KeyboardEvent } from 'react'
 import type { Concepto } from '../schema/concept'
 import type { TipoError } from '../srs/tipos'
 import { evaluarNumero, evaluarTexto, normalizar, type Veredicto } from '../lib/normalize'
@@ -16,6 +16,17 @@ interface Props {
   /** Estable durante el intento, distinta al iniciar otra presentación. */
   semilla?: string
   ocultarFeedback?: boolean
+}
+
+/**
+ * Intro envía la respuesta y se consume ahí. Si no se cancela, el navegador entrega la
+ * misma pulsación (su `keypress`) al botón que recibe el foco al corregir, «Siguiente
+ * pregunta», y la corrección se salta sin llegar a verse.
+ */
+const intro = (enviar: () => void) => (e: KeyboardEvent<HTMLInputElement>) => {
+  if (e.key !== 'Enter') return
+  e.preventDefault()
+  enviar()
 }
 
 const LETRAS = 'ABCDEFGH'
@@ -90,7 +101,7 @@ function Texto({ c, bloqueado, onResponder }: Props) {
     <div className="fila" style={{ gap: 8 }}>
       <input type="text" value={v} disabled={bloqueado} autoComplete="off" autoCapitalize="off" spellCheck={false}
         placeholder="Una palabra o frase corta…" aria-label="Tu respuesta" maxLength={100}
-        onChange={e => setV(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') enviar() }} />
+        onChange={e => setV(e.target.value)} onKeyDown={intro(enviar)} />
       <button className="btn principal" onClick={enviar} disabled={bloqueado || !v.trim()}>Comprobar</button>
     </div>
     </div>
@@ -115,7 +126,7 @@ function Numerico({ c, bloqueado, onResponder }: Props) {
     <div>
       <div className="fila" style={{ gap: 8, flexWrap: 'nowrap' }}>
         <input type="text" inputMode="decimal" value={v} disabled={bloqueado} placeholder="Valor…" aria-label="Respuesta numérica"
-          onChange={e => setV(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') enviar() }} />
+          onChange={e => setV(e.target.value)} onKeyDown={intro(enviar)} />
         {c.evaluacion.unidad && <span className="etq" style={{ flex: 'none' }}>{c.evaluacion.unidad}</span>}
         <button className="btn principal" onClick={enviar} disabled={bloqueado || !v.trim()}>Comprobar</button>
       </div>
@@ -354,7 +365,7 @@ export function EscrituraCorrectiva({ termino, onHecho }: { termino: string; onH
       <div className="fila" style={{ flexWrap: 'nowrap' }}>
         <input type="text" value={v} autoComplete="off" spellCheck={false} aria-label="Transcribe el término"
           placeholder="Escríbelo aquí…" onChange={e => setV(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && ok) onHecho() }} />
+          onKeyDown={intro(() => { if (ok) onHecho() })} />
         <button className="btn principal" disabled={!ok} onClick={onHecho}>{ok ? 'Correcto, continuar' : 'Transcribe'}</button>
       </div>
       <div className="mini" style={{ marginTop: 8 }}>El término volverá a aparecer más adelante sin mostrarse, y su intervalo aumentará cuando puedas escribirlo sin ayuda.</div>
