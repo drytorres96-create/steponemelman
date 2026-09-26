@@ -5,13 +5,17 @@ import { ConceptoZ, IndiceZ } from '../schema/concept'
 import { ESTADO_INICIAL, type EstadoApp } from '../store/model'
 import { csvAuditoria, celdaCSV, jsonNotas } from '../lib/exportar-auditoria'
 
-const mock = vi.hoisted(() => ({ app: vi.fn(), cargar: vi.fn(), leer: vi.fn(), escribir: vi.fn(), descargar: vi.fn() }))
+const mock = vi.hoisted(() => ({ app: vi.fn(), cargar: vi.fn(), leer: vi.fn(), escribir: vi.fn(), descargar: vi.fn(),
+  semanas: vi.fn(), plan: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../store/db', () => ({ leer: mock.leer, escribir: mock.escribir }))
 vi.mock('../data/corpus', () => ({ cargarTodo: mock.cargar, cargarCuarentena: async () => ({ conceptos: [] }) }))
 vi.mock('../components/descarga', () => ({ useDescarga: () => ({ entregar: mock.descargar, dialogo: null }) }))
 vi.mock('../nbme/NbmeProvider', () => ({ useNbme: () => ({ state: { schemaVersion: 1, marca: 'preguntas' } }) }))
-import { Ajustes } from '../screens/Ajustes'
+vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ session: { access_token: 'token-sintetico' } }) }))
+vi.mock('../semana/api', () => ({ cargarHistorialSesiones: mock.semanas }))
+vi.mock('../plan/api', () => ({ cargarPlanSemana: mock.plan }))
+import { Ajustes, LIMITE_EXTRAS_MS } from '../screens/Ajustes'
 import { Auditoria } from '../screens/Auditoria'
 
 const c = ConceptoZ.parse({ concept_id: 'QA-uno', source: { doc: 'QA', doc_title: 'Documento sintético', page: 1, item_id: 'I', fragment: 'Ejemplo sintético.' },
@@ -31,6 +35,7 @@ beforeEach(() => {
   mock.app.mockImplementation(() => ({ estado, actualizarCriterios: guardar,
     exportar: (extra?: Record<string, unknown>) => JSON.stringify({ ...estado, ...extra }), indice }))
   mock.cargar.mockResolvedValue(cs); mock.leer.mockResolvedValue({}); mock.escribir.mockResolvedValue(undefined)
+  mock.semanas.mockResolvedValue([{ id: 'semana-sintetica' }]); mock.plan.mockResolvedValue({ eventoId: 'S-sintetica' })
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks() })
 const boton = (label: string) => [...host.querySelectorAll('button')].find(b => b.textContent?.trim() === label)!
@@ -45,14 +50,32 @@ async function escribir(selector: string, texto: string) {
 }
 
 describe('simplificación con datos conservados', () => {
-  it('Exportar progreso entrega un solo archivo con los conceptos y las preguntas NBME', async () => {
+  it('Exportar progreso entrega un solo archivo con conceptos, preguntas NBME, sesiones de la semana y plan', async () => {
     await act(async () => root.render(<Ajustes />))
     await click('Exportar progreso')
     const [nombre, contenido, tipo] = mock.descargar.mock.calls[0]
     expect(nombre).toMatch(/^progreso-step1-\d{4}-\d{2}-\d{2}\.json$/)
     expect(tipo).toBe('application/json')
-    expect(JSON.parse(contenido)).toMatchObject({ version: 1, nbme: { schemaVersion: 1, marca: 'preguntas' } })
-    expect(host.textContent).toContain('La copia incluye los conceptos y las preguntas NBME')
+    expect(JSON.parse(contenido)).toMatchObject({ version: 1, nbme: { schemaVersion: 1, marca: 'preguntas' },
+      semanas: [{ id: 'semana-sintetica' }], plan: { eventoId: 'S-sintetica' } })
+    expect(mock.plan).toHaveBeenCalledWith('token-sintetico')
+    expect(host.textContent).toContain('La copia incluye los conceptos, las preguntas NBME, las sesiones de la semana y el plan')
+    expect(boton('Exportar progreso').disabled).toBe(false)
+  })
+
+  it('si las sesiones fallan o el plan no responde, el respaldo sale igual sin ellos', async () => {
+    vi.useFakeTimers()
+    mock.semanas.mockRejectedValue(new Error('sin red'))
+    mock.plan.mockReturnValue(new Promise(() => undefined))
+    await act(async () => root.render(<Ajustes />))
+    await act(async () => { boton('Exportar progreso').click() })
+    expect(boton('Preparando la copia…').disabled).toBe(true)
+    expect(mock.descargar).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(LIMITE_EXTRAS_MS) })
+    const archivo = JSON.parse(mock.descargar.mock.calls[0][1])
+    expect(archivo).toMatchObject({ version: 1, nbme: { marca: 'preguntas' }, semanas: null, plan: null })
+    expect(boton('Exportar progreso').disabled).toBe(false)
+    vi.useRealTimers()
   })
 
   it('edita criterios como borrador, valida y guarda todos en una sola operación', async () => {
