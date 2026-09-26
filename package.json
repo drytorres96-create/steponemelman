@@ -10,7 +10,8 @@
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "test": "vitest run --pool=forks --maxWorkers=1",
     "test:nube": "vitest run src/__tests__/sync.test.ts src/__tests__/estado-model.test.ts src/auth --pool=forks --maxWorkers=1",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.116.0",

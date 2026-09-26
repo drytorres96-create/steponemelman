@@ -30,15 +30,27 @@ El rollback no toca GitHub: la próxima fusión a `main` vuelve a desplegar lo q
 
 - El progreso vive en Supabase (`study_state`, `nbme_state`) y en cada navegador. Ninguna
   versión de la aplicación lo guarda en el Worker, así que volver atrás no lo toca.
-- Todas las versiones publicadas leen el mismo formato de progreso (`CORPUS_VERSION`
-  1.0.5). Una versión no puede leer un progreso escrito con un `CORPUS_VERSION` más
-  nuevo: **no volver a una versión anterior a un cambio de `CORPUS_VERSION` ni de
-  `database/*.sql`**. Hasta hoy no ha habido ninguno.
+- **No volver a una versión anterior a un cambio de `CORPUS_VERSION` ni de
+  `database/*.sql`.** Una versión no puede leer un progreso escrito con un
+  `CORPUS_VERSION` más nuevo, ni usar tablas que aún no existían.
+  - `CORPUS_VERSION` sigue en 1.0.5 desde la primera versión.
+  - El último cambio de `database/*.sql` fue el 11 de septiembre (el banco NBME):
+    cualquier versión posterior sirve.
 - Desde 1.24.0, si una copia local no se puede leer, la aplicación la aparta sin borrarla
   y recupera el progreso de la cuenta, en vez de quedarse bloqueada.
 
-## Protección recomendada en GitHub
+## Publicar sólo con las pruebas en verde
 
-Que GitHub exija el CI antes de fusionar. En **Settings → Branches → Add branch
-protection rule** para `main`: *Require status checks to pass before merging* y marcar
-**verificar**. Es un ajuste de la cuenta de Yoel; el código no puede activarlo.
+Hoy Cloudflare despliega todo lo que llega a `main`, pase o no el CI. Dos ajustes lo
+cierran. Son de la cuenta de Yoel: el código no puede activarlos.
+
+- **GitHub** — que no se pueda fusionar con el CI en rojo. En **Settings → Branches →
+  Add branch protection rule** para `main`: *Require status checks to pass before
+  merging* y marcar **verificar** y **navegador**.
+- **Cloudflare** — que la compilación de producción corra las pruebas antes de desplegar.
+  En **Workers & Pages → steponemelman → Settings → Build → Build command**:
+  `npm test && npm run build`. Si una prueba falla, la compilación falla y la versión
+  anterior sigue publicada. Añade menos de un minuto a cada despliegue.
+
+Workers Builds no lee el paso `build` de `wrangler.jsonc`, así que tiene que ser en el
+panel.

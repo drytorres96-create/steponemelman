@@ -86,6 +86,8 @@ npm run preview
 
 `npm run test:nube` ejecuta el subconjunto de autenticación y sincronización. Las pruebas de integración utilizan datos sintéticos y servicios simulados; no sustituyen una prueba con la cuenta real en dos dispositivos.
 
+`npm run e2e` recorre el estudio en Chromium: teclado, foco, piel, cortes y pausa. Arranca la aplicación con dobles en memoria y datos sintéticos (`e2e/arnes`), sin Supabase ni Worker. La primera vez hace falta `npx playwright install chromium`; si el equipo ya tiene otro Chromium, `CHROMIUM_PATH=/ruta/al/chrome npm run e2e`. En CI corre como el trabajo `navegador` de «Verificar aplicación».
+
 Antes de publicar contenido nuevo, comprueba además el conjunto privado de activos que se enviará a Supabase. La carpeta debe contener `index.json`, `modules/` y `quarantine.json`:
 
 ```bash
