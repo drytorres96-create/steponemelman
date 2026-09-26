@@ -7,7 +7,8 @@ import type { NbmeSnapshot } from './sync'
 const memory = vi.hoisted(() => ({ db: new Map<string, unknown>(), row: null as unknown,
   rpc: vi.fn(), from: vi.fn(), session: vi.fn() }))
 vi.mock('../store/db', () => ({ leer: async (key: string) => memory.db.get(key) ?? null,
-  escribir: async (key: string, value: unknown) => { memory.db.set(key, structuredClone(value)) } }))
+  escribir: async (key: string, value: unknown) => { memory.db.set(key, structuredClone(value)) },
+  borrar: async (keys: string[]) => { for (const key of keys) memory.db.delete(key) } }))
 vi.mock('../lib/supabase', () => ({ supabase: { from: memory.from, rpc: memory.rpc, auth: { getSession: memory.session } } }))
 import { NbmeProvider, useNbme } from './NbmeProvider'
 import { NbmePlayer } from './NbmePlayer'
@@ -48,6 +49,28 @@ beforeEach(() => {
   }))
 })
 afterEach(async () => { if (root) await unmount(); vi.unstubAllGlobals() })
+
+it('sets aside a corrupt local copy and recovers the questions from the account instead of blocking the bank', async () => {
+  await mount()
+  await act(async () => { expect(await current.startSession([question])).toBe(true) })
+  await act(async () => { expect(await current.syncNow()).toBe(true) })
+  const id = current.currentSession!.id
+  await unmount()
+  const broken = { userId: 'test-owner', state: { broken: true }, snapshot: null, savedAt: 1 }
+  memory.db.set('nbme-state:test-owner', broken)
+  localStorage.setItem('step1-backup:nbme-state:test-owner', '{ broken')
+  await mount()
+  await vi.waitFor(() => expect(current.syncStatus.state).toBe('synced'))
+  expect(current.error).toBeNull()
+  expect(current.localNotice).toContain('estaba dañada')
+  expect(current.state.sessions[id]).toBeTruthy()
+  const setAside = [...memory.db.keys()].find(key => key.startsWith('apartada:nbme-state:test-owner:'))
+  expect(memory.db.get(setAside!)).toMatchObject({ copia: broken, respaldo: '{ broken' })
+  // The fresh copy that replaced it is valid again.
+  expect(memory.db.get('nbme-state:test-owner')).toMatchObject({ userId: 'test-owner', state: { sessions: { [id]: expect.anything() } } })
+  await act(async () => current.dismissLocalNotice())
+  expect(current.localNotice).toBeNull()
+})
 
 it('resumes a saved correction and selected draft on a second device without changing the first result', async () => {
   await mount()

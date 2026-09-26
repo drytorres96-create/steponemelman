@@ -4,6 +4,8 @@ import { CRITERIOS_POR_DEFECTO } from '../srs/mastery'
 import { useDescarga } from '../components/descarga'
 import { APP_VERSION } from '../release'
 import { ScreenHeading } from '../components/Editorial'
+import { useNbme } from '../nbme/NbmeProvider'
+import { nombreRespaldo } from '../lib/respaldo'
 
 const CAMPOS = [
   { clave: 'recuperaciones', titulo: 'Respuestas independientes correctas mínimas', min: 1, max: 10 },
@@ -15,6 +17,7 @@ const textos = (c: typeof CRITERIOS_POR_DEFECTO) => Object.fromEntries(CAMPOS.ma
 
 export function Ajustes() {
   const { estado, actualizarCriterios, exportar, importar, reiniciar, indice } = useApp()
+  const nbme = useNbme()
   const [msg, setMsg] = useState('')
   const archivo = useRef<HTMLInputElement>(null)
   const { entregar, dialogo } = useDescarga()
@@ -36,8 +39,9 @@ export function Ajustes() {
     for (const f of CAMPOS) nuevos[f.clave] = Number(borrador[f.clave])
     actualizarCriterios(nuevos); setBorrador(textos(nuevos)); setBase(JSON.stringify(textos(nuevos))); setMensajeCriterios('Criterios aplicados. Tu historial se conserva.')
   }
-  const descargar = () =>
-    entregar(`progreso-step1-${new Date().toISOString().slice(0, 10)}.json`, exportar(), 'application/json')
+  // Un solo archivo con todo: conceptos arriba, en el formato que lee «Importar progreso», y
+  // las preguntas NBME en `nbme`, que viven en tu cuenta y no se importan desde aquí.
+  const descargar = () => entregar(nombreRespaldo(), exportar({ nbme: nbme.state }), 'application/json')
 
   return (
     <div className="pila" style={{ maxWidth: 760 }}>
@@ -62,6 +66,7 @@ export function Ajustes() {
       <div className="tarjeta pila">
         <h2>Tu progreso</h2>
         <p className="sutil">Tu progreso se sincroniza con tu cuenta. Inicia sesión con el mismo correo en otro dispositivo para continuar. También puedes importar el progreso de la versión anterior o guardar una copia.</p>
+        <p className="mini">La copia incluye los conceptos y las preguntas NBME. Importar recupera los conceptos; las preguntas se recuperan de tu cuenta.</p>
         <div className="fila">
           <button className="btn" onClick={descargar}>Exportar progreso</button>
           <button className="btn fantasma" onClick={() => archivo.current?.click()}>Importar progreso</button>

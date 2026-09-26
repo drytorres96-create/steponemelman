@@ -17,10 +17,17 @@ export interface SyncReply {
 export interface SyncTransport {
   load(): Promise<CloudSnapshot | null>
   save(input: { state: EstadoApp; expectedRevision: number; generation: string | null }): Promise<SyncReply>
+  /**
+   * Sólo la revisión y la generación de la fila, sin el progreso. Si coinciden con las de la
+   * última copia conocida no hace falta bajar el progreso entero: medio megabyte en
+   * septiembre, varios en diciembre, y se comprueba cada 30 segundos.
+   */
+  peek?(): Promise<{ revision: number; generation: string } | null>
 }
 
 export interface SyncOutcome {
-  kind: 'synced' | 'merged' | 'reset' | 'empty'
+  /** `unchanged`: ni la nube ni este dispositivo tenían nada nuevo; no se transfirió el progreso. */
+  kind: 'synced' | 'merged' | 'reset' | 'empty' | 'unchanged'
   snapshot: CloudSnapshot | null
 }
 
@@ -119,6 +126,13 @@ export class StudySyncEngine {
   fetchAndMerge(): Promise<SyncOutcome> {
     return this.encolar(async () => {
       const epoch = this.epoch
+      if (this.remote && this.transport.peek) {
+        const version = await this.transport.peek()
+        if (epoch !== this.epoch) return { kind: 'reset', snapshot: this.remote }
+        // La copia local ya contiene esta revisión: se fusionó al recibirla.
+        if (version && this.remote && version.revision === this.remote.revision
+          && version.generation === this.remote.generation) return { kind: 'unchanged', snapshot: this.remote }
+      }
       const response = await this.transport.load()
       if (epoch !== this.epoch) return { kind: 'reset', snapshot: this.remote }
       if (response === null) {
@@ -148,6 +162,13 @@ export class StudySyncEngine {
       const base = this.remote
       const local = this.callbacks.getLocal()
       const candidate = combinarEstados(local, base?.state ?? local)
+      // Nada nuevo que subir. Guardar igualmente subía el progreso entero y gastaba una revisión.
+      const texto = base ? serializarEstable(candidate) : null
+      if (base && texto === serializarEstable(base.state)) {
+        if (texto !== serializarEstable(local)) this.callbacks.setLocal(candidate)
+        // Tras un conflicto ya se recibió y fusionó la fila nueva: eso sí fue sincronizar.
+        return { kind: attempt === 0 ? 'unchanged' : 'synced', snapshot: base }
+      }
       const response = await this.transport.save({ state: candidate,
         expectedRevision: base?.revision ?? 0, generation: base?.generation ?? null })
       if (epoch !== this.epoch) return { kind: 'reset', snapshot: this.remote }

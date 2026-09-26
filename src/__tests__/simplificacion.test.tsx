@@ -10,6 +10,7 @@ vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../store/db', () => ({ leer: mock.leer, escribir: mock.escribir }))
 vi.mock('../data/corpus', () => ({ cargarTodo: mock.cargar, cargarCuarentena: async () => ({ conceptos: [] }) }))
 vi.mock('../components/descarga', () => ({ useDescarga: () => ({ entregar: mock.descargar, dialogo: null }) }))
+vi.mock('../nbme/NbmeProvider', () => ({ useNbme: () => ({ state: { schemaVersion: 1, marca: 'preguntas' } }) }))
 import { Ajustes } from '../screens/Ajustes'
 import { Auditoria } from '../screens/Auditoria'
 
@@ -28,7 +29,7 @@ beforeEach(() => {
   estado = { ...ESTADO_INICIAL, criterios: { ...ESTADO_INICIAL.criterios }, progreso: {} }
   guardar.mockImplementation(c => { estado = { ...estado, criterios: c } })
   mock.app.mockImplementation(() => ({ estado, actualizarCriterios: guardar,
-    indice }))
+    exportar: (extra?: Record<string, unknown>) => JSON.stringify({ ...estado, ...extra }), indice }))
   mock.cargar.mockResolvedValue(cs); mock.leer.mockResolvedValue({}); mock.escribir.mockResolvedValue(undefined)
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks() })
@@ -44,6 +45,16 @@ async function escribir(selector: string, texto: string) {
 }
 
 describe('simplificación con datos conservados', () => {
+  it('Exportar progreso entrega un solo archivo con los conceptos y las preguntas NBME', async () => {
+    await act(async () => root.render(<Ajustes />))
+    await click('Exportar progreso')
+    const [nombre, contenido, tipo] = mock.descargar.mock.calls[0]
+    expect(nombre).toMatch(/^progreso-step1-\d{4}-\d{2}-\d{2}\.json$/)
+    expect(tipo).toBe('application/json')
+    expect(JSON.parse(contenido)).toMatchObject({ version: 1, nbme: { schemaVersion: 1, marca: 'preguntas' } })
+    expect(host.textContent).toContain('La copia incluye los conceptos y las preguntas NBME')
+  })
+
   it('edita criterios como borrador, valida y guarda todos en una sola operación', async () => {
     await act(async () => root.render(<Ajustes />))
     expect(host.querySelector('details')?.open).toBe(false)

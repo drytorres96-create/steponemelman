@@ -7,6 +7,7 @@ import { nuevoProgreso } from '../srs/fsrs'
 import { calcularEstado, evaluarDominio, type CriteriosDominio } from '../srs/mastery'
 import { supabase } from '../lib/supabase'
 import { leer, escribir } from './db'
+import { apartarCopia } from './apartar'
 import { ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, combinarEstados, reconstruirProgreso, serializarEstable, type EstadoApp, type Reanudable } from './model'
 import { StudySyncEngine, leerSnapshot, diagnosticoSync, type CloudSnapshot, type SyncReply, type CodigoSync } from './sync'
 export type { EstadoApp, RegistroSesion, Reanudable } from './model'
@@ -24,7 +25,11 @@ interface Ctx {
   iniciarSesion: (modulo: string, ruta: string) => string
   cerrarSesion: (id: string, datos: { vistos: number; correctos: number; ms: number; msVisibles?: number }) => void
   actualizarCriterios: (c: CriteriosDominio) => void
-  exportar: () => string
+  /** Aviso sobre la copia de este dispositivo, p. ej. que estaba dañada y se apartó. */
+  avisoLocal: string | null
+  descartarAvisoLocal: () => void
+  /** `extra` añade datos al respaldo (el progreso NBME); importar sólo lee el de conceptos. */
+  exportar: (extra?: Record<string, unknown>) => string
   importar: (json: string) => { ok: boolean; mensaje: string }
   reiniciar: () => Promise<void>
 }
@@ -41,12 +46,15 @@ function leerGuardado(valor: unknown, userId: string): Guardado | null {
   return { state, snapshot, savedAt: v.savedAt }
 }
 
+export const AVISO_COPIA_APARTADA = 'La copia guardada en este dispositivo estaba dañada. Se apartó sin borrarla y tu progreso se recuperó de tu cuenta.'
+
 export function ProveedorEstado({ children, userId }: { children: ReactNode; userId: string }) {
   const clave = `cuenta:${userId}`
   const [estado, setEstado] = useState<EstadoApp>(ESTADO_INICIAL)
   const [indice, setIndice] = useState<Indice | null>(null)
   const [listo, setListo] = useState(false)
   const [errorCarga, setErrorCarga] = useState<string | null>(null)
+  const [avisoLocal, setAvisoLocal] = useState<string | null>(null)
   const [sincronizacion, setSync] = useState<Ctx['sincronizacion']>({ estado: 'inicializando', mensaje: 'Preparando tu progreso…', ultima: null })
   const actual = useRef(ESTADO_INICIAL)
   const motor = useRef<StudySyncEngine | null>(null)
@@ -92,7 +100,8 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
         if (!esActual()) return false
         const resultado = await engine.flush()
         if (!esActual()) return false
-        await persistir()
+        // Sin cambios no hay nada nuevo que guardar: cada edición ya se guardó al hacerla.
+        if (lectura.kind !== 'unchanged' || resultado.kind !== 'unchanged') await persistir()
         if (!esActual()) return false
         // Una respuesta nueva también puede llegar mientras se escribe IndexedDB.
         if (serializarEstable(actual.current) !== serializarEstable(engine.snapshot?.state)) {
@@ -121,6 +130,7 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
     let cancelado = false
     setListo(false)
     setErrorCarga(null)
+    setAvisoLocal(null)
     reiniciando.current = false
     void (async () => {
       const crudo = await leer<unknown>(clave)
@@ -131,10 +141,17 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
         const respaldo = leerGuardado(respaldoCrudo, userId)
         if (respaldo && (!guardado || respaldo.savedAt > guardado.savedAt)) guardado = respaldo
       } catch { /* Un respaldo malformado no reemplaza IndexedDB. */ }
-      // Una revisión corrupta nunca se convierte en "cuenta nueva": podría revivir un reinicio.
-      if (!guardado && (crudo !== null || respaldoCrudo !== null)) throw new Error('La copia local no es válida.')
+      // Una copia ilegible no bloquea el estudio, pero tampoco se aprovecha a medias: mezclar
+      // un progreso sin su revisión con el de la nube podría revivir un reinicio. Se aparta
+      // entera y se empieza de cero, sin revisión, para que la primera sincronización traiga
+      // el progreso de la cuenta.
+      const apartada = !guardado && (crudo !== null || respaldoCrudo !== null)
+      if (apartada && !await apartarCopia(clave, `step1-respaldo:${clave}`, { copia: crudo, respaldo: respaldoCrudo })) {
+        throw new Error('La copia local no es válida y no pudo apartarse.')
+      }
       const [idx, migraciones] = await Promise.all([cargarIndice(), cargarMigraciones()])
       if (cancelado) return
+      if (apartada) setAvisoLocal(AVISO_COPIA_APARTADA)
       mapa.current = migraciones
       actual.current = migrarConceptIds(leerEstadoDesconocido(guardado?.state) ?? ESTADO_INICIAL, migraciones)
       setEstado(actual.current)
@@ -151,6 +168,15 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
           const validado = leerEstadoDesconocido(data.state)
           if (!validado) throw new Error('El progreso remoto no tiene un formato válido.')
           return { ...data, state: migrarConceptIds(validado, mapa.current) } as CloudSnapshot
+        },
+        peek: async () => {
+          verificarMontaje()
+          const { data, error } = await supabase.from('study_state').select('revision, generation').eq('user_id', userId).maybeSingle()
+          verificarMontaje()
+          if (error) throw error
+          // Algo inesperado se trata como desconocido: la lectura completa lo valida.
+          return data && Number.isSafeInteger(data.revision) && typeof data.generation === 'string'
+            ? { revision: data.revision as number, generation: data.generation } : null
         },
         save: async ({ state, expectedRevision, generation }) => {
           verificarMontaje()
@@ -230,7 +256,10 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
       }
       return { ...p, criterios, progreso, fieldUpdatedAt: { criterios: Math.max(Date.now(), (p.fieldUpdatedAt?.criterios ?? 0) + 1), reanudable: p.fieldUpdatedAt?.reanudable ?? p.reanudable?.ts ?? 0 } }
     }),
-    exportar: () => JSON.stringify({ ...actual.current, exportado: new Date().toISOString() }, null, 1),
+    avisoLocal,
+    descartarAvisoLocal: () => setAvisoLocal(null),
+    // Lo extra va antes: nunca puede pisar el progreso de conceptos que lee «Importar progreso».
+    exportar: extra => JSON.stringify({ ...extra, ...actual.current, exportado: new Date().toISOString() }, null, 1),
     importar: json => {
       if (reiniciando.current || !motor.current || !vivo.current) return { ok: false, mensaje: 'Espera a que termine la operación de tu cuenta.' }
       try {
@@ -260,7 +289,7 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
         if (vivo.current && motor.current === engine) setSync({ estado: 'sincronizado', ultima: Date.now(), mensaje: 'Progreso reiniciado en tu cuenta' })
       } finally { if (motor.current === engine) reiniciando.current = false }
     },
-  }), [listo, indice, estado, errorCarga, sincronizacion, sincronizarAhora, registrarIntento, editar, persistir])
+  }), [listo, indice, estado, errorCarga, avisoLocal, sincronizacion, sincronizarAhora, registrarIntento, editar, persistir])
   return <C.Provider value={api}>{children}</C.Provider>
 }
 export function useApp() {

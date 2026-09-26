@@ -30,7 +30,7 @@ beforeEach(() => {
     catalog: { schemaVersion: 1, bankVersion: 'r1', total: 1, questions: [question] }, state,
     currentSession: null, sessionView: null, currentQuestion: null, sessionQuestions: [],
     selectedOption: null, currentFeedback: null, filters: state.filters, loading: false, questionLoading: false,
-    busy: false, error: null, storageWarning: null, elapsedMs: 0, budgetReached: false,
+    busy: false, error: null, storageWarning: null, localNotice: null, dismissLocalNotice: vi.fn(), elapsedMs: 0, budgetReached: false,
     syncStatus: { state: 'synced', message: '', lastSyncedAt: 1 },
     startSession: vi.fn().mockResolvedValue(true), selectAnswer: vi.fn(), checkAnswer: vi.fn(), nextQuestion: vi.fn(),
     discardSession: vi.fn().mockReturnValue(true), attemptsInSession: vi.fn().mockReturnValue(0),

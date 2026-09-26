@@ -239,3 +239,62 @@ describe('sincronización entre dispositivos', () => {
     expect(client.local.progreso.A.intentos).toHaveLength(1)
   })
 })
+
+/** El mismo servidor, contando cuántas veces se baja el progreso entero y con consulta ligera. */
+function conConsultaLigera(cloud: ReturnType<typeof server>) {
+  let loads = 0
+  const transport: SyncTransport = {
+    load: async () => { loads++; return cloud.transport.load() },
+    save: input => cloud.transport.save(input),
+    peek: async () => cloud.row ? { revision: cloud.row.revision, generation: cloud.row.generation } : null,
+  }
+  return { transport, get loads() { return loads } }
+}
+
+describe('sin cambios no se transfiere el progreso', () => {
+  it('no sube nada si la copia local ya coincide con la nube, y sube en cuanto hay una respuesta nueva', async () => {
+    const cloud = server(snapshot(add(empty(), 'old', 1000)))
+    const client = device(cloud.transport)
+    await client.engine.fetchAndMerge()
+    await client.engine.flush()
+    const antes = cloud.requests
+    expect((await client.engine.flush()).kind).toBe('unchanged')
+    expect(cloud.requests).toBe(antes)
+    client.edit('new', 2000)
+    expect((await client.engine.flush()).kind).toBe('synced')
+    expect(cloud.requests).toBe(antes + 1)
+    expect(cloud.row?.state.progreso.A.intentos.map(i => i.attempt_id)).toEqual(['old', 'new'])
+    expect((await client.engine.flush()).kind).toBe('unchanged')
+    expect(cloud.requests).toBe(antes + 1)
+  })
+
+  it('no baja el progreso entero mientras la revisión de la nube no cambie', async () => {
+    const cloud = server(snapshot(add(empty(), 'old', 1000)))
+    const red = conConsultaLigera(cloud)
+    const a = device(red.transport)
+    const b = device(cloud.transport)
+    await a.engine.fetchAndMerge()
+    expect(red.loads).toBe(1)
+    expect((await a.engine.fetchAndMerge()).kind).toBe('unchanged')
+    expect(red.loads).toBe(1)
+    // Otro dispositivo guarda una respuesta: la revisión cambia y entonces sí se baja.
+    await b.engine.fetchAndMerge()
+    b.edit('otro', 3000)
+    await b.engine.flush()
+    expect((await a.engine.fetchAndMerge()).kind).toBe('merged')
+    expect(red.loads).toBe(2)
+    expect(a.local.progreso.A.intentos.map(i => i.attempt_id)).toContain('otro')
+  })
+
+  it('un reinicio hecho en otro dispositivo se aplica aunque se consulte sólo la revisión', async () => {
+    const cloud = server(snapshot(add(empty(), 'old', 1000)))
+    const red = conConsultaLigera(cloud)
+    const a = device(red.transport)
+    await a.engine.fetchAndMerge()
+    expect(a.local.progreso.A.intentos).toHaveLength(1)
+    cloud.reset()
+    expect((await a.engine.fetchAndMerge()).kind).toBe('reset')
+    expect(a.local.progreso).toEqual({})
+    expect(a.engine.snapshot?.generation).toBe('generation-2')
+  })
+})

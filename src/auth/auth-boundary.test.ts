@@ -58,6 +58,13 @@ async function emit(event: AuthChangeEvent, session: Session | null) {
   })
 }
 
+async function refocus() {
+  await act(async () => {
+    window.dispatchEvent(new Event('focus'))
+    await new Promise(resolve => setTimeout(resolve, 0))
+  })
+}
+
 describe('private account boundary', () => {
   it('shows login without querying membership when there is no session', async () => {
     await emit('INITIAL_SESSION', null)
@@ -102,6 +109,40 @@ describe('private account boundary', () => {
     await emit('SIGNED_IN', sessionFor(userB))
     expect(host.querySelector('[data-private]')).toBeNull()
     expect(host.textContent).toContain(userB.email)
+  })
+
+  it('keeps the study mounted when a focus re-check fails on the network', async () => {
+    await emit('SIGNED_IN', sessionFor(userA))
+    expect(host.querySelector('[data-private="user-a"]')).not.toBeNull()
+    mock.maybeSingle.mockResolvedValue({ data: null, error: { message: 'Failed to fetch' } })
+    await refocus()
+    expect(mock.maybeSingle).toHaveBeenCalledTimes(2)
+    expect(host.querySelector('[data-private="user-a"]')).not.toBeNull()
+    expect(host.textContent).not.toContain('No pudimos comprobar tu acceso')
+  })
+
+  it('still blocks when access was never verified and the check fails', async () => {
+    mock.maybeSingle.mockResolvedValue({ data: null, error: { message: 'Failed to fetch' } })
+    await emit('SIGNED_IN', sessionFor(userA))
+    expect(host.textContent).toContain('No pudimos comprobar tu acceso')
+    expect(host.querySelector('[data-private]')).toBeNull()
+  })
+
+  it('closes the study when a re-check says access was revoked', async () => {
+    await emit('SIGNED_IN', sessionFor(userA))
+    mock.maybeSingle.mockResolvedValue({ data: null, error: null })
+    await refocus()
+    expect(host.querySelector('[data-private]')).toBeNull()
+    expect(host.textContent).toContain('falta habilitar acceso')
+  })
+
+  it('does not keep a verified access across a sign out', async () => {
+    await emit('SIGNED_IN', sessionFor(userA))
+    await emit('SIGNED_OUT', null)
+    mock.maybeSingle.mockResolvedValue({ data: null, error: { message: 'Failed to fetch' } })
+    await emit('SIGNED_IN', sessionFor(userA))
+    expect(host.textContent).toContain('No pudimos comprobar tu acceso')
+    expect(host.querySelector('[data-private]')).toBeNull()
   })
 
   it('opens password recovery before the private study application', async () => {

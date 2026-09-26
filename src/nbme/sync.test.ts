@@ -105,4 +105,28 @@ describe('Independent NBME synchronization', () => {
     await first
     expect(server.saveCount()).toBe(1)
   })
+  it('does not download the whole state while the cloud revision is unchanged, and still applies a reset', async () => {
+    const server = memoryTransport(row(session('session-a')))
+    let loads = 0
+    const transport: NbmeSyncTransport = { ...server.transport,
+      load: async () => { loads++; return server.transport.load() },
+      peek: async () => { const current = server.current(); return current ? { revision: current.revision, generation: current.generation } : null } }
+    let local = emptyNbmeState()
+    const engine = new NbmeSyncEngine(transport, { getLocal: () => local, setLocal: next => { local = next } })
+    await engine.fetchAndMerge()
+    expect(loads).toBe(1)
+    await engine.fetchAndMerge()
+    expect(loads).toBe(1)
+    expect(Object.keys(local.sessions)).toEqual(['session-a'])
+    // Another device saves: the revision changes and the new session is downloaded and merged.
+    server.replace(row(session('session-b', 5), 2))
+    await engine.fetchAndMerge()
+    expect(loads).toBe(2)
+    expect(Object.keys(local.sessions).sort()).toEqual(['session-a', 'session-b'])
+    // A reset elsewhere changes the generation: it is downloaded and replaces the local copy.
+    server.replace(row(emptyNbmeState(), 3, 'generation-2'))
+    await engine.fetchAndMerge()
+    expect(loads).toBe(3)
+    expect(local.sessions).toEqual({})
+  })
 })
