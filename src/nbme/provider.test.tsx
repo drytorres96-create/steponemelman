@@ -83,6 +83,28 @@ it('resumes a saved correction and selected draft on a second device without cha
   expect(memory.rpc.mock.calls.every(([name]) => name === 'sync_nbme_state')).toBe(true)
 })
 
+it('reuses a catalog fetched moments ago only when asked, and never once it is ten minutes old', async () => {
+  await mount()
+  await vi.waitFor(() => expect(current.catalog).not.toBeNull())
+  const fetchMock = globalThis.fetch as unknown as { mock: { calls: [string, RequestInit?][] } }
+  const catalogFetches = () => fetchMock.mock.calls.filter(([path]) => String(path).endsWith('/catalog')).length
+  const initial = catalogFetches()
+  expect(initial).toBe(1)
+  // A box question right after the catalog arrived does not download ~180 KB again.
+  await act(async () => { expect(await current.startSession([question], { reuseRecentCatalog: true })).toBe(true) })
+  expect(catalogFetches()).toBe(initial)
+  // An ordinary start still refreshes it: that is the guard against a bank updated in between.
+  await act(async () => { expect(await current.startSession([questions[1]])).toBe(true) })
+  expect(catalogFetches()).toBe(initial + 1)
+  // Ten minutes later it is no longer recent, and a box question refreshes it too.
+  const now = Date.now()
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 10 * 60_000 + 1)
+  try {
+    await act(async () => { expect(await current.startSession([question], { reuseRecentCatalog: true })).toBe(true) })
+    expect(catalogFetches()).toBe(initial + 2)
+  } finally { clock.mockRestore() }
+})
+
 it('checks authorization before resuming cached material and preserves progress after denial', async () => {
   await mount()
   await act(async () => { expect(await current.startSession([question])).toBe(true) })

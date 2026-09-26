@@ -92,6 +92,14 @@ describe('reproductor en una caja', () => {
     expect(onTramoCompleto).toHaveBeenCalledOnce()
   })
 
+  it('las manos no salen del teclado: la respuesta tiene el foco y, corregida, «Siguiente pregunta» también', async () => {
+    await pintar({ reintento: false, avisoFallo: 'Vuelve dentro de unos pasos.' })
+    expect(document.activeElement).toBe(host.querySelector('input[type="text"]'))
+    await responder('alfa')
+    expect(host.textContent).toContain('Siguiente pregunta')
+    expect(document.activeElement?.textContent).toBe('Siguiente pregunta')
+  })
+
   it('una reinserción se presenta y se registra como corrección con explicación previa', async () => {
     await pintar({ reintento: true, avisoFallo: 'Por hoy ya está.' })
     expect(host.textContent).toContain('Volvemos a un concepto de esta sesión')

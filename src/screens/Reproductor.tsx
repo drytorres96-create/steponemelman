@@ -81,6 +81,8 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
   const abortoIA = useRef(new AbortController())
   const vivoIA = useRef(true)
   const devuelto = useRef(false)
+  const tareaRef = useRef<HTMLDivElement>(null)
+  const siguienteRef = useRef<HTMLButtonElement>(null)
   const [explicacionPrevia, setExplicacionPrevia] = useState(false)
   const [sesionLista, setSesionLista] = useState(false)
   const sesionId = useRef<string | null>(cola.sessionId ?? null)
@@ -409,6 +411,16 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pasoTerminado])
 
+  // En una caja las manos no salen del teclado: la respuesta escrita recibe el foco al
+  // aparecer y, corregida, «Siguiente pregunta» también. Nada se desplaza por ello.
+  useEffect(() => {
+    if (!modoCaja || !sesionLista) return
+    if (fase === 'tarea') tareaRef.current?.querySelector<HTMLElement>('input[type="text"], textarea')?.focus({ preventScroll: true })
+    else if (fase === 'retro') siguienteRef.current?.focus({ preventScroll: true })
+    // `modoCaja` es un objeto nuevo en cada render; lo que cuenta es que exista.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase, preguntaId, sesionLista, !!modoCaja])
+
   if (!sesionLista) return <p role="status">Preparando tu sesión…</p>
   if (!estado.reanudable || estado.reanudable.sessionId !== sesionId.current || estado.reanudable.indice !== i || estado.reanudable.conceptIds?.join('|') !== orden.map(x => x.concept_id).join('|')) return <div className="tarjeta pila" role="status">
     <h2>Tu sesión cambió en otra ventana</h2><p>Las respuestas registradas se conservan. Vuelve a tu plan para abrir el punto de continuación más reciente.</p>
@@ -482,7 +494,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     <div className="avance" aria-label={`Pregunta ${i + 1} de ${examenSinAyuda ? cantidadInicial : orden.length}`}>
       {orden.slice(0, examenSinAyuda ? cantidadInicial : orden.length).map((_, k) => <i key={k} className={k < i ? 'hecho' : k === i ? 'actual' : ''} />)}
     </div></>}
-    <div className="tarea">
+    <div className="tarea" ref={tareaRef}>
       {reintento && <p className="mini">Volvemos a un concepto de esta sesión. Este acierto contará como corrección con explicación previa.</p>}
       {fase === 'ensenanza' && !examenSinAyuda && <div>
         <div className="rotulo" style={{ marginBottom: 10 }}>{modo === 'mecanismo' ? 'Mecanismo paso a paso' : modo === 'comparacion' ? 'Comparación' : 'Antes de recuperar'}</div>
@@ -543,7 +555,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
         {c.patron && <p className="patron"><b>Si ves esto → piensa:</b> {c.patron}</p>}
         {c.confusiones.length > 0 && <p className="mini">No lo confundas con: {c.confusiones.join(' · ')}</p>}
         {c.revision_editorial && <p className="aviso">{c.revision_editorial.nota}</p>}
-        {res.veredicto !== 'revision' && <button className="btn principal" onClick={avanzar}>Siguiente pregunta</button>}
+        {res.veredicto !== 'revision' && <button ref={siguienteRef} className="btn principal" onClick={avanzar}>Siguiente pregunta</button>}
         <details style={{ marginTop: 14 }}><summary>Profundizar</summary>
           {c.contexto && <p>{c.contexto}</p>}
           <p className="mini">Clasificación para el planificador: {NOMBRE_ERROR[res.tipoError]}</p>

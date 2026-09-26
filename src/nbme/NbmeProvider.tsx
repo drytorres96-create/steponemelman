@@ -34,7 +34,12 @@ interface NbmeContextValue {
   error: string | null
   storageWarning: string | null
   syncStatus: NbmeSyncStatus
-  startSession(refs: NbmeQuestionRef[], options?: { title?: string; budgetMinutes?: 10 | 20 | 30 | null }): Promise<boolean>
+  /**
+   * `reuseRecentCatalog` evita volver a pedir el catálogo (~180 KB) si esta pestaña lo
+   * trajo de la red hace menos de diez minutos: las cajas abren una sesión por
+   * pregunta y no tienen que esperar una descarga entera entre una y la siguiente.
+   */
+  startSession(refs: NbmeQuestionRef[], options?: { title?: string; budgetMinutes?: 10 | 20 | 30 | null; reuseRecentCatalog?: boolean }): Promise<boolean>
   selectAnswer(optionId: string): void
   checkAnswer(): void
   nextQuestion(): void
@@ -54,6 +59,8 @@ interface NbmeContextValue {
   loadFigure(assetId: string, signal?: AbortSignal): Promise<Blob>
 }
 const NbmeContext = createContext<NbmeContextValue | null>(null)
+/** Cuánto vale un catálogo recién traído de la red para quien pide reutilizarlo. */
+const RECENT_CATALOG_MS = 10 * 60_000
 interface SavedState { userId: string; state: NbmeState; snapshot: NbmeSnapshot | null; savedAt: number }
 function parseSavedState(value: unknown, userId: string): SavedState | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
@@ -101,11 +108,14 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     tickAt: Date.now(), pendingMs: 0, questionMs: 0, running: false, answering: false })
   const aliveEpoch = useRef(0)
   const accessDenied = useRef(false)
+  /** Cuándo llegó de la red el catálogo actual; `null` mientras sólo hay copia local. */
+  const catalogFetchedAt = useRef<number | null>(null)
 
   const denyAccess = useCallback((failure: unknown) => {
     if (!(failure instanceof NbmeAccessError)) return
     accessDenied.current = true
     engagedSession.current = null
+    catalogFetchedAt.current = null
     questions.current.clear()
     setCatalog(null)
     setContentChange(n => n + 1)
@@ -222,6 +232,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       const next = await api.catalog(controller.signal)
       if (!mounted.current || epoch !== aliveEpoch.current) return
       accessDenied.current = false
+      catalogFetchedAt.current = Date.now()
       setCatalog(next)
       setCatalogStale(false)
       // La versión del banco pasa al estado: es la clave con la que se detecta una corrección.
@@ -272,6 +283,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     engineRef.current = null
     accessDenied.current = false
     engagedSession.current = null
+    catalogFetchedAt.current = null
     actual.current = emptyNbmeState()
     setState(actual.current)
     setCatalog(null)
@@ -425,7 +437,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     }
   }, [persist, syncNow])
 
-  const startSession = useCallback(async (refs: NbmeQuestionRef[], options: { title?: string; budgetMinutes?: 10 | 20 | 30 | null } = {}): Promise<boolean> => {
+  const startSession = useCallback(async (refs: NbmeQuestionRef[], options: { title?: string; budgetMinutes?: 10 | 20 | 30 | null; reuseRecentCatalog?: boolean } = {}): Promise<boolean> => {
     if (actionLock.current || !engineRef.current || !catalog) return false
     if (!refs.length || refs.length > 20 || new Set(refs.map(questionRefKey)).size !== refs.length
       || refs.some(ref => !catalog.questions.some(q => q.status === 'ready' && questionRefKey(q) === questionRefKey(ref)))) {
@@ -436,10 +448,13 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     setBusy(true)
     const epoch = aliveEpoch.current
     try {
-      if (navigator.onLine) {
+      const reciente = !!options.reuseRecentCatalog && catalogFetchedAt.current !== null
+        && Date.now() - catalogFetchedAt.current < RECENT_CATALOG_MS
+      if (navigator.onLine && !reciente) {
         const fresh = await api.catalog()
         if (!mounted.current || epoch !== aliveEpoch.current) return false
         accessDenied.current = false
+        catalogFetchedAt.current = Date.now()
         setCatalog(fresh)
         if (refs.some(ref => !fresh.questions.some(q => q.status === 'ready' && questionRefKey(q) === questionRefKey(ref)))) {
           throw new Error('El banco se ha actualizado. Revisa tu selección e inicia el bloque de nuevo.')

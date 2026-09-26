@@ -2,7 +2,7 @@ import type { NbmeAttempt } from '../nbme/types'
 import { aciertosVigentes, evaluarDominio, evidenciaIndependiente, type CriteriosDominio } from '../srs/mastery'
 import { intentoCorrecto, type ProgresoConcepto } from '../srs/tipos'
 import { reconstruirProgreso } from '../store/model'
-import { TECHO_CAJAS, inicioDelDia } from './dia'
+import { TECHOS, inicioDelDia, tipoDeDia } from './dia'
 import { ultimoIntentoResuelto } from './plan-estudio'
 
 /**
@@ -14,10 +14,10 @@ import { ultimoIntentoResuelto } from './plan-estudio'
  * comprime lo que caería después del examen. Un concepto sale de la escalera
  * cuando cumple los criterios de dominio, no por llegar al último escalón.
  *
- * Lo que vence se reparte con un techo duro por día. Lo que no cabe espera al día
- * siguiente en silencio: ninguna función de este módulo devuelve cuánto quedó
- * fuera, porque una cuenta de deuda es justo lo que deja de servir tras una
- * semana sin estudiar.
+ * Lo que vence se reparte con un techo duro por día —40 entre semana, 70 el fin de
+ * semana, ninguno el viernes—. Lo que no cabe espera al día siguiente en silencio:
+ * ninguna función de este módulo devuelve cuánto quedó fuera, porque una cuenta de
+ * deuda es justo lo que deja de servir tras una semana sin estudiar.
  */
 
 export type Caja = 1 | 2 | 3
@@ -113,7 +113,7 @@ export interface EntradaCajas {
 }
 
 export interface CajasDelDia {
-  /** Lo que toca hoy, como mucho TECHO_CAJAS, en el orden en que se estudia. */
+  /** Lo que toca hoy, como mucho el techo de cajas del tipo de día, en el orden en que se estudia. */
   items: ItemCaja[]
   hechos: number
   techo: number
@@ -129,8 +129,10 @@ function progresoAntesDe(p: ProgresoConcepto, desde: number, criterios: Criterio
 /**
  * Las cajas de hoy. Entra lo que vio días anteriores y no está cerrado, cuando
  * vence antes de seis horas desde que se fija el día; se ordena por lo que venció
- * antes y se corta en TECHO_CAJAS. Todo se calcula con el estado con que cada
- * ítem empezó el día, así que estudiar no mueve el techo: sólo marca hechos.
+ * antes y se corta en el techo del tipo de día. El viernes no entra nada: lo que
+ * vence sigue vencido y el sábado lo recoge primero, porque venció antes. Todo se
+ * calcula con el estado con que cada ítem empezó el día, así que estudiar no mueve
+ * el techo: sólo marca hechos.
  */
 export function cajasDelDia(e: EntradaCajas): CajasDelDia {
   const desde = inicioDelDia(e.ahora)
@@ -165,7 +167,7 @@ export function cajasDelDia(e: EntradaCajas): CajasDelDia {
 
   candidatos.sort((a, b) => a.vence - b.vence || a.caja - b.caja
     || (a.tipo === b.tipo ? 0 : a.tipo === 'concepto' ? -1 : 1) || a.id.localeCompare(b.id))
-  const items = candidatos.slice(0, TECHO_CAJAS)
+  const items = candidatos.slice(0, TECHOS[tipoDeDia(e.ahora)].cajas)
   const hechos = items.filter(i => i.hecho).length
   return { items, hechos, techo: items.length, cerrada: hechos >= items.length }
 }

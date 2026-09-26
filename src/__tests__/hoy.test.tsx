@@ -35,8 +35,8 @@ vi.mock('../data/corpus', () => ({ cargarTodo: mock.corpus, cargarConceptos: moc
 import { Hoy } from '../screens/Hoy'
 import { vistaDesdeHash } from '../App'
 
-/** Viernes 25 de septiembre de 2026, 10:00. La semana va del lunes 21 al domingo 27. */
-const HOY = (h: number, m = 0) => new Date(2026, 8, 25, h, m).getTime()
+/** Jueves 24 de septiembre de 2026, 10:00: un día entre semana. La semana va del lunes 21 al domingo 27. */
+const HOY = (h: number, m = 0) => new Date(2026, 8, 24, h, m).getTime()
 
 let serie = 0
 const intento = (ts: number, extra: Partial<Intento> = {}): Intento => ({
@@ -213,7 +213,7 @@ describe('portada Hoy', () => {
     mock.adherencia.mockResolvedValue([{ eventoId: 'S2', titulo: 'S2 · 14–19 sep · Reproductivo', inicio: '2026-09-14', hechas: 3, tareas: 4 }])
     mock.plan.mockResolvedValue({
       eventoId: 'S3', titulo: 'S3 · 21–26 sep · Renal y ácido-base', inicio: '2026-09-21', fin: '2026-09-26', nota: null,
-      checkpoints: [cp({ id: 1, idx: 1, dia: 5, label: 'AMBOSS Renal · 20 preguntas' })],
+      checkpoints: [cp({ id: 1, idx: 1, dia: 4, label: 'AMBOSS Renal · 20 preguntas' })],
     } satisfies PlanSemana)
     await pintar()
     expect(anillo().classList.contains('cerrado')).toBe(true)
@@ -226,7 +226,7 @@ describe('portada Hoy', () => {
     expect(host.querySelector('#horizonte-titulo')?.textContent).toContain('Cubrir el material en')
     expect(host.querySelector('.plan-adherencia')?.textContent).toContain('75 %')
     // El calendario de la semana va aquí dentro, con el día de hoy abierto.
-    expect(host.querySelector('.plan-dia-titulo[aria-expanded="true"]')?.textContent).toContain('HOY · viernes')
+    expect(host.querySelector('.plan-dia-titulo[aria-expanded="true"]')?.textContent).toContain('HOY · jueves')
     expect(host.textContent).toContain('AMBOSS Renal · 20 preguntas')
   })
 
@@ -239,6 +239,61 @@ describe('portada Hoy', () => {
     window.history.replaceState(null, '', '/#modulos')
     expect(vistaDesdeHash()).toBe('modulos')
     window.history.replaceState(null, '', '/')
+  })
+
+  it('el viernes sale cerrado desde que amanece: sin botones y sin cuentas, aunque haya material y cajas', async () => {
+    vi.setSystemTime(new Date(2026, 8, 25, 3, 5))
+    const semana = ids('C', 12)
+    datos({
+      progresos: { X1: progreso('X1', [fallo(new Date(2026, 8, 22, 9).getTime())]) },
+      respuestas: [respuesta('Q9', new Date(2026, 8, 22, 10).getTime(), false)],
+      conceptos: semana, preguntas: ['Q1', 'Q9'],
+    })
+    mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, semana, ['Q1'])])
+    const onNuevo = vi.fn(), onCajas = vi.fn()
+    await pintar({ onNuevo, onCajas })
+
+    expect(botones()).toHaveLength(0)
+    expect(anillo().classList.contains('cerrado')).toBe(true)
+    expect(host.querySelector('.hoy-ahora')?.textContent).toBe('Viernes: hoy no toca nada, a propósito. Lo que venza hoy entra el sábado.')
+    // Sin cuentas: ni en la línea de lo que toca ni en los bloques, aunque venzan cajas.
+    expect(host.querySelector('.hoy-ahora')?.textContent).not.toMatch(/\d/)
+    expect(host.querySelector('.hoy-bloques')?.textContent).not.toMatch(/\d/)
+    expect(host.textContent).toContain('Cajas · el viernes no toca ninguna')
+    expect(host.textContent).toContain('Nuevo · el viernes no toca')
+    // Ni la tabla del porqué ni otra puerta al estudio: estudiar un viernes es ir al menú a propósito.
+    expect(resumenes()).toEqual(['Cómo va todo'])
+    expect(anillo().getAttribute('aria-label')).toContain('Hoy, viernes sin estudio, pasos hechos: 0 de 0.')
+    expect(onNuevo).not.toHaveBeenCalled()
+    expect(onCajas).not.toHaveBeenCalled()
+  })
+
+  it('el viernes sigue cerrado aunque no lleguen las sesiones de la semana', async () => {
+    vi.setSystemTime(new Date(2026, 8, 25, 10))
+    mock.historial.mockRejectedValue(new Error('sin red'))
+    await pintar()
+    expect(botones()).toHaveLength(0)
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    expect(anillo().classList.contains('cerrado')).toBe(true)
+  })
+
+  it('el fin de semana el techo sube a 20 conceptos, 10 preguntas y 70 cajas, sin contar lo que queda fuera', async () => {
+    vi.setSystemTime(new Date(2026, 8, 26, 10))
+    const semana = ids('C', 25), preguntas = ids('Q', 12)
+    // 75 fallos del martes vencen hoy: entran 70 y los otros cinco esperan sin dejar rastro.
+    const progresos = Object.fromEntries(ids('X', 75).map((id, i) => [id, progreso(id, [fallo(new Date(2026, 8, 22, 9, i).getTime())])]))
+    datos({ progresos, conceptos: semana, preguntas })
+    mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, semana, preguntas)])
+    const onCajas = vi.fn()
+    await pintar({ onCajas })
+
+    expect(host.textContent).toContain('0 / 70 cajas')
+    expect(host.textContent).toContain('0 / 20 conceptos · 0 / 10 preguntas')
+    expect(anillo().getAttribute('aria-label')).toContain('Hoy, pasos hechos: 0 de 100.')
+    expect(host.textContent).not.toMatch(/\b75\b|\b5 (cajas|pendientes)/)
+    await act(async () => { boton('Empezar las cajas').click() })
+    expect(onCajas.mock.calls[0][0]).toHaveLength(70)
+    expect(onCajas.mock.calls[0][1]).toBe('Cajas de hoy · 26 sep')
   })
 
   it('un día sin material se presenta cerrado, no vacío ni con error', async () => {
@@ -327,7 +382,7 @@ describe('portada Hoy', () => {
     expect(onNuevo).toHaveBeenCalledWith({
       conceptIds: ['C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10'],
       preguntas: [{ id: 'Q1', revision: 'r1' }, { id: 'Q2', revision: 'r1' }],
-      titulo: 'Nuevo de hoy · 25 sep', nbmeSessionId: null,
+      titulo: 'Nuevo de hoy · 24 sep', nbmeSessionId: null,
     })
   })
 
