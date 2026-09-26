@@ -37,8 +37,18 @@ El rollback no toca GitHub: la próxima fusión a `main` vuelve a desplegar lo q
 - Desde 1.24.0, si una copia local no se puede leer, la aplicación la aparta sin borrarla
   y recupera el progreso de la cuenta, en vez de quedarse bloqueada.
 
-## Protección recomendada en GitHub
+## Publicar sólo con las pruebas en verde
 
-Que GitHub exija el CI antes de fusionar. En **Settings → Branches → Add branch
-protection rule** para `main`: *Require status checks to pass before merging* y marcar
-**verificar**. Es un ajuste de la cuenta de Yoel; el código no puede activarlo.
+Hoy Cloudflare despliega todo lo que llega a `main`, pase o no el CI. Dos ajustes lo
+cierran. Son de la cuenta de Yoel: el código no puede activarlos.
+
+- **GitHub** — que no se pueda fusionar con el CI en rojo. En **Settings → Branches →
+  Add branch protection rule** para `main`: *Require status checks to pass before
+  merging* y marcar **verificar** y **navegador**.
+- **Cloudflare** — que la compilación de producción corra las pruebas antes de desplegar.
+  En **Workers & Pages → steponemelman → Settings → Build → Build command**:
+  `npm test && npm run build`. Si una prueba falla, la compilación falla y la versión
+  anterior sigue publicada. Añade menos de un minuto a cada despliegue.
+
+Workers Builds no lee el paso `build` de `wrangler.jsonc`, así que tiene que ser en el
+panel.
