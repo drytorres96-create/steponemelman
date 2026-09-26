@@ -15,9 +15,23 @@ import { fechaISO, lunesDe } from './tiempo'
  * progreso real. Los techos, si algún día se editan, irán a Ajustes.
  */
 
-export const TECHO_CONCEPTOS_NUEVOS = 10
-export const TECHO_PREGUNTAS = 5
-export const TECHO_CAJAS = 12
+export type TipoDia = 'semana' | 'finde' | 'vacio'
+
+/**
+ * Techos por tipo de día. Están calibrados con el estado real del 25-sep-2026 y no se
+ * cambian a ojo: con los criterios vigentes un concepto cuesta una exposición nueva y
+ * tres de caja, así que N conceptos nuevos al día piden unos 4 N repasos al día. Es el
+ * techo de cajas el que gobierna el sistema: con 12, el motor se estrangulaba solo a
+ * tres o cuatro nuevos al día. Diez nuevos entre semana piden 40 de caja; veinte el
+ * fin de semana piden 70, que además absorben lo que venció el viernes.
+ */
+export const TECHOS: Record<TipoDia, { conceptos: number; preguntas: number; cajas: number }> = {
+  semana: { conceptos: 10, preguntas: 5, cajas: 40 },
+  finde: { conceptos: 20, preguntas: 10, cajas: 70 },
+  vacio: { conceptos: 0, preguntas: 0, cajas: 0 },
+}
+/** Los viernes van vacíos a propósito: un plan sin holgura muere el primer día malo. */
+export const DIA_VACIO = 5 // viernes, getDay()
 /** El día empieza a las 3:00 locales: una sesión a las 2 AM cuenta como la del día anterior. */
 export const INICIO_DIA_HORA = 3
 
@@ -27,6 +41,16 @@ export function inicioDelDia(ahora: number): number {
   const inicio = new Date(f.getFullYear(), f.getMonth(), f.getDate(), INICIO_DIA_HORA)
   if (inicio.getTime() > ahora) inicio.setDate(inicio.getDate() - 1)
   return inicio.getTime()
+}
+
+/**
+ * Tipo del día de estudio que contiene `ahora`, con el corte de las 3:00: el viernes
+ * va vacío, sábado y domingo son fin de semana y el resto, días entre semana.
+ */
+export function tipoDeDia(ahora: number): TipoDia {
+  const dia = new Date(inicioDelDia(ahora)).getDay()
+  if (dia === DIA_VACIO) return 'vacio'
+  return dia === 0 || dia === 6 ? 'finde' : 'semana'
 }
 
 /** Instante local en que empieza el día de estudio siguiente. Aritmética de calendario, no 24 h fijas. */
@@ -106,6 +130,7 @@ export interface EntradaDia {
 }
 
 export interface EstadoDia {
+  tipo: TipoDia
   nuevo: { conceptos: number; preguntas: number; techoConceptos: number; techoPreguntas: number; cerrada: boolean }
   cajas: { hechos: number; techo: number; cerrada: boolean }
   completo: boolean
@@ -122,9 +147,9 @@ interface CuentaNuevo {
 
 /**
  * «Nuevo» es un concepto sin ningún intento resuelto antes de hoy; «visto» es un
- * intento resuelto hoy, acierto o fallo, venga de donde venga. El techo baja a lo
- * que la semana tiene disponible: la vía nunca se queda abierta pidiendo algo que
- * no existe.
+ * intento resuelto hoy, acierto o fallo, venga de donde venga. El techo es el del
+ * tipo de día y baja a lo que la semana tiene disponible: la vía nunca se queda
+ * abierta pidiendo algo que no existe. El viernes su techo es cero.
  */
 function contarNuevo(e: EntradaDia): CuentaNuevo {
   const desde = inicioDelDia(e.ahora), hasta = finDelDia(e.ahora)
@@ -143,8 +168,9 @@ function contarNuevo(e: EntradaDia): CuentaNuevo {
   for (const t of primeraRespuesta.values()) if (deHoy(t)) preguntas++
   const preguntasLibres = e.preguntasSemana.filter(id => !primeraRespuesta.has(id))
 
-  const techoConceptos = Math.min(TECHO_CONCEPTOS_NUEVOS, conceptos + conceptosLibres.length)
-  const techoPreguntas = Math.min(TECHO_PREGUNTAS, preguntas + preguntasLibres.length)
+  const techos = TECHOS[tipoDeDia(e.ahora)]
+  const techoConceptos = Math.min(techos.conceptos, conceptos + conceptosLibres.length)
+  const techoPreguntas = Math.min(techos.preguntas, preguntas + preguntasLibres.length)
   return {
     conceptos, preguntas, techoConceptos, techoPreguntas,
     siguientesConceptos: conceptosLibres.slice(0, Math.max(0, techoConceptos - conceptos)),
@@ -152,6 +178,11 @@ function contarNuevo(e: EntradaDia): CuentaNuevo {
   }
 }
 
+/**
+ * El estado del día, derivado. El viernes sale completo desde que amanece: sus techos
+ * son cero, así que no queda nada abierto aunque la semana tenga material o venzan
+ * cajas; eso entra en el techo del sábado.
+ */
 export function estadoDelDia(e: EntradaDia): EstadoDia {
   const n = contarNuevo(e)
   const nuevo = {
@@ -159,7 +190,7 @@ export function estadoDelDia(e: EntradaDia): EstadoDia {
     cerrada: n.conceptos >= n.techoConceptos && n.preguntas >= n.techoPreguntas,
   }
   const cajas = { hechos: e.cajas.hechos, techo: e.cajas.techo, cerrada: e.cajas.hechos >= e.cajas.techo }
-  return { nuevo, cajas, completo: nuevo.cerrada && cajas.cerrada }
+  return { tipo: tipoDeDia(e.ahora), nuevo, cajas, completo: nuevo.cerrada && cajas.cerrada }
 }
 
 /** Lo que falta de la vía nueva hoy, en el orden en que la semana lo presenta. */

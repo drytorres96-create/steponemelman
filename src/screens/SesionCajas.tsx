@@ -129,12 +129,17 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
     const pendiente = sesionPendiente(nbme.state, meta.id, meta.revision)
     if (pendiente) { setSesionesPregunta(mapa => ({ ...mapa, [pregunta]: pendiente })); return }
     esperando.current = { paso: cursor, pregunta }
-    void nbmeRef.current.startSession([{ id: meta.id, revision: meta.revision }], { title: TITULO_NBME_CAJAS, budgetMinutes: null }).then(ok => {
+    // Una caja tras otra: el catálogo que se trajo hace un momento vale, no se descarga entero en cada pregunta.
+    void nbmeRef.current.startSession([{ id: meta.id, revision: meta.revision }],
+      { title: TITULO_NBME_CAJAS, budgetMinutes: null, reuseRecentCatalog: true }).then(ok => {
       if (ok) return
       esperando.current = null
       setErrorPaso(nbmeRef.current.error ?? 'No se pudo abrir esta pregunta.')
     })
   }, [paso, cursor, preparado, errorPaso, nbme.loading, nbme.busy, nbme.state, nbme.catalog, sesionesPregunta, avanzar])
+
+  // Cada paso empieza arriba: la explicación larga del anterior no deja la siguiente pregunta fuera de la vista.
+  useEffect(() => { document.scrollingElement?.scrollTo?.({ top: 0 }) }, [cursor])
 
   // El identificador de la sesión NBME sólo se conoce cuando el proveedor la activa.
   useEffect(() => {
@@ -184,13 +189,15 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
   </div>
   const seguir = <button className="btn principal" onClick={() => avanzar(false)}>Seguir con el resto</button>
   const volver = <button className="btn fantasma" onClick={onSalir}>Volver a Hoy</button>
+  // Entre una caja y la siguiente la cabecera no se mueve: sólo cambia lo de debajo.
+  const preparando = (texto: string) => <div className="pila">{encabezado}<div className="vacio" role="status">{texto}</div></div>
 
   if (paso.item.tipo === 'concepto') {
     const c = conceptos.get(paso.item.id)
     if (!c) return <div className="pila">{encabezado}<div className="tarjeta pila" role="alert"><h2>Este concepto no está disponible</h2>
       <p>No está en el material publicado ahora mismo. Puedes seguir con el resto de las cajas.</p>
       <div className="fila">{seguir}{volver}</div></div></div>
-    if (preparado !== cursor) return <div className="vacio" role="status">Preparando el concepto…</div>
+    if (preparado !== cursor) return preparando('Preparando el concepto…')
     const cola: Cola = { titulo, subtitulo: SUBTITULO, ruta: 'repaso', modulo, conceptos: [c], sessionId: sesionPaso }
     return <div className="pila">{encabezado}
       <Reproductor key={sesionPaso} cola={cola} onSalir={onSalir} onTramoCompleto={conceptoTerminado}
@@ -207,7 +214,7 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
   if (!disponible) return <div className="pila">{encabezado}<div className="tarjeta pila" role="alert"><h2>Esta pregunta no está disponible</h2>
     <p>El banco la retiró o está en revisión. Puedes seguir con el resto de las cajas.</p>
     <div className="fila">{seguir}{volver}</div></div></div>
-  if (preparado !== cursor) return <div className="vacio" role="status">Preparando la pregunta…</div>
+  if (preparado !== cursor) return preparando('Preparando la pregunta…')
   return <div className="pila">{encabezado}
     <NbmePlayer modoPaso etiquetaSalida="Volver a Hoy" onSalir={onSalir} onPasoCompleto={preguntaTerminada} />
   </div>

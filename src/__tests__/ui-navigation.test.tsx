@@ -36,6 +36,9 @@ let app: Record<string, unknown>
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.clearAllMocks()
+  // Un jueves: la portada depende del tipo de día y un viernes sale cerrado con otro texto.
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 8, 24, 10))
   window.history.replaceState(null, '', '/')
   host = document.createElement('div')
   document.body.append(host)
@@ -52,6 +55,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
+  vi.useRealTimers()
   vi.restoreAllMocks()
 })
 

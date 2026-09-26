@@ -172,7 +172,8 @@ function useTic(cada = 60_000): void {
 /**
  * La portada, y la única pantalla. Todo cabe en ella y el techo lo pone el sitio:
  * dos vías con su cuenta y su botón, cajas primero y lo nuevo después. Cuando las
- * dos se cierran, los botones desaparecen y la pantalla dice qué se hizo hoy.
+ * dos se cierran, los botones desaparecen y la pantalla dice qué se hizo hoy. El
+ * techo depende del tipo de día, y el viernes sale cerrado desde que amanece.
  * Debajo, plegado, lo que antes vivía en Mi semana, Recuperación y Progreso.
  * Ningún número de deuda fuera de los desplegables: los techos ya dicen lo que hay
  * que hacer.
@@ -235,8 +236,11 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
   const bancoListo = !!nbme.catalog || (!nbme.loading && !!nbme.error)
   if (!bancoListo || (!sesiones && !fallo)) return <div className="vacio" role="status">Preparando tu día…</div>
 
+  // El viernes va vacío a propósito: sale cerrado desde que amanece, sin botones ni cuentas,
+  // y lo que venza entra en el techo del sábado. No depende de nada que tenga que cargar.
+  const viernes = dia.tipo === 'vacio'
   // Sin las sesiones de la semana no se puede dar lo nuevo por cerrado: el día queda abierto.
-  const nuevoConocido = !!sesiones
+  const nuevoConocido = !!sesiones || viernes
   const completo = nuevoConocido && dia.completo
   // Recién abierto un dispositivo, «ya está» sólo se dice cuando llegó el progreso de la cuenta:
   // un cierre calculado sobre una copia local a medias mandaría a cerrar el portátil con trabajo pendiente.
@@ -254,11 +258,12 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
   const techoNuevo = dia.nuevo.techoConceptos + dia.nuevo.techoPreguntas
   const hechosCajas = Math.min(dia.cajas.hechos, dia.cajas.techo)
   const interior = { valor: hechosNuevo + hechosCajas, total: techoNuevo + dia.cajas.techo,
-    etiqueta: completo ? 'Hoy, día cerrado, pasos hechos' : 'Hoy, pasos hechos' }
+    etiqueta: viernes ? 'Hoy, viernes sin estudio, pasos hechos' : completo ? 'Hoy, día cerrado, pasos hechos' : 'Hoy, pasos hechos' }
 
   const cajasAbiertas = !dia.cajas.cerrada
   const nuevoAbierto = nuevoConocido && !dia.nuevo.cerrada
-  const ahoraToca = completo ? fraseCierre(dia)
+  const ahoraToca = viernes ? 'Viernes: hoy no toca nada, a propósito. Lo que venza hoy entra el sábado.'
+    : completo ? fraseCierre(dia)
     : cajasAbiertas && nuevoAbierto ? 'Primero las cajas, que ya las conoces. Después, lo nuevo de la semana.'
     : cajasAbiertas ? 'Te quedan las cajas de hoy.'
     : nuevoAbierto ? 'Ahora, lo nuevo de la semana.'
@@ -296,7 +301,10 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
     <p className="hoy-ahora" role="status">{ahoraToca}</p>
 
     <div className="hoy-bloques">
-      {dia.cajas.cerrada
+      {viernes
+        ? <p className="hoy-bloque-hecho"><span className="hoy-marca" aria-hidden="true">✓</span>
+          <span>Cajas · el viernes no toca ninguna</span></p>
+        : dia.cajas.cerrada
         ? <p className="hoy-bloque-hecho"><span className="hoy-marca" aria-hidden="true">✓</span>
           <span>{dia.cajas.techo ? `Cajas · ${hechosCajas} / ${dia.cajas.techo}` : 'Cajas · hoy no toca ninguna'}</span></p>
         : <section className="tarjeta hoy-bloque" aria-labelledby="hoy-cajas">
@@ -319,6 +327,9 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
           </div>
           <button className="btn" onClick={() => setReintento(v => v + 1)}>Volver a intentar</button>
         </section>
+        : viernes
+          ? <p className="hoy-bloque-hecho"><span className="hoy-marca" aria-hidden="true">✓</span>
+            <span>Nuevo · el viernes no toca</span></p>
         : dia.nuevo.cerrada
           ? <p className="hoy-bloque-hecho"><span className="hoy-marca" aria-hidden="true">✓</span>
             <span>{techoNuevo ? `Nuevo · ${cuentaNuevo}` : 'Nuevo · la semana no trae material por ver'}</span></p>

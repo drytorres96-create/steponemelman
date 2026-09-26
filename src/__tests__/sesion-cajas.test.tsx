@@ -195,7 +195,8 @@ describe('recorrido de las cajas', () => {
     const items = [item('pregunta', 'Q1'), item('concepto', 'B'), item('concepto', 'C'), item('concepto', 'D')]
     await act(async () => { root.render(<SesionCajas items={items} titulo="Cajas de hoy · 25 sep" onSalir={vi.fn()} />) })
     await esperar()
-    expect(mock.startSession).toHaveBeenCalledExactlyOnceWith([{ id: 'Q1', revision: 'r1' }], { title: 'Cajas', budgetMinutes: null })
+    // Una caja tras otra: reutiliza el catálogo recién traído en lugar de descargarlo entero en cada pregunta.
+    expect(mock.startSession).toHaveBeenCalledExactlyOnceWith([{ id: 'Q1', revision: 'r1' }], { title: 'Cajas', budgetMinutes: null, reuseRecentCatalog: true })
     expect(host.textContent).toContain('Reproductor de preguntas')
 
     await act(async () => { responderPregunta(false) })
