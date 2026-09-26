@@ -424,8 +424,8 @@ select option { background: #071b1e; color: var(--texto); }
 .section-toolbar { border-bottom: 1px solid var(--linea); }
 .barras .pista-b, .barra-prog { height: 6px; background: rgba(233, 243, 239, .10); }
 .barras .pista-b > span, .barra-prog > span { background: linear-gradient(90deg, var(--acento), var(--calido)); }
-.horizonte-tabla .horizonte-actual { background: var(--violeta-tenue); }
-.horizonte-tabla .horizonte-actual th[scope='row'] { color: var(--acento); }
+.meta-tabla .meta-actual { background: var(--violeta-tenue); }
+.meta-tabla .meta-actual th[scope='row'] { color: var(--acento); }
 .tabla th { color: var(--texto-3); background: #071b1e; }
 .tabla td { border-bottom-color: var(--linea); }
 
