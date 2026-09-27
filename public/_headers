@@ -3,7 +3,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://jijkzvhpxmxzgfwiqxvc.supabase.co wss://jijkzvhpxmxzgfwiqxvc.supabase.co; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://rcwvwxchpukjbtqsrxfi.supabase.co wss://rcwvwxchpukjbtqsrxfi.supabase.co; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'
 
 # Vite pone un hash en cada nombre: el contenido de /assets nunca cambia bajo el mismo nombre.
 /assets/*
