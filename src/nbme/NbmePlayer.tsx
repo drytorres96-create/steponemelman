@@ -175,7 +175,6 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
               <h1 id="nbme-question-title" className="nbme-question-heading" tabIndex={-1} ref={titleRef}>
                 {sessionView.current?.round ? 'Vuelve a intentarlo' : modoPaso ? 'Pregunta NBME' : `Pregunta ${(sessionView.current?.position ?? 0) + 1} de ${sessionView.initialCount}`}
               </h1>
-              <p className="mini">{source}</p>
               <Enunciado texto={currentQuestion.stem} />
               {figures.loading && <p role="status" className="sutil">Cargando figura…</p>}
               {figures.error && <div className="nbme-error" role="alert"><p>No se pudo cargar la figura.</p><button className="btn" onClick={figures.retry}>Reintentar figura</button></div>}

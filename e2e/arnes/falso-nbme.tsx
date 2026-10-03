@@ -3,10 +3,12 @@ import { activateNbmeSession, deriveNbmeSession, emptyNbmeState, reviewNbmeAnswe
 import { catalogo, respuestas } from './escena'
 // Doble del proveedor NBME que usa el modelo real: abre, responde y revisa sesiones de verdad.
 // Las preguntas son texto sintético sin contenido clínico.
+const conFigura = new URLSearchParams(location.search).has('figura')
+const loadFigure = async () => new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j9WQAAAAASUVORK5CYII='), c => c.charCodeAt(0))], { type: 'image/png' })
 const pregunta = (id: string) => ({ id, revision: 'r1', form: '27', section: 1, item: 1, page: 1, systems: [], disciplines: [], topic: 'T',
-  objective: 'Synthetic objective: the answer follows from the demo mechanism described in the stem.', status: 'ready', reasons: [], figureRequired: false, conceptLinks: [],
+  objective: 'Synthetic objective: the answer follows from the demo mechanism described in the stem.', status: 'ready', reasons: [], figureRequired: conFigura, conceptLinks: [],
   stem: 'A 45-year-old synthetic patient presents with a demonstration finding after a long synthetic history. Laboratory studies are pending. Which of the following is the most likely explanation?',
-  options: 'ABCDE'.split('').map(l => ({ id: l, text: `Synthetic option ${l}` })), answer: 'C', explanation: 'Synthetic explanation.', figures: [],
+  options: 'ABCDE'.split('').map(l => ({ id: l, text: `Synthetic option ${l}` })), answer: 'C', explanation: 'Synthetic explanation.', figures: conFigura ? [{ assetId: 'synthetic-figure', alt: 'Synthetic figure' }] : [],
   provenance: { sourceFile: 'demo', sourceRecordId: id, notes: [] } })
 let state: any = { ...emptyNbmeState(), attempts: Object.fromEntries(respuestas.map((r: any) => [r.id, r])) }
 let seleccion: string | null = null
@@ -29,7 +31,7 @@ function construir() {
     nextQuestion: () => { const sid = state.activeSessionId; const v = sid ? deriveNbmeSession(state, sid) : null; if (sid && v?.current) state = reviewNbmeAnswer(state, sid, v.current.position); seleccion = null; avisar() },
     pauseSession: () => { const sid = state.activeSessionId; if (sid) state = updateNbmeSession(state, sid, { paused: true }); avisar() },
     discardSession: () => true, attemptsInSession: () => 0, continueSession() {}, continueWithoutBudget() {}, setFilters() {},
-    syncNow: async () => true, reloadCatalog: async () => {}, retryQuestionLoad: async () => {}, loadFigure: async () => new Blob(),
+    syncNow: async () => true, reloadCatalog: async () => {}, retryQuestionLoad: async () => {}, loadFigure,
   }
 }
 let valor = construir()
