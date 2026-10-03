@@ -38,6 +38,18 @@ async function responderPaso(page: Page, texto = 'demostración') {
   await page.keyboard.press('Enter')
 }
 
+/** Espera a que el progreso confirme cada transición antes de decidir el siguiente paso. */
+async function llegarAPreguntaNbme(page: Page) {
+  for (let paso = 0; paso < 8; paso++) {
+    await expect(preguntaNbme(page).or(respuesta(page))).toBeVisible()
+    if (await preguntaNbme(page).isVisible()) break
+    const hechas = Number(await cajasHechas(page).getAttribute('value'))
+    await responderPaso(page)
+    await expect(cajasHechas(page)).toHaveAttribute('value', String(hechas + 1))
+  }
+  await expect(preguntaNbme(page)).toBeVisible()
+}
+
 test('cajas: Intro comprueba, enseña la corrección y sólo el segundo Intro pasa a la siguiente', async ({ page }) => {
   const errores = await abrir(page)
   await page.getByRole('button', { name: /(Empezar|Seguir con) las cajas/ }).click()
@@ -87,11 +99,7 @@ test('cajas: la pregunta NBME se contesta con el teclado y la piel no cambia en 
   const pielInicial = await piel(page)
   expect(pielInicial).toMatch(/^(claro|oscuro)$/)
   // Se avanza hasta la pregunta NBME que vence hoy en esta escena.
-  for (let paso = 0; paso < 8 && !(await preguntaNbme(page).isVisible()); paso++) {
-    await responderPaso(page)
-    await expect(preguntaNbme(page).or(respuesta(page)).or(page.getByText('Cajas hechas'))).toBeVisible()
-  }
-  await expect(preguntaNbme(page)).toBeVisible()
+  await llegarAPreguntaNbme(page)
   expect(await piel(page)).toBe(pielInicial)
   await expect(page.locator('#nbme-question-title')).toHaveText('Pregunta NBME')
   await expect(page.getByText('Correcciones pendientes')).toHaveCount(0)
@@ -121,8 +129,7 @@ test('lo nuevo: los tramos de tres conceptos se encadenan sin «Sesión terminad
 test('NBME: la figura se amplía sin revelar la respuesta ni la procedencia antes de comprobar', async ({ page }) => {
   const errores = await abrir(page, 'abierto&figura=1')
   await page.getByRole('button', { name: /(Empezar|Seguir con) las cajas/ }).click()
-  for (let paso = 0; paso < 8 && !(await preguntaNbme(page).isVisible()); paso++) await responderPaso(page)
-  await expect(preguntaNbme(page)).toBeVisible()
+  await llegarAPreguntaNbme(page)
   await expect(preguntaNbme(page).getByText(/NBME 27 · sección/)).toHaveCount(0)
   await expect(page.locator('.nbme-option-state')).toHaveCount(0)
   const image = page.locator('.nbme-image-button img')
@@ -144,7 +151,7 @@ test('NBME: la figura se amplía sin revelar la respuesta ni la procedencia ante
 test('NBME: laboratorios y columnas conservan sus celdas sin desbordar la pantalla', async ({ page }) => {
   const errores = await abrir(page, 'abierto&tabla=1')
   await page.getByRole('button', { name: /(Empezar|Seguir con) las cajas/ }).click()
-  for (let paso = 0; paso < 8 && !(await preguntaNbme(page).isVisible()); paso++) await responderPaso(page)
+  await llegarAPreguntaNbme(page)
   const lab = page.locator('.nbme-lab tbody')
   await expect(lab.getByRole('row')).toHaveCount(2)
   await expect(lab.getByRole('row').first()).toHaveText('Sample X12 units')
