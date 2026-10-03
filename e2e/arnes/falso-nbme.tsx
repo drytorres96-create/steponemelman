@@ -4,11 +4,12 @@ import { catalogo, respuestas } from './escena'
 // Doble del proveedor NBME que usa el modelo real: abre, responde y revisa sesiones de verdad.
 // Las preguntas son texto sintético sin contenido clínico.
 const conFigura = new URLSearchParams(location.search).has('figura')
+const conTabla = new URLSearchParams(location.search).has('tabla')
 const loadFigure = async () => new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j9WQAAAAASUVORK5CYII='), c => c.charCodeAt(0))], { type: 'image/png' })
 const pregunta = (id: string) => ({ id, revision: 'r1', form: '27', section: 1, item: 1, page: 1, systems: [], disciplines: [], topic: 'T',
   objective: 'Synthetic objective: the answer follows from the demo mechanism described in the stem.', status: 'ready', reasons: [], figureRequired: conFigura, conceptLinks: [],
-  stem: 'A 45-year-old synthetic patient presents with a demonstration finding after a long synthetic history. Laboratory studies are pending. Which of the following is the most likely explanation?',
-  options: 'ABCDE'.split('').map(l => ({ id: l, text: `Synthetic option ${l}` })), answer: 'C', explanation: 'Synthetic explanation.', figures: conFigura ? [{ assetId: 'synthetic-figure', alt: 'Synthetic figure' }] : [],
+  stem: conTabla ? 'Synthetic laboratory studies show:\nSample X: 12 units\nSample Y 30%\nGroup | Low | High\nFirst | 20 | 40\nSecond | 30 | 50\nWhich result?\nOption columns: First measure | Second measure' : 'A 45-year-old synthetic patient presents with a demonstration finding after a long synthetic history. Laboratory studies are pending. Which of the following is the most likely explanation?',
+  options: 'ABCDE'.split('').map(l => ({ id: l, text: conTabla ? `${l} first | ${l} second` : `Synthetic option ${l}` })), answer: 'C', explanation: 'Synthetic explanation.', figures: conFigura ? [{ assetId: 'synthetic-figure', alt: 'Synthetic figure' }] : [],
   provenance: { sourceFile: 'demo', sourceRecordId: id, notes: [] } })
 let state: any = { ...emptyNbmeState(), attempts: Object.fromEntries(respuestas.map((r: any) => [r.id, r])) }
 let seleccion: string | null = null
