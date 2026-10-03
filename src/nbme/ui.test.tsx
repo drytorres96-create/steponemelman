@@ -70,6 +70,8 @@ describe('NBME study interface', () => {
     expect(host.textContent).not.toContain(question.objective)
     expect(host.textContent).not.toContain(question.explanation)
     expect(host.textContent).not.toContain(question.topic)
+    expect(host.textContent).not.toContain('NBME 27 · sección 1 · pregunta 1 · página 1')
+    expect(host.querySelector('.nbme-option-state')).toBeNull()
     expect(host.textContent).not.toContain('Explorar conceptos relacionados')
     expect(host.textContent).toContain('Correcciones pendientes: 0')
     expect(button('Comprobar respuesta').disabled).toBe(true)
@@ -95,6 +97,8 @@ describe('NBME study interface', () => {
     context.selectedOption = 'A'
     await act(async () => root.render(<NbmePlayer onSalir={exit} onEstudiar={study} />))
     expect(host.textContent).toContain('Correcciones pendientes: 1')
+    expect(host.textContent).toContain('Fuente: NBME 27 · sección 1 · pregunta 1 · página 1')
+    expect(host.querySelector('.nbme-option.correct')?.textContent).toContain('Respuesta correcta')
     expect(host.textContent).toContain('Leer fundamento completo')
     // La presentación recorta el espaciado sobrante de la extracción; el texto se conserva íntegro.
     expect([...host.querySelectorAll('details')].some(item => item.textContent?.includes(source.trim()))).toBe(true)
