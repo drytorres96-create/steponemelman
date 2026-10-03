@@ -6,7 +6,7 @@ import { useNbme } from '../nbme/NbmeProvider'
 import { deriveNbmeSession } from '../nbme/model'
 import type { NbmeState } from '../nbme/types'
 import { NbmePlayer } from '../nbme/NbmePlayer'
-import { MAX_REINSERCIONES, reinsertarFallo, type ItemCaja } from '../lib/cajas'
+import { MAX_REINSERCIONES, reinsertarFallo, TITULO_NBME_CAJAS, type ItemCaja } from '../lib/cajas'
 import { usePielEstudio } from '../components/PielEstudio'
 import { PAUSA_CADA, PausaSugerida } from '../components/PausaSugerida'
 import type { Concepto } from '../schema/concept'
@@ -20,7 +20,7 @@ const SUBTITULO = 'Lo que viste otros días y todavía no está cerrado.'
  * con el reintento pendiente; cuando vuelve a tocar, otro día, se retoma esa misma
  * en lugar de abrir otra, así que no se acumulan sesiones a medias.
  */
-export const TITULO_NBME_CAJAS = 'Cajas'
+export { TITULO_NBME_CAJAS } from '../lib/cajas'
 
 /** La sesión NBME de las cajas que espera justo el reintento de esta pregunta. */
 function sesionPendiente(state: NbmeState, id: string, revision: string): string | null {

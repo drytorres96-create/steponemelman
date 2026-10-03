@@ -84,7 +84,7 @@ it('exports real screen DOM with synthetic providers and no network, auth bypass
   for (const [file, route] of [['hoy', 'hoy'], ['hoy-detalle', 'hoy'], ['biblioteca', 'modulos'], ['acceso', 'auth']] as const) {
     window.history.replaceState(null, '', `/#${route}`)
     await act(async () => { root.render(route === 'auth' ? <AuthGate>{() => <div>Unexpected private session</div>}</AuthGate> : <App key={file} />) })
-    await act(async () => { await Promise.resolve() })
+    await act(async () => { await vi.dynamicImportSettled() })
     if (file === 'hoy-detalle') {
       for (const resumen of [...host.querySelectorAll<HTMLElement>('.hoy-desplegable > summary')]) {
         await act(async () => { resumen.click() })

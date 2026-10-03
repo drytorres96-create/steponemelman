@@ -5,6 +5,9 @@ import { reconstruirProgreso } from '../store/model'
 import { TECHOS, inicioDelDia, tipoDeDia } from './dia'
 import { ultimoIntentoResuelto } from './plan-estudio'
 
+/** Identifica las sesiones NBME de cajas sin cargar su reproductor. */
+export const TITULO_NBME_CAJAS = 'Cajas'
+
 /**
  * La escalera de cajas: lo ya visto sube de caja hasta cerrarse, y se ve que se acaba.
  *

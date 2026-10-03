@@ -75,13 +75,16 @@ a:hover { color: var(--calido); }
 }
 .cinematic-backdrop::before, .cinematic-backdrop::after { content: none; }
 /* Una imagen estable por sección: al cambiar de vista solo cambia la opacidad. */
-.cine-escena { position: absolute; inset: 0; display: block; opacity: 0; transition: opacity .9s ease; }
-.cine-escena[data-activa='true'] { opacity: var(--cine-foto); }
+.cine-escena { position: absolute; inset: 0; display: block; opacity: 0; visibility: hidden; transition: opacity .9s ease, visibility 0s .9s; }
+.cine-escena[data-activa='true'] { opacity: var(--cine-foto); visibility: visible; transition-delay: 0s; }
 .cine-escena img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
   object-position: 78% 42%; filter: saturate(.72) contrast(1.04);
   animation: cine-respira 64s ease-in-out infinite;
 }
+/* Un fondo transparente no necesita mantener una animación ni una capa visible. */
+.cine-escena[data-activa='false'] img { animation-play-state: paused; }
+.cinematic-backdrop[data-paused='true'] * { animation-play-state: paused !important; }
 /* El velo de la izquierda es lo que sostiene el contraste del texto sobre la foto. */
 .cine-velo, .cine-haz, .cine-niebla, .cine-halo, .cine-vineta { position: absolute; pointer-events: none; }
 .cine-velo {

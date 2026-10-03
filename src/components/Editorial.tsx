@@ -37,20 +37,26 @@ function SceneImage({ scene, className = '', priority = false, sizes = '100vw' }
 
 /**
  * La escena ocupa la ventana entera: las fotografías se apilan y solo cambia la opacidad,
- * de modo que cambiar de vista funde una en otra en vez de recargar la capa. Una escena ya
- * vista se queda montada; así el fundido de vuelta no vuelve a pedir la imagen.
+ * de modo que cambiar de vista funde una en otra en vez de recargar la capa. Sólo se
+ * conservan la escena entrante y la anterior; las demás imágenes las recuerda el navegador.
  */
 export function CinematicBackdrop({ scene, quiet = false }: { scene: CinematicScene; quiet?: boolean }) {
   const [montadas, setMontadas] = useState<CinematicScene[]>(() => [scene])
   const [activa, setActiva] = useState<CinematicScene>(scene)
-  useEffect(() => { setMontadas(m => m.includes(scene) ? m : [...m, scene]) }, [scene])
+  const [oculta, setOculta] = useState(() => document.visibilityState === 'hidden')
+  useEffect(() => { setMontadas(m => m.includes(scene) ? m : [activa, scene]) }, [scene, activa])
+  useEffect(() => {
+    const actualizar = () => setOculta(document.visibilityState === 'hidden')
+    document.addEventListener('visibilitychange', actualizar)
+    return () => document.removeEventListener('visibilitychange', actualizar)
+  }, [])
   useEffect(() => {
     // La capa nueva se pinta a opacidad cero y sube en el siguiente cuadro: sin esto no hay fundido.
     if (!montadas.includes(scene)) return
     const cuadro = requestAnimationFrame(() => setActiva(scene))
     return () => cancelAnimationFrame(cuadro)
   }, [scene, montadas])
-  return <div className={`cinematic-backdrop${quiet ? ' cinematic-backdrop-quiet' : ''}`} data-scene={scene} aria-hidden="true">
+  return <div className={`cinematic-backdrop${quiet ? ' cinematic-backdrop-quiet' : ''}`} data-scene={scene} data-paused={quiet || oculta ? 'true' : 'false'} aria-hidden="true">
     {montadas.map(id => {
       const fondo = FONDOS.find(f => f.id === id)
       return fondo && <picture key={id} className="cine-escena" data-activa={id === activa ? 'true' : 'false'}>

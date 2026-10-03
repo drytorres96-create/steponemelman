@@ -107,8 +107,10 @@ describe('continuidad y navegación accesible', () => {
     // Fuera de la sesión la barra sí navega.
     expect(host.querySelector('nav')).not.toBeNull()
     await act(async () => { boton('Plan diario clásico').click() })
+    await act(async () => { await vi.dynamicImportSettled() })
     expect(host.textContent).toContain('Tu estudio de hoy')
     await act(async () => { boton('Continuar sesión guardada').click() })
+    await act(async () => { await vi.dynamicImportSettled() })
     expect(host.textContent).toContain('Sesión restaurada')
     expect(mock.reproductor.mock.calls.at(-1)?.[0].indiceInicial).toBe(1)
     // Estudiando, la barra calla: ni navegación, ni menú de cuenta, ni interruptor de concentración.
