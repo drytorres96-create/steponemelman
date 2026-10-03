@@ -22,6 +22,7 @@ export interface FilaLaboratorio {
 export type BloqueTexto =
   | { tipo: 'parrafo'; texto: string }
   | { tipo: 'laboratorio'; encabezado: string; filas: FilaLaboratorio[] }
+  | { tipo: 'tabla'; columnas: string[]; filas: string[][] }
 
 /** Valores de laboratorio cualitativos que aparecen como texto, no como cifra. */
 const CUALITATIVOS = /^(present|absent|increased|decreased|elevated|reduced|normal|negative|positive|trace|none|nonreactive|reactive|not detected|detected|within normal limits)\b/i
@@ -64,7 +65,35 @@ export function preguntaConLecturasDudosas(question: { stem: string; options: { 
 }
 
 /** Marcadores que introducen un bloque tabular en el enunciado. */
-const ENCABEZADO_TABLA = /(studies show|laboratory studies|show|shows|results?|values?|findings)\s*:\s*$/i
+const ENCABEZADO_TABLA = /(studies show|laboratory studies|show|shows|results?|values?|findings(?: are)?|phenotype|serum|urine|arterial blood gas analysis(?: on [^:]+)?)\s*:\s*$/i
+const SUBENCABEZADO_TABLA = /^(serum|urine|arterial blood gas analysis(?: on [^:]+)?):?$/i
+
+/** A row already transcribed as a literal label/value pair; no inferred units. */
+function filaEnLinea(linea: string): FilaLaboratorio | null {
+  if (linea.includes('?') || linea.includes('|') || linea.length > 160) return null
+  const explicita = /^([^:]{1,80}):\s*(.{1,80})$/.exec(linea)
+  const separada = /^(.{1,80}?)\s+([<>≤≥±+-]?\s*\d.{0,70}|↑|↓|↔|negative|positive|absent|present|none|normal|increased|decreased|few|red-brown)$/.exec(linea)
+  const par = explicita ?? separada
+  if (!par || !pareceEtiqueta(par[1]) || /[.!?]$/.test(par[2])) return null
+  return { etiqueta: par[1], valor: par[2], dudoso: LECTURA_DUDOSA.test(par[2]) }
+}
+
+/** Pipe-delimited columns have explicit boundaries, including a blank corner. */
+function tablaColumnas(lineas: string[], inicio: number): { bloque: BloqueTexto; fin: number } | null {
+  let fin = inicio
+  const celdas: string[][] = []
+  while (fin < lineas.length && lineas[fin].includes('|') && !lineas[fin].includes('?') && !/^Option columns:/i.test(lineas[fin])) {
+    celdas.push(lineas[fin].split('|').map(celda => celda.trim()))
+    fin++
+  }
+  if (celdas.length < 2) return null
+  const [columnas, ...filas] = celdas
+  const ancho = filas[0].length
+  if (!filas.every(fila => fila.length === ancho)) return null
+  if (columnas.length === ancho - 1) columnas.unshift('')
+  if (columnas.length !== ancho || columnas.length < 2) return null
+  return { bloque: { tipo: 'tabla', columnas, filas }, fin }
+}
 
 /**
  * Correcciones tipográficas dentro de una línea. No alteran cifras ni palabras:
@@ -154,22 +183,46 @@ function emparejarTabla(lineas: string[]): FilaLaboratorio[] | null {
  * la fuente lo permite reconstruir sin ambigüedad, tablas de laboratorio.
  */
 export function analizarEnunciado(crudo: string): BloqueTexto[] {
-  const lineas = unirSaltosDeAjuste(
-    crudo.split('\n').map(normalizarLinea).filter(linea => linea.length > 0),
-  )
+  // Parse explicit rows before joining prose: a lowercase row label must never
+  // become part of the preceding sentence or another table row.
+  const lineas = crudo.split('\n').map(normalizarLinea).filter(linea => linea.length > 0)
   const bloques: BloqueTexto[] = []
   let indice = 0
   while (indice < lineas.length) {
     const linea = lineas[indice]
-    const encabezado = ENCABEZADO_TABLA.test(linea)
+    const columnas = tablaColumnas(lineas, indice)
+    if (columnas) {
+      bloques.push(columnas.bloque)
+      indice = columnas.fin
+      continue
+    }
+    const encabezado = ENCABEZADO_TABLA.test(linea) || SUBENCABEZADO_TABLA.test(linea)
     if (encabezado) {
+      const partes = /^(.*\S)\s+((?:Laboratory (?:studies|findings)|Serum studies|Urinalysis|Arterial blood gas analysis)[^:]*:)$/i.exec(linea)
+      const agregarTabla = (filas: FilaLaboratorio[]) => {
+        if (partes) bloques.push({ tipo: 'parrafo', texto: partes[1] })
+        bloques.push({ tipo: 'laboratorio', encabezado: partes?.[2] ?? linea, filas })
+      }
+      const filasEnLinea: FilaLaboratorio[] = []
+      let finEnLinea = indice + 1
+      while (finEnLinea < lineas.length) {
+        const fila = filaEnLinea(lineas[finEnLinea])
+        if (!fila) break
+        filasEnLinea.push(fila)
+        finEnLinea++
+      }
+      if (filasEnLinea.length) {
+        agregarTabla(filasEnLinea)
+        indice = finEnLinea
+        continue
+      }
       // El bloque tabular va desde la línea siguiente hasta la frase que cierra
       // el enunciado (la pregunta) o hasta una línea de prosa larga.
       let fin = indice + 1
       while (fin < lineas.length && !lineas[fin].includes('?') && (pareceEtiqueta(lineas[fin]) || pareceValor(lineas[fin]))) fin++
       const filas = emparejarTabla(lineas.slice(indice + 1, fin))
       if (filas) {
-        bloques.push({ tipo: 'laboratorio', encabezado: linea, filas })
+        agregarTabla(filas)
         indice = fin
         continue
       }
@@ -200,4 +253,22 @@ export function normalizarTexto(crudo: string): string {
   return unirSaltosDeAjuste(
     crudo.split('\n').map(normalizarLinea).filter(linea => linea.length > 0),
   ).join('\n')
+}
+
+/** Preserve explicitly named option columns; fall back if any row is ambiguous. */
+export function analizarColumnasOpciones(stem: string, opciones: { id: string; text: string }[]) {
+  const cabecera = /\n\s*Option columns:\s*([^\n]+)\s*$/i.exec(stem)
+  if (!cabecera) return null
+  const columnas = cabecera[1].replace(/\.$/, '').split('|').map(s => normalizarLinea(s))
+  if (columnas.length < 2 || columnas.some(s => !s)) return null
+  const filas: Record<string, string[]> = {}
+  for (const opcion of opciones) {
+    const texto = normalizarTexto(opcion.text)
+    const celdas = texto.includes('|') ? texto.split('|').map(s => s.trim())
+      : texto.includes(';') ? texto.split(';').map(s => s.replace(/^[^:]+:\s*/, '').trim())
+        : /^(?:positive|negative|zero)(?:\s+(?:positive|negative|zero))+$/i.test(texto) ? texto.split(/\s+/) : []
+    if (celdas.length !== columnas.length || celdas.some(s => !s)) return null
+    filas[opcion.id] = celdas
+  }
+  return { enunciado: stem.slice(0, cabecera.index), columnas, filas }
 }

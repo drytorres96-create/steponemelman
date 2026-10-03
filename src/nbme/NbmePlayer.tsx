@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from '../components/comunes'
 import { useNbme } from './NbmeProvider'
-import { analizarEnunciado, normalizarTexto, preguntaConLecturasDudosas } from './texto'
+import { analizarColumnasOpciones, analizarEnunciado, normalizarTexto, preguntaConLecturasDudosas } from './texto'
 import type { NbmeQuestion } from './types'
 import './nbme.css'
 
@@ -16,12 +16,20 @@ function Enunciado({ texto }: { texto: string }) {
   return <div className="nbme-stem" lang="en">
     {bloques.map((bloque, indice) => bloque.tipo === 'parrafo'
       ? <p key={indice} className="nbme-stem-parrafo">{bloque.texto}</p>
+      : bloque.tipo === 'tabla'
+        ? <div key={indice} className="nbme-lab-scroll nbme-matrix-scroll" tabIndex={0} role="region" aria-label="Tabla del enunciado">
+          <table className="nbme-lab-tabla nbme-matrix">
+            <thead><tr>{bloque.columnas.map((columna, i) => <th key={i} scope="col">{columna}</th>)}</tr></thead>
+            <tbody>{bloque.filas.map((fila, i) => <tr key={i}>{fila.map((celda, j) => j === 0
+              ? <th key={j} scope="row">{celda}</th> : <td key={j}>{celda}</td>)}</tr>)}</tbody>
+          </table>
+        </div>
       : <figure key={indice} className="nbme-lab">
         <figcaption className="nbme-lab-encabezado">{bloque.encabezado}</figcaption>
         <div className="nbme-lab-scroll">
           <table className="nbme-lab-tabla">
             <tbody>
-              {bloque.filas.map(fila => <tr key={fila.etiqueta}>
+              {bloque.filas.map((fila, i) => <tr key={i}>
                 <th scope="row">{fila.etiqueta}</th>
                 <td>{fila.valor}{fila.dudoso && <abbr className="nbme-dudoso" title="Lectura dudosa en la fuente: contrasta este valor con el PDF">?</abbr>}</td>
               </tr>)}
@@ -87,6 +95,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   const feedbackRef = useRef<HTMLHeadingElement>(null)
   const continuarRef = useRef<HTMLButtonElement>(null)
   const figures = useQuestionFigures(currentQuestion)
+  const columnasOpciones = useMemo(() => currentQuestion ? analizarColumnasOpciones(currentQuestion.stem, currentQuestion.options) : null, [currentQuestion])
   const feedback = sessionView?.phase === 'feedback' ? currentFeedback : null
   const currentReady = !!currentQuestion && currentQuestion.status === 'ready' && currentQuestion.id === sessionView?.current?.id
     && !preguntaConLecturasDudosas(currentQuestion)
@@ -175,7 +184,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
               <h1 id="nbme-question-title" className="nbme-question-heading" tabIndex={-1} ref={titleRef}>
                 {sessionView.current?.round ? 'Vuelve a intentarlo' : modoPaso ? 'Pregunta NBME' : `Pregunta ${(sessionView.current?.position ?? 0) + 1} de ${sessionView.initialCount}`}
               </h1>
-              <Enunciado texto={currentQuestion.stem} />
+              <Enunciado texto={columnasOpciones?.enunciado ?? currentQuestion.stem} />
               {figures.loading && <p role="status" className="sutil">Cargando figura…</p>}
               {figures.error && <div className="nbme-error" role="alert"><p>No se pudo cargar la figura.</p><button className="btn" onClick={figures.retry}>Reintentar figura</button></div>}
               {currentQuestion.figureRequired && !currentQuestion.figures.length && <p role="alert" className="nbme-error">Falta una figura necesaria para responder esta pregunta.</p>}
@@ -192,7 +201,10 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
                     const isIncorrect = !!feedback && !feedback.conflict && isSelected && !feedback.correct
                     return <label key={option.id} className={`nbme-option${isSelected ? ' selected' : ''}${isCorrect ? ' correct' : ''}${isIncorrect ? ' incorrect' : ''}`}>
                       <input type="radio" name={`nbme-answer-${sessionView.current?.position}`} value={option.id} checked={isSelected} onChange={() => selectAnswer(option.id)} />
-                      <span className="nbme-option-letter">{option.id}.</span><span className="nbme-option-text" lang="en">{normalizarTexto(option.text)}
+                      <span className="nbme-option-letter">{option.id}.</span><span className="nbme-option-text" lang="en">
+                        {columnasOpciones ? <span className="nbme-option-cells" style={{ gridTemplateColumns: `repeat(${columnasOpciones.columnas.length}, minmax(0, 1fr))` }}>
+                          {columnasOpciones.filas[option.id].map((valor, i) => <span key={i} className="nbme-option-cell"><small>{columnasOpciones.columnas[i]}</small><span>{valor}</span></span>)}
+                        </span> : normalizarTexto(option.text)}
                         {isCorrect && <span className="nbme-option-state" lang="es">Respuesta correcta</span>}
                         {isIncorrect && <span className="nbme-option-state" lang="es">Tu respuesta</span>}
                       </span>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analizarEnunciado, detectarLecturasDudosas, normalizarLinea, normalizarTexto, preguntaConLecturasDudosas } from './texto'
+import { analizarColumnasOpciones, analizarEnunciado, detectarLecturasDudosas, normalizarLinea, normalizarTexto, preguntaConLecturasDudosas } from './texto'
 
 describe('control de lecturas antes de calificar', () => {
   it('incluye las alternativas y los datos de las tablas', () => {
@@ -64,6 +64,32 @@ describe('normalizarTexto', () => {
 })
 
 describe('analizarEnunciado', () => {
+  it('conserva filas explícitas con cifras, cualitativos y subencabezados', () => {
+    const bloques = analizarEnunciado('Laboratory findings are:\nSerum:\nSample X: 12 mg/dL\nSample Y 30%\nUrine\nSample Z: negative\nWhich sample?')
+    expect(bloques.filter(b => b.tipo === 'laboratorio')).toEqual([
+      { tipo: 'laboratorio', encabezado: 'Serum:', filas: [
+        { etiqueta: 'Sample X', valor: '12 mg/dL', dudoso: false },
+        { etiqueta: 'Sample Y', valor: '30%', dudoso: false },
+      ] },
+      { tipo: 'laboratorio', encabezado: 'Urine', filas: [{ etiqueta: 'Sample Z', valor: 'negative', dudoso: false }] },
+    ])
+    expect(bloques.at(-1)).toEqual({ tipo: 'parrafo', texto: 'Which sample?' })
+  })
+
+  it('conserva las celdas de una tabla con una esquina vacía', () => {
+    const bloques = analizarEnunciado('The results are shown:\nLow | High\nGroup A | 30 | 50\nGroup B | 20 | 40\nWhich group?')
+    expect(bloques[1]).toEqual({ tipo: 'tabla', columnas: ['', 'Low', 'High'], filas: [['Group A', '30', '50'], ['Group B', '20', '40']] })
+    expect(analizarEnunciado('A | B\none | two | three\nfour | five').every(b => b.tipo === 'parrafo')).toBe(true)
+    expect(analizarEnunciado('Option columns: A | B').every(b => b.tipo === 'parrafo')).toBe(true)
+  })
+
+  it('no convierte una frase clínica posterior en una fila', () => {
+    const bloques = analizarEnunciado('Laboratory studies show:\nSample: 12 mg/dL\nFollow-up at 3 months shows improvement.\nWhich result?')
+    const tabla = bloques.find(b => b.tipo === 'laboratorio')
+    expect(tabla?.tipo === 'laboratorio' && tabla.filas).toHaveLength(1)
+    expect(bloques.at(-1)).toEqual({ tipo: 'parrafo', texto: 'Follow-up at 3 months shows improvement. Which result?' })
+  })
+
   it('reconstruye una tabla de laboratorio partida en dos columnas', () => {
     const crudo = [
       'A 57-year- old man comes to the physician because of joint pain. Laboratory studies show:',
@@ -145,5 +171,16 @@ describe('analizarEnunciado', () => {
     if (tabla?.tipo !== 'laboratorio') throw new Error('se esperaba una tabla')
     expect(tabla.filas[0].etiqueta).toBe('Myeloid cells (immature and mature)')
     expect(tabla.filas[1].valor).toBe('present')
+  })
+})
+
+describe('columnas explícitas de opciones', () => {
+  it('mantiene cada celda asociada a su opción y retira solo la cabecera técnica', () => {
+    expect(analizarColumnasOpciones('Which result?\nOption columns: First | Second.', [
+      { id: 'A', text: '↑ | no change' }, { id: 'B', text: '↓ | ↑' },
+    ])).toEqual({ enunciado: 'Which result?', columnas: ['First', 'Second'], filas: { A: ['↑', 'no change'], B: ['↓', '↑'] } })
+    expect(analizarColumnasOpciones('Which result?\nOption columns: First | Second', [
+      { id: 'A', text: 'One ambiguous phrase' },
+    ])).toBeNull()
   })
 })

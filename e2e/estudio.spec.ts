@@ -141,6 +141,26 @@ test('NBME: la figura se amplía sin revelar la respuesta ni la procedencia ante
   expect(errores).toEqual([])
 })
 
+test('NBME: laboratorios y columnas conservan sus celdas sin desbordar la pantalla', async ({ page }) => {
+  const errores = await abrir(page, 'abierto&tabla=1')
+  await page.getByRole('button', { name: /(Empezar|Seguir con) las cajas/ }).click()
+  for (let paso = 0; paso < 8 && !(await preguntaNbme(page).isVisible()); paso++) await responderPaso(page)
+  const lab = page.locator('.nbme-lab tbody')
+  await expect(lab.getByRole('row')).toHaveCount(2)
+  await expect(lab.getByRole('row').first()).toHaveText('Sample X12 units')
+  await expect(page.locator('.nbme-matrix thead th')).toHaveText(['Group', 'Low', 'High'])
+  await expect(page.locator('.nbme-matrix tbody tr').first()).toHaveText('First2040')
+  await expect(page.locator('.nbme-option').first().locator('.nbme-option-cell')).toHaveText(['First measureA first', 'Second measureA second'])
+  for (const width of [1428, 390, 360]) {
+    await page.setViewportSize({ width, height: 900 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  }
+  await page.keyboard.press('c')
+  await page.getByRole('button', { name: 'Comprobar respuesta', exact: true }).click()
+  await expect(page.locator('.nbme-option.correct')).toContainText('Respuesta correcta')
+  expect(errores).toEqual([])
+})
+
 test('cajas: tras 20 seguidas llega la pausa sugerida; Intro en «Seguir» continúa', async ({ page }) => {
   test.setTimeout(120_000)
   const errores = await abrir(page, 'muchas')
