@@ -1,20 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useApp } from './store/estado'
 import { cargarConceptos, cargarModulo } from './data/corpus'
 import type { Concepto } from './schema/concept'
-import { Inicio } from './screens/Inicio'
-import { Modulos } from './screens/Modulos'
 import { Hoy, type MaterialNuevo } from './screens/Hoy'
-import { SesionCajas, TITULO_NBME_CAJAS } from './screens/SesionCajas'
-import type { ItemCaja } from './lib/cajas'
+import { TITULO_NBME_CAJAS, type ItemCaja } from './lib/cajas'
 import { fechaISO } from './lib/tiempo'
-import { SesionMixta } from './semana/SesionMixta'
 import { construirGuion } from './semana/guion'
 import type { SesionSemanal } from './semana/tipos'
 import { crearUUID } from './store/model'
-import { Auditoria } from './screens/Auditoria'
-import { Ajustes } from './screens/Ajustes'
-import { Reproductor, type Cola } from './screens/Reproductor'
+import type { Cola } from './screens/Reproductor'
 import { construirCola, RUTAS, type RutaId } from './lib/rutas'
 import { cargarTodo } from './data/corpus'
 import { useAuth } from './auth/AuthProvider'
@@ -24,14 +18,24 @@ import type { OpcionesSesionPersonalizada } from './lib/busqueda'
 import { alternarFormatos } from './lib/formatos'
 import { aplicarVariante, siguienteVariante } from './lib/variantes'
 import { useNbme } from './nbme/NbmeProvider'
-import { NbmeLibrary } from './nbme/NbmeLibrary'
-import { NbmePlayer } from './nbme/NbmePlayer'
 import { deriveNbmeSession } from './nbme/model'
 import type { FiltrosBusqueda } from './lib/busqueda'
 import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, type CinematicObject, type CinematicScene } from './components/Editorial'
 import { Resguardo, FalloPantalla } from './components/Resguardo'
-import { VinetasInicio, VinetasSesion } from './vinetas/Vinetas'
 import type { Vineta } from './vinetas/modelo'
+
+// Hoy se abre enseguida. El resto se descarga al entrar y queda en la caché del navegador.
+const Inicio = lazy(() => import('./screens/Inicio').then(m => ({ default: m.Inicio })))
+const Modulos = lazy(() => import('./screens/Modulos').then(m => ({ default: m.Modulos })))
+const SesionCajas = lazy(() => import('./screens/SesionCajas').then(m => ({ default: m.SesionCajas })))
+const SesionMixta = lazy(() => import('./semana/SesionMixta').then(m => ({ default: m.SesionMixta })))
+const Auditoria = lazy(() => import('./screens/Auditoria').then(m => ({ default: m.Auditoria })))
+const Ajustes = lazy(() => import('./screens/Ajustes').then(m => ({ default: m.Ajustes })))
+const Reproductor = lazy(() => import('./screens/Reproductor').then(m => ({ default: m.Reproductor })))
+const NbmeLibrary = lazy(() => import('./nbme/NbmeLibrary').then(m => ({ default: m.NbmeLibrary })))
+const NbmePlayer = lazy(() => import('./nbme/NbmePlayer').then(m => ({ default: m.NbmePlayer })))
+const VinetasInicio = lazy(() => import('./vinetas/Vinetas').then(m => ({ default: m.VinetasInicio })))
+const VinetasSesion = lazy(() => import('./vinetas/Vinetas').then(m => ({ default: m.VinetasSesion })))
 
 type Vista = 'hoy' | 'inicio' | 'modulos' | 'auditoria' | 'ajustes'
   | 'estudio' | 'preguntas' | 'sesion' | 'cajas' | 'vinetas'
@@ -268,6 +272,7 @@ export default function App() {
 
           <Resguardo key={`${vista}:${reintento}`} alFallar={fallo => <FalloPantalla error={fallo}
             onHoy={() => { setReintento(n => n + 1); ir('hoy') }} />}>
+          <Suspense fallback={<div className="vacio" role="status">Abriendo esta pantalla…</div>}>
           {!cargando && vista === 'estudio' && cola && (
             <>
               <div style={{ maxWidth: 800, margin: '0 auto 14px' }}>
@@ -311,6 +316,7 @@ export default function App() {
             <button className="btn" onClick={() => { setTipoContenido('vinetas'); ir('modulos') }}>Volver a las viñetas</button></div>}
           {!cargando && vista === 'auditoria' && <Auditoria />}
           {!cargando && vista === 'ajustes' && <Ajustes />}
+          </Suspense>
           </Resguardo>
           </div>
           </div>

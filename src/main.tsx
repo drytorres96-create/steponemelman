@@ -1,6 +1,5 @@
-import { StrictMode } from 'react'
+import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
-import App from './App'
 import { ProveedorEstado } from './store/estado'
 import { AuthProvider } from './auth/AuthProvider'
 import { AuthGate } from './auth/AuthGate'
@@ -14,11 +13,16 @@ import './studio.css'
 import './hoy.css'
 import './piel-estudio.css'
 
+// El acceso no necesita descargar las pantallas de estudio antes de verificar la cuenta.
+const App = lazy(() => import('./App'))
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Resguardo alFallar={error => <FalloGeneral error={error} />}>
       <AuthProvider>
-        <AuthGate>{user => <ProveedorEstado key={user.id} userId={user.id}><NbmeProvider key={user.id} userId={user.id}><App /></NbmeProvider></ProveedorEstado>}</AuthGate>
+        <AuthGate>{user => <ProveedorEstado key={user.id} userId={user.id}><NbmeProvider key={user.id} userId={user.id}>
+          <Suspense fallback={<div className="contenedor" role="status">Abriendo tu estudio…</div>}><App /></Suspense>
+        </NbmeProvider></ProveedorEstado>}</AuthGate>
       </AuthProvider>
     </Resguardo>
   </StrictMode>

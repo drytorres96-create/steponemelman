@@ -1,16 +1,35 @@
 /** Persistencia en IndexedDB, con respaldo en localStorage si IndexedDB no está disponible. */
 const DB = 'step1-progreso', TIENDA = 'kv', VERSION = 1
+let conexion: Promise<IDBDatabase | null> | null = null
 
 function abrir(): Promise<IDBDatabase | null> {
-  return new Promise(resolve => {
+  if (conexion) return conexion
+  const intento = new Promise<IDBDatabase | null>(resolve => {
+    let finalizado = false
+    const terminar = (db: IDBDatabase | null) => {
+      // Una apertura bloqueada puede completarse después de usar el respaldo local.
+      if (finalizado) { db?.close(); return }
+      finalizado = true
+      resolve(db)
+    }
     try {
       const req = indexedDB.open(DB, VERSION)
       req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(TIENDA)) req.result.createObjectStore(TIENDA) }
-      req.onsuccess = () => resolve(req.result)
-      req.onerror = () => resolve(null)
-      req.onblocked = () => resolve(null)
-    } catch { resolve(null) }
+      req.onsuccess = () => {
+        const db = req.result
+        const invalidar = () => { if (conexion === intento) conexion = null }
+        // Ceder la conexión permite actualizar la base desde otra pestaña.
+        db.onversionchange = () => { invalidar(); db.close() }
+        db.onclose = invalidar
+        terminar(db)
+      }
+      req.onerror = () => terminar(null)
+      req.onblocked = () => terminar(null)
+    } catch { terminar(null) }
   })
+  conexion = intento
+  void intento.then(db => { if (!db && conexion === intento) conexion = null })
+  return intento
 }
 
 export async function leer<T>(clave: string, opciones: { estricto?: boolean } = {}): Promise<T | null> {
