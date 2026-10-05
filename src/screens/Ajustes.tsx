@@ -108,7 +108,7 @@ export function Ajustes() {
 
       <details className="tarjeta"><summary>Glosario del material</summary>
         <p className="sutil">Siglas expandidas la primera vez que aparecen, extraídas del propio corpus.</p>
-        <div className="scroll-x" style={{ maxHeight: 320 }}>
+        <div className="scroll-x" tabIndex={0} role="region" aria-label="Glosario del material" style={{ maxHeight: 320 }}>
           <table className="tabla">
             <thead><tr><th>Sigla</th><th>Término</th><th>Disciplina</th></tr></thead>
             <tbody>{(indice?.glosario ?? []).map(g => (

@@ -23,8 +23,10 @@ function fechaLocal(f = new Date()): string {
 function leerCheckpoint(valor: unknown): PlanCheckpoint | null {
   if (!valor || typeof valor !== 'object') return null
   const v = valor as Record<string, unknown>
-  const dia = Number(v.dia)
-  if (!Number.isInteger(Number(v.id)) || !Number.isInteger(dia) || dia < 1 || dia > 6) return null
+  // 0 es domingo opcional; NULL o un valor vacío no son un domingo.
+  const dia = typeof v.dia === 'number' || typeof v.dia === 'string' && v.dia.trim() !== ''
+    ? Number(v.dia) : NaN
+  if (!Number.isInteger(Number(v.id)) || !Number.isInteger(dia) || dia < 0 || dia > 6) return null
   if (!KINDS_CHECKPOINT.includes(v.kind as KindCheckpoint) || typeof v.label !== 'string') return null
   return {
     id: Number(v.id), idx: Number(v.idx) || 0, dia, kind: v.kind as KindCheckpoint,

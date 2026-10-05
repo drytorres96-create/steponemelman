@@ -248,6 +248,27 @@ describe('proxy al plan de la semana', () => {
     expect(remoto.mock.calls[3][0]).toContain('retired_at=is.null')
   })
 
+  it('devuelve domingo opcional sin convertir NULL a un día del plan', async () => {
+    const remoto = cuentaValida(vi.fn())
+      .mockResolvedValueOnce(Response.json([
+        { id: 'S0', title: 'Semana sintética', starts_on: '2026-09-07', ends_on: '2026-09-12', note: null },
+      ]))
+      .mockResolvedValueOnce(Response.json([
+        { event_id: 'S0', ...punto, id: 1, dia: 0 },
+        { event_id: 'S0', ...punto, id: 2, dia: null },
+        { event_id: 'S0', ...punto, id: 3, dia: false },
+        { event_id: 'S0', ...punto, id: 4, dia: '' },
+        { event_id: 'S0', ...punto, id: 5, dia: 6 },
+      ]))
+    vi.stubGlobal('fetch', remoto)
+    const respuesta = await worker.fetch(new Request('https://site/api/plan/semana?hoy=2026-09-07',
+      { headers: AUTORIZACION }), entornoPlan())
+    expect(respuesta.status).toBe(200)
+    const plan = await respuesta.json() as { checkpoints: { id: number; dia: number }[] }
+    expect(plan.checkpoints.map(c => [c.id, c.dia])).toEqual([[1, 0], [5, 6]])
+    expect(remoto.mock.calls.every(c => !c[1]?.method || c[1].method === 'GET')).toBe(true)
+  })
+
   it('el PATCH devuelve lo releído de la base, no lo que se envió', async () => {
     const remoto = cuentaValida(vi.fn())
       .mockResolvedValueOnce(new Response(null, { status: 204 }))

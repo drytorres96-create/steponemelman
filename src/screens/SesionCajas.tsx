@@ -69,6 +69,8 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
   const [preparado, setPreparado] = useState<number | null>(null)
   const [sesionesPregunta, setSesionesPregunta] = useState<Record<string, string>>({})
   const [fallos, setFallos] = useState(0)
+  // Omitir un paso no acredita un repaso ni cambia el progreso guardado.
+  const [omitidos, setOmitidos] = useState<Set<number>>(() => new Set())
   const [pausa, setPausa] = useState(false)
   const pasosRef = useRef(pasos)
   pasosRef.current = pasos
@@ -81,9 +83,10 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
   const sesionPaso = `${sesionId}:${cursor}`
 
   /** Cierra el paso actual una sola vez y, si falló, lo reinserta. */
-  const avanzar = useCallback((fallo: boolean) => {
+  const avanzar = useCallback((fallo: boolean, omitido = false) => {
     if (cerrado.current === cursor) return
     cerrado.current = cursor
+    if (omitido) setOmitidos(previos => new Set([...previos, cursor]))
     if (fallo) setFallos(n => n + 1)
     const siguientes = fallo ? reinsertarFallo(pasosRef.current, cursor) : pasosRef.current
     setPasos(siguientes)
@@ -186,30 +189,42 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
   if (error) return <div className="tarjeta pila" role="alert"><h2>No se pudieron abrir las cajas</h2><p>{error}</p>
     <div><button className="btn principal" onClick={onSalir}>Volver a Hoy</button></div></div>
 
+  // Cuenta cajas respondidas una sola vez; las correcciones y omisiones no llenan la barra.
+  const recorridas = pasos.slice(0, cursor).filter(p => p.vez === 0).length
+  const hechas = pasos.slice(0, cursor).filter((p, posicion) => p.vez === 0 && !omitidos.has(posicion)).length
+  const cajasSinRepasar = new Set([...omitidos].map(posicion => {
+    const item = pasos[posicion].item
+    return `${item.tipo}:${item.id}`
+  })).size
+
   if (cursor >= pasos.length) return <section className="tarjeta pila" aria-labelledby="cajas-fin">
-    <div><span className="etq verde">Cajas hechas</span><h2 id="cajas-fin" style={{ marginTop: 10 }}>{titulo}</h2></div>
-    <p>{items.length === 1 ? 'Una caja repasada' : `${items.length} cajas repasadas`}{fallos
-      ? `. ${fallos === 1 ? 'Un fallo volvió' : `${fallos} fallos volvieron`} a la caja 1 y ${fallos === 1 ? 'se repitió' : 'se repitieron'} más adelante.`
-      : ', todas a la primera.'}</p>
-    <p className="sutil">Lo que falló vuelve mañana desde la caja 1. Lo demás sube de caja.</p>
+    <div><span className={`etq${omitidos.size ? '' : ' verde'}`}>{omitidos.size ? 'Recorrido terminado' : 'Cajas hechas'}</span><h2 id="cajas-fin" style={{ marginTop: 10 }}>{titulo}</h2></div>
+    <p>{hechas === 1 ? 'Una caja repasada' : `${hechas} cajas repasadas`}{fallos
+      ? omitidos.size
+        ? `. ${fallos === 1 ? 'Hubo una respuesta con fallo' : `Hubo ${fallos} respuestas con fallo`}. Lo fallado vuelve a la caja 1.`
+        : `. ${fallos === 1 ? 'Un fallo volvió' : `${fallos} fallos volvieron`} a la caja 1 y ${fallos === 1 ? 'se repitió' : 'se repitieron'} más adelante.`
+      : omitidos.size ? '.' : ', todas a la primera.'}</p>
+    {cajasSinRepasar > 0 && <p>{cajasSinRepasar === 1 ? 'Una caja quedó con un repaso pendiente para otro día.'
+      : `${cajasSinRepasar} cajas quedaron con un repaso pendiente para otro día.`}</p>}
+    <p className="sutil">{omitidos.size ? 'Las respuestas que diste se conservan. Lo que falló vuelve mañana desde la caja 1.'
+      : 'Lo que falló vuelve mañana desde la caja 1. Lo demás sube de caja.'}</p>
     <div><button className="btn principal" onClick={onSalir}>Volver a Hoy</button></div>
   </section>
 
   if (!paso || !conceptos) return <div className="vacio" role="status">Preparando tus cajas…</div>
 
-  // Cuenta cajas de hoy, no pasos: un fallo que vuelve se repasa sin mover la cuenta hacia atrás.
-  const hechas = pasos.slice(0, cursor).filter(p => p.vez === 0).length
   const encabezado = <div className="sesion-mixta-guia">
     <p className="mini">{titulo}</p>
     <p className="sutil">{paso.vez
       ? `Repaso de un fallo · caja 1 · ${hechas} de ${items.length} hechas`
-      : `${hechas + 1} de ${items.length} · caja ${paso.item.caja}`}</p>
+      : `${recorridas + 1} de ${items.length} · caja ${paso.item.caja}`}</p>
+    {cajasSinRepasar > 0 && <p className="mini">{hechas} de {items.length} cajas respondidas · {cajasSinRepasar} con un repaso pendiente</p>}
     <progress className="sesion-mixta-progreso" aria-label="Cajas hechas" value={hechas} max={items.length} />
   </div>
   const avisoFallo = paso.vez < MAX_REINSERCIONES
     ? 'Vuelve a la caja 1 y aparecerá otra vez dentro de unos pasos.'
     : 'Vuelve a la caja 1. Por hoy ya está: lo verás otro día.'
-  const seguir = <button className="btn principal" onClick={() => avanzar(false)}>Seguir con el resto</button>
+  const seguir = <button className="btn principal" onClick={() => avanzar(false, true)}>Seguir con el resto</button>
   const volver = <button className="btn fantasma" onClick={onSalir}>Volver a Hoy</button>
   // Entre una caja y la siguiente la cabecera no se mueve: sólo cambia lo de debajo.
   const preparando = (texto: string) => <div className="pila">{encabezado}<div className="vacio" role="status">{texto}</div></div>

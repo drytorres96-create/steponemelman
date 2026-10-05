@@ -190,6 +190,7 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
   useTic()
   // Se lee en cada render: lo recién respondido nunca queda por delante del reloj de la portada.
   const ahora = Date.now()
+  const limites = limitesSemana(ahora)
   const diaDeEstudio = fechaISO(new Date(inicioDelDia(ahora)))
   const [sesiones, setSesiones] = useState<SesionSemanal[] | null>(null)
   const [fallo, setFallo] = useState(false)
@@ -205,16 +206,17 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
   // El plan sólo pone el rótulo y la reserva del anillo: nunca bloquea la portada.
   useEffect(() => {
     let vivo = true
-    cargarPlanSemana(token, diaDeEstudio).then(p => { if (vivo) setPlan(p) })
+    // Pedir el lunes mantiene el plan junto a los guiones hasta el domingo,
+    // aunque el evento termine el sábado. El día de estudio cambia a las 3:00.
+    cargarPlanSemana(token, limites.inicio).then(p => { if (vivo) setPlan(p) })
     return () => { vivo = false }
-  }, [token, diaDeEstudio])
+  }, [token, diaDeEstudio, limites.inicio])
 
   const intentosPreguntas = useMemo(() => Object.values(nbme.state.attempts), [nbme.state.attempts])
 
   const publicados = useMemo(() => new Set(indice?.modulos.flatMap(m => m.sesiones.flatMap(s => s.conceptos)) ?? []), [indice])
   const listas = useMemo(() => new Map<string, NbmeQuestionMeta>((nbme.catalog?.questions ?? [])
     .filter(q => q.status === 'ready').map(q => [q.id, q])), [nbme.catalog])
-  const limites = limitesSemana(ahora)
   const tema = useMemo(() => sesiones ? temaDeLaSemana(sesiones, limites.inicio, limites.fin) : null,
     [sesiones, limites.inicio, limites.fin])
 

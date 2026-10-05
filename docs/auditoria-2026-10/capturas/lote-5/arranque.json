@@ -1,0 +1,32 @@
+[
+  {
+    "readyMs": 627,
+    "firstConceptMs": 993,
+    "taps": 1,
+    "fullCorpusModulesOnHome": 0
+  },
+  {
+    "readyMs": 516,
+    "firstConceptMs": 868,
+    "taps": 1,
+    "fullCorpusModulesOnHome": 0
+  },
+  {
+    "readyMs": 572,
+    "firstConceptMs": 841,
+    "taps": 1,
+    "fullCorpusModulesOnHome": 0
+  },
+  {
+    "readyMs": 509,
+    "firstConceptMs": 883,
+    "taps": 1,
+    "fullCorpusModulesOnHome": 0
+  },
+  {
+    "readyMs": 584,
+    "firstConceptMs": 1069,
+    "taps": 1,
+    "fullCorpusModulesOnHome": 0
+  }
+]

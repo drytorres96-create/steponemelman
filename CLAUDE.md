@@ -97,7 +97,7 @@ pedírsela con la URL concreta y decirle qué debe ver.
 ## Contexto del código
 
 Aplicación React 18 + Vite 6 + TypeScript. Worker de Cloudflare en
-`src/server/worker.ts`. Supabase `jijkzvhpxmxzgfwiqxvc` guarda el material
+`src/server/worker.ts`. Supabase `rcwvwxchpukjbtqsrxfi` (compartido con step1-lessons) guarda el material
 privado y el progreso.
 
 `docs/` conserva las notas de cambios por versión y el plan de calidad.

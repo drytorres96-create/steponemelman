@@ -10,7 +10,7 @@ export type KindCheckpoint = (typeof KINDS_CHECKPOINT)[number]
 export interface PlanCheckpoint {
   id: number
   idx: number
-  /** 1..6, lunes..sábado. El domingo no entra en la semana de estudio. */
+  /** 1..6, lunes..sábado; 0 sólo cuando el plan trae un domingo opcional. */
   dia: number
   kind: KindCheckpoint
   label: string

@@ -14,6 +14,25 @@ describe('diagnóstico de sincronización', () => {
     expect(diagnosticoSync(new Error('NetworkError al intentar cargar')).codigo).toBe('red')
     expect(diagnosticoSync(new Error('el servidor devolvió 503')).codigo).toBe('servidor')
   })
+  it('reconoce errores de PostgREST que llegan como objetos planos', () => {
+    expect(diagnosticoSync({ message: 'TypeError: Failed to fetch', details: '', hint: '', code: '' }).codigo).toBe('red')
+    expect(diagnosticoSync({ message: 'Servicio temporalmente indisponible', status: 503 }).codigo).toBe('servidor')
+    expect(diagnosticoSync({ message: 'Fallo temporal', status: '500' }).codigo).toBe('servidor')
+    expect(diagnosticoSync({ message: 'Permiso denegado', status: 403, code: '42501' }).codigo).toBe('desconocido')
+    expect(diagnosticoSync({ message: null, status: null }).codigo).toBe('desconocido')
+    expect(diagnosticoSync(null).codigo).toBe('desconocido')
+  })
+  it('identifica el fallo de conexión de PostgREST aunque el SDK no incluya status', () => {
+    for (const code of ['PGRST000', 'PGRST001', 'PGRST002', 'PGRST003']) {
+      expect(diagnosticoSync({ code, message: 'Timeout acquiring a connection', details: '', hint: '' }).codigo).toBe('servidor')
+    }
+    expect(diagnosticoSync({ code: 'PGRST202', message: 'Missing function' }).codigo).toBe('desconocido')
+  })
+  it('conserva el diagnóstico de causas primitivas sin llamar a toString de objetos', () => {
+    expect(diagnosticoSync(503).codigo).toBe('servidor')
+    expect(diagnosticoSync('Failed to fetch').codigo).toBe('red')
+    expect(diagnosticoSync({ toString: () => { throw new Error('No debe llamarse') } }).codigo).toBe('desconocido')
+  })
   it('los cinco motivos no comparten el mismo texto', () => {
     const mensajes = [
       diagnosticoSync(new SyncError('missing', 'a')).mensaje,

@@ -37,6 +37,19 @@ describe('cliente del plan de la semana', () => {
     expect(await cargarPlanSemana(token)).toBeNull()
   })
 
+  it('conserva domingo opcional y descarta NULL sin inventar un domingo', async () => {
+    const checkpoints = [
+      { ...checkpoint, id: 1, dia: 0 },
+      { ...checkpoint, id: 2, dia: null },
+      { ...checkpoint, id: 3, dia: false },
+      { ...checkpoint, id: 4, dia: '' },
+      { ...checkpoint, id: 5, dia: 6 },
+    ]
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ ...semana, checkpoints })))
+    const plan = await cargarPlanSemana(token, '2026-09-14')
+    expect(plan?.checkpoints.map(c => [c.id, c.dia])).toEqual([[1, 0], [5, 6]])
+  })
+
   it('lee la semana y la ordena por idx', async () => {
     const fetch = vi.fn().mockResolvedValue(Response.json(semana))
     vi.stubGlobal('fetch', fetch)

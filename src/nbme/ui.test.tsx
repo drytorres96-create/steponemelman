@@ -1,7 +1,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { emptyNbmeState, deriveNbmeSession, startNbmeSession, submitNbmeAnswer } from './model'
+import { emptyNbmeState, deriveNbmeSession, reviewNbmeAnswer, startNbmeSession, submitNbmeAnswer } from './model'
 import type { NbmeQuestion } from './types'
 import type { useNbme } from './NbmeProvider'
 
@@ -41,12 +41,38 @@ beforeEach(() => {
   }
   mock.context.mockImplementation(() => context)
 })
-afterEach(async () => { await act(async () => root.unmount()); host.remove() })
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals() })
 const button = (label: string) => [...host.querySelectorAll('button')].find(item => item.textContent?.trim() === label)!
 const click = async (label: string) => { expect(button(label)).toBeTruthy(); await act(async () => button(label).click()) }
 const prepareSession = () => {
   const state = startNbmeSession(emptyNbmeState(), { id: 'QA-session', title: 'Synthetic session', refs: [{ id: question.id, revision: question.revision }] }, 100)
   context = { ...context, state, currentSession: state.sessions['QA-session'], sessionView: deriveNbmeSession(state, 'QA-session'), currentQuestion: question }
+}
+
+function mockFigures() {
+  const observers: IntersectionObserverCallback[] = []
+  const images: Array<{ onload: (() => void) | null; onerror: (() => void) | null }> = []
+  let n = 0
+  vi.stubGlobal('URL', class extends URL {
+    static createObjectURL = vi.fn(() => `blob:synthetic-${++n}`)
+    static revokeObjectURL = vi.fn()
+  })
+  vi.stubGlobal('IntersectionObserver', class {
+    constructor(callback: IntersectionObserverCallback) { observers.push(callback) }
+    observe() {}
+    disconnect() {}
+  })
+  vi.stubGlobal('Image', class {
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+    naturalWidth = 1200
+    src = ''
+    constructor() { images.push(this) }
+  })
+  return {
+    show: () => observers.at(-1)!([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver),
+    load: () => images.at(-1)!.onload?.(), fail: () => images.at(-1)!.onerror?.(),
+  }
 }
 
 describe('NBME study interface', () => {
@@ -99,9 +125,11 @@ describe('NBME study interface', () => {
     expect(host.textContent).toContain('Correcciones pendientes: 1')
     expect(host.textContent).toContain('Fuente: NBME 27 · sección 1 · pregunta 1 · página 1')
     expect(host.querySelector('.nbme-option.correct')?.textContent).toContain('Respuesta correcta')
-    expect(host.textContent).toContain('Leer fundamento completo')
-    // La presentación recorta el espaciado sobrante de la extracción; el texto se conserva íntegro.
-    expect([...host.querySelectorAll('details')].some(item => item.textContent?.includes(source.trim()))).toBe(true)
+    // El fundamento importado se conserva íntegro y se lee sin abrir controles.
+    const objetivo = [...host.querySelectorAll('.nbme-feedback .nbme-source-text')].find(item => item.textContent?.includes(source.trim()))!
+    expect(objetivo).toBeTruthy()
+    expect(objetivo.closest('details')).toBeNull()
+    expect(host.textContent).toContain('Objetivo del aprendizaje')
     expect(host.textContent).toContain('Relación sugerida; confirma que corresponde al fundamento.')
     await click('Explorar conceptos relacionados')
     expect(context.pauseSession).toHaveBeenCalledOnce()
@@ -140,6 +168,100 @@ describe('NBME study interface', () => {
     expect(context.nextQuestion).not.toHaveBeenCalled()
   })
 
+  it('a new question stays new in feedback and expands NBME without revealing the source beforehand', async () => {
+    prepareSession()
+    context.currentQuestion = { ...question, distractorExplanations: { A: 'Synthetic reason why A does not answer the question.' } }
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('National Board of Medical Examiners (NBME)')
+    expect(host.textContent).toContain('Pregunta nueva aquí')
+    expect(host.textContent).not.toContain(context.currentQuestion.objective)
+    expect(host.textContent).not.toContain(context.currentQuestion.explanation)
+    expect(host.textContent).not.toContain(context.currentQuestion.distractorExplanations!.A)
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 0, context.currentQuestion, 'I', 10, 200)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    context.currentFeedback = context.sessionView!.attempt
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('Pregunta nueva aquí')
+    expect(host.textContent).not.toContain('Pregunta ya practicada aquí')
+    expect(host.textContent).toContain(question.objective)
+    expect(host.textContent).toContain(question.explanation)
+  })
+
+  it('a question practiced in an earlier block stays marked as practiced after submission', async () => {
+    prepareSession()
+    context.state = startNbmeSession(context.state, { id: 'QA-previous', title: 'Earlier block', refs: [{ id: question.id, revision: question.revision }] }, 1)
+    context.state = submitNbmeAnswer(context.state, 'QA-previous', 0, question, 'I', 10, 20)
+    context.state = reviewNbmeAnswer(context.state, 'QA-previous', 0, 30)
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('Pregunta ya practicada aquí')
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 0, question, 'I', 10, 200)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    context.currentFeedback = context.sessionView!.attempt
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('Pregunta ya practicada aquí')
+  })
+
+  it('later practice does not relabel feedback from the original new presentation', async () => {
+    prepareSession()
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 0, question, 'I', 10, 200)
+    context.state = startNbmeSession(context.state, { id: 'QA-later', title: 'Later block', refs: [{ id: question.id, revision: question.revision }] }, 300)
+    context.state = submitNbmeAnswer(context.state, 'QA-later', 0, question, 'I', 10, 400)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    context.currentFeedback = context.sessionView!.attempt
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('Pregunta nueva aquí')
+    expect(host.textContent).not.toContain('Pregunta ya practicada aquí')
+  })
+
+  it('a retry is marked as correction after explanation and preserves the initial score', async () => {
+    prepareSession()
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 0, question, 'A', 10, 200)
+    context.state = reviewNbmeAnswer(context.state, 'QA-session', 0, 201)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('Pregunta ya practicada aquí')
+    expect(host.textContent).toContain('Corrección tras ver la explicación')
+    expect(host.textContent).not.toContain(question.explanation)
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 1, question, 'I', 10, 300)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    context.currentFeedback = context.sessionView!.attempt
+    context.selectedOption = 'I'
+    const original = context.state.attempts['QA-session:0']
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('Esta corrección tuvo la explicación previa. Se registra aparte de la primera vuelta.')
+    expect(context.sessionView!.firstCorrect).toBe(0)
+    expect(context.sessionView!.retryCount).toBe(1)
+    expect(context.state.attempts['QA-session:0']).toBe(original)
+    expect(context.state.attempts['QA-session:1'].correct).toBe(true)
+  })
+
+  it('shows the chosen distractor explanation immediately and preserves letters and complete source text', async () => {
+    prepareSession()
+    const source = 'A complete synthetic explanation. '.repeat(40)
+    context.currentQuestion = { ...question, explanation: source, distractorExplanations: {
+      A: 'Synthetic reason A is incorrect.', B: 'Synthetic reason B is incorrect.',
+    } }
+    const options = context.currentQuestion.options
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 0, context.currentQuestion, 'A', 10, 200)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    context.currentFeedback = context.sessionView!.attempt
+    context.selectedOption = 'A'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    const visible = [...host.querySelectorAll('.nbme-feedback .nbme-source-text')].filter(item => !item.closest('details'))
+    expect(visible.some(item => item.textContent?.includes(source.trim()))).toBe(true)
+    expect(visible.some(item => item.textContent?.includes('Synthetic reason A is incorrect.'))).toBe(true)
+    expect(visible.some(item => item.textContent?.includes('Synthetic reason B is incorrect.'))).toBe(false)
+    expect(host.textContent).toContain('Por qué tu opción no responde')
+    expect(host.querySelector('.nbme-feedback details')?.textContent).toContain('Synthetic reason B is incorrect.')
+    expect(host.querySelector('.nbme-feedback details')?.textContent).not.toContain('Synthetic reason A is incorrect.')
+    expect(context.currentQuestion.options).toBe(options)
+    expect([...host.querySelectorAll<HTMLInputElement>('input[type="radio"]')].map(input => input.value)).toEqual('ABCDEFGHI'.split(''))
+    expect(context.state.attempts['QA-session:0'].optionId).toBe('A')
+  })
+
   it('Enter on a focused button activates that button instead of checking the answer', async () => {
     prepareSession()
     context.selectedOption = 'I'
@@ -160,6 +282,99 @@ describe('NBME study interface', () => {
     expect(host.textContent).toContain('Falta una figura necesaria')
     expect(host.textContent).toContain(context.storageWarning)
     expect(host.textContent).not.toContain('El progreso está guardado en este dispositivo.')
+  })
+
+  it('defers the download until the viewport and blocks grading until image decoding finishes', async () => {
+    const figures = mockFigures()
+    prepareSession()
+    context.currentQuestion = { ...question, figureRequired: true, figures: [{ assetId: 'synthetic', alt: 'Synthetic figure' }] }
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(context.loadFigure).not.toHaveBeenCalled()
+    expect(button('Comprobar respuesta').disabled).toBe(true)
+    await act(async () => figures.show())
+    expect(context.loadFigure).toHaveBeenCalledOnce()
+    expect(host.textContent).toContain('Cargando figura')
+    expect(button('Comprobar respuesta').disabled).toBe(true)
+    await act(async () => figures.load())
+    expect(button('Comprobar respuesta').disabled).toBe(false)
+    expect(host.querySelector('img')?.getAttribute('src')).toBe('blob:synthetic-1')
+    await act(async () => root.render(<div />))
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:synthetic-1')
+  })
+
+  it('a decode error stays blocked, revokes its URL and retries without changing the answer', async () => {
+    const figures = mockFigures()
+    prepareSession()
+    context.currentQuestion = { ...question, figureRequired: true, figures: [{ assetId: 'synthetic', alt: 'Synthetic figure' }] }
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    await act(async () => figures.show())
+    await act(async () => figures.fail())
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('No se pudo cargar la figura')
+    expect(button('Comprobar respuesta').disabled).toBe(true)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:synthetic-1')
+    await click('Reintentar figura')
+    await act(async () => figures.show())
+    await act(async () => figures.load())
+    expect(context.loadFigure).toHaveBeenCalledTimes(2)
+    expect(button('Comprobar respuesta').disabled).toBe(false)
+    expect(context.selectedOption).toBe('I')
+  })
+
+  it('aborts a pending download on exit and never publishes its late result', async () => {
+    const figures = mockFigures()
+    prepareSession()
+    context.currentQuestion = { ...question, figureRequired: true, figures: [{ assetId: 'synthetic', alt: 'Synthetic figure' }] }
+    let resolve: (blob: Blob) => void = () => {}
+    context.loadFigure = vi.fn((_id, _signal) => new Promise<Blob>(done => { resolve = done }))
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    await act(async () => figures.show())
+    const signal = vi.mocked(context.loadFigure).mock.calls[0][1]!
+    await act(async () => root.render(<div />))
+    expect(signal.aborted).toBe(true)
+    await act(async () => resolve(new Blob(['synthetic'])))
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+    expect(host.querySelector('img')).toBeNull()
+  })
+
+  it('a new figure revision invalidates the old URLs and blocks grading until its own decode completes', async () => {
+    const figures = mockFigures()
+    prepareSession()
+    context.currentQuestion = { ...question, figureRequired: true, figures: [{ assetId: 'synthetic', alt: 'Synthetic figure' }] }
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    await act(async () => figures.show())
+    await act(async () => figures.load())
+    expect(button('Comprobar respuesta').disabled).toBe(false)
+    await click('Ampliar figura')
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull()
+    context.currentQuestion = { ...context.currentQuestion, revision: 'r2' }
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:synthetic-1')
+    expect(host.querySelector('img')).toBeNull()
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(button('Comprobar respuesta').disabled).toBe(true)
+    await act(async () => figures.show())
+    await act(async () => figures.load())
+    expect(host.querySelector('img')?.getAttribute('src')).toBe('blob:synthetic-2')
+    expect(button('Comprobar respuesta').disabled).toBe(false)
+  })
+
+  it('without IntersectionObserver it loads immediately and aborts decoding with one URL revocation on exit', async () => {
+    const figures = mockFigures()
+    vi.stubGlobal('IntersectionObserver', undefined)
+    prepareSession()
+    context.currentQuestion = { ...question, figureRequired: true, figures: [{ assetId: 'synthetic', alt: 'Synthetic figure' }] }
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(context.loadFigure).toHaveBeenCalledOnce()
+    expect(URL.createObjectURL).toHaveBeenCalledOnce()
+    const signal = vi.mocked(context.loadFigure).mock.calls[0][1]!
+    await act(async () => root.render(<div />))
+    expect(signal.aborted).toBe(true)
+    expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:synthetic-1')
+    await act(async () => figures.load())
+    expect(host.querySelector('img')).toBeNull()
   })
 
   it('blocks illegible answer choices and their keyboard shortcuts', async () => {

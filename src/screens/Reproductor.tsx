@@ -50,8 +50,10 @@ export interface ModoCaja {
   avisoFallo: string
 }
 
-export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto, modoCaja }:
-  { cola: Cola; onSalir: () => void; indiceInicial?: number; onTramoCompleto?: () => void; modoCaja?: ModoCaja }) {
+export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto, modoCaja, unaVuelta = false }:
+  { cola: Cola; onSalir: () => void; indiceInicial?: number; onTramoCompleto?: () => void; modoCaja?: ModoCaja
+    /** Consume la cola guardada sin añadir reintentos: las cajas recuperan los fallos otro día. */
+    unaVuelta?: boolean }) {
   const { registrarIntento, progresoDe, estado, guardarReanudable, iniciarSesion, cerrarSesion } = useApp()
   const pielEstudio = usePielEstudio()
   /** Un paso dentro de un recorrido (cajas o lo nuevo): quien orquesta pone la cuenta y decide qué sigue. */
@@ -84,6 +86,8 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
   const vivoIA = useRef(true)
   const devuelto = useRef(false)
   const tareaRef = useRef<HTMLDivElement>(null)
+  const enunciadoRef = useRef<HTMLDivElement>(null)
+  const enunciadoVisible = useRef<string | null>(null)
   const siguienteRef = useRef<HTMLButtonElement>(null)
   const [explicacionPrevia, setExplicacionPrevia] = useState(false)
   const [sesionLista, setSesionLista] = useState(false)
@@ -236,8 +240,9 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     if (ultimaAccion.current === preguntaId) return
     ultimaAccion.current = preguntaId
     reloj.current.activar(false)
-    const siguiente = reintentarRevision && intentoActual.current?.resultado === 'revision'
-      ? [...orden, orden[i]] : modoCaja ? orden : siguienteCola(orden, i, intentoActual.current?.resultado)
+    const siguiente = modoCaja || unaVuelta ? orden
+      : reintentarRevision && intentoActual.current?.resultado === 'revision'
+        ? [...orden, orden[i]] : siguienteCola(orden, i, intentoActual.current?.resultado)
     if (i + 1 >= siguiente.length) relojSesion.activar(false)
     const vencio = !!presupuesto && !tiempoRef.current.sinLimite && relojSesion.leer() >= presupuesto * 60000 && i + 1 < siguiente.length
     if (vencio) { tiempoRef.current.pausa = true; relojSesion.activar(false); setPausaTiempo(true) }
@@ -436,10 +441,21 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
   }, [pasoTerminado])
 
   // Dentro de un recorrido las manos no salen del teclado: la respuesta escrita recibe el foco
-  // al aparecer y, corregida, «Siguiente pregunta» también. Nada se desplaza por ello.
+  // al aparecer y, corregida, «Siguiente pregunta» también. Sólo una presentación nueva
+  // lleva el enunciado a la vista: leer la retroalimentación nunca mueve la página.
   useEffect(() => {
     if (!enSesion || !sesionLista) return
-    if (fase === 'tarea') tareaRef.current?.querySelector<HTMLElement>('input[type="text"], textarea')?.focus({ preventScroll: true })
+    if (fase === 'tarea') {
+      if (enunciadoVisible.current !== preguntaId) {
+        const barra = tareaRef.current?.closest('.app')?.querySelector('.barra')
+        // Usa la altura real de la cabecera (también al envolver controles en móvil).
+        // El margen evita que scrollIntoView coloque el enunciado debajo de la barra sticky.
+        if (enunciadoRef.current) enunciadoRef.current.style.scrollMarginTop = `${Math.ceil(barra?.getBoundingClientRect().height ?? 0) + 1}px`
+        enunciadoRef.current?.scrollIntoView?.({ block: 'start' })
+        enunciadoVisible.current = preguntaId
+      }
+      tareaRef.current?.querySelector<HTMLElement>('input[type="text"], textarea')?.focus({ preventScroll: true })
+    }
     else if (fase === 'retro') siguienteRef.current?.focus({ preventScroll: true })
   }, [fase, preguntaId, sesionLista, enSesion])
 
@@ -484,6 +500,10 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     </div>
   }
   const p = progresoDe(c.concept_id)
+  // La respuesta de este paso no convierte su primera presentación en una repetición.
+  // Al retomarla, los intentos posteriores tampoco cambian cómo se presentó originalmente.
+  const historialAnterior = p.intentos.filter(t => t.pregunta_id !== preguntaId
+    && (!intentoActual.current || t.ts < intentoActual.current.ts))
   const presentacionCambio = !!intentoActual.current?.pregunta_version && intentoActual.current.pregunta_version !== versionPregunta(c)
   const dominio = resumenDominio(p, estado.criterios)
   const cercania = cercaniaDominio(p, estado.criterios)
@@ -491,7 +511,8 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
 
   return <div className="reproductor pila">
     {presupuesto && <Cronometro msVisibles={msVisibles} presupuesto={presupuesto} sinLimite={sinLimite} />}
-    {c.variante_id && <p className="mini">{c.interaccion.recomendada === 'caso_clinico' ? 'Aplicación en un caso' : 'Distinguir conceptos'} · {progresoDe(c.concept_id).intentos.some(t => t.variante_id === c.variante_id && t.pregunta_id !== preguntaId) ? 'Variante ya practicada' : 'Primera presentación de esta variante'}</p>}
+    <p className="mini">{historialAnterior.length ? 'Concepto ya practicado aquí' : 'Concepto nuevo aquí'}
+      {c.variante_id && <> · {c.interaccion.recomendada === 'caso_clinico' ? 'Aplicación en un caso' : 'Distinguir conceptos'} · {historialAnterior.some(t => t.variante_id === c.variante_id) ? 'Variante ya practicada' : 'Primera presentación de esta variante'}</>}</p>
     <div className="fila" style={{ justifyContent: 'space-between' }}>
       <div className="fila" style={{ gap: 8 }}>
         <span className="etq">{c.clasificacion.disciplina_primaria}</span><span className="etq">{c.clasificacion.sistema_primario}</span>
@@ -523,20 +544,20 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
       </div>}
       <div hidden={fase === 'ensenanza'}>
         {fase === 'tarea' && explicacionPrevia && !examenSinAyuda && c.clasificacion.disciplina_primaria === 'Bioquímica' && <p className="aviso">Con la explicación oculta, di en voz alta: qué cambió → qué proceso afecta → qué consecuencia esperas y por qué. Después completa esta misma pregunta. Esto sustituye releer; cuenta como práctica con ayuda previa.</p>}
-        <div className="pregunta">{c.evaluacion.pregunta}</div>
+        <div className="pregunta" ref={enunciadoRef}>{c.evaluacion.pregunta}</div>
         {fase === 'tarea' && <details key={`confianza-${preguntaId}`} className="mini" style={{ marginBottom: 14 }}><summary>Registrar confianza (opcional)</summary><div className="fila" style={{ gap: 6, marginTop: 8 }}>
           {([[1, 'Poca'], [2, 'Media'], [3, 'Mucha']] as const).map(([v, t]) => <button key={v} className={`btn pequeno ${confianza === v ? 'principal' : 'fantasma'}`}
-            aria-pressed={confianza === v} onClick={() => { setConfianza(v); guardarPaso({ confianza: v }) }}>{t}</button>)}
+            aria-pressed={confianza === v} disabled={esperandoIA} onClick={() => { setConfianza(v); guardarPaso({ confianza: v }) }}>{t}</button>)}
         </div></details>}
         {!examenSinAyuda && pistas > 0 && c.pistas.slice(0, pistas).map((t, k) => <div key={k} className="pista"><b>Pista {k + 1}:</b> {t}</div>)}
         {(!examenSinAyuda || fase === 'tarea') && <Interaccion key={`interaccion-${preguntaId}`} c={c} semilla={preguntaId} ocultarFeedback={examenSinAyuda}
           bloqueado={fase !== 'tarea' || esperandoIA} resultado={res} onResponder={responder} />}
         {esperandoIA && <p className="mini" role="status" style={{ marginTop: 10 }}>Comprobando tu respuesta con la IA…</p>}
         {fase === 'tarea' && !examenSinAyuda && <div className="fila" style={{ marginTop: 14 }}>
-          <button className="btn pequeno fantasma" onClick={() => { setExplicacionPrevia(true); setFase('ensenanza'); guardarPaso({ explicacionPrevia: true, ensenanzaAbierta: true }) }}>Necesito aprenderlo</button>
-          <button className="btn pequeno fantasma" disabled={pistas >= c.pistas.length} onClick={() => { setPistas(pistas + 1); guardarPaso({ pistas: pistas + 1 }) }}>
+          <button className="btn pequeno fantasma" disabled={esperandoIA} onClick={() => { setExplicacionPrevia(true); setFase('ensenanza'); guardarPaso({ explicacionPrevia: true, ensenanzaAbierta: true }) }}>Necesito aprenderlo</button>
+          <button className="btn pequeno fantasma" disabled={esperandoIA || pistas >= c.pistas.length} onClick={() => { setPistas(pistas + 1); guardarPaso({ pistas: pistas + 1 }) }}>
             {pistas === 0 ? 'Necesito una pista' : pistas < c.pistas.length ? `Otra pista (${pistas}/${c.pistas.length})` : 'Sin más pistas'}</button>
-          <button className="btn pequeno fantasma" onClick={() => { setFuenteConsultada(true); setVerFuente(true); guardarPaso({ fuenteConsultada: true }) }}>Ver la fuente</button>
+          <button className="btn pequeno fantasma" disabled={esperandoIA} onClick={() => { setFuenteConsultada(true); setVerFuente(true); guardarPaso({ fuenteConsultada: true }) }}>Ver la fuente</button>
         </div>}
       </div>
       {fase === 'retro' && examenSinAyuda && <div className="tarjeta pila" role="status"><b>Respuesta registrada</b>
@@ -559,7 +580,9 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
         <p>Tu respuesta: <b>{res.respuestaDada || 'Respuesta registrada'}</b></p>
         {res.veredicto !== 'correcta' && <p>Respuesta de referencia: <b>{c.respuesta_canonica}</b></p>}
         {res.veredicto === 'revision' && <p>El corrector no puede decidir esta respuesta con seguridad. Compárala con la referencia y decide tú: contará como acierto o como fallo.</p>}
-        {necesitaReintento(res.veredicto) && <p>{modoCaja ? modoCaja.avisoFallo : 'Este concepto volverá al final de la cola hasta que lo aciertes.'}</p>}
+        {necesitaReintento(res.veredicto) && <p>{modoCaja ? modoCaja.avisoFallo : unaVuelta
+          ? 'Este fallo queda guardado; volverá en las cajas de los próximos días.'
+          : 'Este concepto volverá al final de la cola hasta que lo aciertes.'}</p>}
         {(res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que) && <p className="sutil">{res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que}</p>}
         {/* Solo con respuesta escrita: en un formato de opciones ya se sabe qué se eligió. */}
         {res.veredicto !== 'correcta' && res.veredicto !== 'revision' && usaTextoLibre(c) && res.respuestaDada.trim()

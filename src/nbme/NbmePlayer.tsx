@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Modal } from '../components/comunes'
+import { FigureViewer } from './FigureViewer'
 import { useNbme } from './NbmeProvider'
 import { analizarColumnasOpciones, analizarEnunciado, normalizarTexto, preguntaConLecturasDudosas } from './texto'
 import type { NbmeQuestion } from './types'
@@ -26,7 +27,7 @@ function Enunciado({ texto }: { texto: string }) {
         </div>
       : <figure key={indice} className="nbme-lab">
         <figcaption className="nbme-lab-encabezado">{bloque.encabezado}</figcaption>
-        <div className="nbme-lab-scroll">
+        <div className="nbme-lab-scroll" tabIndex={0} role="region" aria-label="Laboratorio de la pregunta">
           <table className="nbme-lab-tabla">
             <tbody>
               {bloque.filas.map((fila, i) => <tr key={i}>
@@ -47,12 +48,29 @@ function TextoFuente({ texto, className = 'nbme-source-text' }: { texto: string;
     <p key={indice} className="nbme-parrafo-fuente">{parrafo}</p>)}</div>
 }
 
-function useQuestionFigures(question: NbmeQuestion | null) {
+function decodeFigure(url: string, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    const finish = (error?: Error) => {
+      image.onload = null; image.onerror = null
+      signal.removeEventListener('abort', abort)
+      if (error) reject(error); else resolve()
+    }
+    const abort = () => { image.src = ''; finish(new DOMException('Aborted', 'AbortError')) }
+    image.onload = () => image.naturalWidth > 0 ? finish() : finish(new Error('Invalid figure'))
+    image.onerror = () => finish(new Error('Invalid figure'))
+    signal.addEventListener('abort', abort, { once: true })
+    image.src = url
+  })
+}
+
+function useQuestionFigures(question: NbmeQuestion | null, target: RefObject<HTMLDivElement>) {
   const { loadFigure } = useNbme()
   const [figures, setFigures] = useState<LoadedFigure[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
   const [retry, setRetry] = useState(0)
+  const [loadedIdentity, setLoadedIdentity] = useState('')
   const identity = question ? `${question.id}:${question.revision}` : ''
   const assets = question?.figures ?? []
   useEffect(() => {
@@ -60,18 +78,39 @@ function useQuestionFigures(question: NbmeQuestion | null) {
     let urls: string[] = []
     setFigures([])
     setError(false)
-    setLoading(assets.length > 0)
-    if (assets.length) {
-      Promise.all(assets.map(figure => loadFigure(figure.assetId, controller.signal))).then(blobs => {
+    setLoading(false)
+    setLoadedIdentity('')
+    let observer: IntersectionObserver | undefined
+    let started = false
+    const load = () => {
+      if (started || controller.signal.aborted) return
+      started = true
+      observer?.disconnect()
+      setLoading(true)
+      Promise.all(assets.map(figure => loadFigure(figure.assetId, controller.signal))).then(async blobs => {
         if (controller.signal.aborted) return
         urls = blobs.map(blob => URL.createObjectURL(blob))
+        await Promise.all(urls.map(url => decodeFigure(url, controller.signal)))
+        if (controller.signal.aborted) return
         setFigures(assets.map((figure, index) => ({ ...figure, url: urls[index] })))
+        setLoadedIdentity(identity)
         setLoading(false)
-      }).catch(() => { if (!controller.signal.aborted) { setError(true); setLoading(false) } })
+      }).catch(() => {
+        urls.forEach(url => URL.revokeObjectURL(url)); urls = []
+        if (!controller.signal.aborted) { setError(true); setLoading(false) }
+      })
     }
-    return () => { controller.abort(); urls.forEach(url => URL.revokeObjectURL(url)) }
-  }, [identity, retry, loadFigure])
-  return { figures, loading, error, retry: () => setRetry(value => value + 1) }
+    if (assets.length) {
+      if (typeof IntersectionObserver === 'undefined' || !target.current) load()
+      else {
+        observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) load() }, { rootMargin: '200px' })
+        observer.observe(target.current)
+      }
+    }
+    return () => { observer?.disconnect(); controller.abort(); urls.forEach(url => URL.revokeObjectURL(url)); urls = [] }
+  }, [identity, retry, loadFigure, target])
+  const ready = loadedIdentity === identity && figures.length === assets.length
+  return { figures: ready ? figures : [], loading, error, ready, waiting: assets.length > 0 && !ready && !loading && !error, retry: () => setRetry(value => value + 1) }
 }
 
 /**
@@ -86,7 +125,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   { onSalir: () => void; onEstudiar?: (ids: string[]) => void; onBuscar?: (question: NbmeQuestion) => void
     modoPaso?: boolean; onPasoCompleto?: () => void; etiquetaSalida?: string; avisoFallo?: string }) {
   const {
-    catalog, currentSession, sessionView, currentQuestion, selectedOption, currentFeedback, questionLoading,
+    catalog, state, currentSession, sessionView, currentQuestion, selectedOption, currentFeedback, questionLoading,
     loading, busy, error, storageWarning, syncStatus, selectAnswer, checkAnswer, nextQuestion, pauseSession,
     retryQuestionLoad, syncNow, budgetReached, continueWithoutBudget,
   } = useNbme()
@@ -94,20 +133,22 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   const titleRef = useRef<HTMLHeadingElement>(null)
   const feedbackRef = useRef<HTMLHeadingElement>(null)
   const continuarRef = useRef<HTMLButtonElement>(null)
-  const figures = useQuestionFigures(currentQuestion)
+  const figureRef = useRef<HTMLDivElement>(null)
+  const answersRef = useRef<HTMLFieldSetElement>(null)
+  const figures = useQuestionFigures(currentQuestion, figureRef)
   const columnasOpciones = useMemo(() => currentQuestion ? analizarColumnasOpciones(currentQuestion.stem, currentQuestion.options) : null, [currentQuestion])
   const feedback = sessionView?.phase === 'feedback' ? currentFeedback : null
   const currentReady = !!currentQuestion && currentQuestion.status === 'ready' && currentQuestion.id === sessionView?.current?.id
     && !preguntaConLecturasDudosas(currentQuestion)
     && !!catalog?.questions.some(q => q.id === currentQuestion.id && q.status === 'ready')
-  const requiredFigureUnavailable = !!currentQuestion?.figureRequired && (!currentQuestion.figures.length || figures.loading || figures.error)
+  const requiredFigureUnavailable = !!currentQuestion?.figureRequired && (!currentQuestion.figures.length || !figures.ready)
   const canAnswer = currentReady && !!selectedOption && !questionLoading && !busy && !requiredFigureUnavailable && !feedback
 
   useEffect(() => {
     setExpandedFigure(null)
     if (!questionLoading && sessionView?.phase === 'question') titleRef.current?.focus()
     if (sessionView?.phase === 'feedback') (modoPaso ? continuarRef : feedbackRef).current?.focus({ preventScroll: modoPaso })
-  }, [sessionView?.current?.position, sessionView?.phase, currentQuestion?.id, questionLoading, modoPaso])
+  }, [sessionView?.current?.position, sessionView?.phase, currentQuestion?.id, currentQuestion?.revision, questionLoading, modoPaso])
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
@@ -156,14 +197,20 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   </section>
 
   const source = currentQuestion ? `NBME ${currentQuestion.form} · sección ${currentQuestion.section} · pregunta ${currentQuestion.item} · página ${currentQuestion.page}` : 'Pregunta de aplicación'
-  const explanationSource = currentQuestion?.objective || currentQuestion?.explanation
-  const briefExplanation = explanationSource && explanationSource.length > 900 ? `${explanationSource.slice(0, 900).trimEnd()}…` : explanationSource
+  const reintentoTrasExplicacion = (sessionView.current?.round ?? 0) > 0
+  const yaPracticada = !!currentQuestion && Object.values(state.attempts).some(attempt =>
+    attempt.questionId === currentQuestion.id
+    && !(attempt.sessionId === currentSession.id && attempt.position === sessionView.current?.position)
+    && (!feedback || attempt.submittedAt < feedback.submittedAt))
+  const distractorElegido = feedback && !feedback.correct && !feedback.conflict
+    ? currentQuestion?.distractorExplanations?.[feedback.optionId] : null
   const reviewedLinks = (currentQuestion?.conceptLinks ?? []).filter(link => link.review === 'reviewed')
   const relatedLinks = reviewedLinks.length ? reviewedLinks : (currentQuestion?.conceptLinks ?? []).filter(link => link.review === 'suggested' && link.confidence >= 0.74)
   const conceptIds = [...new Set(relatedLinks.map(link => link.conceptId))].slice(0, 3)
   const suggestedLinks = conceptIds.length > 0 && !reviewedLinks.length
 
   return <div className="nbme-player pila">
+    <p className="mini">National Board of Medical Examiners (NBME)</p>
     <header className={`nbme-player-header${modoPaso ? ' paso' : ''}`}>
       {!modoPaso && <div><p className="mini">{currentSession.title}</p><p className="sutil">Primera vuelta: {sessionView.firstAnswered}/{sessionView.initialCount} · Correcciones pendientes: {sessionView.pendingErrors}</p></div>}
       <button className="btn fantasma" onClick={pause}>{etiquetaSalida ?? 'Pausar y guardar'}</button>
@@ -184,16 +231,27 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
               <h1 id="nbme-question-title" className="nbme-question-heading" tabIndex={-1} ref={titleRef}>
                 {sessionView.current?.round ? 'Vuelve a intentarlo' : modoPaso ? 'Pregunta NBME' : `Pregunta ${(sessionView.current?.position ?? 0) + 1} de ${sessionView.initialCount}`}
               </h1>
+              {!!currentQuestion.figures.length && <div className="nbme-figure-notice">
+                <p>Esta pregunta incluye una figura.{currentQuestion.figureRequired && ' Consúltala para responder.'}</p>
+                <div className="nbme-figure-links">
+                  <a href="#nbme-figures" onClick={event => { event.preventDefault(); figureRef.current?.focus(); figureRef.current?.scrollIntoView({ block: 'start' }) }}>Ir a la figura</a>
+                  <a href="#nbme-answers" onClick={event => { event.preventDefault(); answersRef.current?.focus(); answersRef.current?.scrollIntoView({ block: 'start' }) }}>Ir a las respuestas</a>
+                </div>
+              </div>}
+              <p className="mini">{yaPracticada ? 'Pregunta ya practicada aquí' : 'Pregunta nueva aquí'}
+                {reintentoTrasExplicacion && ' · Corrección tras ver la explicación'}</p>
               <Enunciado texto={columnasOpciones?.enunciado ?? currentQuestion.stem} />
-              {figures.loading && <p role="status" className="sutil">Cargando figura…</p>}
-              {figures.error && <div className="nbme-error" role="alert"><p>No se pudo cargar la figura.</p><button className="btn" onClick={figures.retry}>Reintentar figura</button></div>}
               {currentQuestion.figureRequired && !currentQuestion.figures.length && <p role="alert" className="nbme-error">Falta una figura necesaria para responder esta pregunta.</p>}
-              {!!figures.figures.length && <div className="nbme-question-images">{figures.figures.map(figure => <button type="button" className="nbme-image-button" key={figure.assetId}
+              {!!currentQuestion.figures.length && <div id="nbme-figures" ref={figureRef} tabIndex={-1} className="nbme-question-images">
+                {figures.waiting && <p className="sutil nbme-figure-placeholder">Figura de la pregunta</p>}
+                {figures.loading && <p role="status" className="sutil nbme-figure-placeholder">Cargando figura…</p>}
+                {figures.error && <div className="nbme-error" role="alert"><p>No se pudo cargar la figura.{currentQuestion.figureRequired && ' Necesitas la figura antes de comprobar la respuesta.'}</p><button className="btn" onClick={figures.retry}>Reintentar figura</button></div>}
+                {figures.figures.map(figure => <button type="button" className="nbme-image-button" key={figure.assetId}
                 onClick={() => setExpandedFigure(figure)} aria-label={`Ampliar: ${figure.alt || 'figura de la pregunta'}`}>
-                <img src={figure.url} alt={figure.alt || 'Figura de la pregunta'} /><span>Ampliar figura</span>
+                <img src={figure.url} alt={figure.alt || 'Figura de la pregunta'} decoding="async" /><span>Ampliar figura</span>
               </button>)}</div>}
               <form onSubmit={event => { event.preventDefault(); if (canAnswer) checkAnswer() }}>
-                <fieldset className="nbme-options" disabled={!!feedback || busy}>
+                <fieldset id="nbme-answers" ref={answersRef} tabIndex={-1} className="nbme-options" disabled={!!feedback || busy}>
                   <legend>Selecciona una respuesta</legend>
                   {currentQuestion.options.map(option => {
                     const isSelected = selectedOption === option.id
@@ -223,11 +281,12 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
                     : modoPaso ? avisoFallo ?? 'Vuelve en las cajas de los próximos días.'
                       : 'Esta pregunta volverá durante la práctica. Puedes pausar cuando lo necesites.'}</p></div>
               {!feedback.conflict && <p className="nbme-respuesta"><b>Respuesta: {currentQuestion.answer}.</b> <span lang="en">{normalizarTexto(currentQuestion.options.find(option => option.id === currentQuestion.answer)?.text ?? '')}</span></p>}
-              {briefExplanation && <div><h3>Fundamento de la respuesta</h3>{explanationSource !== briefExplanation && <p className="mini">Extracto del texto fuente.</p>}<TextoFuente texto={briefExplanation} /></div>}
-              {currentQuestion.objective && explanationSource !== briefExplanation && <details className="nbme-details"><summary>Leer fundamento completo</summary><TextoFuente texto={currentQuestion.objective} /></details>}
-              {currentQuestion.explanation && currentQuestion.explanation !== briefExplanation && <details className="nbme-details"><summary>Leer explicación completa</summary><TextoFuente texto={currentQuestion.explanation} /></details>}
-              {currentQuestion.distractorExplanations && Object.keys(currentQuestion.distractorExplanations).length > 0 && <details className="nbme-details"><summary>Por qué las otras opciones no</summary>
-                <div className="pila nbme-distractores">{currentQuestion.options.filter(option => option.id !== currentQuestion.answer && currentQuestion.distractorExplanations?.[option.id]).map(option => <div key={option.id} className="nbme-distractor"><b>{option.id}. <span lang="en">{normalizarTexto(option.text)}</span></b><TextoFuente texto={currentQuestion.distractorExplanations?.[option.id] ?? ''} /></div>)}</div>
+              {reintentoTrasExplicacion && <p className="mini">Esta corrección tuvo la explicación previa. Se registra aparte de la primera vuelta.</p>}
+              {currentQuestion.objective && <div><h3>Objetivo del aprendizaje</h3><TextoFuente texto={currentQuestion.objective} /></div>}
+              {currentQuestion.explanation && currentQuestion.explanation !== currentQuestion.objective && <div><h3>Fundamento de la respuesta</h3><TextoFuente texto={currentQuestion.explanation} /></div>}
+              {distractorElegido && <div className="nbme-distractor"><h3>Por qué tu opción no responde</h3><b>{feedback.optionId}. <span lang="en">{normalizarTexto(currentQuestion.options.find(option => option.id === feedback.optionId)?.text ?? '')}</span></b><TextoFuente texto={distractorElegido} /></div>}
+              {currentQuestion.options.some(option => option.id !== currentQuestion.answer && (!distractorElegido || option.id !== feedback.optionId) && currentQuestion.distractorExplanations?.[option.id]) && <details className="nbme-details"><summary>Por qué las otras opciones no</summary>
+                <div className="pila nbme-distractores">{currentQuestion.options.filter(option => option.id !== currentQuestion.answer && (!distractorElegido || option.id !== feedback.optionId) && currentQuestion.distractorExplanations?.[option.id]).map(option => <div key={option.id} className="nbme-distractor"><b>{option.id}. <span lang="en">{normalizarTexto(option.text)}</span></b><TextoFuente texto={currentQuestion.distractorExplanations?.[option.id] ?? ''} /></div>)}</div>
               </details>}
               <p className="mini">Fuente: {source}. Explicación procedente del material importado.</p>
               {suggestedLinks && <p className="mini">Relación sugerida; confirma que corresponde al fundamento.</p>}
@@ -241,6 +300,6 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
     <div className="nbme-status" role="status"><span>{syncText}</span>
       {(syncStatus.state === 'error' || syncStatus.state === 'offline') && <button className="btn pequeno fantasma" disabled={busy} style={{ marginLeft: 8 }} onClick={() => void syncNow()}>Reintentar</button>}
     </div>
-    {expandedFigure && <Modal titulo="Figura de la pregunta" onCerrar={() => setExpandedFigure(null)} ancho={1100}><img className="nbme-image-expanded" src={expandedFigure.url} alt={expandedFigure.alt || 'Figura ampliada de la pregunta'} /></Modal>}
+    {expandedFigure && <Modal titulo="Figura de la pregunta" onCerrar={() => setExpandedFigure(null)} ancho={1100}><FigureViewer key={expandedFigure.url} url={expandedFigure.url} alt={expandedFigure.alt || 'Figura ampliada de la pregunta'} /></Modal>}
   </div>
 }

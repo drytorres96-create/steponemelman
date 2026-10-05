@@ -49,8 +49,15 @@ export function diagnosticoSync(causa: unknown): { codigo: CodigoSync; mensaje: 
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     return { codigo: 'sin_conexion', mensaje: 'Sin conexión. Tus cambios están guardados en este dispositivo.' }
   }
-  const texto = causa instanceof Error ? `${causa.name}: ${causa.message}` : String(causa)
-  if (/\b(5\d{2})\b|server|servidor/i.test(texto)) {
+  // PostgREST también rechaza con objetos planos, no sólo con instancias de Error.
+  const objeto = causa !== null && typeof causa === 'object' ? causa as Record<string, unknown> : null
+  const texto = causa instanceof Error ? `${causa.name}: ${causa.message}`
+    : typeof objeto?.message === 'string' ? objeto.message
+      : typeof causa !== 'object' && typeof causa !== 'function' ? String(causa) : ''
+  const status = typeof objeto?.status === 'number' ? objeto.status
+    : typeof objeto?.status === 'string' && /^\d{3}$/.test(objeto.status) ? Number(objeto.status) : null
+  const falloConexionServidor = typeof objeto?.code === 'string' && /^PGRST00[0-3]$/.test(objeto.code)
+  if (falloConexionServidor || (status !== null && status >= 500 && status <= 599) || /\b(5\d{2})\b|server|servidor/i.test(texto)) {
     return { codigo: 'servidor', mensaje: 'El servidor no pudo guardar ahora. Tus cambios están guardados aquí; vuelve a sincronizar.' }
   }
   if (/fetch|network|networkerror|timeout|abort|conexi/i.test(texto)) {

@@ -21,6 +21,7 @@ const mock = vi.hoisted(() => {
     nbme: crear<{ sessions: Record<string, { id: string; initial: { id: string; revision: string }[]; paused: boolean }>; attempts: Record<string, unknown>; activeSessionId: string | null }>(
       { sessions: {}, attempts: {}, activeSessionId: null }),
     intento: { correct: true } as { correct: boolean },
+    error: null as string | null,
     reproductor: vi.fn(),
     jugador: vi.fn(),
     startSession: vi.fn(),
@@ -46,7 +47,7 @@ vi.mock('../nbme/NbmeProvider', async () => {
   const suscribir = (o: () => void) => { mock.nbme.oyentes.add(o); return () => { mock.nbme.oyentes.delete(o) } }
   const catalog = { questions: [{ id: 'Q1', revision: 'r1', status: 'ready' }] }
   return { useNbme: () => ({
-    state: useSyncExternalStore(suscribir, () => mock.nbme.valor), catalog, loading: false, busy: false, error: null,
+    state: useSyncExternalStore(suscribir, () => mock.nbme.valor), catalog, loading: false, busy: false, error: mock.error,
     sessionView: { attempt: { ...mock.intento, conflict: false } },
     startSession: mock.startSession, resumeSession: mock.resumeSession, nextQuestion: mock.nextQuestion,
   }) }
@@ -81,6 +82,7 @@ beforeEach(() => {
   mock.nbme.valor = { sessions: {}, attempts: {}, activeSessionId: null }
   mock.nbme.oyentes.clear()
   mock.intento.correct = true
+  mock.error = null
   mock.cargarConceptos.mockImplementation(async (ids: string[]) => new Map(ids.map(id => [id, concepto(id)])))
   let n = 0
   mock.startSession.mockImplementation(async (refs: { id: string; revision: string }[]) => {
@@ -138,6 +140,90 @@ async function terminarConcepto(resultado: 'correcta' | 'incorrecta') {
 }
 
 describe('recorrido de las cajas', () => {
+  it('omitir un concepto no disponible no llena la barra ni acredita una caja repasada', async () => {
+    mock.cargarConceptos.mockResolvedValue(new Map([['B', concepto('B')]]))
+    const progresoGuardado = { A: { concept_id: 'A', intentos: [{ resultado: 'incorrecta', ts: 1 }] } }
+    mock.app.valor = { ...mock.app.valor, progreso: progresoGuardado }
+    await act(async () => { root.render(<SesionCajas items={[item('concepto', 'A'), item('concepto', 'B')]} titulo="Cajas" onSalir={vi.fn()} />) })
+    await esperar()
+    expect(host.textContent).toContain('Este concepto no está disponible')
+    await act(async () => { boton('Seguir con el resto').click() })
+    await esperar()
+    expect(host.querySelector<HTMLProgressElement>('progress')!.value).toBe(0)
+    expect(host.textContent).toContain('2 de 2 · caja 2')
+    expect(host.textContent).toContain('0 de 2 cajas respondidas · 1 con un repaso pendiente')
+    expect(mock.app.valor.progreso).toBe(progresoGuardado)
+    await terminarConcepto('correcta')
+    expect(host.textContent).toContain('Recorrido terminado')
+    expect(host.textContent).toContain('Una caja repasada')
+    expect(host.textContent).toContain('Una caja quedó con un repaso pendiente para otro día')
+    expect(host.textContent).not.toContain('todas a la primera')
+    expect(host.textContent).not.toContain('Cajas hechas')
+    expect((mock.app.valor.progreso as typeof progresoGuardado).A).toBe(progresoGuardado.A)
+  })
+
+  it('una pregunta retirada se omite sin registrar respuesta y cierra con cero cajas repasadas', async () => {
+    await act(async () => { root.render(<SesionCajas items={[item('pregunta', 'Q-retirada')]} titulo="Cajas" onSalir={vi.fn()} />) })
+    await esperar()
+    expect(host.textContent).toContain('Esta pregunta no está disponible')
+    await act(async () => { boton('Seguir con el resto').click() })
+    expect(host.textContent).toContain('Recorrido terminado')
+    expect(host.textContent).toContain('0 cajas repasadas')
+    expect(host.textContent).toContain('Una caja quedó con un repaso pendiente para otro día')
+    expect(host.textContent).not.toContain('todas a la primera')
+    expect(mock.startSession).not.toHaveBeenCalled()
+    expect(mock.nextQuestion).not.toHaveBeenCalled()
+    expect(mock.nbme.valor.attempts).toEqual({})
+  })
+
+  it('un error al abrir la pregunta permite cerrar el recorrido sin borrar progreso guardado', async () => {
+    mock.startSession.mockResolvedValue(false)
+    mock.error = 'No se pudo guardar el progreso.'
+    const progresoGuardado = { A: { concept_id: 'A', intentos: [{ resultado: 'correcta', ts: 1 }] } }
+    mock.app.valor = { ...mock.app.valor, progreso: progresoGuardado }
+    const nbmeGuardado = {
+      sessions: { anterior: { id: 'anterior', initial: [{ id: 'Q-anterior', revision: 'r1' }], paused: true } },
+      attempts: { 'anterior:0': { id: 'anterior:0', sessionId: 'anterior', position: 0, questionId: 'Q-anterior',
+        revision: 'r1', optionId: 'A', correct: true, submittedAt: 1, reviewedAt: 2, durationMs: 100 } },
+      activeSessionId: null,
+    }
+    mock.nbme.valor = nbmeGuardado
+    await act(async () => { root.render(<SesionCajas items={[item('pregunta', 'Q1')]} titulo="Cajas" onSalir={vi.fn()} />) })
+    await esperar()
+    expect(host.textContent).toContain('Esta pregunta no se pudo abrir')
+    expect(host.textContent).toContain(mock.error)
+    await act(async () => { boton('Seguir con el resto').click() })
+    expect(host.textContent).toContain('0 cajas repasadas')
+    expect(host.textContent).not.toContain('todas a la primera')
+    expect(host.textContent).not.toContain('Cajas hechas')
+    expect(mock.app.valor.progreso).toBe(progresoGuardado)
+    expect(mock.nbme.valor).toBe(nbmeGuardado)
+    expect(mock.nextQuestion).not.toHaveBeenCalled()
+  })
+
+  it('omitir una corrección no borra la respuesta inicial ni la cuenta dos veces', async () => {
+    mock.resumeSession.mockResolvedValue(false)
+    mock.error = 'No se pudo retomar esta pregunta.'
+    await act(async () => { root.render(<SesionCajas items={[item('pregunta', 'Q1')]} titulo="Cajas" onSalir={vi.fn()} />) })
+    await esperar()
+    await act(async () => { responderPregunta(false) })
+    await act(async () => { boton('Continuar').click() })
+    await esperar()
+    expect(host.textContent).toContain('Esta pregunta no se pudo abrir')
+    expect(host.querySelector<HTMLProgressElement>('progress')!.value).toBe(1)
+    const nbmeGuardado = mock.nbme.valor
+    await act(async () => { boton('Seguir con el resto').click() })
+    expect(host.textContent).toContain('Una caja repasada')
+    expect(host.textContent).not.toContain('2 cajas repasadas')
+    expect(host.textContent).toContain('Una caja quedó con un repaso pendiente para otro día')
+    expect(host.textContent).not.toContain('todas a la primera')
+    expect(host.textContent).toContain('Hubo una respuesta con fallo. Lo fallado vuelve a la caja 1.')
+    expect(host.textContent).not.toContain('se repitió')
+    expect(host.textContent).not.toContain('se repitieron')
+    expect(mock.nbme.valor).toBe(nbmeGuardado)
+    expect(mock.nextQuestion).toHaveBeenCalledOnce()
+  })
+
   it('un concepto fallado vuelve cuatro pasos después, como corrección', async () => {
     const items = ['A', 'B', 'C', 'D', 'E'].map(id => item('concepto', id))
     await act(async () => { root.render(<SesionCajas items={items} titulo="Cajas de hoy · 25 sep" onSalir={vi.fn()} />) })
