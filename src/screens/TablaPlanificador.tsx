@@ -43,7 +43,7 @@ export function TablaPlanificador({ items, ahora }: { items: ItemCaja[]; ahora: 
 
   return <div className="pila">
     <p className="mini">La retención es una estimación del planificador, no una medición directa de tu memoria. Puedes estudiar sin revisar estos valores.</p>
-    <div className="scroll-x">
+    <div className="scroll-x" tabIndex={0} role="region" aria-label="Detalle de las cajas de hoy">
       <table className="tabla">
         <thead><tr><th>Caja de hoy</th><th>Entró en</th><th>Qué falta para cerrarla</th><th>Retención</th><th>Estado</th><th>Interacción</th></tr></thead>
         <tbody>

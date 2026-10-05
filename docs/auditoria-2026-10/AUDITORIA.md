@@ -133,3 +133,18 @@ conservan fuera del repo; los entregables no contienen corpus ni exportaciones.
   Puertas finales en Node 22: **585 aprobadas/2 omitidas**, build correcto,
   **16/16 e2e**. Revisor adversarial corrigió antes de aprobar cantidadInicial
   ausente y scroll bajo cabecera; ambos casos reproducidos y probados.
+
+- Lote 2 · figuras y lectura móvil: H08–H12 (diseño y productividad).
+  Laboratorios usan los tokens de ambas pieles: valores 1,08→13,55:1 y caption
+  2,30→6,88:1 en la piel clara. Figuras fuera de vista no se descargan; se
+  comprueba que la imagen abra antes de responder si es necesaria. Aviso,
+  saltos con foco, errores con reintento y visor 100–400 % con pellizco/arrastre.
+  Regiones de tablas accesibles, controles de 44 px y áreas seguras también
+  en horizontal. Revisión adversarial corrigió cambio de revisión con modal
+  abierto y desplazamiento sin cambio de escala. 29 pruebas UI y 13 casos
+  de navegador dirigidos aprobados. Puertas completas: **590 aprobadas/2
+  omitidas**, build correcto, **29/29 e2e**. El primer CI del lote 1 detectó
+  un selector de prueba ambiguo con el chat durante la transición: se identifica
+  ahora la respuesta por su nombre accesible, conservando las aserciones.
+  Se repite el navegador sobre el lote aislado tras esta corrección.
+  Capturas anteriores y nuevas son limpias y usan sólo contenido sintético.

@@ -124,7 +124,7 @@ export function NbmeLibrary({ onStart }: { onStart: () => void }) {
     {catalog && <details className="tarjeta nbme-details"><summary>Contenido del banco: {totalReady} disponibles · {questions.length - totalReady} pendientes de revisión</summary>
       <p className="sutil">Las preguntas con problemas de opciones, texto o figuras se conservan en el inventario y quedan fuera de la práctica hasta resolverlos.</p>
       <p className="mini">El contenido procede de los archivos importados. Disponibilidad indica que pasó los controles de extracción; no certifica una revisión médica independiente. La clasificación por sistema y disciplina es orientativa.</p>
-      <div className="nbme-table-wrap"><table className="nbme-quality-table"><caption className="mini">Disponibilidad por forma</caption>
+      <div className="nbme-table-wrap" tabIndex={0} role="region" aria-label="Disponibilidad por forma"><table className="nbme-quality-table"><caption className="mini">Disponibilidad por forma</caption>
         <thead><tr><th scope="col">Forma</th><th scope="col">Disponibles</th><th scope="col">Pendientes</th><th scope="col">Total</th></tr></thead>
         <tbody>{(['27', '28', '29'] as const).map(form => <tr key={form}><th scope="row">NBME {form}</th><td>{countForForm(form, 'ready')}</td><td>{countForForm(form, 'blocked')}</td><td>{countForForm(form)}</td></tr>)}</tbody>
       </table></div>

@@ -41,12 +41,38 @@ beforeEach(() => {
   }
   mock.context.mockImplementation(() => context)
 })
-afterEach(async () => { await act(async () => root.unmount()); host.remove() })
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals() })
 const button = (label: string) => [...host.querySelectorAll('button')].find(item => item.textContent?.trim() === label)!
 const click = async (label: string) => { expect(button(label)).toBeTruthy(); await act(async () => button(label).click()) }
 const prepareSession = () => {
   const state = startNbmeSession(emptyNbmeState(), { id: 'QA-session', title: 'Synthetic session', refs: [{ id: question.id, revision: question.revision }] }, 100)
   context = { ...context, state, currentSession: state.sessions['QA-session'], sessionView: deriveNbmeSession(state, 'QA-session'), currentQuestion: question }
+}
+
+function mockFigures() {
+  const observers: IntersectionObserverCallback[] = []
+  const images: Array<{ onload: (() => void) | null; onerror: (() => void) | null }> = []
+  let n = 0
+  vi.stubGlobal('URL', class extends URL {
+    static createObjectURL = vi.fn(() => `blob:synthetic-${++n}`)
+    static revokeObjectURL = vi.fn()
+  })
+  vi.stubGlobal('IntersectionObserver', class {
+    constructor(callback: IntersectionObserverCallback) { observers.push(callback) }
+    observe() {}
+    disconnect() {}
+  })
+  vi.stubGlobal('Image', class {
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+    naturalWidth = 1200
+    src = ''
+    constructor() { images.push(this) }
+  })
+  return {
+    show: () => observers.at(-1)!([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver),
+    load: () => images.at(-1)!.onload?.(), fail: () => images.at(-1)!.onerror?.(),
+  }
 }
 
 describe('NBME study interface', () => {
@@ -160,6 +186,99 @@ describe('NBME study interface', () => {
     expect(host.textContent).toContain('Falta una figura necesaria')
     expect(host.textContent).toContain(context.storageWarning)
     expect(host.textContent).not.toContain('El progreso está guardado en este dispositivo.')
+  })
+
+  it('defers the download until the viewport and blocks grading until image decoding finishes', async () => {
+    const figures = mockFigures()
+    prepareSession()
+    context.currentQuestion = { ...question, figureRequired: true, figures: [{ assetId: 'synthetic', alt: 'Synthetic figure' }] }
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(context.loadFigure).not.toHaveBeenCalled()
+    expect(button('Comprobar respuesta').disabled).toBe(true)
+    await act(async () => figures.show())
+    expect(context.loadFigure).toHaveBeenCalledOnce()
+    expect(host.textContent).toContain('Cargando figura')
+    expect(button('Comprobar respuesta').disabled).toBe(true)
+    await act(async () => figures.load())
+    expect(button('Comprobar respuesta').disabled).toBe(false)
+    expect(host.querySelector('img')?.getAttribute('src')).toBe('blob:synthetic-1')
+    await act(async () => root.render(<div />))
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:synthetic-1')
+  })
+
+  it('a decode error stays blocked, revokes its URL and retries without changing the answer', async () => {
+    const figures = mockFigures()
+    prepareSession()
+    context.currentQuestion = { ...question, figureRequired: true, figures: [{ assetId: 'synthetic', alt: 'Synthetic figure' }] }
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    await act(async () => figures.show())
+    await act(async () => figures.fail())
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('No se pudo cargar la figura')
+    expect(button('Comprobar respuesta').disabled).toBe(true)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:synthetic-1')
+    await click('Reintentar figura')
+    await act(async () => figures.show())
+    await act(async () => figures.load())
+    expect(context.loadFigure).toHaveBeenCalledTimes(2)
+    expect(button('Comprobar respuesta').disabled).toBe(false)
+    expect(context.selectedOption).toBe('I')
+  })
+
+  it('aborts a pending download on exit and never publishes its late result', async () => {
+    const figures = mockFigures()
+    prepareSession()
+    context.currentQuestion = { ...question, figureRequired: true, figures: [{ assetId: 'synthetic', alt: 'Synthetic figure' }] }
+    let resolve: (blob: Blob) => void = () => {}
+    context.loadFigure = vi.fn((_id, _signal) => new Promise<Blob>(done => { resolve = done }))
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    await act(async () => figures.show())
+    const signal = vi.mocked(context.loadFigure).mock.calls[0][1]!
+    await act(async () => root.render(<div />))
+    expect(signal.aborted).toBe(true)
+    await act(async () => resolve(new Blob(['synthetic'])))
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+    expect(host.querySelector('img')).toBeNull()
+  })
+
+  it('a new figure revision invalidates the old URLs and blocks grading until its own decode completes', async () => {
+    const figures = mockFigures()
+    prepareSession()
+    context.currentQuestion = { ...question, figureRequired: true, figures: [{ assetId: 'synthetic', alt: 'Synthetic figure' }] }
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    await act(async () => figures.show())
+    await act(async () => figures.load())
+    expect(button('Comprobar respuesta').disabled).toBe(false)
+    await click('Ampliar figura')
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull()
+    context.currentQuestion = { ...context.currentQuestion, revision: 'r2' }
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:synthetic-1')
+    expect(host.querySelector('img')).toBeNull()
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(button('Comprobar respuesta').disabled).toBe(true)
+    await act(async () => figures.show())
+    await act(async () => figures.load())
+    expect(host.querySelector('img')?.getAttribute('src')).toBe('blob:synthetic-2')
+    expect(button('Comprobar respuesta').disabled).toBe(false)
+  })
+
+  it('without IntersectionObserver it loads immediately and aborts decoding with one URL revocation on exit', async () => {
+    const figures = mockFigures()
+    vi.stubGlobal('IntersectionObserver', undefined)
+    prepareSession()
+    context.currentQuestion = { ...question, figureRequired: true, figures: [{ assetId: 'synthetic', alt: 'Synthetic figure' }] }
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(context.loadFigure).toHaveBeenCalledOnce()
+    expect(URL.createObjectURL).toHaveBeenCalledOnce()
+    const signal = vi.mocked(context.loadFigure).mock.calls[0][1]!
+    await act(async () => root.render(<div />))
+    expect(signal.aborted).toBe(true)
+    expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:synthetic-1')
+    await act(async () => figures.load())
+    expect(host.querySelector('img')).toBeNull()
   })
 
   it('blocks illegible answer choices and their keyboard shortcuts', async () => {

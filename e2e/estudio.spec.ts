@@ -18,7 +18,7 @@ async function abrir(page: Page, escena = 'abierto') {
   return errores
 }
 
-const respuesta = (page: Page) => page.locator('input[type="text"]')
+const respuesta = (page: Page) => page.getByRole('textbox', { name: 'Tu respuesta', exact: true })
 const preguntaNbme = (page: Page) => page.locator('.nbme-question')
 const piel = (page: Page) => page.evaluate(() => document.documentElement.getAttribute('data-piel-estudio'))
 const cajasHechas = (page: Page) => page.getByRole('progressbar', { name: 'Cajas hechas' })

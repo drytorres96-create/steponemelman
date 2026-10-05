@@ -87,7 +87,7 @@
   --texto: var(--piel-texto); --texto-2: var(--piel-texto-2);
   --texto-3: var(--piel-texto-3); --texto-4: var(--piel-texto-3);
   --linea: var(--piel-linea); --linea-suave: var(--piel-linea); --linea-fuerte: var(--piel-linea-fuerte);
-  --linea-interactiva: var(--piel-linea-fuerte); --linea-interactiva-viva: var(--piel-acento);
+  --linea-interactiva: var(--piel-texto-3); --linea-interactiva-viva: var(--piel-acento);
   --acento: var(--piel-acento); --acento-2: var(--piel-acento);
   --calido: var(--piel-ambar); --calido-2: var(--piel-ambar);
   --violeta: var(--piel-acento); --violeta-2: var(--piel-acento); --violeta-tenue: var(--piel-acento-suave);
@@ -155,13 +155,19 @@
 }
 :root[data-piel-estudio] .pregunta,
 :root[data-piel-estudio] .nbme-stem { color: var(--piel-texto); }
+:root[data-piel-estudio] .nbme-lab { background: transparent; }
+:root[data-piel-estudio] .nbme-lab-scroll { background: var(--piel-superficie-2); border-color: var(--piel-linea); }
+:root[data-piel-estudio] .nbme-lab-tabla td { color: var(--piel-texto); }
+:root[data-piel-estudio] .nbme-lab-tabla th { color: var(--piel-texto-2); }
+:root[data-piel-estudio] .nbme-lab-encabezado { background: transparent; color: var(--piel-texto-2); }
+:root[data-piel-estudio] .nbme-figure-links a { color: var(--piel-acento-fuerte); }
 :root[data-piel-estudio] .rotulo,
 :root[data-piel-estudio] .editorial-eyebrow { color: var(--piel-acento); }
 
 /* Controles. */
 :root[data-piel-estudio] .btn {
   color: var(--piel-texto);
-  border: 1px solid var(--piel-linea-fuerte);
+  border: 1px solid var(--linea-interactiva);
   border-radius: var(--piel-radio-s);
   background: var(--piel-superficie);
   box-shadow: none;
@@ -215,7 +221,7 @@
 :root[data-piel-estudio] .flecha-fila,
 :root[data-piel-estudio] .flecha-ops button {
   color: var(--piel-texto);
-  border: 1px solid var(--piel-linea);
+  border: 1px solid var(--linea-interactiva);
   border-radius: var(--piel-radio-s);
   background: var(--piel-superficie);
 }
@@ -308,7 +314,7 @@
 :root[data-piel-estudio] select,
 :root[data-piel-estudio] textarea {
   color: var(--piel-texto);
-  border: 1px solid var(--piel-linea-fuerte);
+  border: 1px solid var(--linea-interactiva);
   border-radius: var(--piel-radio-s);
   background: var(--piel-superficie);
   box-shadow: none;
@@ -324,7 +330,7 @@
 :root[data-piel-estudio] .vacio { color: var(--piel-texto-2); }
 
 /* El conmutador de la piel. */
-.piel-boton { display: inline-flex; align-items: center; gap: 7px; }
+.piel-boton { display: inline-flex; align-items: center; gap: 7px; min-width: 44px; }
 .piel-boton svg { width: 15px; height: 15px; flex-shrink: 0; }
 @media (max-width: 720px) {
   .piel-boton-texto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
