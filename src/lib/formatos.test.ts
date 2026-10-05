@@ -65,9 +65,9 @@ describe('variación de formatos sin modificar la evidencia del concepto', () =>
     expect(JSON.stringify(opcion)).toBe(antes)
   })
 
-  it('las sesiones nuevas conservan todas las opciones editoriales en cualquier posición', () => {
+  it('la versión 2 conserva todas las opciones editoriales en cualquier posición', () => {
     for (const indice of [0, 2, 5, 8]) {
-      const c = prepararConcepto(opcion, { ...contexto, indice })
+      const c = prepararConcepto(opcion, { ...contexto, indice, version: 2 })
       expect(c.interaccion.recomendada).toBe('opcion_multiple')
       expect(c.evaluacion).toEqual(opcion.evaluacion)
     }
@@ -80,6 +80,77 @@ describe('variación de formatos sin modificar la evidencia del concepto', () =>
     const preparado = prepararConcepto(caso, { ...contexto, indice: 2 })
     expect(preparado.interaccion.recomendada).toBe('caso_clinico')
     expect(preparado.evaluacion).toEqual(caso.evaluacion)
+  })
+
+  it('la versión 3 alterna recuerdo permitido y opciones sin cambiar el contenido o la selección', () => {
+    const permitido = ConceptoZ.parse({ ...opcion, interaccion: { recomendada: 'opcion_multiple', permitidas: ['opcion_multiple', 'recuperacion_libre'] } })
+    const antes = structuredClone(permitido)
+    const recuerdo = prepararConcepto(permitido, { ...contexto, version: 3 })
+    expect(recuerdo.interaccion.recomendada).toBe('recuperacion_libre')
+    expect(recuerdo.evaluacion.opciones).toBeUndefined()
+    expect(recuerdo.evaluacion.pregunta).toBe(permitido.evaluacion.pregunta)
+    expect(recuerdo.respuesta_canonica).toBe(permitido.respuesta_canonica)
+    expect(recuerdo.concept_id).toBe(permitido.concept_id)
+    expect(recuerdo.source).toEqual(permitido.source)
+    expect(recuerdo).toEqual(prepararConcepto(permitido, { ...contexto, version: 3 }))
+    const reconocimiento = prepararConcepto(permitido, { ...contexto, semilla: 'QA-sesion:1', version: 3 })
+    expect(reconocimiento.interaccion.recomendada).toBe('opcion_multiple')
+    expect(reconocimiento.evaluacion).toEqual(permitido.evaluacion)
+    for (const version of [1, 2] as const) {
+      const restaurado = prepararConcepto(permitido, { ...contexto, version })
+      expect(restaurado.interaccion.recomendada).toBe('opcion_multiple')
+      expect(restaurado.evaluacion).toEqual(permitido.evaluacion)
+    }
+    expect(permitido).toEqual(antes)
+  })
+
+  it('V3 permite completar sólo con formato autorizado y un hueco literal no ambiguo', () => {
+    const completar = ConceptoZ.parse({ ...opcion, interaccion: { recomendada: 'opcion_multiple', permitidas: ['opcion_multiple', 'completar'] } })
+    const preparado = prepararConcepto(completar, { ...contexto, version: 3 })
+    expect(preparado.interaccion.recomendada).toBe('completar')
+    expect(preparado.evaluacion.pregunta).toBe('Completa con una palabra o frase corta:\n\nLa letra ______ pertenece al grupo inicial.')
+    expect(preparado.respuesta_canonica).toBe('alfa')
+    for (const afirmacion of ['Alfabeto es otra palabra.', 'Alfa se escribe alfa.']) {
+      const ambiguo = ConceptoZ.parse({ ...completar, afirmacion })
+      expect(prepararConcepto(ambiguo, { ...contexto, version: 3 }).interaccion.recomendada).toBe('opcion_multiple')
+    }
+  })
+
+  it('V3 conserva opciones si no hay autorización, la respuesta es larga o se filtra en el enunciado', () => {
+    const permitido = ConceptoZ.parse({ ...opcion, interaccion: { recomendada: 'opcion_multiple', permitidas: ['recuperacion_libre'] } })
+    const casos = [
+      opcion,
+      ConceptoZ.parse({ ...permitido, interaccion: { ...permitido.interaccion, prohibidas: ['recuperacion_libre'] } }),
+      ConceptoZ.parse({ ...permitido, respuesta_canonica: 'Una respuesta canónica completa con muchos más de seis términos', sinonimos: ['alfa'] }),
+      ConceptoZ.parse({ ...permitido, evaluacion: { ...permitido.evaluacion, pregunta: '¿Qué letra es alfa?' } }),
+      ConceptoZ.parse({ ...permitido, evaluacion: { ...permitido.evaluacion, pregunta: 'Which of the following is first?' } }),
+      ConceptoZ.parse({ ...permitido, evaluacion: { ...permitido.evaluacion, pregunta: 'Which choice is correct?' } }),
+      ConceptoZ.parse({ ...permitido, evaluacion: { ...permitido.evaluacion, pregunta: 'Which statement is false?' } }),
+      ConceptoZ.parse({ ...permitido, evaluacion: { ...permitido.evaluacion, pregunta: 'Which of these is first?' } }),
+      ConceptoZ.parse({ ...permitido, evaluacion: { ...permitido.evaluacion, pregunta: '¿Cuál es el término alpha?' } }),
+      ConceptoZ.parse({ ...permitido, evaluacion: { ...permitido.evaluacion, pregunta: 'Which alfa-dependent mechanism is involved?' } }),
+      ConceptoZ.parse({ ...permitido, evaluacion: { ...permitido.evaluacion, pregunta: 'What distinguishes alfa/beta in this example?' } }),
+    ]
+    for (const c of casos) {
+      const preparado = prepararConcepto(c, { ...contexto, version: 3 })
+      expect(preparado.interaccion.recomendada).toBe('opcion_multiple')
+      expect(preparado.evaluacion).toEqual(c.evaluacion)
+      expect(preparado.respuesta_canonica).toBe(c.respuesta_canonica)
+    }
+    const clinico = ConceptoZ.parse({ ...permitido, respuesta_canonica: 'IgG', sinonimos: [],
+      evaluacion: { ...permitido.evaluacion, pregunta: 'What differs from IgG4 in this example?', respuestas_aceptadas: [] } })
+    expect(prepararConcepto(clinico, { ...contexto, version: 3 }).interaccion.recomendada).toBe('recuperacion_libre')
+  })
+
+  it('V3 conserva casos, variantes, exámenes y reintentos aunque permitan recuerdo', () => {
+    const permitido = ConceptoZ.parse({ ...opcion, interaccion: { recomendada: 'opcion_multiple', permitidas: ['recuperacion_libre'] } })
+    for (const ctx of [{ ...contexto, ruta: 'examen' }, { ...contexto, forzarReconocimiento: true }]) {
+      expect(prepararConcepto(permitido, { ...ctx, version: 3 }).evaluacion).toEqual(permitido.evaluacion)
+    }
+    for (const c of [ConceptoZ.parse({ ...permitido, interaccion: { ...permitido.interaccion, recomendada: 'caso_clinico' } }),
+      ConceptoZ.parse({ ...permitido, variante_id: 'QA-variante' })]) {
+      expect(prepararConcepto(c, { ...contexto, version: 3 })).toEqual(c)
+    }
   })
 
   it('completar conserva la afirmación con un hueco exacto y evita cambios ambiguos', () => {

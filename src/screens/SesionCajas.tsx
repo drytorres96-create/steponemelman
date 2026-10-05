@@ -118,7 +118,7 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
       setPreparado(cursor)
       return
     }
-    guardarReanudable({ versionFormato: 2, modulo, sesion: 'repaso', indice: 0, ts: Date.now(), sessionId: sesionPaso,
+    guardarReanudable({ versionFormato: 3, modulo, sesion: 'repaso', indice: 0, ts: Date.now(), sessionId: sesionPaso,
       conceptIds: [c.concept_id], titulo, subtitulo: SUBTITULO, cantidadInicial: 1, revisionInicialHecha: false, msVisibles: 0 })
   }, [paso, cursor, conceptos, preparado, estado.reanudable, guardarReanudable, sesionPaso, modulo, titulo])
 

@@ -150,7 +150,7 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
       return
     }
     guardarReanudable({
-      versionFormato: 2, modulo: `semana:${sesion.id}`, sesion: 'repaso',
+      versionFormato: 3, modulo: `semana:${sesion.id}`, sesion: 'repaso',
       indice: Math.min(tramo.desde, ids.length), ts: Date.now(), sessionId: sesion.id, conceptIds: ids,
       titulo: sesion.titulo, subtitulo: sesion.subtitulo ?? 'Sesión de la semana',
       cantidadInicial: ids.length, revisionInicialHecha: false, msVisibles: 0,

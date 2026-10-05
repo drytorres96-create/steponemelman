@@ -146,7 +146,7 @@ function Direccional({ c, bloqueado, onResponder, ocultarFeedback = false }: Pro
     const aciertos = flechas.filter((f, i) => sel[i] === f.direccion).length
     const ve: Veredicto = aciertos === flechas.length ? 'correcta' : aciertos >= Math.ceil(flechas.length / 2) ? 'parcial' : 'incorrecta'
     onResponder({
-      veredicto: ve, tipoError: ve === 'correcta' ? 'ninguno' : 'error_mecanistico', recuperacionActiva: true,
+      veredicto: ve, tipoError: ve === 'correcta' ? 'ninguno' : 'error_mecanistico', recuperacionActiva: false,
       detalle: ve === 'correcta' ? undefined : `${aciertos} de ${flechas.length} flechas correctas.`,
       respuestaDada: flechas.map((f, i) => `${f.variable}: ${SIGNOS.find(s => s.k === sel[i])?.s ?? '—'}`).join(', '),
     })
@@ -186,7 +186,7 @@ function Secuencia({ c, bloqueado, onResponder, semilla, ocultarFeedback = false
     const desplazados = orden.filter((v, i) => v !== i).length
     onResponder({
       veredicto: ok ? 'correcta' : desplazados <= 2 ? 'parcial' : 'incorrecta',
-      tipoError: ok ? 'ninguno' : 'error_secuencia', recuperacionActiva: true,
+      tipoError: ok ? 'ninguno' : 'error_secuencia', recuperacionActiva: false,
       detalle: ok ? undefined : `${desplazados} de ${pasos.length} pasos fuera de lugar.`,
       respuestaDada: orden.map(i => pasos[i]).join(' → '),
     })
@@ -232,7 +232,7 @@ function Relacionar({ c, bloqueado, onResponder, semilla, ocultarFeedback = fals
     const ok = aciertos === pares.length
     onResponder({
       veredicto: ok ? 'correcta' : aciertos >= Math.ceil(pares.length / 2) ? 'parcial' : 'incorrecta',
-      tipoError: ok ? 'ninguno' : 'confusion_conceptos', recuperacionActiva: true,
+      tipoError: ok ? 'ninguno' : 'confusion_conceptos', recuperacionActiva: false,
       detalle: ok ? undefined : `${aciertos} de ${pares.length} parejas correctas.`,
       respuestaDada: pares.map((p, i) => `${p.izquierda} → ${pares[enlaces[i]]?.derecha ?? '—'}`).join('; '),
     })
@@ -283,7 +283,7 @@ function Clasificar({ c, bloqueado, onResponder, semilla, ocultarFeedback = fals
     const ok = aciertos === total
     onResponder({
       veredicto: ok ? 'correcta' : aciertos >= Math.ceil(total * 0.6) ? 'parcial' : 'incorrecta',
-      tipoError: ok ? 'ninguno' : 'confusion_conceptos', recuperacionActiva: true,
+      tipoError: ok ? 'ninguno' : 'confusion_conceptos', recuperacionActiva: false,
       detalle: ok ? undefined : `${aciertos} de ${total} elementos bien clasificados.`,
       respuestaDada: Object.entries(asig).map(([id, g]) => `${elementos.find(x => x.id === id)?.e ?? id}: ${grupos[g]?.nombre}`).join('; '),
     })

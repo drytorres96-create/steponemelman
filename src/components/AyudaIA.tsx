@@ -7,7 +7,7 @@ import { referenciaPagina } from '../lib/fuente'
 
 export function AyudaIA({ concepto, respuesta, preguntaId, indice, ruta, reintento, versionFormato = 2 }: {
   concepto: Concepto; respuesta: string; preguntaId: string; indice: number; ruta: string; reintento: boolean
-  versionFormato?: 1 | 2
+  versionFormato?: 1 | 2 | 3
 }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')

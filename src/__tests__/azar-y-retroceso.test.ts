@@ -14,7 +14,7 @@ const base = (ts: number, extra: Partial<Intento> = {}): Intento => ({
 const fallo = (ts: number) => base(ts, { resultado: 'incorrecta', tipo_error: 'desconocimiento' })
 const progresoCon = (intentos: Intento[]) => ({ ...nuevoProgreso('C'), intentos })
 
-describe('evidencia contra el azar', () => {
+describe('estimaciones históricas de azar, separadas de la acreditación de dominio', () => {
   it('tasa cada formato por lo fácil que es acertarlo sin saber', () => {
     expect(azarDeIntento(base(1))).toBe(0.05)
     expect(azarDeIntento(base(1, { recuperacion_activa: false, tipo_evidencia: undefined, interaccion: 'opcion_multiple' }))).toBe(0.25)
@@ -48,12 +48,17 @@ describe('evidencia contra el azar', () => {
     expect(porcentajeAzar(0.0000001)).toBe('< 0,01 %')
   })
 
-  it('verdadero o falso nunca acredita por sí solo: 0,5 elevado a lo que sea tarda en bajar', () => {
+  it('una estimación pequeña de azar en verdadero o falso no sustituye la recuperación real', () => {
     const vf = (n: number) => Array.from({ length: n }, (_, i) =>
       base(i, { recuperacion_activa: false, tipo_evidencia: undefined, interaccion: 'verdadero_falso' }))
     expect(azarAcumulado(vf(3))).toBe(0.125)
     expect(azarAcumulado(vf(6))).toBeCloseTo(0.015625)
     expect(azarAcumulado(vf(7))).toBeLessThanOrEqual(UMBRAL_AZAR)
+    const intentos = vf(20).map((i, n) => ({ ...i, ts: n * DIA }))
+    const ev = evaluarDominio(progresoCon(intentos), CRITERIOS_POR_DEFECTO, 20 * DIA)
+    expect(ev.detalle.find(d => d.clave === 'aciertos')!.cumplido).toBe(true)
+    expect(ev.detalle.find(d => d.clave === 'recuperacion')!.cumplido).toBe(false)
+    expect(ev.cumple).toBe(false)
   })
 })
 

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConceptoZ } from '../schema/concept'
 import { ESTADO_INICIAL, leerEstadoDesconocido, reconstruirProgreso, type EstadoApp } from '../store/model'
 import { nuevoProgreso } from '../srs/fsrs'
+import { evaluarDominio } from '../srs/mastery'
 import type { Intento } from '../srs/tipos'
 import type { SesionSemanal } from '../semana/tipos'
 import type { ResultadoCalificacion } from '../lib/calificacion-ia'
@@ -112,6 +113,69 @@ async function responder(texto: string) {
 const pintar = () => act(async () => root.render(<SesionMixta sesion={sesion} onSalir={vi.fn()} efimera />))
 
 describe('neurocognición: tramo mixto finito', () => {
+  const conOpciones = () => ConceptoZ.parse({ ...conceptos[0],
+    interaccion: { recomendada: 'opcion_multiple', permitidas: ['opcion_multiple', 'recuperacion_libre'] },
+    evaluacion: { ...conceptos[0].evaluacion, opciones: [
+      { texto: 'alfa', correcta: true }, { texto: 'beta', correcta: false },
+    ] },
+  })
+  it('una visita V3 puede recuperar sin alternativas y se reanuda con la misma presentación y respuesta', async () => {
+    const c = conOpciones()
+    const antes = Date.now()
+    const anteriores: Intento[] = [5, 2].map(d => ({
+      attempt_id: `reconocimiento-${d}`, session_id: `anterior-${d}`, ts: antes - d * 86_400_000,
+      calificacion: 3, resultado: 'correcta', interaccion: 'opcion_multiple', recuperacion_activa: false,
+      tipo_evidencia: 'discriminacion', respuesta_dada: 'alfa', pistas_usadas: 0, ms: 1000,
+      fuente_consultada: false, explicacion_previa: false, confianza_declarada: 2, tipo_error: 'ninguno',
+    }))
+    mock.estado = { ...ESTADO_INICIAL, progreso: {
+      [c.concept_id]: reconstruirProgreso(c.concept_id, anteriores, ESTADO_INICIAL.criterios),
+    } }
+    // La semilla persistida elige recuerdo en esta visita, incluso con un único concepto.
+    const cola = { titulo: 'Recuperación', subtitulo: '', ruta: 'repaso', modulo: 'QA', conceptos: [c], sessionId: 'opciones' }
+    await act(async () => root.render(<Reproductor cola={cola} onSalir={vi.fn()} />))
+    expect(host.querySelector('[role="radiogroup"]')).toBeNull()
+    expect(host.querySelector('input[type="text"]')).not.toBeNull()
+    expect(mock.estado!.reanudable?.versionFormato).toBe(3)
+    await responder('alfa')
+    expect(mock.registrados).toHaveLength(1)
+    expect(mock.registrados[0]).toMatchObject({ interaccion: 'recuperacion_libre', recuperacion_activa: true,
+      tipo_evidencia: 'recuerdo', resultado: 'correcta', fuente_consultada: false, explicacion_previa: false, evaluador_version: '2.3.0' })
+    expect(evaluarDominio(mock.estado!.progreso[c.concept_id], mock.estado!.criterios).cumple).toBe(true)
+    const preguntaVersion = mock.registrados[0].pregunta_version
+    const guardado = leerEstadoDesconocido(JSON.parse(JSON.stringify(mock.estado)))!
+    expect(guardado).not.toBeNull()
+    await act(async () => root.unmount())
+    mock.estado = guardado
+    root = createRoot(host)
+    await act(async () => root.render(<Reproductor cola={cola} onSalir={vi.fn()} />))
+    expect(host.querySelector('[role="radiogroup"]')).toBeNull()
+    expect(host.querySelector<HTMLInputElement>('input[type="text"]')?.disabled).toBe(true)
+    expect(host.textContent).toContain('Tu respuesta: alfa')
+    expect(host.textContent).not.toContain('otra presentación')
+    expect(mock.registrados).toHaveLength(1)
+    expect(mock.estado!.progreso[c.concept_id].intentos.at(-1)!.pregunta_version).toBe(preguntaVersion)
+  })
+
+  it('una sesión V2 con recuerdo permitido conserva sus opciones al restaurarse', async () => {
+    const c = conOpciones()
+    const sessionId = 'legacy-v2'
+    mock.estado = leerEstadoDesconocido(JSON.parse(JSON.stringify({ ...ESTADO_INICIAL,
+      reanudable: { modulo: 'QA', sesion: 'repaso', indice: 0, ts: 1, sessionId, versionFormato: 2,
+        conceptIds: [c.concept_id], cantidadInicial: 1 },
+    })))!
+    const cola = { titulo: 'Legada', subtitulo: '', ruta: 'repaso', modulo: 'QA', conceptos: [c], sessionId }
+    await act(async () => root.render(<Reproductor cola={cola} onSalir={vi.fn()} />))
+    expect(host.querySelector('input[type="text"]')).toBeNull()
+    expect(host.querySelector('[role="radiogroup"]')).not.toBeNull()
+    expect(mock.estado!.reanudable?.versionFormato).toBe(2)
+    const alfa = [...host.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find(b => b.lastElementChild?.textContent === 'alfa')!
+    await act(async () => alfa.click())
+    await act(async () => boton('Comprobar respuesta').click())
+    expect(mock.registrados).toHaveLength(1)
+    expect(mock.registrados[0]).toMatchObject({ interaccion: 'opcion_multiple', recuperacion_activa: false, tipo_evidencia: 'discriminacion' })
+  })
+
   it('tres fallos consecutivos llegan a NBME sin ampliar el guion ni pedir otra vuelta', async () => {
     await pintar()
     for (let n = 0; n < 3; n++) {
@@ -119,7 +183,7 @@ describe('neurocognición: tramo mixto finito', () => {
       expect(host.textContent).toContain('volverá en las cajas de los próximos días')
       expect(host.textContent).not.toContain('hasta que lo aciertes')
       const actual = leerEstadoDesconocido(JSON.parse(JSON.stringify(mock.estado)))
-      expect(actual?.reanudable).toMatchObject({ versionFormato: 2, indice: n, conceptIds: ['QA-1', 'QA-2', 'QA-3'] })
+      expect(actual?.reanudable).toMatchObject({ versionFormato: 3, indice: n, conceptIds: ['QA-1', 'QA-2', 'QA-3'] })
       await avanzar()
     }
     expect(host.textContent).toContain('Pregunta NBME siguiente')

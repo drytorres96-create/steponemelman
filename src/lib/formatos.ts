@@ -31,7 +31,34 @@ function fraseConHueco(c: Concepto): string | null {
   return c.afirmacion.replace(patron, '______')
 }
 
-export interface ContextoFormato { semilla: string; indice: number; ruta?: string; forzarReconocimiento?: boolean; version?: 1 | 2 }
+export type VersionFormato = 1 | 2 | 3
+export const VERSION_FORMATO_ACTUAL: VersionFormato = 3
+export interface ContextoFormato { semilla: string; indice: number; ruta?: string; forzarReconocimiento?: boolean; version?: VersionFormato }
+
+/** La recuperación no se presenta con la respuesta o un sinónimo ya escrito en la pregunta. */
+function muestraRespuesta(c: Concepto, pregunta: string): boolean {
+  const enunciado = normalizar(pregunta)
+  return [c.respuesta_canonica, ...c.sinonimos, ...c.evaluacion.respuestas_aceptadas]
+    .some(s => {
+      if (!esRespuestaBreve(s)) return false
+      const respuesta = normalizar(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      return !!respuesta && new RegExp(`(?<![\\p{L}\\p{N}])${respuesta}(?![\\p{L}\\p{N}])`, 'u').test(enunciado)
+    })
+}
+
+/** Una pregunta redactada para comparar las opciones necesita conservarlas. */
+function dependeDeOpciones(pregunta: string): boolean {
+  return /\b(?:of the following|of these|of those|(?:which|what) (?:choices?|options?|statements?|one)|following (?:options|choices|statements)|(?:options|choices) (?:below|above)|opciones|alternativas|de las siguientes|de los siguientes|de estos|de estas)\b/.test(normalizar(pregunta))
+}
+
+function limpiarRespuestasBreves(c: Concepto): void {
+  const enunciado = ` ${normalizar(c.evaluacion.pregunta)} `
+  const canonica = normalizar(c.respuesta_canonica)
+  const admisible = (s: string) => esRespuestaBreve(s) && (normalizar(s) === canonica
+    || !enunciado.includes(` ${normalizar(s)} `))
+  c.sinonimos = c.sinonimos.filter(admisible)
+  c.evaluacion.respuestas_aceptadas = c.evaluacion.respuestas_aceptadas.filter(admisible)
+}
 
 /**
  * La variante depende sólo de la presentación guardada, nunca del progreso mutable.
@@ -46,6 +73,27 @@ export function prepararConcepto(original: Concepto, contexto: ContextoFormato):
   }
   const nativa = c.interaccion.recomendada
   if (tieneOpcionesValidas(c) && ['opcion_multiple', 'caso_clinico', ...ESCRITAS].includes(nativa)) {
+    // V3 ofrece recuerdo en algunas visitas, incluso en cajas de un solo concepto.
+    // La semilla de la presentación queda guardada: responder o sincronizar no cambia el formato.
+    if (contexto.version === 3 && contexto.ruta !== 'examen' && !contexto.forzarReconocimiento
+        && nativa !== 'caso_clinico' && esRespuestaBreve(c.respuesta_canonica)
+        && (hash(contexto.semilla) + contexto.indice) % 2 === 1) {
+      const permitido = (tipo: Interaccion) => !c.interaccion.prohibidas.includes(tipo)
+        && (c.interaccion.permitidas.includes(tipo) || nativa === tipo)
+      const escrito = permitido('recuperacion_libre') ? 'recuperacion_libre'
+        : ESCRITAS.includes(nativa) && permitido(nativa) ? nativa
+        : permitido('completar') ? 'completar' : null
+      const hueco = escrito === 'completar' ? fraseConHueco(c) : null
+      const pregunta = hueco ? `Completa con una palabra o frase corta:\n\n${hueco}` : c.evaluacion.pregunta
+      if (escrito && (escrito !== 'completar' || nativa === 'completar' || hueco)
+          && !muestraRespuesta(c, pregunta) && !dependeDeOpciones(pregunta)) {
+        c.evaluacion.pregunta = pregunta
+        delete c.evaluacion.opciones
+        c.interaccion.recomendada = escrito
+        limpiarRespuestasBreves(c)
+        return c
+      }
+    }
     // Las preguntas clínicas se conservan completas. El examen usa siempre sus opciones.
     // Sólo las sesiones antiguas conservan su presentación V/F; las nuevas usan las opciones editoriales.
     if (contexto.version === 1 && contexto.ruta !== 'examen' && !contexto.forzarReconocimiento && contexto.indice % 3 === 2
@@ -71,12 +119,7 @@ export function prepararConcepto(original: Concepto, contexto: ContextoFormato):
   }
   // No aceptamos como respuesta un alias que ya aparece en el enunciado y no
   // designa la canónica (p. ej., el nombre del fármaco cuando se pide su efecto).
-  const enunciado = ` ${normalizar(c.evaluacion.pregunta)} `
-  const canonica = normalizar(c.respuesta_canonica)
-  const admisible = (s: string) => esRespuestaBreve(s) && (normalizar(s) === canonica
-    || !enunciado.includes(` ${normalizar(s)} `))
-  c.sinonimos = c.sinonimos.filter(admisible)
-  c.evaluacion.respuestas_aceptadas = c.evaluacion.respuestas_aceptadas.filter(admisible)
+  limpiarRespuestasBreves(c)
   const hueco = fraseConHueco(c)
   const formatoFijo = c.interaccion.permitidas.length === 1 && c.interaccion.permitidas[0] === 'recuperacion_libre'
   if (hueco && !formatoFijo && contexto.indice % 2 === 1 && contexto.ruta !== 'terminos'

@@ -1,6 +1,5 @@
 import { intentoCorrecto, type Intento, type ProgresoConcepto, type EstadoDominio } from './tipos'
-import { DIA, estaVencido, retencion } from './fsrs'
-import { azarAcumulado, porcentajeAzar, UMBRAL_AZAR } from './azar'
+import { DIA, estaVencido, proximaRevision, retencion } from './fsrs'
 
 /** Criterios de dominio — configurables desde Ajustes. */
 export interface CriteriosDominio {
@@ -8,14 +7,12 @@ export interface CriteriosDominio {
   sesiones: number              // en al menos N sesiones distintas
   separacionHoras: number       // separadas temporalmente
   exigirSinPistas: boolean      // al menos una sin pistas
-  exigirRecuperacionActiva: boolean // clave histórica: evidencia independiente, también discriminación/aplicación
+  exigirRecuperacionActiva: boolean // al menos un recuerdo sin alternativas o una aplicación
   ventanaConfusionDias: number  // sin confusiones fundamentales recientes
 }
 export const CRITERIOS_POR_DEFECTO: CriteriosDominio = {
-  // 48 h, decidido por Yoel el 14-sep-2026. Veinte horas caben en una tarde larga y la mañana
-  // siguiente —machacar la misma huella, no espaciarla—, pero 96 h eran cuatro días por concepto
-  // con el examen en diciembre: demasiado para ver progreso. Dos noches de sueño separan los
-  // aciertos de verdad y caben en la semana.
+  // Regla operativa de separación decidida por Yoel el 14-sep-2026: 48 h.
+  // Evita acreditar una racha de la misma tarde y cabe en el horizonte del examen.
   recuperaciones: 3, sesiones: 2, separacionHoras: 48,
   exigirSinPistas: true, exigirRecuperacionActiva: true, ventanaConfusionDias: 7,
 }
@@ -43,21 +40,37 @@ export function sonCriteriosHeredados(c: CriteriosDominio): boolean {
 }
 
 /** Identificador estable de cada criterio, para razonar sobre ellos sin leer el rótulo. */
-export type ClaveCriterio = 'aciertos' | 'sesiones' | 'separacion' | 'pistas' | 'azar' | 'retencion' | 'confusion'
+export type ClaveCriterio = 'aciertos' | 'sesiones' | 'separacion' | 'pistas' | 'recuperacion' | 'retencion' | 'confusion'
 
 export interface EvidenciaDominio {
   cumple: boolean
-  /** Aciertos exigidos para este concepto: sube cuando toda la evidencia es reconocimiento. */
+  /** Respuestas independientes exigidas por los criterios guardados. */
   requeridas: number
   detalle: { clave: ClaveCriterio; criterio: string; cumplido: boolean; valor: string }[]
 }
 
-/** Recuerdo libre o aplicación de un caso, frente al reconocimiento entre opciones. */
+const FORMATOS_SIN_ALTERNATIVAS = new Set([
+  'recuperacion_libre', 'completar', 'numerico', 'tarjeta', 'escritura_correctiva', 'visual', 'simulador',
+])
+
+/**
+ * Interpreta la evidencia sin reescribir el historial. Los controles con alternativas
+ * visibles antes se marcaban como recuperación; su formato prevalece sobre ese flag.
+ * Un formato desconocido o un caso antiguo sin aplicación registrada no la demuestra.
+ */
+export function tipoEvidenciaDeIntento(i: Intento): NonNullable<Intento['tipo_evidencia']> {
+  if (i.interaccion === 'caso_clinico' && i.tipo_evidencia === 'aplicacion') return 'aplicacion'
+  if (FORMATOS_SIN_ALTERNATIVAS.has(i.interaccion) && i.recuperacion_activa
+      && i.tipo_evidencia !== 'discriminacion') return 'recuerdo'
+  return 'discriminacion'
+}
+
+/** Recuerdo sin alternativas o aplicación registrada, frente a elegir entre opciones. */
 export function evidenciaActiva(i: Intento): boolean {
-  return i.recuperacion_activa || i.tipo_evidencia === 'aplicacion'
+  return tipoEvidenciaDeIntento(i) !== 'discriminacion'
 }
 /**
- * Probabilidad de recordarlo hoy por debajo de la cual el concepto pide repaso. Es el mismo
+ * Retención estimada por debajo de la cual el concepto pide repaso. Es el mismo
  * 0,90 con el que el planificador calcula sus intervalos, así que la cifra que se enseña y la
  * regla que vence un concepto son la misma. Decidido por Yoel el 14-sep-2026.
  */
@@ -103,11 +116,8 @@ export function aciertosVigentes(p: ProgresoConcepto): Intento[] {
 export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): EvidenciaDominio {
   const correctas = aciertosVigentes(p)
   const requeridas = c.recuperaciones
-  // Evidencia contra el azar: cada acierto aporta la probabilidad de haberlo acertado sin
-  // saberlo, y el conjunto se multiplica. Dos recuerdos libres bastan (0,25 %); cuatro
-  // aciertos de opción múltiple entre cuatro, también (0,39 %); tres, todavía no (1,6 %).
-  const azar = azarAcumulado(correctas)
-  // Probabilidad de recordarlo hoy según el planificador. Es la señal continua: sube con cada
+  const recuperacion = correctas.some(evidenciaActiva)
+  // Retención estimada hoy según el planificador. Es la señal continua: sube con cada
   // acierto bien espaciado y baja sola con los días, así que el avance se ve sin puertas.
   const dias = p.ultimo ? Math.max(0, (ahora - p.ultimo) / DIA) : 0
   const prevista = p.estabilidad > 0 ? retencion(dias, p.estabilidad) : 0
@@ -126,10 +136,10 @@ export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora =
     { clave: 'separacion', criterio: `separadas ≥ ${c.separacionHoras} h`, cumplido: separadas, valor: separadas ? 'sí' : 'no' },
     ...(c.exigirSinPistas ? [{ clave: 'pistas' as const, criterio: 'al menos una sin pistas', cumplido: sinPistas, valor: sinPistas ? 'sí' : 'no' }] : []),
     ...(c.exigirRecuperacionActiva ? [{
-      clave: 'azar' as const,
-      criterio: `probabilidad de acertarlo por azar ≤ ${porcentajeAzar(UMBRAL_AZAR)}`,
-      cumplido: correctas.length > 0 && azar <= UMBRAL_AZAR,
-      valor: correctas.length ? porcentajeAzar(azar) : 'sin evidencia',
+      clave: 'recuperacion' as const,
+      criterio: 'al menos un recuerdo sin alternativas o una aplicación independiente',
+      cumplido: recuperacion,
+      valor: recuperacion ? 'sí' : 'pendiente',
     }] : []),
     // Indicador, no puerta. El planificador ya fija `proxima` en el instante en que la
     // retención cae a este mismo 0,90, así que exigirlo aquí además duplicaría el
@@ -137,7 +147,7 @@ export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora =
     // Vive en el detalle porque es la señal continua: sube y baja cada día, a la vista.
     {
       clave: 'retencion' as const,
-      criterio: `probabilidad de recordarlo hoy ≥ ${Math.round(UMBRAL_RETENCION * 100)} %`,
+      criterio: `retención estimada hoy ≥ ${Math.round(UMBRAL_RETENCION * 100)} %`,
       cumplido: prevista >= UMBRAL_RETENCION,
       valor: `${Math.round(prevista * 100)} %`,
     },
@@ -149,16 +159,14 @@ export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora =
 /**
  * Explica la evidencia que falta sin equiparar acertar un reintento con dominar.
  *
- * El texto lleva siempre las dos señales continuas —lo improbable que es que la racha sea
- * suerte y la probabilidad de recordarlo hoy— porque son las que se mueven cada día. Un
- * conteo de aciertos se queda quieto; estos dos números enseñan el avance mientras lo hay.
+ * La estimación de retención se separa de la evidencia registrada: acertar entre
+ * alternativas muchas veces no demuestra por sí solo una recuperación sin ellas.
  */
 export function resumenDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): { texto: string; pendientes: string[] } {
   const ev = evaluarDominio(p, c, ahora)
   const pendientes = ev.detalle.filter(d => !d.cumplido).map(d => d.criterio)
   const de = (clave: ClaveCriterio) => ev.detalle.find(d => d.clave === clave)?.valor ?? '—'
-  const senales = `recuerdo hoy ${de('retencion')}`
-    + (ev.detalle.some(d => d.clave === 'azar') ? ` · azar ${de('azar')}` : '')
+  const senales = `retención estimada hoy ${de('retencion')}`
 
   if (ev.cumple) return {
     texto: estaVencido(p, ahora)
@@ -187,7 +195,7 @@ export function calcularEstado(p: ProgresoConcepto, c: CriteriosDominio, ahora =
 
 /** Estado actual; `dominado_en` sólo conserva el hito histórico. */
 export function dominioVigente(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): boolean {
-  return calcularEstado(p, c, ahora) === 'dominado'
+  return proximaRevision(p) !== null && calcularEstado(p, c, ahora) === 'dominado'
 }
 
 /** Etapas visibles del aprendizaje, para diferenciarlas en la interfaz. */

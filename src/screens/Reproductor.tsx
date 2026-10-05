@@ -10,7 +10,7 @@ import { resumenDominio } from '../srs/mastery'
 import { cercaniaDominio } from '../srs/cercania'
 import { crearUUID } from '../store/model'
 import { EVALUADOR_VERSION } from '../lib/normalize'
-import { prepararConcepto } from '../lib/formatos'
+import { prepararConcepto, VERSION_FORMATO_ACTUAL, type VersionFormato } from '../lib/formatos'
 import { AyudaIA } from '../components/AyudaIA'
 import { ExamenIA } from '../components/ExamenIA'
 import { ConfusionIA } from '../components/ConfusionIA'
@@ -59,7 +59,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
   /** Un paso dentro de un recorrido (cajas o lo nuevo): quien orquesta pone la cuenta y decide qué sigue. */
   const enSesion = !!modoCaja || !!onTramoCompleto
   const guardada = cola.sessionId && estado.reanudable?.sessionId === cola.sessionId ? estado.reanudable : null
-  const [versionFormato] = useState<1 | 2>(guardada ? guardada.versionFormato ?? 1 : 2)
+  const [versionFormato] = useState<VersionFormato>(guardada ? guardada.versionFormato ?? 1 : VERSION_FORMATO_ACTUAL)
   const [presupuesto] = useState(guardada?.presupuestoMinutos ?? cola.presupuestoMinutos)
   const [relojSesion] = useState(() => { const r = new RelojActividad(); r.reiniciar(guardada?.msVisibles ?? 0); return r })
   const [msVisibles, setMsVisibles] = useState(guardada?.msVisibles ?? 0)
