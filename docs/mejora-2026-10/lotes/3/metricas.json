@@ -1,0 +1,44 @@
+[
+  {
+    "width": 390,
+    "scrollWidth": 390,
+    "buttons": [
+      {
+        "label": "Volver a Hoy",
+        "width": 112,
+        "height": 44
+      },
+      {
+        "label": "Ampliar figura",
+        "width": 324,
+        "height": 60
+      },
+      {
+        "label": "Comprobar respuesta",
+        "width": 324,
+        "height": 50
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "scrollWidth": 1280,
+    "buttons": [
+      {
+        "label": "Volver a Hoy",
+        "width": 112,
+        "height": 44
+      },
+      {
+        "label": "Ampliar figura",
+        "width": 796,
+        "height": 60
+      },
+      {
+        "label": "Comprobar respuesta",
+        "width": 200,
+        "height": 50
+      }
+    ]
+  }
+]

@@ -1,0 +1,370 @@
+[
+  {
+    "width": 390,
+    "scene": "hoy",
+    "overflow": false,
+    "motion": [],
+    "primary": [
+      {
+        "text": "Empezar las cajas",
+        "x": 35,
+        "y": 694.5625,
+        "width": 320,
+        "height": 50.390625
+      }
+    ],
+    "smallTargets": []
+  },
+  {
+    "width": 390,
+    "scene": "concepto",
+    "overflow": false,
+    "motion": [],
+    "primary": [],
+    "question": {
+      "x": 33,
+      "y": 278.578125,
+      "width": 324,
+      "height": 60,
+      "top": 278.578125,
+      "right": 357,
+      "bottom": 338.578125,
+      "left": 33
+    },
+    "input": {
+      "x": 33,
+      "y": 397.765625,
+      "width": 324,
+      "height": 52.796875,
+      "top": 397.765625,
+      "right": 357,
+      "bottom": 450.5625,
+      "left": 33
+    },
+    "smallTargets": []
+  },
+  {
+    "width": 390,
+    "scene": "feedback",
+    "overflow": false,
+    "motion": [],
+    "primary": [
+      {
+        "text": "Siguiente pregunta",
+        "x": 52,
+        "y": 856.15625,
+        "width": 175.859375,
+        "height": 50.390625
+      }
+    ],
+    "question": {
+      "x": 33,
+      "y": 278.578125,
+      "width": 324,
+      "height": 60,
+      "top": 278.578125,
+      "right": 357,
+      "bottom": 338.578125,
+      "left": 33
+    },
+    "input": {
+      "x": 33,
+      "y": 397.765625,
+      "width": 324,
+      "height": 52.796875,
+      "top": 397.765625,
+      "right": 357,
+      "bottom": 450.5625,
+      "left": 33
+    },
+    "smallTargets": []
+  },
+  {
+    "width": 390,
+    "scene": "feedback-oscuro",
+    "overflow": false,
+    "motion": [],
+    "primary": [
+      {
+        "text": "Siguiente pregunta",
+        "x": 52,
+        "y": 856.15625,
+        "width": 175.859375,
+        "height": 50.390625
+      }
+    ],
+    "question": {
+      "x": 33,
+      "y": 278.578125,
+      "width": 324,
+      "height": 60,
+      "top": 278.578125,
+      "right": 357,
+      "bottom": 338.578125,
+      "left": 33
+    },
+    "input": {
+      "x": 33,
+      "y": 397.765625,
+      "width": 324,
+      "height": 52.796875,
+      "top": 397.765625,
+      "right": 357,
+      "bottom": 450.5625,
+      "left": 33
+    },
+    "smallTargets": []
+  },
+  {
+    "width": 390,
+    "scene": "nbme",
+    "overflow": false,
+    "motion": [],
+    "primary": [],
+    "smallTargets": []
+  },
+  {
+    "width": 390,
+    "scene": "nbme-feedback-full",
+    "overflow": false,
+    "motion": [],
+    "primary": [
+      {
+        "text": "Continuar",
+        "x": 33,
+        "y": 2015.796875,
+        "width": 324,
+        "height": 50.390625
+      }
+    ],
+    "smallTargets": []
+  },
+  {
+    "width": 390,
+    "scene": "progreso",
+    "overflow": false,
+    "motion": [],
+    "primary": [
+      {
+        "text": "Empezar las cajas",
+        "x": 35,
+        "y": 694.5625,
+        "width": 320,
+        "height": 50.390625
+      }
+    ],
+    "smallTargets": []
+  },
+  {
+    "width": 390,
+    "scene": "menu",
+    "overflow": false,
+    "motion": [],
+    "primary": [
+      {
+        "text": "Empezar las cajas",
+        "x": 35,
+        "y": 694.5625,
+        "width": 320,
+        "height": 50.390625
+      }
+    ],
+    "smallTargets": []
+  },
+  {
+    "width": 390,
+    "scene": "hoy-cerrado",
+    "overflow": false,
+    "motion": [],
+    "primary": [],
+    "smallTargets": []
+  },
+  {
+    "width": 390,
+    "errors": []
+  },
+  {
+    "width": 1280,
+    "scene": "hoy",
+    "overflow": false,
+    "motion": [],
+    "primary": [
+      {
+        "text": "Empezar las cajas",
+        "x": 145,
+        "y": 651.390625,
+        "width": 190,
+        "height": 50.390625
+      }
+    ],
+    "smallTargets": []
+  },
+  {
+    "width": 1280,
+    "scene": "concepto",
+    "overflow": false,
+    "motion": [],
+    "primary": [],
+    "question": {
+      "x": 257,
+      "y": 299.609375,
+      "width": 766,
+      "height": 31.5,
+      "top": 299.609375,
+      "right": 1023,
+      "bottom": 331.109375,
+      "left": 257
+    },
+    "input": {
+      "x": 257,
+      "y": 374.703125,
+      "width": 634.015625,
+      "height": 52.796875,
+      "top": 374.703125,
+      "right": 891.015625,
+      "bottom": 427.5,
+      "left": 257
+    },
+    "smallTargets": []
+  },
+  {
+    "width": 1280,
+    "scene": "feedback",
+    "overflow": false,
+    "motion": [],
+    "primary": [
+      {
+        "text": "Siguiente pregunta",
+        "x": 276,
+        "y": 703.421875,
+        "width": 175.859375,
+        "height": 50.390625
+      }
+    ],
+    "question": {
+      "x": 257,
+      "y": 299.609375,
+      "width": 766,
+      "height": 31.5,
+      "top": 299.609375,
+      "right": 1023,
+      "bottom": 331.109375,
+      "left": 257
+    },
+    "input": {
+      "x": 257,
+      "y": 374.703125,
+      "width": 634.015625,
+      "height": 52.796875,
+      "top": 374.703125,
+      "right": 891.015625,
+      "bottom": 427.5,
+      "left": 257
+    },
+    "smallTargets": []
+  },
+  {
+    "width": 1280,
+    "scene": "feedback-oscuro",
+    "overflow": false,
+    "motion": [],
+    "primary": [
+      {
+        "text": "Siguiente pregunta",
+        "x": 276,
+        "y": 703.421875,
+        "width": 175.859375,
+        "height": 50.390625
+      }
+    ],
+    "question": {
+      "x": 257,
+      "y": 299.609375,
+      "width": 766,
+      "height": 31.5,
+      "top": 299.609375,
+      "right": 1023,
+      "bottom": 331.109375,
+      "left": 257
+    },
+    "input": {
+      "x": 257,
+      "y": 374.703125,
+      "width": 634.015625,
+      "height": 52.796875,
+      "top": 374.703125,
+      "right": 891.015625,
+      "bottom": 427.5,
+      "left": 257
+    },
+    "smallTargets": []
+  },
+  {
+    "width": 1280,
+    "scene": "nbme",
+    "overflow": false,
+    "motion": [],
+    "primary": [],
+    "smallTargets": []
+  },
+  {
+    "width": 1280,
+    "scene": "nbme-feedback-full",
+    "overflow": false,
+    "motion": [],
+    "primary": [
+      {
+        "text": "Continuar",
+        "x": 242,
+        "y": 2203.3125,
+        "width": 112.765625,
+        "height": 50.390625
+      }
+    ],
+    "smallTargets": []
+  },
+  {
+    "width": 1280,
+    "scene": "progreso",
+    "overflow": false,
+    "motion": [],
+    "primary": [
+      {
+        "text": "Empezar las cajas",
+        "x": 145,
+        "y": 651.390625,
+        "width": 190,
+        "height": 50.390625
+      }
+    ],
+    "smallTargets": []
+  },
+  {
+    "width": 1280,
+    "scene": "menu",
+    "overflow": false,
+    "motion": [],
+    "primary": [
+      {
+        "text": "Empezar las cajas",
+        "x": 145,
+        "y": 651.390625,
+        "width": 190,
+        "height": 50.390625
+      }
+    ],
+    "smallTargets": []
+  },
+  {
+    "width": 1280,
+    "scene": "hoy-cerrado",
+    "overflow": false,
+    "motion": [],
+    "primary": [],
+    "smallTargets": []
+  },
+  {
+    "width": 1280,
+    "errors": []
+  }
+]

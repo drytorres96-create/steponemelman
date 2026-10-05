@@ -189,7 +189,7 @@ describe('orquestador de la sesión mixta', () => {
     expect(document.documentElement.hasAttribute(ATRIBUTO_PIEL)).toBe(false)
   })
 
-  it('tras veinte respuestas seguidas sugiere un respiro entre pasos, nunca a mitad de un tramo', async () => {
+  it('los bloques se encadenan sin pausa obligatoria ni ocultar la pregunta siguiente', async () => {
     const ids = Array.from({ length: 21 }, (_, n) => `C${n + 1}`)
     const guion = ids.flatMap((id, n) => (n + 1) % 3 === 0
       ? [{ kind: 'concepto' as const, id }, { kind: 'pregunta' as const, id: 'NBME27-P0009', revision: 'rev-1' }]
@@ -202,11 +202,8 @@ describe('orquestador de la sesión mixta', () => {
       await act(async () => { boton('Terminar tramo').click() })
       if (tramo < 6) await act(async () => { boton('Revisar y continuar').click() })
     }
-    expect(host.textContent).toContain('Llevas 21 seguidos')
-    expect(host.textContent).not.toContain('Reproductor de preguntas')
-    expect(document.activeElement?.textContent).toBe('Seguir')
-    await act(async () => { boton('Seguir').click() })
     expect(host.textContent).toContain('Reproductor de preguntas')
+    expect(host.textContent).not.toContain('Llevas 21 seguidos')
   })
 })
 

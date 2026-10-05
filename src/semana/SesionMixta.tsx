@@ -5,7 +5,8 @@ import { useNbme } from '../nbme/NbmeProvider'
 import { deriveNbmeSession } from '../nbme/model'
 import { NbmePlayer } from '../nbme/NbmePlayer'
 import { usePielEstudio } from '../components/PielEstudio'
-import { PAUSA_CADA, PausaSugerida } from '../components/PausaSugerida'
+import { PausaDeBloque } from '../components/PausaDeBloque'
+import { bloqueDelGuion } from '../lib/bloques'
 import { Reproductor, type Cola } from '../screens/Reproductor'
 import { resumirIntentos } from '../screens/sesion'
 import type { Concepto } from '../schema/concept'
@@ -42,11 +43,6 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
   const [tramoListo, setTramoListo] = useState<string | null>(null)
   const [estadoGuardado, setEstadoGuardado] = useState<EstadoSesion>(sesion.estado)
   const esperandoId = useRef(false)
-  const [pausa, setPausa] = useState(false)
-  // Lo respondido al entrar y las pausas ya ofrecidas en esta visita: la pausa cuenta seguidas, no el total.
-  const hechosAlEntrar = useRef<number | null>(null)
-  const hechosActuales = useRef(0)
-  const pausasOfrecidas = useRef(0)
 
   // Una sesión de recuperación se arma al vuelo y no tiene fila que actualizar:
   // lo estudiado se registra igual en `study_state` y `nbme_state`.
@@ -126,13 +122,6 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
   // la evidencia registrada, en el efecto de abajo, no el hecho de llegar al final.
   const avanzarA = useCallback((siguiente: number) => {
     const destino = Math.min(Math.max(siguiente, 0), sesion.guion.length)
-    // Entre un paso y el siguiente, nunca a mitad de un tramo: veinte seguidas piden un respiro.
-    const seguidas = hechosActuales.current - (hechosAlEntrar.current ?? hechosActuales.current)
-    const debidas = Math.floor(seguidas / PAUSA_CADA)
-    if (debidas > pausasOfrecidas.current && destino < sesion.guion.length) {
-      pausasOfrecidas.current = debidas
-      setPausa(true)
-    }
     setCursor(destino)
     void guardar({ cursor: destino })
   }, [guardar, sesion.guion.length])
@@ -165,11 +154,11 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
   // En un paso de pregunta la sesión NBME tiene que estar activa y sin pausar. Durante el
   // respiro no se retoma: ese tiempo no debe contar como tiempo en la pregunta.
   useEffect(() => {
-    if (paso?.kind !== 'pregunta' || pausa || !nbmeId || nbme.busy || nbme.loading) return
+    if (paso?.kind !== 'pregunta' || !nbmeId || nbme.busy || nbme.loading) return
     const guardada = nbme.state.sessions[nbmeId]
     if (!guardada) return
     if (nbme.state.activeSessionId !== nbmeId || guardada.paused) void nbmeRef.current.resumeSession(nbmeId)
-  }, [paso?.kind, pausa, nbmeId, nbme.busy, nbme.loading, nbme.state])
+  }, [paso?.kind, nbmeId, nbme.busy, nbme.loading, nbme.state])
 
   const vista = nbmeId ? deriveNbmeSession(nbme.state, nbmeId) : null
   const intentosSesion = Object.values(estado.progreso).flatMap(p => p.intentos).filter(t => t.session_id === sesion.id)
@@ -185,10 +174,6 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
     : [], [nbme.state.attempts, nbmeId])
   const cobertura = useMemo(() => coberturaSesion(sesion.guion, conceptosConEvidencia, preguntasRespondidas),
     [sesion.guion, conceptosConEvidencia, preguntasRespondidas])
-  hechosActuales.current = cobertura.hechos
-  useEffect(() => {
-    if (!cargando && hechosAlEntrar.current === null) hechosAlEntrar.current = cobertura.hechos
-  }, [cargando, cobertura.hechos])
 
   // Una sesión se marca completada sola en cuanto la evidencia cubre el guion, y nunca
   // vuelve atrás: lo estudiado no se desestudia porque se abra otra vez la sesión.
@@ -205,16 +190,20 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
     if (estadoDeseado === 'completada') onCompletada?.()
   }, [estadoDeseado, estadoGuardado, cargando, guardar, onCompletada])
 
-  const encabezado = <div className="sesion-mixta-guia">
+  const posicionVisible = tramo ? tramo.inicio + Math.min(reanudableTramo?.indice ?? tramo.desde, tramo.ids.length - 1) : cursor
+  const bloque = bloqueDelGuion(sesion.guion, posicionVisible)
+  const encabezado = <div className="sesion-mixta-guia session-stepper">
     <p className="mini">{sesion.titulo}</p>
+    <p className="session-step-label">Bloque {bloque.numero} de {bloque.total} · Paso {bloque.paso} de {bloque.pasos}</p>
     <p className="sutil">{cobertura.hechos} de {sesion.guion.length} · {conceptIds.length} conceptos y {preguntas.length} preguntas</p>
     <progress className="sesion-mixta-progreso" aria-label="Pasos respondidos de la sesión" value={cobertura.hechos} max={sesion.guion.length} />
+    {cursor > 0 && sesion.guion[cursor - 1]?.kind === 'pregunta' && <PausaDeBloque onParar={onSalir} />}
   </div>
 
   if (error) return <div className="tarjeta pila" role="alert"><h2>No se pudo abrir la sesión</h2><p>{error}</p>
     <button className="btn principal" onClick={onSalir}>{etiquetaSalida}</button></div>
 
-  if (cursor >= sesion.guion.length) return <section className="tarjeta pila" aria-labelledby="sesion-mixta-fin">
+  if (cursor >= sesion.guion.length) return <section className="tarjeta pila hoy-completion" aria-labelledby="sesion-mixta-fin">
     <div><span className={`etq ${cobertura.cumple ? 'verde' : 'ambar'}`}>{cobertura.cumple ? 'Sesión completada' : 'Recorrido terminado'}</span>
       <h2 id="sesion-mixta-fin" style={{ marginTop: 10 }}>{sesion.titulo}</h2></div>
     <p>{conceptIds.length} conceptos y {preguntas.length} preguntas en este recorrido.</p>
@@ -233,10 +222,6 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
   </section>
 
   if (cargando || !paso) return <div className="vacio" role="status">Preparando tu sesión…</div>
-
-  if (pausa) return <div className="pila">{encabezado}
-    <PausaSugerida hechos={cobertura.hechos - (hechosAlEntrar.current ?? 0)} onSeguir={() => setPausa(false)}
-      onParar={onSalir} etiquetaParar="Parar por ahora" /></div>
 
   if (paso.kind === 'concepto') {
     if (!cola) return <div className="tarjeta pila" role="alert"><h2>Este tramo no está disponible</h2>

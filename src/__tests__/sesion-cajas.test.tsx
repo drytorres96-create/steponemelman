@@ -320,21 +320,31 @@ describe('recorrido de las cajas', () => {
     expect(host.textContent).toContain('Cajas hechas')
   })
 
-  it('cada veinte pasos seguidos sugiere un respiro que se salta con «Seguir»', async () => {
+  it('al terminar un bloque ofrece una pausa cerrada sin sustituir el siguiente ejercicio', async () => {
     const onSalir = vi.fn()
     const items = Array.from({ length: 21 }, (_, n) => item('concepto', `C${n + 1}`))
     await act(async () => { root.render(<SesionCajas items={items} titulo="Cajas" onSalir={onSalir} />) })
     await esperar()
     for (let n = 1; n <= 20; n++) await terminarConcepto('correcta')
-    expect(host.textContent).toContain('Llevas 20 seguidos')
-    expect(host.textContent).not.toContain('Reproductor de conceptos')
-    expect(document.activeElement?.textContent).toBe('Seguir')
-    // La cuenta sigue a la vista y no cambia con el respiro.
-    expect(host.textContent).toContain('21 de 21')
-    await act(async () => { boton('Seguir').click() })
-    await esperar()
+    expect(host.textContent).toContain('Bloque terminado · pausa opcional')
+    expect(host.querySelector<HTMLDetailsElement>('.session-block-pause')!.open).toBe(false)
     expect(host.textContent).toContain('Reproductor de conceptos C21')
+    expect(host.textContent).toContain('21 de 21')
     expect(onSalir).not.toHaveBeenCalled()
+    const historial = structuredClone(mock.app.valor.progreso)
+    await act(async () => { boton('Parar por ahora').click() })
+    expect(onSalir).toHaveBeenCalledOnce()
+    expect(mock.app.valor.progreso).toEqual(historial)
+  })
+
+  it('el reintento al final no muestra un paso fuera del bloque original', async () => {
+    await act(async () => { root.render(<SesionCajas items={[item('concepto', 'A'), item('concepto', 'B')]} titulo="Cajas" onSalir={vi.fn()} />) })
+    await esperar()
+    await terminarConcepto('incorrecta')
+    await terminarConcepto('correcta')
+    expect(host.querySelector('.session-step-label')?.textContent).toBe('Corrección · repaso de un fallo')
+    expect(host.textContent).not.toContain('Paso 3 de 2')
+    expect(host.querySelector<HTMLProgressElement>('progress')!.value).toBe(2)
   })
 
   it('la última caja no pide respiro: si no queda nada, se cierra sin pausa', async () => {
