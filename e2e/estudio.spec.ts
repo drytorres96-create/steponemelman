@@ -126,6 +126,62 @@ test('lo nuevo: los tramos de tres conceptos se encadenan sin «Sesión terminad
   expect(errores).toEqual([])
 })
 
+test('lo nuevo: los fallos respetan el techo y llegan al cierre en una sola vuelta', async ({ page }) => {
+  const errores = await abrir(page)
+  await page.getByRole('button', { name: /(Empezar|Seguir con) lo nuevo/ }).click()
+  const pasos = page.getByRole('progressbar', { name: 'Pasos respondidos de la sesión' })
+  await expect(respuesta(page)).toBeVisible()
+  const total = Number(await pasos.getAttribute('max'))
+  for (let hecho = 1; hecho <= total; hecho++) {
+    await responderPaso(page, 'otra cosa')
+    if (hecho < total) await expect(pasos).toHaveAttribute('value', String(hecho))
+    // La primera pregunta NBME llega después de tres conceptos, también si fallan todos.
+    if (hecho === 3) await expect(preguntaNbme(page)).toBeVisible()
+  }
+  await expect(page.getByText('Sesión completada', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Volver a Hoy', exact: true })).toBeVisible()
+  await expect(respuesta(page)).toHaveCount(0)
+  expect(errores).toEqual([])
+})
+
+test('lo nuevo: tras un feedback largo el siguiente enunciado queda visible bajo la cabecera', async ({ page }) => {
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 844 })
+    const errores = await abrir(page)
+    await page.getByRole('button', { name: /(Empezar|Seguir con) lo nuevo/ }).click()
+    // Mantiene el documento alto después de retirar el feedback: el final de la página
+    // no puede limitar el scroll y esconder un enunciado tapado por la barra sticky.
+    await page.evaluate(() => {
+      const cola = document.createElement('div')
+      cola.style.height = '1800px'
+      cola.dataset.testScrollTail = 'true'
+      document.body.append(cola)
+    })
+    await respuesta(page).fill('otra cosa')
+    await respuesta(page).press('Enter')
+    const siguiente = page.getByRole('button', { name: 'Siguiente pregunta', exact: true })
+    await expect(siguiente).toBeFocused()
+    // Sólo alargamos el feedback de esta escena sintética para reproducir una lectura con scroll.
+    await page.locator('.retro').evaluate(el => {
+      const lectura = document.createElement('p')
+      lectura.style.height = '1600px'
+      lectura.textContent = 'Explicación sintética larga para comprobar la siguiente transición.'
+      el.insertBefore(lectura, el.querySelector('button.btn.principal'))
+    })
+    await siguiente.scrollIntoViewIfNeeded()
+    expect(await page.evaluate(() => scrollY)).toBeGreaterThan(500)
+    await siguiente.click()
+    await expect(respuesta(page)).toBeFocused()
+    const posicion = await page.locator('.pregunta').evaluate(el => ({
+      top: el.getBoundingClientRect().top, bottom: el.getBoundingClientRect().bottom,
+      cabecera: document.querySelector('.barra')!.getBoundingClientRect().bottom, alto: innerHeight,
+    }))
+    expect(posicion.top).toBeGreaterThanOrEqual(posicion.cabecera)
+    expect(posicion.bottom).toBeLessThan(posicion.alto)
+    expect(errores).toEqual([])
+  }
+})
+
 test('NBME: la figura se amplía sin revelar la respuesta ni la procedencia antes de comprobar', async ({ page }) => {
   const errores = await abrir(page, 'abierto&figura=1')
   await page.getByRole('button', { name: /(Empezar|Seguir con) las cajas/ }).click()

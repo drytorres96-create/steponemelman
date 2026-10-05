@@ -124,3 +124,12 @@ conservan fuera del repo; los entregables no contienen corpus ni exportaciones.
 
 - Lote 0: AGENTS (<60 líneas), corrección de proyecto Supabase en CLAUDE y esta auditoría.
   Línea base 575/2 y build verde; no hay pantalla modificada.
+- Lote 1 · un final real para los bloques: H01–H04 (coach y neurocognición).
+  Mixta consume una vuelta sin ampliar errores; las apariciones de colas antiguas
+  y su feedback se conservan. Cajas omitidas no acreditan respuesta ni repaso.
+  Confianza/ayudas se fijan al envío; el siguiente enunciado vuelve a la vista.
+  Diez regresiones unitarias nuevas y dos de navegador, incluyendo lector de
+  estado antiguo, cola ampliada, IA pendiente y scroll a 390/1280 px.
+  Puertas finales en Node 22: **585 aprobadas/2 omitidas**, build correcto,
+  **16/16 e2e**. Revisor adversarial corrigió antes de aprobar cantidadInicial
+  ausente y scroll bajo cabecera; ambos casos reproducidos y probados.

@@ -109,6 +109,18 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
     ? tramo.ids.map(id => conceptos.get(id)).filter((c): c is Concepto => Boolean(c))
     : [], [tramo, conceptos])
   const claveTramo = tramo ? `${sesion.id}:${tramo.inicio}` : null
+  // Una cola antigua puede traer correcciones ya añadidas. Conserva sus apariciones,
+  // versión e índice para retomar el mismo intento; unaVuelta impide ampliarla de nuevo.
+  const guardadaTramo = estado.reanudable
+  const idsTramo = conceptosTramo.map(c => c.concept_id)
+  const reanudableTramo = guardadaTramo?.sessionId === sesion.id
+    && guardadaTramo.modulo === `semana:${sesion.id}`
+    && guardadaTramo.conceptIds && idsTramo.length > 0
+    && guardadaTramo.conceptIds.length >= idsTramo.length
+    && idsTramo.every((id, n) => guardadaTramo.conceptIds![n] === id)
+    && guardadaTramo.conceptIds.slice(idsTramo.length).every(id => idsTramo.includes(id))
+      ? guardadaTramo : null
+  const colaTramo = reanudableTramo?.conceptIds?.map(id => conceptos!.get(id)!) ?? conceptosTramo
 
   // El cursor sólo dice por dónde va el recorrido. Si la sesión está hecha lo decide
   // la evidencia registrada, en el efecto de abajo, no el hecho de llegar al final.
@@ -130,8 +142,10 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
   useEffect(() => {
     if (!claveTramo || !tramo || tramoListo === claveTramo || !conceptosTramo.length) return
     const ids = conceptosTramo.map(c => c.concept_id)
-    const guardada = estado.reanudable
-    if (guardada && guardada.sessionId === sesion.id && guardada.conceptIds?.join('|') === ids.join('|')) {
+    if (reanudableTramo) {
+      // Las versiones antiguas podían omitir el tamaño inicial. El guion lo conoce:
+      // las apariciones añadidas deben seguir contando como corrección con ayuda previa.
+      if (reanudableTramo.cantidadInicial === undefined) guardarReanudable({ ...reanudableTramo, cantidadInicial: ids.length })
       setTramoListo(claveTramo)
       return
     }
@@ -141,11 +155,11 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
       titulo: sesion.titulo, subtitulo: sesion.subtitulo ?? 'Sesión de la semana',
       cantidadInicial: ids.length, revisionInicialHecha: false, msVisibles: 0,
     })
-  }, [claveTramo, tramo, tramoListo, conceptosTramo, estado.reanudable, guardarReanudable, sesion])
+  }, [claveTramo, tramo, tramoListo, conceptosTramo, reanudableTramo, guardarReanudable, sesion])
 
   const cola: Cola | null = tramo && conceptosTramo.length ? {
     titulo: sesion.titulo, subtitulo: sesion.subtitulo ?? 'Sesión de la semana',
-    ruta: 'repaso', modulo: `semana:${sesion.id}`, conceptos: conceptosTramo, sessionId: sesion.id,
+    ruta: 'repaso', modulo: `semana:${sesion.id}`, conceptos: colaTramo, sessionId: sesion.id,
   } : null
 
   // En un paso de pregunta la sesión NBME tiene que estar activa y sin pausar. Durante el
@@ -232,8 +246,8 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
     if (tramoListo !== claveTramo) return <div className="vacio" role="status">Preparando el tramo de conceptos…</div>
     return <div className="pila">{encabezado}
       {aviso && <p className="mini">{aviso}</p>}
-      <Reproductor key={claveTramo} cola={cola} indiceInicial={Math.min(tramo!.desde, conceptosTramo.length - 1)}
-        onSalir={onSalir} onTramoCompleto={() => avanzarA(tramo!.inicio + tramo!.ids.length)} />
+      <Reproductor key={claveTramo} cola={cola} indiceInicial={reanudableTramo?.indice ?? Math.min(tramo!.desde, conceptosTramo.length - 1)}
+        unaVuelta onSalir={onSalir} onTramoCompleto={() => avanzarA(tramo!.inicio + tramo!.ids.length)} />
     </div>
   }
 
