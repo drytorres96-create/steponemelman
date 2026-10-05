@@ -235,8 +235,8 @@ export default function App() {
   if (!indice) return <div className="vacio" style={{ paddingTop: 120 }}><p>{errorCarga ?? 'No se pudo cargar el material de estudio.'}</p><button className="btn" onClick={() => location.reload()}>Volver a intentar</button></div>
 
   return (
-    <div className={`app editorial-app${enConcentracion ? ' study-focus' : ''}`} data-app-version={APP_VERSION} data-view={vista}>
-      <CinematicBackdrop scene={SCENES[vista].fondo} quiet={enConcentracion} />
+    <div className={`app editorial-app${enConcentracion ? ' study-focus session-focus' : ''}`} data-app-version={APP_VERSION} data-view={vista}>
+      {!enConcentracion && <CinematicBackdrop scene={SCENES[vista].fondo} />}
       <a className="saltar-contenido" href="#contenido" onClick={e => { e.preventDefault(); contenido.current?.focus() }}>Saltar al contenido</a>
       <header className="barra">
         <div className="contenedor barra-in">

@@ -8,5 +8,6 @@ import '@app/cinema.css'
 import '@app/studio.css'
 import '@app/hoy.css'
 import '@app/piel-estudio.css'
+import '@app/premium.css'
 
 createRoot(document.getElementById('root')!).render(<Resguardo alFallar={error => <FalloGeneral error={error} />}><App /></Resguardo>)

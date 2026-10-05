@@ -12,6 +12,7 @@ import './cinema.css'
 import './studio.css'
 import './hoy.css'
 import './piel-estudio.css'
+import './premium.css'
 
 // El acceso no necesita descargar las pantallas de estudio antes de verificar la cuenta.
 const App = lazy(() => import('./App'))
