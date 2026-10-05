@@ -57,7 +57,7 @@ Las seis piezas de la auditoría del 12-sep están en esta base:
 - NBME sin desbordamiento de página: scrollWidth 390/1280 para viewport 390/1280;
   pruebas existentes añaden 360 y 1428 px para tablas y columnas.
 - Botones NBME medidos: salida 128×44, comprobar móvil 316×50 y ampliar 316×60.
-  El conmutador de piel requiere verificación específica antes de corregirlo.
+  Conmutador de piel base: 41×44 px; lote 2: 44×44 px medidos a 390 px.
 - Texto secundario piel claro 6,88:1 / oscuro 7,53:1; bordes de campos 1,54:1 / 1,49:1.
 - Sync: no hay tasa real antes/después sin login. 104 pruebas focalizadas de motores,
   parser, generaciones, diagnóstico y SRS pasan en la revisión adversarial inicial.
@@ -79,7 +79,7 @@ Riesgo indica estado guardado / semántica del plan; alto se mantiene como propu
 | H08 | Diseño · media | `index.html:5`, ausencia safe-area en CSS | Notch y barra del teléfono pueden recortar controles en horizontal. | Proteger shell y modal con safe-area. | Bajo | Ninguno |
 | H09 | Diseño · media | `NbmePlayer.tsx:29`, `TablaPlanificador.tsx:46`, `Ajustes.tsx:111`, `NbmeLibrary.tsx:127` | Algunas regiones de tabla dependen del navegador para scroll por teclado. | Regiones enfocables y nombradas, sin alterar celdas/texto. | Bajo | Ninguno |
 | H10 | Diseño · alta | `organic.css:271,273`; `capturas/antes/nbme-390.png` | Valores de laboratorio claros sobre fondo claro (1,08:1) casi ilegibles; caption 2,30:1. | Resolver herencia de laboratorio en ambas pieles con tokens existentes; también bordes de campos <3:1. | Bajo | Ninguno |
-| H11 | Diseño · baja | `piel-estudio.css:327–330` | Conmutador móvil posiblemente 41 px, pendiente medida. | Min-width 44 si se confirma; comprobar foco y ambos temas. | Bajo | Ninguno |
+| H11 | Diseño · baja | `piel-estudio.css:327–330` | Conmutador móvil mide 41×44 px; ancho inferior a 44 px. | Min-width 44; comprobar foco y ambos temas. | Bajo | Ninguno |
 | H12 | Diseño + productividad · media | `NbmePlayer.tsx:65,193`, `nbme.css:64` | Todas las figuras se solicitan juntas; una figura alta puede ocultar opciones sin aviso. | Diferir fuera del viewport, vista compacta, salto visible a opciones; zoom táctil comprobable con gráfico sintético grande. | Medio | Ninguno |
 | H13 | Revisor adversarial · alta | `nbme/model.ts:12,110,112`, `model.test.ts:223` | Tras 201 descartes una copia antigua puede resucitar la sesión descartada. | Rediseñar retención con compatibilidad de clientes; no quitar límites a ciegas. | Alto | Alto |
 | H14 | Revisor adversarial · media | `nbme/model.ts:15` | Lápidas de misma fecha empatan de forma distinta según orden de mezcla. | Desempate estable por ID; no soluciona por sí solo H13. | Bajo | Bajo |
@@ -159,3 +159,16 @@ conservan fuera del repo; los entregables no contienen corpus ni exportaciones.
   incluidas diez nuevas; capturas antes/después a 390/1280 px. Puertas
   completas: **600 aprobadas/2 omitidas**, build correcto, **29/29 e2e**.
   Revisión adversarial aprobada. H20 queda editorial.
+
+- Lote 4 · diagnosticar la sincronización y mezclar descartes de forma estable:
+  H14–H15 (revisor adversarial; compatibilidad revisada por neurocognición y
+  productividad). Errores PostgREST planos conservan message/status/code;
+  PGRST000–003 identifican fallo de conexión del servidor sin status del SDK.
+  Se preservan prioridad offline/SyncError y causas primitivas; no se ejecuta
+  toString de objetos. Lápidas de misma fecha desempatan por ID, con el mismo
+  tope y parser. **H13 sigue pendiente:** este desempate no resuelve la retención.
+  Cuatro fixtures de estados actuales/antiguos conservan sesión, continuación,
+  intentos, letras y borrador. 32 pruebas dirigidas aprobadas; capturas del
+  diagnóstico objeto antes/después a 390/1280 px; revisión independiente
+  aprobada. Puertas completas: **608 aprobadas/2 omitidas**, build correcto,
+  **29/29 e2e**. No se ejecuta transporte remoto.

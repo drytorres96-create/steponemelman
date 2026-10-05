@@ -220,6 +220,15 @@ describe('las lápidas impiden que la unión resucite un bloque descartado', () 
     expect(leido!.discarded).toEqual({})
     expect(leido!.sessions.S1).toBeDefined()
   })
+  it('con fechas empatadas conserva las mismas lápidas en ambos sentidos de la mezcla', () => {
+    const a = emptyNbmeState(), b = emptyNbmeState()
+    for (let i = 0; i < 101; i++) a.discarded[`A${i}`] = 1000
+    for (let i = 0; i < 100; i++) b.discarded[`B${i}`] = 1000
+    const ab = mergeNbmeStates(a, b), ba = mergeNbmeStates(b, a)
+    expect(ab).toEqual(ba)
+    expect(Object.keys(ab.discarded)).toHaveLength(MAX_LAPIDAS)
+    expect(parseNbmeState(JSON.parse(JSON.stringify(ab)))).toEqual(ab)
+  })
   it('poda las lápidas para que no crezcan sin límite', () => {
     let s = emptyNbmeState()
     for (let i = 0; i < MAX_LAPIDAS + 30; i++) {

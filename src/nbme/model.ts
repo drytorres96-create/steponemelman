@@ -12,7 +12,8 @@ export const MAX_LAPIDAS = 200
 function podarLapidas(discarded: NbmeDiscarded): NbmeDiscarded {
   const entradas = Object.entries(discarded)
   if (entradas.length <= MAX_LAPIDAS) return discarded
-  return Object.fromEntries(entradas.sort((a, b) => b[1] - a[1]).slice(0, MAX_LAPIDAS))
+  return Object.fromEntries(entradas.sort((a, b) => b[1] - a[1]
+    || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)).slice(0, MAX_LAPIDAS))
 }
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= Number.MAX_SAFE_INTEGER
