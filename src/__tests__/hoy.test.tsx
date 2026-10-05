@@ -119,7 +119,11 @@ const resumenes = () => [...host.querySelectorAll('summary')].map(s => s.textCon
 const abrir = async (titulo: string) => {
   const resumen = [...host.querySelectorAll('summary')].find(s => s.textContent === titulo)!
   await act(async () => { resumen.click() })
-  await act(async () => { await Promise.resolve() })
+  await act(async () => { await vi.dynamicImportSettled() })
+  // Los details nativos notifican su estado con toggle.
+  if (resumen.parentElement instanceof HTMLDetailsElement && resumen.parentElement.open) {
+    await act(async () => { resumen.parentElement!.dispatchEvent(new Event('toggle')) })
+  }
 }
 
 /** Diez conceptos nuevos y cinco preguntas vistos hoy: las dos vías cerradas. */
@@ -255,6 +259,9 @@ describe('portada Hoy', () => {
     await abrir('Cómo va todo')
     expect(host.querySelector('[aria-label="Resumen de esta semana"]')).not.toBeNull()
     expect(host.querySelector('#meta-titulo')?.textContent).toContain('Meta de 60 días')
+    expect(mock.corpus).not.toHaveBeenCalled()
+    expect(mock.adherencia).not.toHaveBeenCalled()
+    await abrir('Mi semana y mi plan')
     expect(host.querySelector('.plan-adherencia')?.textContent).toContain('75 %')
     // El calendario de la semana va aquí dentro, con el día de hoy abierto.
     expect(host.querySelector('.plan-dia-titulo[aria-expanded="true"]')?.textContent).toContain('HOY · jueves')
@@ -379,7 +386,7 @@ describe('portada Hoy', () => {
     await pintar()
     const etiquetados = host.querySelectorAll('.anillo-doble[role="img"]')
     expect(etiquetados).toHaveLength(1)
-    expect(anillo().getAttribute('aria-label')).toBe('Hoy, pasos hechos: 3 de 12. Tema de la semana, conceptos cerrados: 0 de 12.')
+    expect(anillo().getAttribute('aria-label')).toBe('Hoy, pasos hechos: 3 de 12. Tema de la semana, dominio demostrado: 0 de 12.')
     expect(anillo().querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
   })
 
