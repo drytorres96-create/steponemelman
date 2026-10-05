@@ -89,6 +89,7 @@ Riesgo indica estado guardado / semántica del plan; alto se mantiene como propu
 | H18 | Productividad · media | `srs/fsrs.ts:28` | Repasos posteriores al horizonte convergen el 20-dic. | Proponer reparto determinista con tope, ≤20-dic y fixtures antiguos antes de cambiarlo. | Alto | Alto |
 | H19 | Productividad · baja | `screens/Inicio.tsx:27`, `screens/Modulos.tsx:41` | Vistas heredadas aún pagan corpus completo; no afecta Hoy actual. | Índice de metadatos o carga focalizada, sólo con igualdad exacta de selección previa/posterior. | Alto | Bajo si idéntica |
 | H20 | Coach · baja | `nbme/types.ts:24`, `NbmePlayer.tsx:195` | Sin patrón clínico estructurado ni confianza NBME histórica. | Backlog editorial/diseño de registro; nunca inferir patrones médicos por heurística. | Medio | Alto editorial / bajo estado |
+| H21 | Productividad + revisor adversarial · media | CI de los lotes 2–5: unitarias/build terminan, segundo runner de navegador no se asigna; run 37371871821 cancelado sin ejecutar navegador | Impide publicar mejoras verificadas localmente. | Ejecutar los mismos checks en un runner, conservando ambos presupuestos de tiempo y las trazas; adjuntar auditoría sintética sólo en este PR. | Bajo | Ninguno en la aplicación |
 
 Principios de las propuestas docentes:
 
@@ -187,9 +188,19 @@ conservan fuera del repo; los entregables no contienen corpus ni exportaciones.
   Las capturas usan doble de selección/lectura y parser real; no llaman
   Worker ni base. La prueba nueva del proxy comprueba peticiones GET únicamente.
 
+- Lote 6 · completar la verificación y entregar la auditoría: H21
+  (productividad; revisión adversarial). CI conserva npm ci, todas las pruebas
+  unitarias, build, Chromium oficial y todos los e2e, ahora en secuencia sobre
+  un runner con 20 minutos. No se filtra ni omite ninguna prueba ni se amplían
+  permisos. Este PR adjunta un ZIP de auditoría/capturas sintéticas durante
+  siete días; los archivos permanecen en el repositorio. No modifica pantallas,
+  dependencias ni aplicación. Revisión adversarial aprobada. Puertas locales
+  repetidas con Node 22: npm ci correcto, **617 aprobadas/2 omitidas**, build
+  correcto y **29/29 e2e**. CI del HEAD exacto se confirma en el PR.
+
 ## 6. Resultado medido y publicación
 
-| Comprobación | Antes | Después de lotes 0–5 |
+| Comprobación | Antes | Después de lotes 0–6 |
 |---|---:|---:|
 | Pruebas unitarias aprobadas / omitidas previstas | 575 / 2 | 617 / 2 |
 | Pruebas de navegador | 14 / 14 | 29 / 29 |
@@ -211,7 +222,8 @@ feedback explican el aumento del chunk NBME, que se carga al entrar.
 Hoy sigue sin materializar módulos completos, verificado por sus rutas de código.
 No se conoce la tasa de fallos de sincronización real antes/después.
 
-H01–H12 y H14–H16 quedan implementados y probados. H13 y H17–H20 siguen
+H01–H12 y H14–H16 quedan implementados y probados; H21 se verifica mediante CI.
+H13 y H17–H20 siguen
 como propuestas; no se modificaron esquema, corpus/banco, RPC, cuotas ni
 criterios/evaluación. Los parsers públicos leen fixtures reales antiguos y
 actuales de study_state y nbme_state; conservaron historial y continuación.
