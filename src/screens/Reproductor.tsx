@@ -6,11 +6,12 @@ import { Interaccion, EscrituraCorrectiva, usaTextoLibre, type Resultado } from 
 import { calificarConIA } from '../lib/calificacion-ia'
 import { Modal, PanelFuente, EtiquetaEstado } from '../components/comunes'
 import { NOMBRE_ERROR, type Intento, type TipoError } from '../srs/tipos'
-import { resumenDominio } from '../srs/mastery'
+import { calcularEstado, resumenDominio } from '../srs/mastery'
+import { antesTeCostaba } from '../lib/progreso-aprendizaje'
 import { cercaniaDominio } from '../srs/cercania'
 import { crearUUID } from '../store/model'
 import { EVALUADOR_VERSION } from '../lib/normalize'
-import { prepararConcepto } from '../lib/formatos'
+import { prepararConcepto, VERSION_FORMATO_ACTUAL, type VersionFormato } from '../lib/formatos'
 import { AyudaIA } from '../components/AyudaIA'
 import { ExamenIA } from '../components/ExamenIA'
 import { ConfusionIA } from '../components/ConfusionIA'
@@ -59,7 +60,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
   /** Un paso dentro de un recorrido (cajas o lo nuevo): quien orquesta pone la cuenta y decide qué sigue. */
   const enSesion = !!modoCaja || !!onTramoCompleto
   const guardada = cola.sessionId && estado.reanudable?.sessionId === cola.sessionId ? estado.reanudable : null
-  const [versionFormato] = useState<1 | 2>(guardada ? guardada.versionFormato ?? 1 : 2)
+  const [versionFormato] = useState<VersionFormato>(guardada ? guardada.versionFormato ?? 1 : VERSION_FORMATO_ACTUAL)
   const [presupuesto] = useState(guardada?.presupuestoMinutos ?? cola.presupuestoMinutos)
   const [relojSesion] = useState(() => { const r = new RelojActividad(); r.reiniciar(guardada?.msVisibles ?? 0); return r })
   const [msVisibles, setMsVisibles] = useState(guardada?.msVisibles ?? 0)
@@ -511,14 +512,14 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
 
   return <div className="reproductor pila">
     {presupuesto && <Cronometro msVisibles={msVisibles} presupuesto={presupuesto} sinLimite={sinLimite} />}
-    <p className="mini">{historialAnterior.length ? 'Concepto ya practicado aquí' : 'Concepto nuevo aquí'}
+    <p className="mini session-presentation">{historialAnterior.length ? 'Concepto ya practicado aquí' : 'Concepto nuevo aquí'}
       {c.variante_id && <> · {c.interaccion.recomendada === 'caso_clinico' ? 'Aplicación en un caso' : 'Distinguir conceptos'} · {historialAnterior.some(t => t.variante_id === c.variante_id) ? 'Variante ya practicada' : 'Primera presentación de esta variante'}</>}</p>
-    <div className="fila" style={{ justifyContent: 'space-between' }}>
+    <div className="fila session-toolbar" style={{ justifyContent: 'space-between' }}>
       <div className="fila" style={{ gap: 8 }}>
         <span className="etq">{c.clasificacion.disciplina_primaria}</span><span className="etq">{c.clasificacion.sistema_primario}</span>
         {/* En un recorrido sobran el formato y el estado: la caja ya dice por dónde va, y un «Requiere repaso» en rojo sólo presiona. */}
         {!enSesion && <span className="etq violeta">{NOMBRE_INTERACCION[c.interaccion.recomendada]}</span>}
-        {!examenSinAyuda && !enSesion && <EtiquetaEstado estado={p.estado} />}
+        {!examenSinAyuda && !enSesion && <EtiquetaEstado estado={calcularEstado(p, estado.criterios)} />}
       </div>
       <div className="fila" style={{ gap: 8 }}>
         <BotonPiel piel={pielEstudio.piel} alternar={pielEstudio.alternar} />
@@ -545,15 +546,15 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
       <div hidden={fase === 'ensenanza'}>
         {fase === 'tarea' && explicacionPrevia && !examenSinAyuda && c.clasificacion.disciplina_primaria === 'Bioquímica' && <p className="aviso">Con la explicación oculta, di en voz alta: qué cambió → qué proceso afecta → qué consecuencia esperas y por qué. Después completa esta misma pregunta. Esto sustituye releer; cuenta como práctica con ayuda previa.</p>}
         <div className="pregunta" ref={enunciadoRef}>{c.evaluacion.pregunta}</div>
-        {fase === 'tarea' && <details key={`confianza-${preguntaId}`} className="mini" style={{ marginBottom: 14 }}><summary>Registrar confianza (opcional)</summary><div className="fila" style={{ gap: 6, marginTop: 8 }}>
-          {([[1, 'Poca'], [2, 'Media'], [3, 'Mucha']] as const).map(([v, t]) => <button key={v} className={`btn pequeno ${confianza === v ? 'principal' : 'fantasma'}`}
-            aria-pressed={confianza === v} disabled={esperandoIA} onClick={() => { setConfianza(v); guardarPaso({ confianza: v }) }}>{t}</button>)}
-        </div></details>}
         {!examenSinAyuda && pistas > 0 && c.pistas.slice(0, pistas).map((t, k) => <div key={k} className="pista"><b>Pista {k + 1}:</b> {t}</div>)}
         {(!examenSinAyuda || fase === 'tarea') && <Interaccion key={`interaccion-${preguntaId}`} c={c} semilla={preguntaId} ocultarFeedback={examenSinAyuda}
           bloqueado={fase !== 'tarea' || esperandoIA} resultado={res} onResponder={responder} />}
+        {fase === 'tarea' && <details key={`confianza-${preguntaId}`} className="mini session-confidence"><summary>Registrar confianza (opcional)</summary><div className="fila" style={{ gap: 6, marginTop: 8 }}>
+          {([[1, 'Poca'], [2, 'Media'], [3, 'Mucha']] as const).map(([v, t]) => <button key={v} className={`btn pequeno ${confianza === v ? 'principal' : 'fantasma'}`}
+            aria-pressed={confianza === v} disabled={esperandoIA} onClick={() => { setConfianza(v); guardarPaso({ confianza: v }) }}>{t}</button>)}
+        </div></details>}
         {esperandoIA && <p className="mini" role="status" style={{ marginTop: 10 }}>Comprobando tu respuesta con la IA…</p>}
-        {fase === 'tarea' && !examenSinAyuda && <div className="fila" style={{ marginTop: 14 }}>
+        {fase === 'tarea' && !examenSinAyuda && <div className="fila session-help">
           <button className="btn pequeno fantasma" disabled={esperandoIA} onClick={() => { setExplicacionPrevia(true); setFase('ensenanza'); guardarPaso({ explicacionPrevia: true, ensenanzaAbierta: true }) }}>Necesito aprenderlo</button>
           <button className="btn pequeno fantasma" disabled={esperandoIA || pistas >= c.pistas.length} onClick={() => { setPistas(pistas + 1); guardarPaso({ pistas: pistas + 1 }) }}>
             {pistas === 0 ? 'Necesito una pista' : pistas < c.pistas.length ? `Otra pista (${pistas}/${c.pistas.length})` : 'Sin más pistas'}</button>
@@ -567,6 +568,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
       {fase === 'retro' && res && !examenSinAyuda && <div className={`retro ${res.veredicto === 'correcta' ? 'ok' : res.veredicto === 'incorrecta' ? 'no' : 'parcial'}`} role="status">
         <div className="fila" style={{ justifyContent: 'space-between', marginBottom: 8 }}><b>{etiquetaResultado(res.veredicto)}</b></div>
         <p className="mini">Tu respuesta ya está registrada.{intentoActual.current && conAyuda(intentoActual.current) ? ' Esta práctica tuvo ayuda.' : ''}</p>
+        {intentoActual.current && antesTeCostaba(p, intentoActual.current) && <p className="learning-recovered">Esto antes te costaba: hoy lo resolviste sin ayuda, después de un fallo de otro día.</p>}
         {avisoIA && <p className="mini">La IA no pudo corregir esta respuesta: {avisoIA} Decidió el corrector propio.</p>}
         {intentoActual.current?.calificado_por_ia && <div className="veredicto-ia">
           <p className="mini">{intentoActual.current.correccion_manual
@@ -583,12 +585,12 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
         {necesitaReintento(res.veredicto) && <p>{modoCaja ? modoCaja.avisoFallo : unaVuelta
           ? 'Este fallo queda guardado; volverá en las cajas de los próximos días.'
           : 'Este concepto volverá al final de la cola hasta que lo aciertes.'}</p>}
-        {(res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que) && <p className="sutil">{res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que}</p>}
+        {(res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que) && <p className="session-feedback-key">{res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que}</p>}
         {/* Solo con respuesta escrita: en un formato de opciones ya se sabe qué se eligió. */}
         {res.veredicto !== 'correcta' && res.veredicto !== 'revision' && usaTextoLibre(c) && res.respuestaDada.trim()
           && <ConfusionIA conceptId={c.concept_id} respuesta={res.respuestaDada} />}
+        {c.patron && <p className="patron session-feedback-key"><b>Si ves esto → piensa:</b> {c.patron}</p>}
         <p>{c.explicacion}</p>
-        {c.patron && <p className="patron"><b>Si ves esto → piensa:</b> {c.patron}</p>}
         {c.confusiones.length > 0 && <p className="mini">No lo confundas con: {c.confusiones.join(' · ')}</p>}
         {c.revision_editorial && <p className="aviso">{c.revision_editorial.nota}</p>}
         {/* Una sola decisión tras responder: seguir o, si el corrector no supo, decir tú si la sabías. */}

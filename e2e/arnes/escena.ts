@@ -56,6 +56,10 @@ if (escena === 'muchas') {
   // Veinticinco conceptos vistos hace dos días con un acierto: caja 2, vencidos hoy.
   for (let i = 0; i < 25; i++) progreso[`K${i}`] = reconstruirProgreso(`K${i}`, [intento(haceDias(2, 9))], CRITERIOS_POR_DEFECTO)
 }
+if (escena === 'mantenimiento') {
+  // Acreditado hace meses: sigue demostrado, pero su fecha FSRS ya venció.
+  progreso.C12 = reconstruirProgreso('C12', [intento(haceDias(100)), intento(haceDias(98)), intento(haceDias(96))], CRITERIOS_POR_DEFECTO)
+}
 export const conceptosMuchas = escena === 'muchas' ? Array.from({ length: 25 }, (_, i) => `K${i}`) : []
 export const conceptos = [...semana, 'X1', 'X2', 'X3', ...conceptosMeta, ...conceptosMuchas]
 const preguntas = ids('Q', 5)

@@ -99,7 +99,7 @@ describe('respuestas breves y formatos interactivos', () => {
     expect(boton('Comprobar flechas').disabled).toBe(true)
     await pulsar(host.querySelector<HTMLButtonElement>('[aria-label="Variable beta aumenta"]')!)
     await pulsar(boton('Comprobar flechas'))
-    expect(resultado.mock.calls[0][0]).toMatchObject({ veredicto: 'parcial', respuestaDada: 'Variable alfa: ↑, Variable beta: ↑' })
+    expect(resultado.mock.calls[0][0]).toMatchObject({ veredicto: 'parcial', recuperacionActiva: false, respuestaDada: 'Variable alfa: ↑, Variable beta: ↑' })
   })
 
   it('ordenar registra el orden elegido y un nuevo intento empieza con la secuencia vacía', async () => {
@@ -107,7 +107,7 @@ describe('respuestas breves y formatos interactivos', () => {
     await render(c)
     for (const texto of ['Primero', 'Después', 'Finalmente']) await pulsar(boton(texto))
     await pulsar(boton('Comprobar orden'))
-    expect(resultado.mock.calls[0][0]).toMatchObject({ veredicto: 'correcta', respuestaDada: 'Primero → Después → Finalmente' })
+    expect(resultado.mock.calls[0][0]).toMatchObject({ veredicto: 'correcta', recuperacionActiva: false, respuestaDada: 'Primero → Después → Finalmente' })
     await render(c, { semilla: 'QA-sesion:1' })
     expect(host.querySelectorAll('ol li')).toHaveLength(0)
     expect(boton('Comprobar orden').disabled).toBe(true)
@@ -126,7 +126,7 @@ describe('respuestas breves y formatos interactivos', () => {
     await pulsar(boton('Elemento beta'))
     await pulsar(derechas[0])
     await pulsar(boton('Comprobar parejas'))
-    expect(resultado.mock.calls[0][0]).toMatchObject({ veredicto: 'correcta', recuperacionActiva: true })
+    expect(resultado.mock.calls[0][0]).toMatchObject({ veredicto: 'correcta', recuperacionActiva: false })
   })
 
   it('clasificar conserva cada asignación y evalúa todos los elementos', async () => {
@@ -139,6 +139,6 @@ describe('respuestas breves y formatos interactivos', () => {
     expect(boton('Comprobar clasificación').disabled).toBe(true)
     await pulsar(boton('Elemento beta')); await pulsar(grupos[1])
     await pulsar(boton('Comprobar clasificación'))
-    expect(resultado.mock.calls[0][0]).toMatchObject({ veredicto: 'correcta', respuestaDada: 'Elemento alfa: Grupo uno; Elemento beta: Grupo dos' })
+    expect(resultado.mock.calls[0][0]).toMatchObject({ veredicto: 'correcta', recuperacionActiva: false, respuestaDada: 'Elemento alfa: Grupo uno; Elemento beta: Grupo dos' })
   })
 })

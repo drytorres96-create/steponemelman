@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { nuevoProgreso, programar, DIA } from '../srs/fsrs'
-import { CRITERIOS_POR_DEFECTO, CRITERIOS_HEREDADOS, CRITERIOS_96H, sonCriteriosHeredados, evaluarDominio, calcularEstado, dominioVigente, evidenciaIndependiente, etapa, resumenDominio } from '../srs/mastery'
+import { CRITERIOS_POR_DEFECTO, CRITERIOS_HEREDADOS, CRITERIOS_96H, sonCriteriosHeredados, evaluarDominio, calcularEstado, dominioVigente, evidenciaActiva, evidenciaIndependiente, etapa, resumenDominio, tipoEvidenciaDeIntento } from '../srs/mastery'
 import type { Intento } from '../srs/tipos'
 
 const it3 = (ts: number, extra: Partial<Intento> = {}): Intento => ({
@@ -25,30 +25,31 @@ describe('criterios de dominio', () => {
     expect(ev.cumple).toBe(true)
     expect(ev.detalle.every(d => d.cumplido)).toBe(true)
   })
-  it('el reconocimiento puro exige más evidencia que el recuerdo libre, medida como azar', () => {
+  it('el reconocimiento puro necesita recuperación o aplicación aunque acumule más aciertos', () => {
     const t = Date.now()
     const mcq = { recuperacion_activa: false, interaccion: 'opcion_multiple' }
     let p = nuevoProgreso('X')
     for (const d of [0, 2, 5]) p = programar(p, it3(t + d * DIA, mcq), t + d * DIA)
-    // Tres aciertos de opción múltiple salen por azar 1 de cada 64 veces: 1,6 %, todavía por
-    // encima del 1 % exigido. El umbral ya no es un recargo al conteo, es la probabilidad.
     const tres = evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA)
     expect(tres.requeridas).toBe(3)
     expect(tres.cumple).toBe(false)
-    expect(tres.detalle.find(d => d.clave === 'azar')).toMatchObject({ cumplido: false, valor: '1.6 %' })
+    expect(tres.detalle.find(d => d.clave === 'recuperacion')).toMatchObject({ cumplido: false, valor: 'pendiente' })
 
     p = programar(p, it3(t + 7 * DIA, mcq), t + 7 * DIA)
     const cuatro = evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 7 * DIA)
-    expect(cuatro.cumple).toBe(true)
-    expect(cuatro.detalle.find(d => d.clave === 'azar')).toMatchObject({ cumplido: true, valor: '0.39 %' })
+    expect(cuatro.cumple).toBe(false)
+    expect(cuatro.detalle.find(d => d.clave === 'recuperacion')).toMatchObject({ cumplido: false, valor: 'pendiente' })
+
+    p = programar(p, it3(t + 9 * DIA), t + 9 * DIA)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 9 * DIA).cumple).toBe(true)
   })
 
-  it('dos recuerdos libres bastan: 0,05 × 0,05 ya es suficientemente improbable', () => {
+  it('respeta un criterio personalizado de dos recuerdos sin alternativas', () => {
     const t = Date.now()
     let p = nuevoProgreso('LIBRE')
     for (const d of [0, 3]) p = programar(p, it3(t + d * DIA), t + d * DIA)
     const ev = evaluarDominio(p, { ...CRITERIOS_POR_DEFECTO, recuperaciones: 2 }, t + 3 * DIA)
-    expect(ev.detalle.find(d => d.clave === 'azar')).toMatchObject({ cumplido: true, valor: '0.25 %' })
+    expect(ev.detalle.find(d => d.clave === 'recuperacion')).toMatchObject({ cumplido: true, valor: 'sí' })
     expect(ev.cumple).toBe(true)
   })
 
@@ -66,7 +67,18 @@ describe('criterios de dominio', () => {
     expect(vencido.cumple).toBe(true)
     expect(calcularEstado(p, CRITERIOS_POR_DEFECTO, p.proxima! + 30 * DIA)).toBe('requiere_repaso')
   })
-  it('un solo recuerdo libre devuelve el umbral normal de tres aciertos', () => {
+  it('sin agenda conocida conserva la evidencia demostrada pero no declara dominio al día', () => {
+    const t = Date.now()
+    let p = nuevoProgreso('SIN-FECHA')
+    for (const d of [0, 2, 5]) p = programar(p, it3(t + d * DIA), t + d * DIA)
+    p = { ...p, proxima: null, dominado_en: t + 5 * DIA }
+    const antes = structuredClone(p)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA).cumple).toBe(true)
+    expect(dominioVigente(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA)).toBe(false)
+    expect(etapa(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA)).not.toBe('dominio')
+    expect(p).toEqual(antes)
+  })
+  it('dos discriminaciones y un recuerdo libre acreditan los tres aciertos requeridos', () => {
     const t = Date.now()
     let p = nuevoProgreso('MIXTO')
     p = programar(p, it3(t, { recuperacion_activa: false, interaccion: 'opcion_multiple' }), t)
@@ -84,6 +96,67 @@ describe('criterios de dominio', () => {
     }), t + d * DIA)
     expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA).requeridas).toBe(3)
     expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA).cumple).toBe(true)
+  })
+  it.each(['prediccion_direccional', 'secuencia', 'relacionar', 'clasificar', 'opcion_multiple', 'verdadero_falso'])(
+    '%s conserva la discriminación histórica aunque el flag diga recuperación', interaccion => {
+      const t = Date.now()
+      let p = nuevoProgreso('ALTERNATIVAS')
+      for (const d of [0, 2, 5, 7]) p = programar(p, it3(t + d * DIA, {
+        interaccion, recuperacion_activa: true, tipo_evidencia: 'recuerdo', evaluador_version: '2.2.0',
+      }), t + d * DIA)
+      const antes = structuredClone(p.intentos)
+      expect(tipoEvidenciaDeIntento(p.intentos[0])).toBe('discriminacion')
+      expect(evidenciaActiva(p.intentos[0])).toBe(false)
+      const ev = evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 7 * DIA)
+      expect(ev.detalle.find(d => d.clave === 'aciertos')!.cumplido).toBe(true)
+      expect(ev.detalle.find(d => d.clave === 'recuperacion')!.cumplido).toBe(false)
+      expect(ev.cumple).toBe(false)
+      expect(p.intentos).toEqual(antes)
+    })
+  it('un formato desconocido, un caso sin aplicación y flags contradictorios no prueban recuperación', () => {
+    for (const extra of [
+      { interaccion: 'formato-antiguo', tipo_evidencia: 'recuerdo' as const },
+      { interaccion: 'caso_clinico', tipo_evidencia: undefined },
+      { interaccion: 'recuperacion_libre', tipo_evidencia: 'discriminacion' as const },
+      { interaccion: 'recuperacion_libre', recuperacion_activa: false, tipo_evidencia: 'recuerdo' as const },
+      { interaccion: 'clasificar', tipo_evidencia: 'aplicacion' as const },
+    ]) expect(tipoEvidenciaDeIntento(it3(1000, extra))).toBe('discriminacion')
+    expect(tipoEvidenciaDeIntento(it3(1000))).toBe('recuerdo')
+  })
+  it.each([
+    { pistas_usadas: 1 }, { fuente_consultada: true }, { explicacion_previa: true },
+    { fuente_consultada: undefined }, { explicacion_previa: undefined },
+    { resultado: 'parcial' as const }, { resultado: 'revision' as const }, { resultado: undefined },
+  ])('la recuperación con ayuda o sin resultado comprobado no acredita la puerta: %j', ayuda => {
+    const t = Date.now()
+    const intentos = [0, 2, 5].map(d => it3(t + d * DIA, { interaccion: 'opcion_multiple', recuperacion_activa: false }))
+    intentos.push(it3(t + 6 * DIA, ayuda))
+    const p = { ...nuevoProgreso('GUIADA'), intentos }
+    const ev = evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 6 * DIA)
+    expect(ev.detalle.find(d => d.clave === 'recuperacion')!.cumplido).toBe(false)
+    expect(ev.cumple).toBe(false)
+  })
+  it('si un fallo descuenta el único recuerdo, los aciertos entre opciones no lo sustituyen', () => {
+    const t = Date.now()
+    const opcion = { interaccion: 'opcion_multiple', recuperacion_activa: false }
+    const intentos = [0, 2, 4].map(d => it3(t + d * DIA, opcion))
+    intentos.push(it3(t + 5 * DIA), it3(t + 6 * DIA, { resultado: 'incorrecta' }), it3(t + 8 * DIA, opcion))
+    const ev = evaluarDominio({ ...nuevoProgreso('VIGENTE'), intentos }, CRITERIOS_POR_DEFECTO, t + 8 * DIA)
+    expect(ev.detalle.find(d => d.clave === 'aciertos')!.valor).toBe('3')
+    expect(ev.detalle.find(d => d.clave === 'recuperacion')!.cumplido).toBe(false)
+    expect(ev.cumple).toBe(false)
+  })
+  it('los límites de 48 horas y siete días de confusión conservan sus fronteras', () => {
+    const t = Date.now()
+    const fallo = it3(t, { resultado: 'incorrecta', tipo_error: 'confusion_conceptos' })
+    const intentos = [fallo, it3(t + DIA), it3(t + 2 * DIA), it3(t + 3 * DIA)]
+    const p = { ...nuevoProgreso('FRONTERA'), intentos }
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 7 * DIA - 1).cumple).toBe(false)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 7 * DIA).cumple).toBe(true)
+    const separacion = { ...p, intentos: [it3(t), it3(t + DIA), it3(t + 2 * DIA - 1)] }
+    expect(evaluarDominio(separacion, CRITERIOS_POR_DEFECTO, t + 2 * DIA).detalle.find(d => d.clave === 'separacion')!.cumplido).toBe(false)
+    separacion.intentos[2] = it3(t + 2 * DIA)
+    expect(evaluarDominio(separacion, CRITERIOS_POR_DEFECTO, t + 2 * DIA).cumple).toBe(true)
   })
   it('acertar siempre con pistas impide el dominio', () => {
     const t = Date.now()
@@ -108,11 +181,12 @@ describe('criterios de dominio', () => {
   })
   it('los criterios son configurables', () => {
     const t = Date.now()
-    const p = programar(nuevoProgreso('X'), it3(t), t)
-    // Laxos de verdad: sin la exigencia contra el azar, un solo acierto acredita.
+    const p = programar(nuevoProgreso('X'), it3(t, { interaccion: 'opcion_multiple', recuperacion_activa: false }), t)
+    // Desactivar la exigencia de recuperación permite acreditar sólo discriminación.
     const laxos = { ...CRITERIOS_POR_DEFECTO, exigirRecuperacionActiva: false,
       recuperaciones: 1, sesiones: 1, separacionHoras: 0 }
     expect(evaluarDominio(p, laxos, t).cumple).toBe(true)
+    expect(evaluarDominio(p, laxos, t).detalle.some(d => d.clave === 'recuperacion')).toBe(false)
   })
   it('las etapas visibles progresan', () => {
     const t = Date.now()
@@ -203,8 +277,7 @@ describe('criterios de dominio', () => {
     expect(p.aciertos).toBe(3)
     expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 180_000).cumple).toBe(false)
     const resumen = resumenDominio(p, CRITERIOS_POR_DEFECTO, t + 180_000)
-    // El resumen lleva siempre las dos señales continuas, incluso a cero.
-    expect(resumen.texto).toBe('Dominio: 0/3 aciertos independientes · 0/2 sesiones · recuerdo hoy 100 % · azar sin evidencia')
+    expect(resumen.texto).toBe('Dominio: 0/3 aciertos independientes · 0/2 sesiones · retención estimada hoy 100 %')
     expect(resumen.pendientes).toContain('separadas ≥ 48 h')
   })
   it('términos breves y selección múltiple pueden acreditar dominio con evidencia independiente', () => {
@@ -216,7 +289,7 @@ describe('criterios de dominio', () => {
         recuperacion_activa: interaccion !== 'opcion_multiple' }), ts)
     }
     expect(resumenDominio(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA)).toEqual({
-      texto: 'Dominio acreditado · recuerdo hoy 100 % · azar 0.06 %', pendientes: [] })
+      texto: 'Dominio acreditado · retención estimada hoy 100 %', pendientes: [] })
     expect(resumenDominio(p, CRITERIOS_POR_DEFECTO, p.proxima! + 1).texto).toContain('repaso pendiente')
   })
 })

@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { notificarUsoIA } from './cuota-ia'
 import type { CoachVeredicto } from '../server/worker'
+import type { VersionFormato } from './formatos'
 
 /** Lo que devuelve el intento de corrección: un veredicto, o por qué no lo hubo. */
 export type ResultadoCalificacion =
@@ -14,7 +15,7 @@ export interface PeticionCalificacion {
   answer: string
   questionId: string
   version: string
-  formatVersion: 1 | 2
+  formatVersion: VersionFormato
   variantId?: string
   index: number
   route: string

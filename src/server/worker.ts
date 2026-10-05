@@ -936,7 +936,7 @@ export default {
       if (typeof input.conceptId !== 'string' || input.conceptId.length > 200 || typeof input.answer !== 'string' || input.answer.length > 500
         || typeof input.questionId !== 'string' || input.questionId.length > 512 || typeof input.version !== 'string'
         || !Number.isInteger(input.index) || input.index < 0 || input.index > 100000
-        || (input.formatVersion !== undefined && ![1, 2].includes(input.formatVersion))
+        || (input.formatVersion !== undefined && ![1, 2, 3].includes(input.formatVersion))
         || !['guiada', 'sistemas', 'disciplinas', 'repaso', 'debiles', 'confusiones', 'direccional', 'terminos', 'examen', 'mixta', 'aplicacion'].includes(input.route)
         || typeof input.retry !== 'boolean' || (input.variantId !== undefined && (typeof input.variantId !== 'string' || input.variantId.length > 200))) return json({ error: 'Solicitud no válida.' }, 400)
       const quien = await identificar(request)

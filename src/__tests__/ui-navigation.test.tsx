@@ -62,12 +62,12 @@ afterEach(async () => {
 const boton = (texto: string) => [...host.querySelectorAll('button')].find(b => b.textContent?.includes(texto))!
 const pintar = async () => {
   await act(async () => { root.render(<App />) })
-  await act(async () => { await Promise.resolve() })
+  await act(async () => { await vi.dynamicImportSettled() })
 }
 const abrirDesplegable = async (titulo: string) => {
   const resumen = [...host.querySelectorAll('summary')].find(s => s.textContent === titulo)!
   await act(async () => { resumen.click() })
-  await act(async () => { await Promise.resolve() })
+  await act(async () => { await vi.dynamicImportSettled() })
 }
 
 describe('continuidad y navegación accesible', () => {
@@ -81,18 +81,27 @@ describe('continuidad y navegación accesible', () => {
     // Mi semana, Recuperación y Progreso viven ya dentro de Hoy: el menú discreto guarda
     // lo demás, y estudiar más es ir a «Elegir contenido» a propósito.
     const menu = [...host.querySelectorAll('.menu-cuenta-opciones button')].map(b => b.textContent)
-    expect(menu).toEqual(['Elegir contenido', 'Ajustes y respaldo', 'Calidad del material', 'Plan diario clásico', 'Salir'])
-    await act(async () => { boton('Elegir contenido').click() })
+    expect(menu).toEqual(['Biblioteca', 'Progreso', 'Ajustes y respaldo', 'Calidad del material', 'Plan diario clásico', 'Salir'])
+    await act(async () => { boton('Biblioteca').click() })
     expect(window.location.hash).toBe('#modulos')
-    expect(host.textContent).toContain('Mi espacio / Elegir contenido')
+    expect(host.textContent).toContain('Mi espacio / Biblioteca')
   })
 
-  it.each(['#semana', '#recuperacion', '#progreso', '#repaso'])('el enlace guardado %s aterriza en Hoy', async hash => {
+  it.each(['#semana', '#recuperacion', '#repaso'])('el enlace guardado %s aterriza en Hoy', async hash => {
     window.history.replaceState(null, '', `/${hash}`)
     await pintar()
     expect(host.textContent).toContain('Mi espacio / Hoy')
     expect(host.querySelector('.anillo-doble')).not.toBeNull()
     expect([...host.querySelectorAll('summary')].map(s => s.textContent)).toContain('Cómo va todo')
+  })
+
+  it('el enlace #progreso abre sus indicadores con navegación secundaria', async () => {
+    window.history.replaceState(null, '', '/#progreso')
+    await pintar()
+    expect(host.textContent).toContain('Mi espacio / Progreso')
+    expect(host.querySelector('.premium-progress')).not.toBeNull()
+    expect(mock.cargarTodo).not.toHaveBeenCalled()
+    expect([...host.querySelectorAll('nav button')].map(b => b.textContent)).toEqual(['Hoy'])
   })
 
   it('recargar #estudio aterriza en Hoy y el plan clásico permite recuperar el resumen pendiente', async () => {
@@ -153,21 +162,20 @@ describe('continuidad y navegación accesible', () => {
   })
 
   it('las cifras de Progreso siguen dentro de Hoy, plegadas en «Cómo va todo»', async () => {
-    window.history.replaceState(null, '', '/#progreso')
+    window.history.replaceState(null, '', '/#hoy')
     await pintar()
     // Plegado no se pinta ni se carga: el corpus entero sólo se pide al abrirlo.
     expect(host.querySelector('[aria-label="Resumen de esta semana"]')).toBeNull()
     expect(mock.cargarTodo).not.toHaveBeenCalled()
     await abrirDesplegable('Cómo va todo')
     expect(host.querySelector('[aria-label="Resumen de esta semana"]')).not.toBeNull()
-    expect(host.querySelectorAll('.progress-ring-layer')).toHaveLength(3)
+    expect(host.textContent).toContain('Dominio demostrado')
     expect(host.textContent).toContain('Meta de 60 días')
   })
 
   it('ya no quedan las secciones retiradas del progreso', async () => {
     window.history.replaceState(null, '', '/#progreso')
     await pintar()
-    await abrirDesplegable('Cómo va todo')
     expect(host.textContent).not.toContain('Respuestas por revisar')
     expect(host.textContent).not.toContain('¿Puedes aplicarlo en una pregunta nueva?')
     expect(host.querySelector('[aria-labelledby="revision-titulo"]')).toBeNull()

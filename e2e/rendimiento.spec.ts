@@ -12,7 +12,7 @@ test('un fallo al descargar una pantalla conserva la navegación y permite volve
   await expect(page.locator('.anillo-doble')).toBeVisible()
 })
 
-test('navegar no acumula fondos animados invisibles y estudiar pausa el paisaje', async ({ page }) => {
+test('navegar no acumula fondos animados invisibles y estudiar retira el paisaje', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-09-28T07:30:00-04:00') })
   await page.goto('/?escena=abierto')
   await expect(page.locator('.anillo-doble')).toBeVisible()
@@ -26,11 +26,7 @@ test('navegar no acumula fondos animados invisibles y estudiar pausa el paisaje'
   await expect(oculta).toHaveCSS('visibility', 'hidden')
   await expect(oculta.locator('img')).toHaveCSS('animation-play-state', 'paused')
   await page.getByRole('button', { name: /(Empezar|Seguir con) las cajas/ }).click()
-  await expect(page.locator('.cinematic-backdrop')).toHaveAttribute('data-paused', 'true')
-  await expect.poll(() => page.locator('.cinematic-backdrop').evaluate(el =>
-    el.getAnimations({ subtree: true }).filter(a => a.playState === 'running' && a.effect instanceof KeyframeEffect
-      && a.effect.getTiming().iterations === Infinity).length,
-  )).toBe(0)
+  await expect(page.locator('.cinematic-backdrop')).toHaveCount(0)
 })
 
 test('IndexedDB reutiliza una conexión para lecturas y escrituras concurrentes', async ({ page }) => {

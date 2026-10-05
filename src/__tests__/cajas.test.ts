@@ -6,6 +6,7 @@ import {
 import { estadoDelDia, TECHOS } from '../lib/dia'
 import type { NbmeAttempt } from '../nbme/types'
 import { CRITERIOS_POR_DEFECTO } from '../srs/mastery'
+import { EXAMEN_MS } from '../srs/fsrs'
 import type { Intento, ProgresoConcepto } from '../srs/tipos'
 import { reconstruirProgreso } from '../store/model'
 
@@ -61,16 +62,25 @@ describe('escalera de cajas', () => {
     expect(caja(intentos)).toBe(1)
   })
 
-  it('un concepto que cumple dominio sale de la escalera y no vuelve a aparecer', () => {
+  it('un concepto que cumple dominio vuelve para mantenimiento en su fecha FSRS', () => {
     const intentos = [acierto(F(14, 9), 's1'), acierto(F(16, 10), 's2'), acierto(F(19, 11), 's3')]
     const p = progreso('dominado', intentos)
     expect(cajaDeConcepto(p, CRITERIOS_POR_DEFECTO, AHORA)).toBe('cerrado')
-    // Ni hoy, ni cuando el planificador ya lo da por vencido semanas después: vuelve al FSRS normal.
+    // Sale de la adquisición. El techo de 72 h ya pasó, pero no adelanta la fecha FSRS.
     expect(p.proxima!).toBeLessThan(AHORA + 60 * DIA)
-    for (const ahora of [AHORA, AHORA + 3 * DIA, AHORA + 60 * DIA]) {
+    expect(p.proxima!).toBeGreaterThan(AHORA + 3 * DIA)
+    for (const ahora of [AHORA, AHORA + 3 * DIA]) {
       const hoy = cajasDelDia(entrada({ progreso: { dominado: p }, referencia: ahora, ahora }))
       expect(hoy.items).toEqual([])
     }
+    // Si vence un viernes, el descanso sigue intacto y aparece al día siguiente.
+    const fecha = new Date(p.proxima!)
+    if (fecha.getDay() === 5) fecha.setDate(fecha.getDate() + 1)
+    const vencido = fecha.getTime()
+    const hoy = cajasDelDia(entrada({ progreso: { dominado: p }, referencia: vencido, ahora: vencido }))
+    expect(cajaDeConcepto(p, CRITERIOS_POR_DEFECTO, vencido)).toBe('cerrado')
+    expect(hoy.items).toEqual([{ tipo: 'concepto', id: 'dominado', caja: 3, vence: p.proxima, mantenimiento: true, hecho: false }])
+    expect(hoy).toMatchObject({ hechos: 0, techo: 1, cerrada: false })
   })
 
   it('vence a lo que diga el planificador pero nunca más tarde que el techo de su caja', () => {
@@ -199,6 +209,70 @@ describe('escalera de cajas', () => {
 })
 
 describe('las cajas de hoy', () => {
+  it('el mantenimiento usa la ventana de seis horas y no inventa una fecha si falta proxima', () => {
+    const historial = [acierto(F(14, 9), 's1'), acierto(F(16, 10), 's2'), acierto(F(19, 11), 's3')]
+    const cerrado = progreso('C', historial)
+    const p = { ...cerrado, proxima: AHORA + 6 * HORA }
+    expect(cajasDelDia(entrada({ progreso: { C: p } })).items).toEqual([])
+    expect(cajasDelDia(entrada({ progreso: { C: { ...p, proxima: p.proxima - 1 } } })).items[0])
+      .toMatchObject({ mantenimiento: true, vence: AHORA + 6 * HORA - 1 })
+    expect(cajasDelDia(entrada({ progreso: { C: { ...p, proxima: null } } })).items).toEqual([])
+    expect(cajasDelDia(entrada({ progreso: { C: { ...p, proxima: AHORA - DIA } } })).items[0].vence).toBe(AHORA - DIA)
+  })
+
+  it('el mantenimiento comparte el techo diario, el orden de vencimiento y el viernes vacío', () => {
+    const historial = [acierto(F(14, 9), 's1'), acierto(F(16, 10), 's2'), acierto(F(19, 11), 's3')]
+    const mantenimiento = Object.fromEntries(Array.from({ length: 80 }, (_, n) => {
+      const id = `M${String(n).padStart(2, '0')}`
+      return [id, { ...progreso(id, historial), proxima: F(23, 8) + n * 1000 }]
+    }))
+    const progresoMixto = { ...mantenimiento, A: progreso('A', [fallo(F(21, 9), 's')]) }
+    const jueves = cajasDelDia(entrada({ progreso: progresoMixto }))
+    expect(jueves.items).toHaveLength(40)
+    expect(jueves.items[0].id).toBe('A')
+    expect(jueves.items[0].mantenimiento).toBeUndefined()
+    expect(jueves.items.slice(1).every(i => i.mantenimiento === true)).toBe(true)
+    expect(jueves.items.slice(1).map(i => i.id)).toEqual(Object.keys(mantenimiento).slice(0, 39))
+    const viernes = cajasDelDia(entrada({ progreso: progresoMixto, referencia: F(25, 10), ahora: F(25, 10) }))
+    expect(viernes).toEqual({ items: [], hechos: 0, techo: 0, cerrada: true })
+    const sabado = cajasDelDia(entrada({ progreso: progresoMixto, referencia: F(26, 10), ahora: F(26, 10) }))
+    expect(sabado.items).toHaveLength(70)
+    expect(sabado.items.map(i => i.id)).toEqual(['A', ...Object.keys(mantenimiento).slice(0, 69)])
+  })
+
+  it('el día de mantenimiento fijado conserva su fecha y marca hechos tras un fallo o revisión', () => {
+    const historial = [acierto(F(1, 9), 's1'), acierto(F(3, 10), 's2'), acierto(F(6, 11), 's3')]
+    const inicial = progreso('M', historial)
+    const manana = cajasDelDia(entrada({ progreso: { M: inicial } }))
+    expect(manana.items[0]).toMatchObject({ id: 'M', mantenimiento: true, hecho: false, vence: inicial.proxima })
+    const soloRevision = progreso('M', [...historial, acierto(F(24, 11), 'hoy', { resultado: 'revision' })])
+    expect(cajasDelDia(entrada({ progreso: { M: soloRevision }, referencia: AHORA, ahora: F(24, 20) })).items).toEqual(manana.items)
+    const trasFallo = progreso('M', [...historial, fallo(F(24, 12), 'hoy')])
+    expect(cajaDeConcepto(trasFallo, CRITERIOS_POR_DEFECTO, F(24, 20))).toBe(1)
+    const noche = cajasDelDia(entrada({ progreso: { M: trasFallo }, referencia: AHORA, ahora: F(24, 20) }))
+    expect(noche.items).toEqual(manana.items.map(i => ({ ...i, hecho: true })))
+    expect(noche).toMatchObject({ hechos: 1, techo: 1, cerrada: true })
+  })
+
+  it('un mantenimiento con el antiguo tope del examen mantiene su agenda canónica antes y después de responder', () => {
+    const historial = [new Date(2026, 9, 1, 10), new Date(2026, 9, 20, 10), new Date(2026, 10, 10, 10)]
+      .map((fecha, n) => acierto(fecha.getTime(), `final-${n}`, { calificacion: 4 }))
+    const canonico = progreso('M-FINAL', historial)
+    expect(canonico.proxima!).toBeLessThan(EXAMEN_MS - DIA)
+    const guardadoAntiguo = { ...canonico, proxima: EXAMEN_MS - DIA }
+    const referencia = canonico.proxima!
+    const antes = cajasDelDia(entrada({ progreso: { 'M-FINAL': guardadoAntiguo }, referencia, ahora: referencia }))
+    expect(antes.items).toEqual([{ tipo: 'concepto', id: 'M-FINAL', caja: 3, mantenimiento: true,
+      vence: canonico.proxima, hecho: false }])
+    const despues = progreso('M-FINAL', [...historial, acierto(referencia + HORA, 'hoy')])
+    const tarde = cajasDelDia(entrada({ progreso: { 'M-FINAL': despues }, referencia, ahora: referencia + 2 * HORA }))
+    expect(tarde.items).toEqual(antes.items.map(i => ({ ...i, hecho: true })))
+    expect(tarde).toMatchObject({ techo: 1, hechos: 1, cerrada: true })
+    // Derivar la agenda no migra el objeto persistido ni su historial.
+    expect(guardadoAntiguo.proxima).toBe(EXAMEN_MS - DIA)
+    expect(guardadoAntiguo.intentos).toEqual(historial)
+  })
+
   it('lo visto hoy por primera vez no entra en las cajas de hoy aunque venza pronto', () => {
     const p = { nuevo: progreso('nuevo', [fallo(F(24, 4), 'hoy')]) }
     expect(cajasDelDia(entrada({ progreso: p })).items).toEqual([])

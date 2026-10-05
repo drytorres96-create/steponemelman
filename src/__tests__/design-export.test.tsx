@@ -74,7 +74,7 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi
 
 it('exports real screen DOM with synthetic providers and no network, auth bypass or medical corpus', async () => {
   const out = process.env.MELMAN_DESIGN_EXPORT
-  const styles = ['nbme/nbme.css', 'auth/auth.css', 'styles.css', 'editorial.css', 'organic.css', 'cinema.css', 'studio.css', 'hoy.css', 'piel-estudio.css']
+  const styles = ['nbme/nbme.css', 'auth/auth.css', 'styles.css', 'editorial.css', 'organic.css', 'cinema.css', 'studio.css', 'hoy.css', 'piel-estudio.css', 'premium.css']
   if (out) {
     mkdirSync(resolve(out, 'styles'), { recursive: true })
     for (const file of styles) writeFileSync(resolve(out, 'styles', file.replaceAll('/', '-')), readFileSync(resolve('src', file)))
@@ -88,9 +88,12 @@ it('exports real screen DOM with synthetic providers and no network, auth bypass
     if (file === 'hoy-detalle') {
       for (const resumen of [...host.querySelectorAll<HTMLElement>('.hoy-desplegable > summary')]) {
         await act(async () => { resumen.click() })
-        await act(async () => { await Promise.resolve() })
+        await act(async () => { await vi.dynamicImportSettled() })
       }
-      expect(host.querySelectorAll('.hoy-desplegable[open]')).toHaveLength(3)
+      const semana = [...host.querySelectorAll('summary')].find(s => s.textContent === 'Mi semana y mi plan')!
+      await act(async () => { semana.click(); semana.parentElement!.dispatchEvent(new Event('toggle')) })
+      await act(async () => { await Promise.resolve() })
+      expect(host.querySelectorAll('.hoy-desplegable[open]')).toHaveLength(4)
       expect(host.querySelectorAll('.plan-dia')).not.toHaveLength(0)
     }
     expect(host.querySelector('h1')).not.toBeNull()

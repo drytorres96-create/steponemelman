@@ -12,7 +12,7 @@ export function Anillo({ valor, total, tam = 108, etiqueta, oro = false }:
   return (
     <div className="anillo" style={{ width: tam, height: tam }}
          role="img" aria-label={`${etiqueta}: ${valor} de ${total}`}>
-      <svg width={tam} height={tam} aria-hidden="true">
+      <svg width={tam} height={tam} viewBox={`0 0 ${tam} ${tam}`} aria-hidden="true">
         <circle cx={tam/2} cy={tam/2} r={r} fill="none" stroke="var(--linea)" strokeWidth="7" />
         <circle cx={tam/2} cy={tam/2} r={r} fill="none" strokeWidth="7" strokeLinecap="round"
           stroke={`url(#${gradiente})`}
@@ -57,7 +57,7 @@ export function AnilloDoble({ interior, exterior, segmentos, cerrado = false, ta
   return (
     <div className={`anillo anillo-doble${cerrado ? ' cerrado' : ''}`} style={{ width: tam, height: tam }} role="img"
       aria-label={`${interior.etiqueta}: ${interior.valor} de ${interior.total}. ${exterior.etiqueta}: ${exterior.valor} de ${exterior.total}.`}>
-      <svg width={tam} height={tam} aria-hidden="true">
+      <svg width={tam} height={tam} viewBox={`0 0 ${tam} ${tam}`} aria-hidden="true">
         <defs>
           <linearGradient id={gradiente} x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor={cerrado ? 'var(--oro)' : 'var(--violeta)'} />

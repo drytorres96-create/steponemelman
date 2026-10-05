@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Anillo, AnilloDoble, type SegmentoAnillo } from '../components/comunes'
 import { ScenePhoto } from '../components/Editorial'
 import { useAuth } from '../auth/AuthProvider'
@@ -20,13 +20,11 @@ import {
 import type { CriteriosDominio } from '../srs/mastery'
 import type { ProgresoConcepto } from '../srs/tipos'
 import { fechaISO } from '../lib/tiempo'
-import { cargarTodo } from '../data/corpus'
-import type { Concepto } from '../schema/concept'
-import { BandaDeCifras } from './ProgresoCifras'
-import { ProgresoMeta } from './ProgresoMeta'
-import { BandaAdherencia } from './ProgresoAdherencia'
-import { CalendarioSemana } from './CalendarioSemana'
 import { TablaPlanificador } from './TablaPlanificador'
+import { estimarBloque } from '../lib/ritmo'
+import { hitoSemanalAprendizaje } from '../lib/progreso-aprendizaje'
+
+const ResumenProgreso = lazy(() => import('./Progreso').then(m => ({ default: m.ResumenProgreso })))
 
 export interface MaterialNuevo {
   conceptIds: string[]
@@ -63,8 +61,8 @@ function anilloDeLaSemana(tema: TemaSemana | null, plan: PlanSemana | null,
       return { valor: ids.filter(cerrado).length, total: ids.length }
     })
     const valor = tema.conceptIds.filter(cerrado).length, total = tema.conceptIds.length
-    return { valor, total, segmentos, rotulo: 'Tema de la semana, conceptos cerrados',
-      leyenda: `el tema de la semana, ${valor} de ${total} conceptos cerrados` }
+    return { valor, total, segmentos, rotulo: 'Tema de la semana, dominio demostrado',
+      leyenda: `el tema de la semana, ${valor} de ${total} con dominio demostrado` }
   }
   if (!plan) return { valor: 0, total: 0, segmentos: [], rotulo: 'Sin semana planificada',
     leyenda: 'la semana, todavía sin sesiones planificadas' }
@@ -98,7 +96,7 @@ function fraseCierre(dia: EstadoDia): string {
   const partes = [
     dia.nuevo.conceptos ? plural(dia.nuevo.conceptos, 'concepto nuevo', 'conceptos nuevos') : '',
     dia.nuevo.preguntas ? plural(dia.nuevo.preguntas, 'pregunta', 'preguntas') : '',
-    dia.cajas.hechos ? plural(dia.cajas.hechos, 'caja cerrada', 'cajas cerradas') : '',
+    dia.cajas.hechos ? plural(dia.cajas.hechos, 'repaso realizado', 'repasos realizados') : '',
   ].filter(Boolean)
   if (!partes.length) return 'Hoy ya está: no tocaba nada nuevo ni ninguna caja.'
   const lista = partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : partes[0]
@@ -137,27 +135,7 @@ function Desplegable({ titulo, children }: { titulo: string; children: () => Rea
 
 /** «Cómo va todo»: las cifras de la semana, la meta de 60 días, la adherencia y el plan de la semana. */
 function ComoVaTodo() {
-  const { indice } = useApp()
-  const [conceptos, setConceptos] = useState<Concepto[] | null>(null)
-  const [fallo, setFallo] = useState(false)
-  const [reintento, setReintento] = useState(0)
-  useEffect(() => {
-    if (!indice) return
-    let vivo = true
-    setFallo(false)
-    cargarTodo(indice.modulos).then(cs => { if (vivo) setConceptos(cs) }).catch(() => { if (vivo) setFallo(true) })
-    return () => { vivo = false }
-  }, [indice, reintento])
-  return <div className="pila">
-    {conceptos ? <>
-      <BandaDeCifras conceptos={conceptos} ventana="semana" />
-      <ProgresoMeta conceptos={conceptos} />
-    </> : fallo ? <div className="pila"><p className="mini" role="alert">No se pudieron cargar las cifras del material. Tu progreso está a salvo.</p>
-      <div><button className="btn pequeno fantasma" onClick={() => setReintento(v => v + 1)}>Volver a intentar</button></div></div>
-      : <p className="mini" role="status">Cargando las cifras…</p>}
-    <BandaAdherencia />
-    <CalendarioSemana />
-  </div>
+  return <Suspense fallback={<p role="status">Abriendo tu progreso…</p>}><ResumenProgreso /></Suspense>
 }
 
 /** Repinta cada minuto: el día cambia a las 3:00 aunque la pestaña siga abierta. */
@@ -233,6 +211,8 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
   }
   const dia = estadoDelDia(entrada)
   const anillo = anilloDeLaSemana(tema, plan, estado.progreso, estado.criterios, ahora)
+  const hito = useMemo(() => hitoSemanalAprendizaje(Object.values(estado.progreso).filter(p => publicados.has(p.concept_id)),
+    new Date(`${limites.inicio}T03:00:00`).getTime(), ahora, estado.criterios), [estado.progreso, estado.criterios, publicados, limites.inicio, ahora])
 
   // Sin el banco de preguntas no se sabe qué entra hoy; sin él tras un fallo, el día sigue sin preguntas.
   const bancoListo = !!nbme.catalog || (!nbme.loading && !!nbme.error)
@@ -284,8 +264,15 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
     tc || !tq ? `${Math.min(c, tc)} / ${tc} ${tc === 1 ? 'concepto' : 'conceptos'}` : '',
     tq ? `${Math.min(q, tq)} / ${tq} ${tq === 1 ? 'pregunta' : 'preguntas'}` : '',
   ].filter(Boolean).join(' · ')
+  const pendientesCajas = cajas.items.filter(i => !i.hecho)
+  const siguiente = cajasAbiertas ? 'cajas' : nuevoAbierto ? 'nuevo' : null
+  const bloqueConceptos = siguiente === 'cajas' ? pendientesCajas.slice(0, 5).filter(i => i.tipo === 'concepto').length : Math.min(3, Math.max(0, tc - c))
+  const bloquePreguntas = siguiente === 'cajas' ? pendientesCajas.slice(0, 5).filter(i => i.tipo === 'pregunta').length : Math.min(1, Math.max(0, tq - q))
+  const tiempo = estimarBloque(estado.progreso, intentosPreguntas, { conceptos: bloqueConceptos, preguntas: bloquePreguntas })
+  const retomar = hechosCajas + hechosNuevo > 0
+  const quedan = interior.total - interior.valor
 
-  return <div className="pila hoy">
+  return <div className="pila hoy hoy-focus">
     <header className="semana-encabezado hoy-cabecera" data-depth-scene>
       <ScenePhoto scene="dawn" />
       <div className="hoy-anillo">
@@ -296,13 +283,35 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
         <p className="editorial-eyebrow">{fecha}</p>
         <h1>Hoy</h1>
         <p className="hoy-tema">{rotuloTema(tema, plan)}</p>
-        <p className="mini hoy-leyenda">Dentro, el día. Fuera, {anillo.leyenda}.</p>
+        <p className="mini hoy-leyenda">Dentro, trabajo realizado hoy. Fuera, {anillo.leyenda}.</p>
       </div>
     </header>
 
     <p className="hoy-ahora" role="status">{ahoraToca}</p>
+    {!completo && siguiente && <section className="tarjeta hoy-next-block" aria-labelledby="siguiente-bloque">
+      <p className="rotulo">{retomar ? 'Retomamos aquí' : 'Tu siguiente bloque'}</p>
+      <h2 id="siguiente-bloque">{siguiente === 'cajas' ? 'Repasar y mantener lo aprendido' : 'Avanzar en el tema de la semana'}</h2>
+      <p className="hoy-objective">{bloqueConceptos > 0 && plural(bloqueConceptos, 'concepto', 'conceptos')}
+        {bloqueConceptos > 0 && bloquePreguntas > 0 && ' + '}{bloquePreguntas > 0 && plural(bloquePreguntas, 'pregunta', 'preguntas')} en el siguiente bloque.</p>
+      {siguiente === 'cajas' && pendientesCajas.some(i => i.mantenimiento) && <p className="mini">Incluye mantenimiento de conceptos cuyo dominio ya demostraste.</p>}
+      {tiempo && <p className="mini">{tiempo}</p>}
+      <button className="btn principal" onClick={siguiente === 'cajas' ? () => onCajas(pendientesCajas, tituloCajas) : empezarNuevo}>
+        {siguiente === 'cajas' ? hechosCajas ? 'Seguir con las cajas' : 'Empezar las cajas' : hechosNuevo ? 'Seguir con lo nuevo' : 'Empezar lo nuevo'}
+      </button>
+      <p className="mini hoy-progress-summary">Tu objetivo de hoy: {interior.total} pasos dentro de tu techo diario. Avance: {interior.valor} hechos · quedan {quedan}. Las respuestas falladas también cuentan como trabajo realizado.</p>
+    </section>}
+    {completo && <section className="tarjeta hoy-completion" aria-labelledby="dia-terminado">
+      <span className="rotulo">Plan de hoy terminado</span><h2 id="dia-terminado">Puedes cerrar por hoy.</h2>
+      <p>{viernes ? 'Hoy es tu día libre.' : `Completaste ${interior.valor} pasos de tu plan.`}</p>
+      <p className="mini">Tu práctica queda guardada. Al volver, Hoy preparará los repasos que correspondan y lo siguiente de tu semana.</p>
+    </section>}
+    {hito.conceptos > 0 && <p className="learning-milestone" role="note">
+      Esta semana confirmaste {hito.conceptos} {hito.conceptos === 1 ? 'concepto' : 'conceptos'} sin ayuda después de al menos 24 h.
+      {hito.nuevosDominios > 0 && ` ${hito.nuevosDominios} con dominio demostrado y un hito registrado esta semana.`}
+      {hito.mantenimientoConfirmado > 0 && ` ${hito.mantenimientoConfirmado} en mantenimiento confirmado.`}
+    </p>}
 
-    <div className="hoy-bloques">
+    <div className="hoy-bloques hoy-progress-summary">
       {viernes
         ? <p className="hoy-bloque-hecho"><span className="hoy-marca" aria-hidden="true">✓</span>
           <span>Cajas · el viernes no toca ninguna</span></p>
@@ -314,11 +323,8 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
           <div className="hoy-bloque-texto">
             <h2 id="hoy-cajas">Cajas</h2>
             <p className="hoy-cuenta">{hechosCajas} / {dia.cajas.techo} {dia.cajas.techo === 1 ? 'caja' : 'cajas'}</p>
-            <p className="mini">Lo que viste otros días y todavía no está cerrado.</p>
+            <p className="mini">Consolidación y mantenimiento dentro del techo de hoy.</p>
           </div>
-          <button className="btn principal" onClick={() => onCajas(cajas.items.filter(i => !i.hecho), tituloCajas)}>
-            {hechosCajas ? 'Seguir con las cajas' : 'Empezar las cajas'}
-          </button>
         </section>}
 
       {!nuevoConocido
@@ -342,9 +348,9 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
               <p className="hoy-cuenta">{cuentaNuevo}</p>
               <p className="mini">Tres conceptos y una pregunta, hasta el techo de hoy.</p>
             </div>
-            <button className={`btn${cajasAbiertas ? '' : ' principal'}`} onClick={empezarNuevo}>
+            {siguiente !== 'nuevo' && <button className="btn fantasma" onClick={empezarNuevo}>
               {hechosNuevo ? 'Seguir con lo nuevo' : 'Empezar lo nuevo'}
-            </button>
+            </button>}
           </section>}
     </div>
 

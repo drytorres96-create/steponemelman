@@ -2,8 +2,9 @@
    La fotografía conserva el carácter cinematográfico sin desplazar controles. */
 :root {
   --ancho:1280px; --radio:20px; --radio-s:12px;
-  --fondo-0:#0b1114; --fondo-1:#0b1114; --fondo-2:#101c22; --fondo-3:#16272d;
-  --bg:#0b1114; --bg-2:#101c22; --panel:#141e23; --panel-2:#1d2a30;
+  --fondo-0:#0b1114; --fondo-1:#0b1114; --fondo-2:#14261f; --fondo-3:#14261f;
+  --bg:#0b1114; --bg-2:#14261f; --panel:#14261f; --panel-2:#0b1114;
+  --tinte-petroleo:var(--panel);
   --texto:#f3f5f2; --texto-2:#c5d2d2; --texto-3:#a9bdc0; --texto-4:#a9bdc0;
   --acento:#cae5d8; --acento-2:#cae5d8; --calido:#e8cfa4;
   --linea:rgba(206,223,226,.16); --linea-fuerte:rgba(206,223,226,.3);
@@ -38,7 +39,7 @@
 .editorial-app:not(.study-focus) .barra-fin { gap:8px; min-width:0; }
 .editorial-app:not(.study-focus) .medidor-ia { padding:4px; border:0; background:none; }
 .menu-cuenta>summary { min-height:44px; padding:10px 12px; border-radius:11px; font-size:13px; }
-.editorial-app:not(.study-focus) .menu-cuenta-opciones { border-radius:14px; background:#15232a; max-width:calc(100vw - 32px); }
+.editorial-app:not(.study-focus) .menu-cuenta-opciones { border-radius:14px; background:var(--panel); max-width:calc(100vw - 32px); }
 .brand-wordmark>span { color:var(--texto-3); }
 .editorial-app>main>.contenedor { padding-left:max(24px, env(safe-area-inset-left, 0px)); padding-right:max(24px, env(safe-area-inset-right, 0px)); }
 .editorial-app>main { padding-top:20px; padding-bottom:max(90px, env(safe-area-inset-bottom, 0px)); }
@@ -64,14 +65,14 @@
 .btn.fantasma { color:var(--texto-2); }
 .editorial-app:not(.study-focus) :where(.section-toolbar,.section-toolbar>.fila) { gap:4px; }
 .editorial-app:not(.study-focus) .section-toolbar { margin:0; padding:0; border:0; }
-.editorial-app:not(.study-focus) :where(.section-toolbar[role='group'],.section-toolbar>[role='group']) { padding:4px; border:1px solid var(--linea); border-radius:14px; background:#111c22; width:fit-content; max-width:100%; flex-wrap:wrap; }
+.editorial-app:not(.study-focus) :where(.section-toolbar[role='group'],.section-toolbar>[role='group']) { padding:4px; border:1px solid var(--linea); border-radius:14px; background:var(--panel-2); width:fit-content; max-width:100%; flex-wrap:wrap; }
 .editorial-app:not(.study-focus) .section-toolbar .btn { border:0; border-radius:10px; box-shadow:none; min-height:44px; padding:9px 14px; }
-.editorial-app:not(.study-focus) .section-toolbar .btn[aria-pressed='true'] { background:#2b403e; color:var(--texto); }
+.editorial-app:not(.study-focus) .section-toolbar .btn[aria-pressed='true'] { background:var(--violeta-tenue); color:var(--texto); }
 .progreso-controles { display:flex; justify-content:space-between; flex-wrap:wrap; }
 /* Semana: una franja de días y una zona de trabajo, sin tarjetas anidadas gigantes. */
 .plan-workspace { border-radius:20px; padding:22px; gap:8px; }
 .plan-dia-titulo,.plan-dia.abierto .plan-dia-titulo { min-height:64px; padding:10px 15px; border-radius:12px; }
-.plan-dia.abierto .plan-dia-titulo { background:#2b403e; border-color:#819f9c; box-shadow:none; }
+.plan-dia.abierto .plan-dia-titulo { background:var(--violeta-tenue); border-color:var(--linea-interactiva); box-shadow:none; }
 .plan-dia-numero,.plan-dia.abierto .plan-dia-numero { font-weight:400; font-size:23px; }
 .plan-panel { padding-top:20px; }
 .plan-lista { gap:10px; padding-top:16px; }
@@ -106,13 +107,13 @@
   .progress-next-session .progress-ring-legend { flex:1 1 180px; }
   .progress-next-session .progress-ring-legend p { font-size:14px; }
 }
-.editorial-app:not(.study-focus) .tarjeta .tarjeta { box-shadow:none; border-radius:12px; background:#142229; }
+.editorial-app:not(.study-focus) .tarjeta .tarjeta { box-shadow:none; border-radius:12px; background:var(--panel-2); }
 .library-composer { border-radius:18px; }
 .scroll-x { max-width:100%; overflow:auto; }
 .tabla { font-size:14px; }
 .tabla :where(th,td) { padding:12px 14px; }
 .modal-fondo { padding: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px)); }
-.modal { max-height:calc(100dvh - max(20px, env(safe-area-inset-top, 0px)) - max(20px, env(safe-area-inset-bottom, 0px))); overflow:auto; border-radius:20px; background:#142229; }
+.modal { max-height:calc(100dvh - max(20px, env(safe-area-inset-top, 0px)) - max(20px, env(safe-area-inset-bottom, 0px))); overflow:auto; border-radius:20px; background:var(--panel); }
 .editorial-app:not(.study-focus) :where(input,select,textarea) { font-size:16px; }
 /* Movimiento de cámara lento; la niebla usa el mismo ciclo y no anima filtros. */
 .cine-escena img { animation-duration:90s; }

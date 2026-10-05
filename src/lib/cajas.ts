@@ -1,6 +1,7 @@
 import type { NbmeAttempt } from '../nbme/types'
 import { aciertosVigentes, evaluarDominio, evidenciaIndependiente, type CriteriosDominio } from '../srs/mastery'
 import { intentoCorrecto, type ProgresoConcepto } from '../srs/tipos'
+import { proximaRevision } from '../srs/fsrs'
 import { reconstruirProgreso } from '../store/model'
 import { TECHOS, inicioDelDia, tipoDeDia } from './dia'
 import { ultimoIntentoResuelto } from './plan-estudio'
@@ -13,9 +14,10 @@ export const TITULO_NBME_CAJAS = 'Cajas'
  *
  * No es un planificador paralelo. La caja se deriva de la evidencia que ya existe
  * —los aciertos vigentes independientes— y el vencimiento sigue siendo el que
- * propone el planificador; la caja sólo pone un techo, igual que `techoHorizonte`
+ * propone el planificador; durante la adquisición la caja pone un techo, igual que `techoHorizonte`
  * comprime lo que caería después del examen. Un concepto sale de la escalera
- * cuando cumple los criterios de dominio, no por llegar al último escalón.
+ * cuando cumple los criterios de dominio, no por llegar al último escalón. Después
+ * vuelve para mantenimiento en la fecha FSRS, sin los techos de adquisición.
  *
  * Lo que vence se reparte con un techo duro por día —40 entre semana, 70 el fin de
  * semana, ninguno el viernes—. Lo que no cabe espera al día siguiente en silencio:
@@ -68,7 +70,8 @@ export function techoCaja(ultimo: number, caja: Caja): number {
 /** Vence a lo que proponga el planificador, pero nunca más tarde que el techo de su caja. */
 export function vencimientoConcepto(p: ProgresoConcepto, caja: Caja): number {
   const techo = techoCaja(p.ultimo ?? 0, caja)
-  return p.proxima === null ? techo : Math.min(p.proxima, techo)
+  const proxima = proximaRevision(p)
+  return proxima === null ? techo : Math.min(proxima, techo)
 }
 
 /**
@@ -102,6 +105,8 @@ export interface ItemCaja {
   vence: number
   /** Ya tiene un intento resuelto hoy. */
   hecho: boolean
+  /** Dominio acreditado al empezar el día; repaso en su fecha FSRS, sin techo de caja. */
+  mantenimiento?: boolean
 }
 
 export interface EntradaCajas {
@@ -130,7 +135,7 @@ function progresoAntesDe(p: ProgresoConcepto, desde: number, criterios: Criterio
 }
 
 /**
- * Las cajas de hoy. Entra lo que vio días anteriores y no está cerrado, cuando
+ * Las cajas de hoy. Entra lo que vio días anteriores, incluido el mantenimiento, cuando
  * vence antes de seis horas desde que se fija el día; se ordena por lo que venció
  * antes y se corta en el techo del tipo de día. El viernes no entra nada: lo que
  * vence sigue vencido y el sábado lo recoge primero, porque venció antes. Todo se
@@ -146,10 +151,13 @@ export function cajasDelDia(e: EntradaCajas): CajasDelDia {
     if (!e.conceptoDisponible(p.concept_id)) continue
     const antes = progresoAntesDe(p, desde, e.criterios)
     const escalon = cajaDeConcepto(antes, e.criterios, desde)
-    if (escalon === null || escalon === 'cerrado') continue
-    const vence = vencimientoConcepto(antes, escalon)
-    if (vence >= limite) continue
-    candidatos.push({ tipo: 'concepto', id: p.concept_id, caja: escalon, vence,
+    if (escalon === null) continue
+    const mantenimiento = escalon === 'cerrado'
+    const caja = escalon === 'cerrado' ? 3 : escalon
+    const vence = mantenimiento ? proximaRevision(antes) : vencimientoConcepto(antes, caja)
+    if (vence === null || vence >= limite) continue
+    candidatos.push({ tipo: 'concepto', id: p.concept_id, caja, vence,
+      ...(mantenimiento ? { mantenimiento: true } : {}),
       hecho: p.intentos.some(i => i.resultado !== 'revision' && i.ts >= desde) })
   }
 

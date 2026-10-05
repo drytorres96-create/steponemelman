@@ -2,12 +2,12 @@
  * Planificador de repetición espaciada.
  *
  * Modelo transparente inspirado en FSRS (Free Spaced Repetition Scheduler): cada concepto tiene
- * una **estabilidad** S (días que la memoria aguanta antes de caer a la retención objetivo) y una
+ * una **estabilidad** S (escala de días del modelo para la retención objetivo) y una
  * **dificultad** D (1-10). No usamos la biblioteca oficial para no depender de un paquete externo
  * en tiempo de estudio; los pesos son los del conjunto FSRS-4.5 por defecto, reducidos al
  * subconjunto que necesitamos, y todo el cálculo es auditable desde la propia interfaz.
  *
- * R(t) = (1 + F · t/S)^C   con F = 19/81 y C = -0.5   → retención tras t días
+ * R(t) = (1 + F · t/S)^C   con F = 19/81 y C = -0.5   → retención estimada tras t días
  */
 import { intentoCorrecto, type Intento, type ProgresoConcepto, type EstadoDominio } from './tipos'
 
@@ -23,15 +23,42 @@ export const DIA = 86_400_000
  */
 export const FECHA_EXAMEN = '2026-12-21T08:00:00-05:00'
 export const EXAMEN_MS = Date.parse(FECHA_EXAMEN)
+const DIAS_REPARTO_FINAL = 14
+const diaNuevaYork = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' })
 
-/** Último instante en que un repaso todavía sirve: el día anterior al examen. */
-export function techoHorizonte(propuesta: number, ahora: number, examen = EXAMEN_MS): number {
+/** FNV-1a sobre el ID: mismo reparto en navegador, Worker y reconstrucción del historial. */
+function hashConcepto(id: string): number {
+  let hash = 2166136261
+  for (let i = 0; i < id.length; i++) hash = Math.imul(hash ^ id.charCodeAt(i), 16777619)
+  return hash >>> 0
+}
+
+/**
+ * Último repaso antes del examen. Sólo lo que rebasa el límite se reparte por ID
+ * entre las últimas 14 fechas; viernes queda libre. La ejecución mantiene su techo
+ * diario en las cajas: este reparto no garantiza una cuota por fecha.
+ * Sin ID se conserva el tope anterior para propuestas válidas. Antes del horizonte,
+ * una propuesta que ya está en el pasado se lleva a ahora, con ID o sin él.
+ */
+export function techoHorizonte(propuesta: number, ahora: number, examen = EXAMEN_MS, conceptId?: string): number {
   if (!Number.isFinite(examen)) return propuesta
   const limite = examen - DIA
   // Pasado el horizonte, el planificador vuelve a su comportamiento largo sin quedarse
   // atascado programando todo en el pasado.
   if (limite <= ahora) return propuesta
-  return Math.min(propuesta, limite)
+  if (Number.isNaN(propuesta) || Number.isNaN(ahora)) return Math.min(propuesta, limite)
+  const prevista = Math.max(propuesta, ahora)
+  if (prevista <= limite) return prevista
+  if (!conceptId || !Number.isFinite(new Date(limite).getTime())) return limite
+
+  const fechas: number[] = []
+  for (let d = DIAS_REPARTO_FINAL - 1; d >= 0; d--) {
+    const fecha = limite - d * DIA
+    if (fecha >= ahora && diaNuevaYork.format(fecha) !== 'Fri') fechas.push(fecha)
+  }
+  // Un horizonte personalizado puede terminar un viernes sin otra fecha futura.
+  // Mantener su límite es compatible y evita inventar un repaso en el pasado.
+  return fechas.length ? fechas[hashConcepto(conceptId) % fechas.length] : limite
 }
 
 export function retencion(dias: number, estabilidad: number): number {
@@ -116,18 +143,31 @@ export function programar(p: ProgresoConcepto, intento: Intento, ahora = Date.no
   const fallos = p.fallos + (correcto ? 0 : 1)
 
   return { ...p, dificultad, estabilidad, ultimo: ahora,
-           proxima: techoHorizonte(ahora + dias * DIA, ahora, examen),
+           proxima: techoHorizonte(ahora + dias * DIA, ahora, examen, p.concept_id),
            intentos, aciertos, fallos }
 }
 
+/**
+ * Agenda canónica sin reescribir el estado: el antiguo tope común se interpreta
+ * con el mismo reparto que la reconstrucción del historial. Las otras fechas,
+ * incluida una agenda ausente, se conservan.
+ */
+export function proximaRevision(p: Pick<ProgresoConcepto, 'concept_id' | 'proxima' | 'ultimo'>): number | null {
+  const limite = EXAMEN_MS - DIA
+  return p.proxima === limite && p.ultimo !== null && p.ultimo < limite
+    ? techoHorizonte(limite + DIA, p.ultimo, EXAMEN_MS, p.concept_id) : p.proxima
+}
+
 export function estaVencido(p: ProgresoConcepto, ahora = Date.now()): boolean {
-  return p.proxima != null && p.proxima <= ahora
+  const proxima = proximaRevision(p)
+  return proxima != null && proxima <= ahora
 }
 
 /** Prioridad de la cola de repaso: primero lo más olvidado y lo más confundido. */
 export function prioridad(p: ProgresoConcepto, ahora = Date.now()): number {
-  if (p.proxima == null) return 0
-  const atraso = (ahora - p.proxima) / DIA
+  const proxima = proximaRevision(p)
+  if (proxima == null) return 0
+  const atraso = (ahora - proxima) / DIA
   const rr = p.estabilidad > 0 ? retencion(Math.max(0, (ahora - (p.ultimo ?? ahora)) / DIA), p.estabilidad) : 0
   const penalConfusion = p.intentos.slice(-3).some(i => i.tipo_error === 'confusion_conceptos') ? 1.4 : 1
   return (atraso + 1) * (1 - rr) * penalConfusion

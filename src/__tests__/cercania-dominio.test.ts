@@ -48,6 +48,19 @@ describe('cercanía al dominio', () => {
     expect(cerrado.faltan).toEqual([])
   })
 
+  it('una racha de discriminación necesita que el próximo acierto sea recuperación o aplicación', () => {
+    const intentos = [0, 25, 50, 75].map((horas, n) => acierto(T0 + horas * HORA, `s${n}`, {
+      interaccion: 'opcion_multiple', recuperacion_activa: false, tipo_evidencia: 'discriminacion',
+    }))
+    const ahora = T0 + 76 * HORA
+    const c = cercania(intentos, ahora)
+    expect(c.cumple).toBe(false)
+    expect(c.bastaUnAcierto).toBe(true)
+    expect(c.esperandoSeparacion).toBe(false)
+    expect(c.faltan).toEqual(['al menos un recuerdo sin alternativas o una aplicación independiente'])
+    expect(cercania([...intentos, acierto(ahora, 'nueva')], ahora).cumple).toBe(true)
+  })
+
   it('un concepto ya dominado no pide nada más', () => {
     const intentos = [acierto(T0, 's1'), acierto(T0 + 25 * HORA, 's2'), acierto(T0 + 50 * HORA, 's3')]
     const c = cercania(intentos, T0 + 51 * HORA)

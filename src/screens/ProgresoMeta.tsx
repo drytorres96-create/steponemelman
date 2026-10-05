@@ -5,7 +5,7 @@ import {
   DIAS_META, DIAS_PARA_PROYECTAR, fechaDelDia, primerasRespuestasNbme, resumenMeta, type SerieMeta,
 } from '../lib/meta'
 import type { Concepto } from '../schema/concept'
-import { evaluarDominio } from '../srs/mastery'
+import { resumenProgresoAprendizaje } from '../lib/progreso-aprendizaje'
 
 const diaYMes = (f: Date) => f.toLocaleDateString('es', { day: 'numeric', month: 'short' }).replace('.', '')
 const desdeISO = (iso: string) => {
@@ -50,21 +50,18 @@ function Serie({ titulo, serie, fin }: { titulo: string; serie: SerieMeta; fin: 
  * ellos: ya cuenta con días malos, así que nunca pide más de lo que Hoy da en un día.
  * Ir por debajo no trae alarma ni color; sólo la distancia.
  */
-export function ProgresoMeta({ conceptos }: { conceptos: Concepto[] }) {
+export function ProgresoMeta({ conceptos, conceptIds }: { conceptos?: Concepto[]; conceptIds?: string[]; cargarDetalleConceptos?: () => Promise<Concepto[]> }) {
   const { estado } = useApp()
   const nbme = useNbme()
   const ahora = Date.now()
   const preguntas = useMemo(() => primerasRespuestasNbme(nbme.state, nbme.catalog), [nbme.state, nbme.catalog])
-  // Dominado es cumplir los criterios, como una caja cerrada en Hoy: un repaso pendiente no
-  // lo descuenta, porque Hoy no lo ofrece y la cifra bajaría sin nada que hacer para evitarlo.
-  const dominadosEn = conceptos.flatMap(c => {
-    const p = estado.progreso[c.concept_id]
-    return p && evaluarDominio(p, estado.criterios, ahora).cumple ? [p.dominado_en ?? 0] : []
-  })
+  const ids = useMemo(() => conceptIds ?? (conceptos ?? []).map(c => c.concept_id), [conceptIds, conceptos])
+  const aprendizaje = useMemo(() => resumenProgresoAprendizaje(ids, estado.progreso, estado.criterios, ahora),
+    [ids, estado.progreso, estado.criterios, ahora])
   // Sin catálogo todavía no se sabe cuántas hay: la meta no se recorta a cero mientras carga.
   const catalogo = !!nbme.catalog
   const r = resumenMeta({
-    ahora, dominadosEn, conceptosPublicados: conceptos.length,
+    ahora, dominadosEn: aprendizaje.dominadosEn, conceptosPublicados: aprendizaje.total,
     primerasRespuestas: preguntas.marcas, preguntasPublicadas: catalogo ? preguntas.publicadas : Number.POSITIVE_INFINITY,
   })
 
@@ -83,7 +80,8 @@ export function ProgresoMeta({ conceptos }: { conceptos: Concepto[] }) {
       <p className="sutil">{cuando}</p>
     </div>
 
-    <Serie titulo="Conceptos dominados" serie={r.conceptos} fin={fin} />
+    <Serie titulo="Conceptos con dominio demostrado en esta meta" serie={r.conceptos} fin={fin} />
+    <p className="mini">Dominio demostrado total: {aprendizaje.dominioDemostrado} conceptos. Mantenimiento: {aprendizaje.mantenimientoAlDia} al día · {aprendizaje.mantenimientoPendiente} pendientes de repaso{aprendizaje.mantenimientoPorComprobar > 0 && <> · {aprendizaje.mantenimientoPorComprobar} por comprobar</>}.</p>
     {catalogo ? <Serie titulo="Preguntas NBME respondidas" serie={r.preguntas} fin={fin} />
       : <p className="mini" role="status">{nbme.error ? 'Las preguntas NBME no están disponibles ahora mismo.' : 'Cargando las preguntas NBME…'}</p>}
     {proyeccionPendiente && <p className="mini">La proyección sale el {diaYMes(fechaDelDia(DIAS_PARA_PROYECTAR + 1))}: antes no hay ritmo que proyectar.</p>}
@@ -102,8 +100,8 @@ export function ProgresoMeta({ conceptos }: { conceptos: Concepto[] }) {
     </div>
 
     <p className="mini">La línea sigue los techos de Hoy —nada el viernes, el doble el fin de semana— y, en conceptos,
-      va una semana por detrás: lo que tarda uno en quedar dominado. Ya cuenta con días malos: avanza más despacio de lo
-      que dan los techos, así que nunca hace falta hacer más de lo que Hoy te da. Cuenta desde el {inicio}; «dominado» usa
-      tus criterios de dominio, y una pregunta cuenta la primera vez que la respondes.</p>
+      deja una semana para consolidar como supuesto de planificación. Ya cuenta con días malos: avanza más despacio de lo
+      que dan los techos, así que nunca hace falta hacer más de lo que Hoy te da. Cuenta desde el {inicio}; el dominio demostrado usa
+      tus criterios de dominio. Un mantenimiento pendiente no borra esa evidencia. Una pregunta cuenta la primera vez que la respondes.</p>
   </section>
 }

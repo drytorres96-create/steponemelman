@@ -1,0 +1,16 @@
+Node22 · snapshot 7fbfee23c4b8a7454c3698f4c5d7db9482f8c624
+
+$ npm ci
+added 170 packages in 2s
+
+$ npm test
+ Test Files  70 passed | 1 skipped (71)
+      Tests  701 passed | 2 skipped (703)
+   Start at  23:07:25
+   Duration  54.41s (transform 2.50s, setup 0ms, import 7.40s, tests 8.49s, environment 27.96s)
+
+$ npm run build
+✓ built in 3.44s
+
+$ npm run e2e (Chromium del sistema)
+  29 passed (1.7m)

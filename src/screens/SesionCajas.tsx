@@ -8,13 +8,13 @@ import type { NbmeState } from '../nbme/types'
 import { NbmePlayer } from '../nbme/NbmePlayer'
 import { MAX_REINSERCIONES, reinsertarFallo, TITULO_NBME_CAJAS, type ItemCaja } from '../lib/cajas'
 import { usePielEstudio } from '../components/PielEstudio'
-import { PAUSA_CADA, PausaSugerida } from '../components/PausaSugerida'
+import { PausaDeBloque } from '../components/PausaDeBloque'
 import type { Concepto } from '../schema/concept'
 import type { Intento } from '../srs/tipos'
 import { Reproductor, type Cola } from './Reproductor'
 import { necesitaReintento } from './sesion'
 
-const SUBTITULO = 'Lo que viste otros días y todavía no está cerrado.'
+const SUBTITULO = 'Consolidación y mantenimiento de lo que ya estudiaste.'
 /**
  * Título fijo de las sesiones NBME de las cajas. Una pregunta fallada deja su sesión
  * con el reintento pendiente; cuando vuelve a tocar, otro día, se retoma esa misma
@@ -71,7 +71,6 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
   const [fallos, setFallos] = useState(0)
   // Omitir un paso no acredita un repaso ni cambia el progreso guardado.
   const [omitidos, setOmitidos] = useState<Set<number>>(() => new Set())
-  const [pausa, setPausa] = useState(false)
   const pasosRef = useRef(pasos)
   pasosRef.current = pasos
   const esperando = useRef<{ paso: number; pregunta: string } | null>(null)
@@ -90,8 +89,6 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
     if (fallo) setFallos(n => n + 1)
     const siguientes = fallo ? reinsertarFallo(pasosRef.current, cursor) : pasosRef.current
     setPasos(siguientes)
-    // Veinte pasos seguidos en esta visita: respiro antes del siguiente, si queda alguno.
-    if ((cursor + 1) % PAUSA_CADA === 0 && cursor + 1 < siguientes.length) setPausa(true)
     setCursor(cursor + 1)
     setPreparado(null)
     setErrorPaso(null)
@@ -118,14 +115,14 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
       setPreparado(cursor)
       return
     }
-    guardarReanudable({ versionFormato: 2, modulo, sesion: 'repaso', indice: 0, ts: Date.now(), sessionId: sesionPaso,
+    guardarReanudable({ versionFormato: 3, modulo, sesion: 'repaso', indice: 0, ts: Date.now(), sessionId: sesionPaso,
       conceptIds: [c.concept_id], titulo, subtitulo: SUBTITULO, cantidadInicial: 1, revisionInicialHecha: false, msVisibles: 0 })
   }, [paso, cursor, conceptos, preparado, estado.reanudable, guardarReanudable, sesionPaso, modulo, titulo])
 
   // Paso de pregunta: la primera vez abre su sesión; una reinserción retoma la misma, que ya trae el reintento.
-  // Durante la pausa no se abre: el tiempo de respiro no debe contar como tiempo en la pregunta.
+  // Una pregunta se prepara una sola vez al llegar a su paso.
   useEffect(() => {
-    if (!paso || paso.item.tipo !== 'pregunta' || preparado === cursor || errorPaso || pausa || nbme.loading || nbme.busy) return
+    if (!paso || paso.item.tipo !== 'pregunta' || preparado === cursor || errorPaso || nbme.loading || nbme.busy) return
     const pregunta = paso.item.id
     const abierta = sesionesPregunta[pregunta]
     if (abierta && nbme.state.sessions[abierta]) {
@@ -154,7 +151,7 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
       esperando.current = null
       setErrorPaso(nbmeRef.current.error ?? 'No se pudo abrir esta pregunta.')
     })
-  }, [paso, cursor, preparado, errorPaso, pausa, nbme.loading, nbme.busy, nbme.state, nbme.catalog, sesionesPregunta, avanzar])
+  }, [paso, cursor, preparado, errorPaso, nbme.loading, nbme.busy, nbme.state, nbme.catalog, sesionesPregunta, avanzar])
 
   // Cada paso empieza arriba: la explicación larga del anterior no deja la siguiente pregunta fuera de la vista.
   useEffect(() => { document.scrollingElement?.scrollTo?.({ top: 0 }) }, [cursor])
@@ -197,7 +194,7 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
     return `${item.tipo}:${item.id}`
   })).size
 
-  if (cursor >= pasos.length) return <section className="tarjeta pila" aria-labelledby="cajas-fin">
+  if (cursor >= pasos.length) return <section className="tarjeta pila hoy-completion" aria-labelledby="cajas-fin">
     <div><span className={`etq${omitidos.size ? '' : ' verde'}`}>{omitidos.size ? 'Recorrido terminado' : 'Cajas hechas'}</span><h2 id="cajas-fin" style={{ marginTop: 10 }}>{titulo}</h2></div>
     <p>{hechas === 1 ? 'Una caja repasada' : `${hechas} cajas repasadas`}{fallos
       ? omitidos.size
@@ -206,20 +203,22 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
       : omitidos.size ? '.' : ', todas a la primera.'}</p>
     {cajasSinRepasar > 0 && <p>{cajasSinRepasar === 1 ? 'Una caja quedó con un repaso pendiente para otro día.'
       : `${cajasSinRepasar} cajas quedaron con un repaso pendiente para otro día.`}</p>}
-    <p className="sutil">{omitidos.size ? 'Las respuestas que diste se conservan. Lo que falló vuelve mañana desde la caja 1.'
-      : 'Lo que falló vuelve mañana desde la caja 1. Lo demás sube de caja.'}</p>
+    <p className="sutil">Tus respuestas quedan guardadas. El siguiente repaso se programa según la evidencia de cada concepto o pregunta.</p>
     <div><button className="btn principal" onClick={onSalir}>Volver a Hoy</button></div>
   </section>
 
   if (!paso || !conceptos) return <div className="vacio" role="status">Preparando tus cajas…</div>
 
-  const encabezado = <div className="sesion-mixta-guia">
+  const encabezado = <div className="sesion-mixta-guia session-stepper">
     <p className="mini">{titulo}</p>
+    {paso.vez ? <p className="session-step-label">Corrección · repaso de un fallo</p>
+      : <p className="session-step-label">Bloque {Math.floor(recorridas / 5) + 1} de {Math.ceil(items.length / 5)} · Paso {recorridas % 5 + 1} de {Math.min(5, items.length - Math.floor(recorridas / 5) * 5)}</p>}
     <p className="sutil">{paso.vez
       ? `Repaso de un fallo · caja 1 · ${hechas} de ${items.length} hechas`
-      : `${recorridas + 1} de ${items.length} · caja ${paso.item.caja}`}</p>
+      : `${recorridas + 1} de ${items.length} · ${paso.item.mantenimiento ? 'mantenimiento' : `caja ${paso.item.caja}`}`}</p>
     {cajasSinRepasar > 0 && <p className="mini">{hechas} de {items.length} cajas respondidas · {cajasSinRepasar} con un repaso pendiente</p>}
     <progress className="sesion-mixta-progreso" aria-label="Cajas hechas" value={hechas} max={items.length} />
+    {recorridas > 0 && recorridas % 5 === 0 && paso.vez === 0 && <PausaDeBloque onParar={onSalir} />}
   </div>
   const avisoFallo = paso.vez < MAX_REINSERCIONES
     ? 'Vuelve a la caja 1 y aparecerá otra vez dentro de unos pasos.'
@@ -228,9 +227,6 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
   const volver = <button className="btn fantasma" onClick={onSalir}>Volver a Hoy</button>
   // Entre una caja y la siguiente la cabecera no se mueve: sólo cambia lo de debajo.
   const preparando = (texto: string) => <div className="pila">{encabezado}<div className="vacio" role="status">{texto}</div></div>
-
-  if (pausa) return <div className="pila">{encabezado}
-    <PausaSugerida hechos={cursor} onSeguir={() => setPausa(false)} onParar={onSalir} etiquetaParar="Parar por ahora" /></div>
 
   if (paso.item.tipo === 'concepto') {
     const c = conceptos.get(paso.item.id)

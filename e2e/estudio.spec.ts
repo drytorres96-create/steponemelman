@@ -224,20 +224,22 @@ test('NBME: laboratorios y columnas conservan sus celdas sin desbordar la pantal
   expect(errores).toEqual([])
 })
 
-test('cajas: tras 20 seguidas llega la pausa sugerida; Intro en «Seguir» continúa', async ({ page }) => {
+test('cajas: tras 20 seguidas la pausa es opcional y permite guardar sin un intento nuevo', async ({ page }) => {
   test.setTimeout(120_000)
   const errores = await abrir(page, 'muchas')
   await page.getByRole('button', { name: /(Empezar|Seguir con) las cajas/ }).click()
-  const pausa = page.getByText('Pausa sugerida')
+  const pausa = page.locator('.session-block-pause')
   for (let paso = 0; paso < 20; paso++) {
-    await expect(pausa).toHaveCount(0)
+    await expect(page.getByText('Pausa sugerida')).toHaveCount(0)
     await responderPaso(page)
   }
   await expect(pausa).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Seguir', exact: true })).toBeFocused()
-  await page.keyboard.press('Enter')
-  await expect(pausa).toHaveCount(0)
+  await expect(pausa).not.toHaveAttribute('open', '')
   await expect(preguntaNbme(page).or(respuesta(page))).toBeVisible()
+  await pausa.locator('summary').click()
+  await page.getByRole('button', { name: 'Parar por ahora', exact: true }).click()
+  await expect(page.locator('.anillo-doble')).toBeVisible()
+  await expect(page.getByText('Retomamos aquí', { exact: true })).toBeVisible()
   expect(errores).toEqual([])
 })
 

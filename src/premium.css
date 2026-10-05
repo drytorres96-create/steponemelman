@@ -1,0 +1,184 @@
+/* Melman · un objetivo visible, una acción principal y una superficie de lectura.
+   La fotografía pertenece a la portada. Los hitos usan el oro ya presente en la piel. */
+:root:not([data-piel-estudio]) {
+  --panel: #14261f;
+  --panel-2: #0b1114;
+  --vidrio-barra: var(--panel);
+  --vidrio-bajo: var(--panel);
+  --vidrio-medio: var(--panel);
+  --glass-floor: var(--panel);
+  --magenta: var(--acento);
+  --radio: 18px;
+  --radio-s: 10px;
+}
+
+.editorial-app { font-weight: 400; }
+.editorial-app :where(h1, h2, h3) { text-wrap: balance; }
+.editorial-app .btn { border-radius: var(--radio-s); letter-spacing: .005em; font-weight: 550; }
+.editorial-app .btn.principal { min-height: 48px; padding-inline: 20px; }
+.editorial-app .btn.pequeno { font-weight: 450; }
+.editorial-app .btn:disabled { opacity: .55; }
+.editorial-app .tarjeta { border-radius: var(--radio); }
+.editorial-app:not(.session-focus) .barra-prog:not(.oro) > span { background: var(--acento); }
+.editorial-app:not(.session-focus) .barra-in { box-shadow: none; border-color: var(--linea); }
+.editorial-app:not(.session-focus) .nav button { font-size: 13px; font-weight: 500; }
+.editorial-app:not(.session-focus) .workspace-topline { font-size: 12px; padding-bottom: 14px; }
+.editorial-app:not(.session-focus) .hoy-focus { max-width: 1040px; gap: 20px; }
+.editorial-app:not(.session-focus) .hoy-focus .hoy-cabecera { min-height: 220px; padding: 30px; border-radius: 22px; gap: 28px; }
+.editorial-app:not(.session-focus) .hoy-focus .hoy-cabecera h1 { font-size: clamp(32px, 3.8vw, 46px); line-height: 1.14; font-weight: 550; letter-spacing: -.035em; }
+.hoy-focus .hoy-tema { font-size: 17px; line-height: 1.55; }
+.hoy-focus .hoy-leyenda { max-width: 54ch; }
+.hoy-focus .panel-escena { opacity: .22; }
+.hoy-objective { min-width: 0; margin: 14px 0; padding: 12px 14px; border-left: 2px solid var(--acento); border-radius: var(--radio-s); background: var(--panel-2); font-size: 17px; line-height: 1.5; }
+.hoy-objective :where(h2, p) { margin: 0; }
+.hoy-objective h2 { font-size: clamp(21px, 2.2vw, 27px); font-weight: 500; line-height: 1.35; }
+.hoy-objective p + p { margin-top: 6px; }
+.hoy-objective .mini { margin-top: 8px; line-height: 1.55; }
+.hoy-progress-summary { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; font-variant-numeric: tabular-nums; }
+.hoy-progress-summary p { margin: 0; }
+.hoy-progress-summary b { font-weight: 600; color: var(--texto); }
+.editorial-app:not(.session-focus) .hoy-next-block { padding: 24px; border-color: var(--linea-interactiva); background: var(--panel); }
+.hoy-next-block > .rotulo { margin-bottom: 8px; }
+.hoy-next-block h2 { margin: 0; font-size: 25px; line-height: 1.3; font-weight: 500; }
+.hoy-next-block > .mini { line-height: 1.5; }
+.hoy-next-block > .hoy-progress-summary { margin-top: 16px; color: var(--texto-3); }
+.hoy-next-block .btn.principal { min-width: 190px; }
+.hoy-focus .hoy-ahora { padding: 0 2px; background: transparent; font-size: 16px; line-height: 1.55; }
+.hoy-focus .hoy-bloques { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+.editorial-app:not(.session-focus) .hoy-focus .hoy-bloque { grid-template-columns: auto minmax(0, 1fr); padding: 18px; gap: 14px; }
+.hoy-focus .hoy-bloque .btn { grid-column: 1 / -1; width: 100%; min-width: 0; }
+.hoy-focus .hoy-bloque h2 { font-size: 18px; }
+.hoy-focus .hoy-bloque .mini { font-size: 13px; line-height: 1.5; }
+.hoy-focus .hoy-desplegable > summary { font-size: 14px; }
+.hoy-completion { padding: 24px; border: 1px solid var(--linea); border-left: 3px solid var(--oro); border-radius: var(--radio); background: var(--panel); }
+.hoy-completion h2 { font-size: 26px; line-height: 1.3; margin: 0 0 8px; font-weight: 500; }
+.hoy-completion :where(.etq, strong) { color: var(--oro); }
+.study-secondary-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.study-secondary-nav .btn { min-height: 44px; font-size: 13px; background: transparent; border-color: transparent; padding-inline: 12px; }
+.study-secondary-nav .btn:hover:not(:disabled) { background: var(--panel-2); border-color: var(--linea); }
+.premium-progress-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.premium-progress-card { min-width: 0; padding: 22px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel); }
+.premium-progress-card :where(h2, h3) { font-size: 18px; font-weight: 550; margin: 0 0 8px; }
+.premium-progress-card > strong { display: block; font-size: 32px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.premium-progress-card .mini { line-height: 1.55; margin-top: 8px; }
+.premium-progress > .tarjeta h2 { font-size: 24px; line-height: 1.35; font-weight: 500; }
+.premium-progress .progress-radial-summary { gap: 20px; }
+.premium-progress .progress-ring-legend { gap: 10px; }
+.premium-progress details > summary { color: var(--texto-2); font-size: 14px; }
+.learning-milestone { padding: 14px 16px; margin: 12px 0; border-left: 3px solid var(--oro); border-radius: var(--radio-s); background: var(--oro-tenue); color: var(--texto); line-height: 1.55; }
+.learning-milestone strong { color: var(--oro); font-weight: 600; }
+.learning-recovered { color: var(--verde); font-weight: 500; line-height: 1.5; }
+
+/* La sesión ocupa el plano de lectura: marca discreta y ninguna capa fotográfica. */
+.session-focus :where(.cine-escena, .cine-velo, .cine-haz, .cine-niebla, .cine-halo, .cine-vineta, .panel-escena, .scene-window) { display: none; }
+.session-focus .cinematic-backdrop { background: var(--bg); }
+.editorial-app.session-focus > main { padding-top: 10px; padding-bottom: max(48px, env(safe-area-inset-bottom, 0px)); }
+.editorial-app.session-focus > main > .contenedor { max-width: 900px; }
+.editorial-app.session-focus > .barra { padding-top: max(8px, env(safe-area-inset-top, 0px)); }
+:root[data-piel-estudio] .session-focus .barra-in { min-height: 44px; border: 0; background: transparent; box-shadow: none; padding: 6px 10px; }
+.session-focus .brand-wordmark { font-size: 15px; }
+.session-focus .brand-wordmark > span { font-size: 9px; letter-spacing: .13em; }
+.session-focus :where(.reproductor, .nbme-player, .sesion-mixta-guia) { width: 100%; max-width: 820px; }
+.session-focus .reproductor.pila, .session-focus .nbme-player.pila { gap: 12px; }
+.session-focus .session-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; min-width: 0; }
+.session-toolbar > * { min-width: 0; }
+.session-toolbar > .fila { gap: 6px; }
+.session-focus .session-toolbar .etq { border: 0; background: transparent; padding: 3px 0; font-size: 12px; }
+.session-toolbar .etq + .etq { margin-left: 8px; }
+.session-focus .session-toolbar .btn { padding-inline: 11px; font-size: 13px; }
+.session-toolbar .mini { margin: 0; }
+.session-focus .session-presentation { margin: 0; line-height: 1.4; }
+.session-confidence { margin: 0; }
+.session-focus .session-help { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+.session-focus .session-help .btn { min-width: 0; padding: 7px 6px; font-size: 13px; line-height: 1.35; border-color: transparent; }
+.session-stepper { display: grid; gap: 5px; padding: 6px 0 12px; font-size: 13px; line-height: 1.45; border-bottom: 1px solid var(--linea); }
+.session-stepper :where(p, progress) { margin: 0; }
+.session-stepper progress { height: 4px; width: 100%; }
+.session-stepper .mini { color: var(--texto-2); }
+.session-focus .session-stepper .mini { font-size: 13px; }
+.session-stepper .session-step-label { color: var(--texto); font-size: 14px; font-weight: 550; }
+.session-stepper .sutil { font-size: 13px; line-height: 1.45; }
+.session-block-pause { border-top: 1px solid var(--linea); margin-top: 4px; padding-top: 4px; }
+.session-block-pause > summary { font-size: 13px; color: var(--texto-2); }
+:root[data-piel-estudio] .session-focus :is(.tarea, .nbme-question, .nbme-feedback) { padding: 24px 26px; border-radius: var(--radio); box-shadow: none; }
+:root[data-piel-estudio] .session-focus .pregunta { font-size: 21px; line-height: 1.5; font-weight: 450; margin-bottom: 16px; }
+.session-focus .tarea .fila:has(> input[type='text']) { display: flex; flex-wrap: wrap; gap: 8px; }
+.session-focus .tarea .fila > input[type='text'] { flex: 1 1 220px; width: auto; min-height: 48px; font-size: 16px; }
+.session-focus .tarea .fila:has(> input[type='text']) > .btn.principal { flex: 0 0 auto; }
+.session-focus .tarea .mini:has(+ .fila > input[type='text']) { margin: 0 0 8px; line-height: 1.4; }
+.session-focus .tarea details > summary { font-size: 13px; }
+.session-feedback-key { margin: 10px 0; padding: 12px 14px; border-left: 2px solid var(--acento); border-radius: var(--radio-s); background: var(--violeta-tenue); color: var(--texto); font-size: 17px; line-height: 1.6; }
+.session-feedback-key p { margin: 0; }
+.session-focus .retro { padding: 18px; margin-top: 14px; }
+.session-focus .retro > .btn.principal { margin-top: 10px; }
+.session-focus .retro-mas { border-top: 1px solid var(--linea); padding-top: 8px; }
+.session-focus .retro-mas > summary { color: var(--texto-2); }
+.session-focus .nbme-player-header .mini { margin: 0; }
+.session-focus .nbme-player-header .btn { font-size: 13px; }
+.session-focus .nbme-player:has(> .nbme-player-header.paso) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.session-focus .nbme-player:has(> .nbme-player-header.paso) > * { grid-column: 1 / -1; }
+.session-focus .nbme-player:has(> .nbme-player-header.paso) > p.mini:first-child { grid-column: 1; margin: 0; font-size: 13px; line-height: 1.45; }
+.session-focus .nbme-player:has(> .nbme-player-header.paso) > .nbme-player-header { grid-column: 2; grid-row: 1; }
+.session-focus .nbme-question-heading { color: var(--texto-2); font-size: 14px; font-weight: 500; margin-bottom: 10px; }
+:root[data-piel-estudio] .session-focus .nbme-stem { font-size: 18px; line-height: 1.7; margin-top: 12px; }
+.session-focus .nbme-stem-parrafo { margin-bottom: 14px; }
+.session-focus .nbme-options { margin-top: 18px; }
+.session-focus .nbme-options legend { margin-bottom: 8px; }
+.session-focus .nbme-option { padding: 11px 13px; line-height: 1.5; }
+.session-focus .nbme-feedback { gap: 14px; }
+.session-focus .nbme-feedback h2 { font-size: 21px; line-height: 1.3; font-weight: 500; }
+.session-focus .nbme-source-text { line-height: 1.65; }
+.session-focus .nbme-feedback .nbme-respuesta { margin: 0; padding: 12px 14px; background: var(--violeta-tenue); border-radius: var(--radio-s); }
+.session-focus .nbme-status { line-height: 1.5; }
+.session-focus .nbme-figure-notice { padding: 8px 12px; font-size: 14px; }
+.session-focus .nbme-figure-links { column-gap: 16px; }
+
+@media (max-width: 760px) {
+  .premium-progress-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .premium-progress-card { padding: 18px; }
+  .premium-progress-card > strong { font-size: 28px; }
+  .premium-progress > .tarjeta h2 { font-size: 22px; }
+  .editorial-app:not(.session-focus) .hoy-focus { gap: 16px; }
+  .editorial-app:not(.session-focus) .hoy-focus .hoy-cabecera { min-height: 0; grid-template-columns: 116px minmax(0, 1fr); padding: 20px 18px; gap: 16px; text-align: left; justify-items: start; }
+  .hoy-focus .hoy-anillo .anillo-doble { width: 116px !important; height: 116px !important; }
+  .hoy-focus .hoy-anillo .anillo-doble svg { width: 100%; height: 100%; }
+  .hoy-focus .anillo-doble .centro b { font-size: 24px; }
+  .hoy-focus .anillo-doble .centro b span { font-size: 13px; }
+  .hoy-focus .hoy-cabecera .editorial-eyebrow { margin-bottom: 6px; letter-spacing: .06em; }
+  .hoy-focus .hoy-tema { margin-top: 6px; font-size: 15px; }
+  .editorial-app:not(.session-focus) .hoy-focus .hoy-leyenda { margin: 8px 0 0; font-size: 12px; }
+  .editorial-app:not(.session-focus) .hoy-focus .hoy-cabecera h1 { font-size: 34px; }
+  .hoy-objective { padding: 11px 12px; font-size: 16px; }
+  .hoy-progress-summary { gap: 6px 16px; font-size: 14px; }
+  .editorial-app:not(.session-focus) .hoy-next-block { padding: 18px; }
+  .hoy-next-block h2 { font-size: 23px; }
+  .hoy-next-block .btn.principal { min-width: 0; width: 100%; }
+  .hoy-completion { padding: 20px; }
+  .hoy-focus .hoy-bloques { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .editorial-app.session-focus > main { padding-top: 6px; }
+  .editorial-app.session-focus > main > .contenedor { padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); }
+  .session-focus .session-toolbar { gap: 4px 8px; }
+  .session-focus .session-toolbar .btn { padding-inline: 9px; }
+  .session-stepper { padding-block: 4px 10px; }
+  :root[data-piel-estudio] .session-focus :is(.tarea, .nbme-question, .nbme-feedback) { padding: 18px; }
+  :root[data-piel-estudio] .session-focus .pregunta { font-size: 20px; margin-bottom: 12px; }
+  :root[data-piel-estudio] .session-focus .nbme-stem { font-size: 17px; line-height: 1.68; }
+  .session-focus .tarea .fila > input[type='text'] { flex-basis: 100%; }
+  .session-focus .tarea .fila:has(> input[type='text']) > .btn.principal { width: 100%; }
+  .session-focus .tarea .fila:has(> input[inputmode='decimal']) { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .session-focus .tarea .fila:has(> input[inputmode='decimal']) > .btn.principal { grid-column: 1 / -1; }
+  .session-focus .nbme-option { padding: 11px; gap: 8px; }
+  .session-focus .nbme-feedback h2 { font-size: 20px; }
+  .session-feedback-key { padding: 11px 12px; font-size: 16px; }
+  .session-focus .nbme-actions { gap: 8px; }
+}
+
+@media (max-width: 380px) {
+  .editorial-app.session-focus > main > .contenedor { padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
+  :root[data-piel-estudio] .session-focus :is(.tarea, .nbme-question, .nbme-feedback) { padding: 16px; }
+  .session-focus .session-toolbar .etq { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hoy-focus *, .session-focus *, .learning-milestone, .premium-progress-card { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

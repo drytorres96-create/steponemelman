@@ -26,6 +26,7 @@ const acierto = (ts: number): Intento => ({
   attempt_id: `a-${++serie}`, session_id: `s-${serie}`, ts, calificacion: 3, resultado: 'correcta',
   interaccion: 'recuperacion_libre', recuperacion_activa: true, tipo_evidencia: 'recuerdo',
   pistas_usadas: 0, fuente_consultada: false, explicacion_previa: false,
+  pregunta_version: 'sintetica-v1', evaluador_version: 'sintetico-v1',
   ms: 1000, tipo_error: 'ninguno', confianza_declarada: null,
 })
 /** Un concepto que cumple los criterios con su tercer acierto, que cae en `ultimo`. */
@@ -92,7 +93,8 @@ describe('visión a futuro', () => {
     await pintar(f(10, 10, 10))
     expect(host.querySelector('#meta-titulo')?.textContent).toBe('Meta de 60 días: 510 conceptos y 255 preguntas')
     expect(texto()).toContain('Día 16 de 60, del 25 sept al 23 nov. Después quedan 4 semanas para consolidar antes del examen.')
-    expect(barra('Conceptos dominados')?.getAttribute('aria-valuetext')).toBe('80 de 510; la línea va por 67')
+    expect(barra('Conceptos con dominio demostrado en esta meta')?.getAttribute('aria-valuetext')).toBe('80 de 510; la línea va por 67')
+    expect(texto()).toContain('Dominio demostrado total: 81 conceptos.')
     expect(barra('Preguntas NBME respondidas')?.getAttribute('aria-valuetext')).toBe('38 de 255; la línea va por 59')
     expect(texto()).toContain('80 / 510 · 16 %')
     expect(texto()).toContain('38 / 255 · 15 %')
@@ -131,13 +133,26 @@ describe('visión a futuro', () => {
     expect(host.querySelector('.meta-tabla tr.meta-actual th')?.textContent).toBe('11 oct esta semana')
   })
 
-  it('un repaso pendiente no descuenta un concepto dominado: cuenta como una caja cerrada en Hoy', async () => {
+  it('un repaso pendiente conserva el dominio demostrado y muestra su mantenimiento separado', async () => {
     for (let i = 1; i <= 30; i++) progreso[`C${i}`] = dominado(`C${i}`, f(10, 1))
     const ahora = f(11, 20, 10)
-    // El escenario tiene sentido sólo si el repaso ya venció: el estado vigente lo daría por perdido.
+    // El escenario tiene sentido sólo si el mantenimiento ya está pendiente.
     expect(dominioVigente(progreso.C1, CRITERIOS_POR_DEFECTO, ahora)).toBe(false)
     await pintar(ahora)
-    expect(barra('Conceptos dominados')?.getAttribute('aria-valuetext')).toMatch(/^30 de 510;/)
+    expect(barra('Conceptos con dominio demostrado en esta meta')?.getAttribute('aria-valuetext')).toMatch(/^30 de 510;/)
+    expect(texto()).toContain('0 al día · 30 pendientes de repaso')
+  })
+
+  it('calcula con los IDs del índice sin cargar el contenido y sin fechar un dominio desconocido', async () => {
+    progreso.C1 = dominado('C1', f(10, 1))
+    progreso.C2 = { ...dominado('C2', f(10, 1)), dominado_en: null }
+    progreso.fuera = dominado('fuera', f(10, 1))
+    const cargarDetalleConceptos = vi.fn()
+    vi.setSystemTime(new Date(f(10, 10, 10)))
+    await act(async () => root.render(<ProgresoMeta conceptIds={['C1', 'C2', 'C1']} cargarDetalleConceptos={cargarDetalleConceptos} />))
+    expect(cargarDetalleConceptos).not.toHaveBeenCalled()
+    expect(barra('Conceptos con dominio demostrado en esta meta')?.getAttribute('aria-valuenow')).toBe('1')
+    expect(texto()).toContain('Dominio demostrado total: 2 conceptos.')
   })
 
   it('mientras carga el banco no recorta la meta de preguntas a cero', async () => {

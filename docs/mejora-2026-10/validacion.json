@@ -1,0 +1,48 @@
+{
+  "version": "1.26.0",
+  "base": "7610e317abf1de2536788805ca3abc7ea2f6b6f0",
+  "lotes": [
+    {
+      "lote": 1,
+      "snapshot_codigo": "44194a2ac9d9301ce3098876352d48800432283a",
+      "npm_ci": "success",
+      "unitarias": "Tests  674 passed | 2 skipped (676)",
+      "build": "success",
+      "navegador": "29 passed (1.3m)"
+    },
+    {
+      "lote": 2,
+      "snapshot_codigo": "7fbfee23c4b8a7454c3698f4c5d7db9482f8c624",
+      "npm_ci": "success",
+      "unitarias": "Tests  701 passed | 2 skipped (703)",
+      "build": "success",
+      "navegador": "29 passed (1.7m)"
+    },
+    {
+      "lote": 3,
+      "snapshot_codigo": "1d514755f1ec9289c99d9c3b5fa6c811ff0bf4e8",
+      "npm_ci": "success",
+      "unitarias": "Tests  701 passed | 2 skipped (703)",
+      "build": "success",
+      "navegador": "29 passed (1.6m)"
+    },
+    {
+      "lote": 4,
+      "snapshot_codigo": "c5d6f58192a40264e83b26ce21b8aecb72918aff",
+      "npm_ci": "success",
+      "unitarias": "Tests  707 passed | 2 skipped (709)",
+      "build": "success",
+      "navegador": "29 passed (1.4m)"
+    },
+    {
+      "lote": 5,
+      "snapshot_codigo": "085abc094b651d77dbf6cc22434ad6e28449ecce",
+      "npm_ci": "success",
+      "unitarias": "Tests  708 passed | 2 skipped (710)",
+      "build": "success",
+      "navegador": "37 passed (1.7m)"
+    }
+  ],
+  "png": 64,
+  "nota": "Tras estas puertas se añaden sólo el informe y las capturas; el CI comprueba el HEAD definitivo."
+}

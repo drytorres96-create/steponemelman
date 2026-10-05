@@ -26,6 +26,7 @@ import type { Vineta } from './vinetas/modelo'
 
 // Hoy se abre enseguida. El resto se descarga al entrar y queda en la caché del navegador.
 const Inicio = lazy(() => import('./screens/Inicio').then(m => ({ default: m.Inicio })))
+const Progreso = lazy(() => import('./screens/Progreso').then(m => ({ default: m.Progreso })))
 const Modulos = lazy(() => import('./screens/Modulos').then(m => ({ default: m.Modulos })))
 const SesionCajas = lazy(() => import('./screens/SesionCajas').then(m => ({ default: m.SesionCajas })))
 const SesionMixta = lazy(() => import('./semana/SesionMixta').then(m => ({ default: m.SesionMixta })))
@@ -37,7 +38,7 @@ const NbmePlayer = lazy(() => import('./nbme/NbmePlayer').then(m => ({ default: 
 const VinetasInicio = lazy(() => import('./vinetas/Vinetas').then(m => ({ default: m.VinetasInicio })))
 const VinetasSesion = lazy(() => import('./vinetas/Vinetas').then(m => ({ default: m.VinetasSesion })))
 
-type Vista = 'hoy' | 'inicio' | 'modulos' | 'auditoria' | 'ajustes'
+type Vista = 'hoy' | 'inicio' | 'modulos' | 'auditoria' | 'ajustes' | 'progreso'
   | 'estudio' | 'preguntas' | 'sesion' | 'cajas' | 'vinetas'
 /**
  * Una sola entrada: la portada pone el techo del día y absorbe lo que antes eran Mi
@@ -46,7 +47,8 @@ type Vista = 'hoy' | 'inicio' | 'modulos' | 'auditoria' | 'ajustes'
  */
 const NAV: { id: Vista; txt: string }[] = [{ id: 'hoy', txt: 'Hoy' }]
 const SECUNDARIAS: { id: Vista; txt: string }[] = [
-  { id: 'modulos', txt: 'Elegir contenido' },
+  { id: 'modulos', txt: 'Biblioteca' },
+  { id: 'progreso', txt: 'Progreso' },
   { id: 'ajustes', txt: 'Ajustes y respaldo' },
   { id: 'auditoria', txt: 'Calidad del material' }, { id: 'inicio', txt: 'Plan diario clásico' },
 ]
@@ -65,6 +67,7 @@ const SCENES: Record<Vista, { fondo: CinematicScene; ventana: CinematicScene; ob
   modulos: { fondo: 'ribbons', ventana: 'constellation', objeto: 'crystal' },
   auditoria: { fondo: 'stone', ventana: 'lens', objeto: 'neural-violet' },
   ajustes: { fondo: 'smoke', ventana: 'stone', objeto: 'optical-violet' },
+  progreso: { fondo: 'forest', ventana: 'forest', objeto: 'crystal' },
   estudio: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
   preguntas: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
   sesion: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
@@ -72,7 +75,7 @@ const SCENES: Record<Vista, { fondo: CinematicScene; ventana: CinematicScene; ob
   vinetas: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
 }
 /** Pantallas que Hoy absorbió: los enlaces guardados siguen llegando, ahora a la portada. */
-const ABSORBIDAS = ['semana', 'recuperacion', 'progreso', 'repaso']
+const ABSORBIDAS = ['semana', 'recuperacion', 'repaso']
 
 // A session queue is restored from the saved study state, never from the URL alone.
 export function vistaDesdeHash(): Vista {
@@ -232,8 +235,8 @@ export default function App() {
   if (!indice) return <div className="vacio" style={{ paddingTop: 120 }}><p>{errorCarga ?? 'No se pudo cargar el material de estudio.'}</p><button className="btn" onClick={() => location.reload()}>Volver a intentar</button></div>
 
   return (
-    <div className={`app editorial-app${enConcentracion ? ' study-focus' : ''}`} data-app-version={APP_VERSION} data-view={vista}>
-      <CinematicBackdrop scene={SCENES[vista].fondo} quiet={enConcentracion} />
+    <div className={`app editorial-app${enConcentracion ? ' study-focus session-focus' : ''}`} data-app-version={APP_VERSION} data-view={vista}>
+      {!enConcentracion && <CinematicBackdrop scene={SCENES[vista].fondo} />}
       <a className="saltar-contenido" href="#contenido" onClick={e => { e.preventDefault(); contenido.current?.focus() }}>Saltar al contenido</a>
       <header className="barra">
         <div className="contenedor barra-in">
@@ -249,7 +252,7 @@ export default function App() {
             {!enConcentracion && <MedidorIA />}
             {sincronizacionVisible && <button className="btn pequeno fantasma" title="Comprobar y sincronizar el progreso"
               onClick={() => { void sincronizarTodo() }} aria-live="polite">{sincronizacionVisible}</button>}
-            {!enConcentracion && <details className="menu-cuenta"><summary>Cuenta y ajustes</summary><div className="menu-cuenta-opciones">{SECUNDARIAS.map(n => <button className="btn pequeno fantasma" key={n.id} onClick={e => { ir(n.id); e.currentTarget.closest('details')?.removeAttribute('open') }}>{n.txt}</button>)}<button className="btn pequeno fantasma" onClick={async () => {
+            {!enConcentracion && <details className="menu-cuenta study-secondary-nav"><summary>Biblioteca, progreso y cuenta</summary><div className="menu-cuenta-opciones">{SECUNDARIAS.map(n => <button className="btn pequeno fantasma" key={n.id} onClick={e => { ir(n.id); e.currentTarget.closest('details')?.removeAttribute('open') }}>{n.txt}</button>)}<button className="btn pequeno fantasma" onClick={async () => {
               const guardado = await sincronizarTodo()
               if (!guardado && !confirm('Puede haber cambios pendientes. Se conservarán en este navegador para esta cuenta. ¿Cerrar sesión?')) return
               try { await signOut() } catch { setError('No se pudo cerrar la sesión. Vuelve a intentarlo.') }
@@ -315,6 +318,7 @@ export default function App() {
           {!cargando && vista === 'vinetas' && !vinetasAbiertas && <div className="vacio"><p>Estas viñetas ya no están abiertas.</p>
             <button className="btn" onClick={() => { setTipoContenido('vinetas'); ir('modulos') }}>Volver a las viñetas</button></div>}
           {!cargando && vista === 'auditoria' && <Auditoria />}
+          {!cargando && vista === 'progreso' && <Progreso />}
           {!cargando && vista === 'ajustes' && <Ajustes />}
           </Suspense>
           </Resguardo>

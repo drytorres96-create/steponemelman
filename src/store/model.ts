@@ -1,6 +1,7 @@
 import { nuevoProgreso, programar } from '../srs/fsrs'
 import { CRITERIOS_POR_DEFECTO, calcularEstado, evaluarDominio, type CriteriosDominio, sonCriteriosHeredados } from '../srs/mastery'
 import { intentoCorrecto, NOMBRE_ERROR, NOMBRE_ESTADO, type Intento, type ProgresoConcepto } from '../srs/tipos'
+import type { VersionFormato } from '../lib/formatos'
 
 export const CORPUS_VERSION = '1.0.5' as const
 
@@ -17,7 +18,7 @@ export interface RegistroSesion {
 }
 
 export interface Reanudable {
-  versionFormato?: 1 | 2
+  versionFormato?: VersionFormato
   modulo: string
   sesion: string
   indice: number
@@ -184,7 +185,7 @@ function leerReanudable(v: unknown): Reanudable | null | false {
   if (v.cantidadInicial !== undefined && (!entero(v.cantidadInicial, 1)
     || !Array.isArray(v.conceptIds) || v.cantidadInicial > v.conceptIds.length)) return false
   if (v.revisionInicialHecha !== undefined && typeof v.revisionInicialHecha !== 'boolean') return false
-  if (v.versionFormato !== undefined && ![1, 2].includes(v.versionFormato as number)) return false
+  if (v.versionFormato !== undefined && ![1, 2, 3].includes(v.versionFormato as number)) return false
   if (v.presupuestoMinutos !== undefined && ![10, 20, 30].includes(v.presupuestoMinutos as number)) return false
   if (v.msVisibles !== undefined && !numero(v.msVisibles)) return false
   for (const k of ['continuarSinLimite', 'pausaPorTiempoPendiente']) if (v[k] !== undefined && typeof v[k] !== 'boolean') return false
@@ -199,7 +200,7 @@ function leerReanudable(v: unknown): Reanudable | null | false {
     sesion: v.sesion,
     indice: v.indice,
     ts: v.ts,
-    ...(v.versionFormato !== undefined ? { versionFormato: v.versionFormato as 1 | 2 } : {}),
+    ...(v.versionFormato !== undefined ? { versionFormato: v.versionFormato as VersionFormato } : {}),
     ...(v.conceptIds !== undefined ? { conceptIds: [...v.conceptIds] as string[] } : {}),
     ...(v.titulo !== undefined ? { titulo: v.titulo } : {}),
     ...(v.subtitulo !== undefined ? { subtitulo: v.subtitulo } : {}),

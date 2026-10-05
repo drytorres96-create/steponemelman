@@ -5,8 +5,8 @@ import { cargarConceptos } from '../data/corpus'
 import { NOMBRE_INTERACCION, type Concepto } from '../schema/concept'
 import { DIA, retencion } from '../srs/fsrs'
 import { cercaniaDominio } from '../srs/cercania'
-import { EtiquetaEstado } from '../components/comunes'
 import { cajaDeConcepto, escalonDePregunta, type ItemCaja } from '../lib/cajas'
+import { ETIQUETAS_APRENDIZAJE, resumenProgresoAprendizaje } from '../lib/progreso-aprendizaje'
 
 /**
  * Lo que estoy cerrando: la tabla de detalle del planificador, que vivía al final de
@@ -40,6 +40,7 @@ export function TablaPlanificador({ items, ahora }: { items: ItemCaja[]; ahora: 
 
   const preguntas = new Map((nbme.catalog?.questions ?? []).map(q => [q.id, q]))
   const intentosPregunta = (id: string) => Object.values(nbme.state.attempts).filter(a => a.questionId === id)
+  const aprendizaje = resumenProgresoAprendizaje(ids, estado.progreso, estado.criterios, ahora)
 
   return <div className="pila">
     <p className="mini">La retención es una estimación del planificador, no una medición directa de tu memoria. Puedes estudiar sin revisar estos valores.</p>
@@ -73,10 +74,10 @@ export function TablaPlanificador({ items, ahora }: { items: ItemCaja[]; ahora: 
             return <tr key={`concepto:${item.id}`}>
               <td><b style={{ fontWeight: 560 }}>{c.objetivo}</b>
                 <div className="mini">{c.clasificacion.disciplina_primaria} · {c.clasificacion.tema} · {hoy}</div></td>
-              <td>caja {item.caja}</td>
-              <td className="mini">{faltan}</td>
+              <td>{item.mantenimiento ? 'Mantenimiento' : `caja ${item.caja}`}</td>
+              <td className="mini">{item.mantenimiento ? 'Confirmar el recuerdo en el repaso programado' : faltan}</td>
               <td style={{ color: r < 0.7 ? 'var(--ambar)' : 'var(--texto-2)' }}>{(r * 100).toFixed(0)} %</td>
-              <td><EtiquetaEstado estado={p.estado} /></td>
+              <td className="mini">{ETIQUETAS_APRENDIZAJE[aprendizaje.porConcepto.get(item.id)!.estado]}</td>
               <td className="sutil">{NOMBRE_INTERACCION[c.interaccion.recomendada]}</td>
             </tr>
           })}

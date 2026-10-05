@@ -24,13 +24,13 @@ describe('variantes y mapa accionable', () => {
     expect(aplicacionComprobada(c, p)).toBe(false)
     expect(resumenTransferencia([c], { [c.concept_id]: p })).toMatchObject({ disponibles: 1, vistos: 1, evaluados: 1, correctos: 0 })
   })
-  it('una copia antigua de la misma sesión no borra la versión de presentación conocida', () => {
-    const resume = { modulo: 'M', sesion: 'repaso', indice: 2, ts: 1000, sessionId: 'S', conceptIds: ['A', 'B', 'C'], versionFormato: 2 as const }
+  it.each([1, 2, 3] as const)('una copia antigua de la misma sesión no borra la versión %s conocida', versionFormato => {
+    const resume = { modulo: 'M', sesion: 'repaso', indice: 2, ts: 1000, sessionId: 'S', conceptIds: ['A', 'B', 'C'], versionFormato }
     const a = { ...ESTADO_INICIAL, reanudable: resume, fieldUpdatedAt: { criterios: 0, reanudable: 1000 } }
     const b = { ...a, reanudable: { ...resume, versionFormato: undefined, ts: 2000 }, fieldUpdatedAt: { criterios: 0, reanudable: 2000 } }
-    expect(leerEstadoDesconocido(a)?.reanudable?.versionFormato).toBe(2)
-    expect(combinarEstados(a, b).reanudable?.versionFormato).toBe(2)
-    expect(combinarEstados(b, a).reanudable?.versionFormato).toBe(2)
+    expect(leerEstadoDesconocido(a)?.reanudable?.versionFormato).toBe(versionFormato)
+    expect(combinarEstados(a, b).reanudable?.versionFormato).toBe(versionFormato)
+    expect(combinarEstados(b, a).reanudable?.versionFormato).toBe(versionFormato)
   })
   it('preserva tiempo, variantes y continuación al importar y combinar dispositivos', () => {
     const resume = { modulo: 'M', sesion: 'aplicacion', indice: 0, ts: 1000, sessionId: 'S', conceptIds: [c.concept_id], cantidadInicial: 1, presupuestoMinutos: 10 as const, msVisibles: 600000, pausaPorTiempoPendiente: true, variantes: ['QA-001-a1'] }
