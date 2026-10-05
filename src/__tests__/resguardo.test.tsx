@@ -102,7 +102,7 @@ describe('resguardo de una pantalla', () => {
     expect(host.textContent).toContain('Esta pantalla no pudo mostrarse.')
     // La barra sigue: se puede navegar sin recargar.
     expect(host.querySelector('.barra')).not.toBeNull()
-    expect(host.textContent).toContain('Cuenta y ajustes')
+    expect(host.textContent).toContain('Biblioteca, progreso y cuenta')
     await act(async () => { boton('Volver a Hoy')!.click() })
     await act(async () => { await Promise.resolve() })
     expect(host.textContent).not.toContain('Esta pantalla no pudo mostrarse.')

@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConceptoZ, IndiceZ } from '../schema/concept'
 import { ESTADO_INICIAL } from '../store/model'
 import type { ProgresoConcepto } from '../srs/tipos'
+import { reconstruirProgreso } from '../store/model'
+import { CRITERIOS_POR_DEFECTO } from '../srs/mastery'
 
 const mock = vi.hoisted(() => ({ app: vi.fn(), cargarTodo: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
@@ -70,6 +72,22 @@ async function modo(valor: string) {
 async function combine() { await filter('Filtrar por disciplina', 'Farmacología'); await filter('Filtrar por sistema', 'Endocrino') }
 
 describe('sesiones personalizadas con filtros reales de conceptos', () => {
+  it('separa actividad, dominio demostrado y mantenimiento sin cambiar los IDs de la sesión', async () => {
+    const id = cs[0].concept_id
+    const intentos = [7, 4, 2].map((dias, n) => ({ ...progreso[id].intentos[0], ts: ahora - dias * 86_400_000,
+      attempt_id: `independiente-${n}`, session_id: `sesion-${n}`, interaccion: 'recuperacion_libre',
+      fuente_consultada: false, explicacion_previa: false, pregunta_version: 'sintetica-v1', tipo_evidencia: 'recuerdo' as const }))
+    progreso[id] = { ...reconstruirProgreso(id, intentos, CRITERIOS_POR_DEFECTO), proxima: ahora - 1 }
+    await render()
+    const barra = host.querySelector('[role="progressbar"][aria-label="Dominio demostrado de Módulo de prueba"]')
+    expect(barra?.getAttribute('aria-valuetext')).toBe('1 de 4')
+    expect(host.textContent).toContain('3 en aprendizaje')
+    expect(host.textContent).toContain('1 con dominio demostrado')
+    expect(host.textContent).toContain('Actividad registrada: 4/4 · Mantenimiento al día: 0 · Mantenimiento pendiente: 1')
+    await click('Estudiar este módulo')
+    expect(onEstudiar.mock.calls.at(-1)?.[0]).toEqual(cs.map(c => c.concept_id))
+  })
+
   it('lanza la intersección exacta incluso con todos los resultados vistos y al día', async () => {
     await render(); await combine()
     expect(host.textContent).toContain('2 conceptos coincidentes')

@@ -262,13 +262,15 @@ describe('portada Hoy', () => {
   })
 
   it('los hashes antiguos resuelven a Hoy', () => {
-    for (const hash of ['#semana', '#recuperacion', '#progreso', '#repaso']) {
+    for (const hash of ['#semana', '#recuperacion', '#repaso']) {
       window.history.replaceState(null, '', `/${hash}`)
       expect(vistaDesdeHash()).toBe('hoy')
     }
     // Lo que sigue en el menú discreto conserva su propio enlace.
     window.history.replaceState(null, '', '/#modulos')
     expect(vistaDesdeHash()).toBe('modulos')
+    window.history.replaceState(null, '', '/#progreso')
+    expect(vistaDesdeHash()).toBe('progreso')
     window.history.replaceState(null, '', '/')
   })
 

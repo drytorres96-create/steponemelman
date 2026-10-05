@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../store/estado'
 import { Barra, Vacio } from '../components/comunes'
 import type { Concepto, Modulo } from '../schema/concept'
-import { estaVencido } from '../srs/fsrs'
 import { construirCola, RUTAS, type RutaId } from '../lib/rutas'
-import { dominioVigente } from '../srs/mastery'
+import { resumenProgresoAprendizaje } from '../lib/progreso-aprendizaje'
 import { SelectorCarga, useCargaEstudio } from '../components/SelectorCarga'
 import { ExploradorConceptos } from './ExploradorConceptos'
 import { cargarTodo } from '../data/corpus'
@@ -58,7 +57,8 @@ export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion, 
   const hayFiltros = !!resumenFiltros
   const cambiarFiltros = (nuevos: FiltrosBusqueda) => { setFiltros(nuevos); setAviso('') }
   const cambiarFiltro = (patch: Partial<FiltrosBusqueda>) => cambiarFiltros({ ...filtros, ...patch })
-  const idsModulo = (m: Modulo) => [...new Set(m.sesiones.flatMap(s => s.conceptos))]
+  const idsPorModulo = useMemo(() => new Map(modulos.map(m => [m.module_id, [...new Set(m.sesiones.flatMap(s => s.conceptos))]])), [modulos])
+  const idsModulo = (m: Modulo) => idsPorModulo.get(m.module_id) ?? []
   const coincidenciasModulo = (m: Modulo) => idsModulo(m).filter(id => idsCoincidentes.has(id))
   const elegir = (cs: Concepto[], manual = false) => ruta === 'guiada'
     ? manual ? cs.slice(0, carga.cantidad) : construirSesionPersonalizada(cs, estado.progreso, carga.cantidad)
@@ -75,17 +75,10 @@ export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion, 
     practicar(resultados.filter(c => ids.has(c.concept_id)), `${m.nombre}${sesion ? ` · ${sesion.titulo}` : ''}`, m.module_id, [resumenFiltros, sesion?.objetivo].filter(Boolean).join(' · '))
   }
 
-  const stats = (m: Modulo) => {
-    const ids = idsModulo(m)
-    let nuevos = 0, aprendiendo = 0, dominados = 0, vencidos = 0
-    for (const id of ids) {
-      const p = estado.progreso[id]
-      if (!p || !p.intentos.length) { nuevos++; continue }
-      if (dominioVigente(p, estado.criterios)) dominados++; else aprendiendo++
-      if (estaVencido(p)) vencidos++
-    }
-    return { total: ids.length, nuevos, aprendiendo, dominados, vencidos }
-  }
+  const ahora = Date.now()
+  const estadisticas = useMemo(() => new Map(modulos.map(m => [m.module_id,
+    resumenProgresoAprendizaje(idsPorModulo.get(m.module_id) ?? [], estado.progreso, estado.criterios, ahora)])),
+    [modulos, idsPorModulo, estado.progreso, estado.criterios, ahora])
 
   const visibles = hayFiltros ? modulos.filter(m => coincidenciasModulo(m).length > 0) : modulos
 
@@ -153,7 +146,7 @@ export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion, 
 
       <div className="rejilla r2 library-modules">
         {visibles.map(m => {
-          const s = stats(m)
+          const s = estadisticas.get(m.module_id)!
           const abiertoEste = abierto === m.module_id
           return (
             <div className="tarjeta" key={m.module_id}>
@@ -162,19 +155,20 @@ export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion, 
                   <h3>{m.nombre}</h3>
                   <p className="mini" style={{ margin: '2px 0 8px' }}>{m.proposito}</p>
                 </div>
-                {s.vencidos > 0 && <span className="etq ambar">{s.vencidos} vencidos</span>}
+                {s.mantenimientoPendiente > 0 && <span className="etq">{s.mantenimientoPendiente} en mantenimiento</span>}
               </div>
 
-              <Barra valor={s.dominados} total={s.total} oro etiqueta={`Dominio vigente de ${m.nombre}`} />
+              <Barra valor={s.dominioDemostrado} total={s.total} oro etiqueta={`Dominio demostrado de ${m.nombre}`} />
               <div className="fila" style={{ gap: 12, marginTop: 8 }}>
                 <span className="mini">{s.total} conceptos</span>
                 <span className="mini">·</span>
-                <span className="mini">{s.nuevos} nuevos</span>
+                <span className="mini">{s.sinActividad} sin actividad</span>
                 <span className="mini">·</span>
-                <span className="mini">{s.aprendiendo} en curso</span>
+                <span className="mini">{s.enAprendizaje} en aprendizaje</span>
                 <span className="mini">·</span>
-                <span className="mini" style={{ color: 'var(--oro)' }}>{s.dominados} dominados</span>
+                <span className="mini" style={{ color: 'var(--oro)' }}>{s.dominioDemostrado} con dominio demostrado</span>
               </div>
+              <p className="mini">Actividad registrada: {s.actividad}/{s.total} · Mantenimiento al día: {s.mantenimientoAlDia} · Mantenimiento pendiente: {s.mantenimientoPendiente}{s.mantenimientoPorComprobar > 0 && <> · Mantenimiento por comprobar: {s.mantenimientoPorComprobar}</>}</p>
               {hayFiltros && <p className="mini">{coincidenciasModulo(m).length} conceptos de este módulo cumplen tus filtros.</p>}
 
               <div className="fila" style={{ gap: 6, marginTop: 10 }}>
@@ -202,7 +196,7 @@ export function Modulos({ onEstudiar, seleccion: seleccionExterna, onSeleccion, 
                         onClick={() => abrirModulo(m, ses.session_id)}>
                         <div className="fila" style={{ justifyContent: 'space-between' }}>
                           <b style={{ fontSize: '.92rem' }}>{ses.titulo}</b>
-                          <span className="mini">{hayFiltros ? `${coincidencias} coincidentes` : `${hechos}/${ses.conceptos.length}`}</span>
+                          <span className="mini">{hayFiltros ? `${coincidencias} coincidentes` : `Actividad: ${hechos}/${ses.conceptos.length}`}</span>
                         </div>
                         <div className="mini" style={{ marginTop: 2 }}>{ses.objetivo || 'Objetivos variados'}</div>
                       </button>
