@@ -148,3 +148,14 @@ conservan fuera del repo; los entregables no contienen corpus ni exportaciones.
   ahora la respuesta por su nombre accesible, conservando las aserciones.
   Se repite el navegador sobre el lote aislado tras esta corrección.
   Capturas anteriores y nuevas son limpias y usan sólo contenido sintético.
+
+- Lote 3 · feedback que distingue práctica y corrección: H05–H07 (coach).
+  Conceptos/preguntas indican nuevo o ya practicado aquí sin reclasificar
+  su primera respuesta al guardarla o retomarla. Correcciones NBME se señalan
+  tras explicación; objetivo, fundamento íntegro y distractor elegido están
+  visibles después del envío, sin exponerlos antes. NBME se escribe con su
+  nombre completo. No cambia letras, puntuación, intentos ni evaluación.
+  Principios: calibración y elaboración. 22 pruebas dirigidas aprobadas,
+  incluidas diez nuevas; capturas antes/después a 390/1280 px. Puertas
+  completas: **600 aprobadas/2 omitidas**, build correcto, **29/29 e2e**.
+  Revisión adversarial aprobada. H20 queda editorial.

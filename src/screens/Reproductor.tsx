@@ -500,6 +500,10 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     </div>
   }
   const p = progresoDe(c.concept_id)
+  // La respuesta de este paso no convierte su primera presentación en una repetición.
+  // Al retomarla, los intentos posteriores tampoco cambian cómo se presentó originalmente.
+  const historialAnterior = p.intentos.filter(t => t.pregunta_id !== preguntaId
+    && (!intentoActual.current || t.ts < intentoActual.current.ts))
   const presentacionCambio = !!intentoActual.current?.pregunta_version && intentoActual.current.pregunta_version !== versionPregunta(c)
   const dominio = resumenDominio(p, estado.criterios)
   const cercania = cercaniaDominio(p, estado.criterios)
@@ -507,7 +511,8 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
 
   return <div className="reproductor pila">
     {presupuesto && <Cronometro msVisibles={msVisibles} presupuesto={presupuesto} sinLimite={sinLimite} />}
-    {c.variante_id && <p className="mini">{c.interaccion.recomendada === 'caso_clinico' ? 'Aplicación en un caso' : 'Distinguir conceptos'} · {progresoDe(c.concept_id).intentos.some(t => t.variante_id === c.variante_id && t.pregunta_id !== preguntaId) ? 'Variante ya practicada' : 'Primera presentación de esta variante'}</p>}
+    <p className="mini">{historialAnterior.length ? 'Concepto ya practicado aquí' : 'Concepto nuevo aquí'}
+      {c.variante_id && <> · {c.interaccion.recomendada === 'caso_clinico' ? 'Aplicación en un caso' : 'Distinguir conceptos'} · {historialAnterior.some(t => t.variante_id === c.variante_id) ? 'Variante ya practicada' : 'Primera presentación de esta variante'}</>}</p>
     <div className="fila" style={{ justifyContent: 'space-between' }}>
       <div className="fila" style={{ gap: 8 }}>
         <span className="etq">{c.clasificacion.disciplina_primaria}</span><span className="etq">{c.clasificacion.sistema_primario}</span>

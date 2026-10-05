@@ -1,7 +1,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { emptyNbmeState, deriveNbmeSession, startNbmeSession, submitNbmeAnswer } from './model'
+import { emptyNbmeState, deriveNbmeSession, reviewNbmeAnswer, startNbmeSession, submitNbmeAnswer } from './model'
 import type { NbmeQuestion } from './types'
 import type { useNbme } from './NbmeProvider'
 
@@ -125,9 +125,11 @@ describe('NBME study interface', () => {
     expect(host.textContent).toContain('Correcciones pendientes: 1')
     expect(host.textContent).toContain('Fuente: NBME 27 · sección 1 · pregunta 1 · página 1')
     expect(host.querySelector('.nbme-option.correct')?.textContent).toContain('Respuesta correcta')
-    expect(host.textContent).toContain('Leer fundamento completo')
-    // La presentación recorta el espaciado sobrante de la extracción; el texto se conserva íntegro.
-    expect([...host.querySelectorAll('details')].some(item => item.textContent?.includes(source.trim()))).toBe(true)
+    // El fundamento importado se conserva íntegro y se lee sin abrir controles.
+    const objetivo = [...host.querySelectorAll('.nbme-feedback .nbme-source-text')].find(item => item.textContent?.includes(source.trim()))!
+    expect(objetivo).toBeTruthy()
+    expect(objetivo.closest('details')).toBeNull()
+    expect(host.textContent).toContain('Objetivo del aprendizaje')
     expect(host.textContent).toContain('Relación sugerida; confirma que corresponde al fundamento.')
     await click('Explorar conceptos relacionados')
     expect(context.pauseSession).toHaveBeenCalledOnce()
@@ -164,6 +166,100 @@ describe('NBME study interface', () => {
     await click('Continuar')
     expect(onPaso).toHaveBeenCalledOnce()
     expect(context.nextQuestion).not.toHaveBeenCalled()
+  })
+
+  it('a new question stays new in feedback and expands NBME without revealing the source beforehand', async () => {
+    prepareSession()
+    context.currentQuestion = { ...question, distractorExplanations: { A: 'Synthetic reason why A does not answer the question.' } }
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('National Board of Medical Examiners (NBME)')
+    expect(host.textContent).toContain('Pregunta nueva aquí')
+    expect(host.textContent).not.toContain(context.currentQuestion.objective)
+    expect(host.textContent).not.toContain(context.currentQuestion.explanation)
+    expect(host.textContent).not.toContain(context.currentQuestion.distractorExplanations!.A)
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 0, context.currentQuestion, 'I', 10, 200)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    context.currentFeedback = context.sessionView!.attempt
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('Pregunta nueva aquí')
+    expect(host.textContent).not.toContain('Pregunta ya practicada aquí')
+    expect(host.textContent).toContain(question.objective)
+    expect(host.textContent).toContain(question.explanation)
+  })
+
+  it('a question practiced in an earlier block stays marked as practiced after submission', async () => {
+    prepareSession()
+    context.state = startNbmeSession(context.state, { id: 'QA-previous', title: 'Earlier block', refs: [{ id: question.id, revision: question.revision }] }, 1)
+    context.state = submitNbmeAnswer(context.state, 'QA-previous', 0, question, 'I', 10, 20)
+    context.state = reviewNbmeAnswer(context.state, 'QA-previous', 0, 30)
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('Pregunta ya practicada aquí')
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 0, question, 'I', 10, 200)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    context.currentFeedback = context.sessionView!.attempt
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('Pregunta ya practicada aquí')
+  })
+
+  it('later practice does not relabel feedback from the original new presentation', async () => {
+    prepareSession()
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 0, question, 'I', 10, 200)
+    context.state = startNbmeSession(context.state, { id: 'QA-later', title: 'Later block', refs: [{ id: question.id, revision: question.revision }] }, 300)
+    context.state = submitNbmeAnswer(context.state, 'QA-later', 0, question, 'I', 10, 400)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    context.currentFeedback = context.sessionView!.attempt
+    context.selectedOption = 'I'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('Pregunta nueva aquí')
+    expect(host.textContent).not.toContain('Pregunta ya practicada aquí')
+  })
+
+  it('a retry is marked as correction after explanation and preserves the initial score', async () => {
+    prepareSession()
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 0, question, 'A', 10, 200)
+    context.state = reviewNbmeAnswer(context.state, 'QA-session', 0, 201)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('Pregunta ya practicada aquí')
+    expect(host.textContent).toContain('Corrección tras ver la explicación')
+    expect(host.textContent).not.toContain(question.explanation)
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 1, question, 'I', 10, 300)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    context.currentFeedback = context.sessionView!.attempt
+    context.selectedOption = 'I'
+    const original = context.state.attempts['QA-session:0']
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    expect(host.textContent).toContain('Esta corrección tuvo la explicación previa. Se registra aparte de la primera vuelta.')
+    expect(context.sessionView!.firstCorrect).toBe(0)
+    expect(context.sessionView!.retryCount).toBe(1)
+    expect(context.state.attempts['QA-session:0']).toBe(original)
+    expect(context.state.attempts['QA-session:1'].correct).toBe(true)
+  })
+
+  it('shows the chosen distractor explanation immediately and preserves letters and complete source text', async () => {
+    prepareSession()
+    const source = 'A complete synthetic explanation. '.repeat(40)
+    context.currentQuestion = { ...question, explanation: source, distractorExplanations: {
+      A: 'Synthetic reason A is incorrect.', B: 'Synthetic reason B is incorrect.',
+    } }
+    const options = context.currentQuestion.options
+    context.state = submitNbmeAnswer(context.state, 'QA-session', 0, context.currentQuestion, 'A', 10, 200)
+    context.sessionView = deriveNbmeSession(context.state, 'QA-session')
+    context.currentFeedback = context.sessionView!.attempt
+    context.selectedOption = 'A'
+    await act(async () => root.render(<NbmePlayer onSalir={exit} />))
+    const visible = [...host.querySelectorAll('.nbme-feedback .nbme-source-text')].filter(item => !item.closest('details'))
+    expect(visible.some(item => item.textContent?.includes(source.trim()))).toBe(true)
+    expect(visible.some(item => item.textContent?.includes('Synthetic reason A is incorrect.'))).toBe(true)
+    expect(visible.some(item => item.textContent?.includes('Synthetic reason B is incorrect.'))).toBe(false)
+    expect(host.textContent).toContain('Por qué tu opción no responde')
+    expect(host.querySelector('.nbme-feedback details')?.textContent).toContain('Synthetic reason B is incorrect.')
+    expect(host.querySelector('.nbme-feedback details')?.textContent).not.toContain('Synthetic reason A is incorrect.')
+    expect(context.currentQuestion.options).toBe(options)
+    expect([...host.querySelectorAll<HTMLInputElement>('input[type="radio"]')].map(input => input.value)).toEqual('ABCDEFGHI'.split(''))
+    expect(context.state.attempts['QA-session:0'].optionId).toBe('A')
   })
 
   it('Enter on a focused button activates that button instead of checking the answer', async () => {

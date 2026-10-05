@@ -125,7 +125,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   { onSalir: () => void; onEstudiar?: (ids: string[]) => void; onBuscar?: (question: NbmeQuestion) => void
     modoPaso?: boolean; onPasoCompleto?: () => void; etiquetaSalida?: string; avisoFallo?: string }) {
   const {
-    catalog, currentSession, sessionView, currentQuestion, selectedOption, currentFeedback, questionLoading,
+    catalog, state, currentSession, sessionView, currentQuestion, selectedOption, currentFeedback, questionLoading,
     loading, busy, error, storageWarning, syncStatus, selectAnswer, checkAnswer, nextQuestion, pauseSession,
     retryQuestionLoad, syncNow, budgetReached, continueWithoutBudget,
   } = useNbme()
@@ -197,14 +197,20 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   </section>
 
   const source = currentQuestion ? `NBME ${currentQuestion.form} · sección ${currentQuestion.section} · pregunta ${currentQuestion.item} · página ${currentQuestion.page}` : 'Pregunta de aplicación'
-  const explanationSource = currentQuestion?.objective || currentQuestion?.explanation
-  const briefExplanation = explanationSource && explanationSource.length > 900 ? `${explanationSource.slice(0, 900).trimEnd()}…` : explanationSource
+  const reintentoTrasExplicacion = (sessionView.current?.round ?? 0) > 0
+  const yaPracticada = !!currentQuestion && Object.values(state.attempts).some(attempt =>
+    attempt.questionId === currentQuestion.id
+    && !(attempt.sessionId === currentSession.id && attempt.position === sessionView.current?.position)
+    && (!feedback || attempt.submittedAt < feedback.submittedAt))
+  const distractorElegido = feedback && !feedback.correct && !feedback.conflict
+    ? currentQuestion?.distractorExplanations?.[feedback.optionId] : null
   const reviewedLinks = (currentQuestion?.conceptLinks ?? []).filter(link => link.review === 'reviewed')
   const relatedLinks = reviewedLinks.length ? reviewedLinks : (currentQuestion?.conceptLinks ?? []).filter(link => link.review === 'suggested' && link.confidence >= 0.74)
   const conceptIds = [...new Set(relatedLinks.map(link => link.conceptId))].slice(0, 3)
   const suggestedLinks = conceptIds.length > 0 && !reviewedLinks.length
 
   return <div className="nbme-player pila">
+    <p className="mini">National Board of Medical Examiners (NBME)</p>
     <header className={`nbme-player-header${modoPaso ? ' paso' : ''}`}>
       {!modoPaso && <div><p className="mini">{currentSession.title}</p><p className="sutil">Primera vuelta: {sessionView.firstAnswered}/{sessionView.initialCount} · Correcciones pendientes: {sessionView.pendingErrors}</p></div>}
       <button className="btn fantasma" onClick={pause}>{etiquetaSalida ?? 'Pausar y guardar'}</button>
@@ -232,6 +238,8 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
                   <a href="#nbme-answers" onClick={event => { event.preventDefault(); answersRef.current?.focus(); answersRef.current?.scrollIntoView({ block: 'start' }) }}>Ir a las respuestas</a>
                 </div>
               </div>}
+              <p className="mini">{yaPracticada ? 'Pregunta ya practicada aquí' : 'Pregunta nueva aquí'}
+                {reintentoTrasExplicacion && ' · Corrección tras ver la explicación'}</p>
               <Enunciado texto={columnasOpciones?.enunciado ?? currentQuestion.stem} />
               {currentQuestion.figureRequired && !currentQuestion.figures.length && <p role="alert" className="nbme-error">Falta una figura necesaria para responder esta pregunta.</p>}
               {!!currentQuestion.figures.length && <div id="nbme-figures" ref={figureRef} tabIndex={-1} className="nbme-question-images">
@@ -273,11 +281,12 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
                     : modoPaso ? avisoFallo ?? 'Vuelve en las cajas de los próximos días.'
                       : 'Esta pregunta volverá durante la práctica. Puedes pausar cuando lo necesites.'}</p></div>
               {!feedback.conflict && <p className="nbme-respuesta"><b>Respuesta: {currentQuestion.answer}.</b> <span lang="en">{normalizarTexto(currentQuestion.options.find(option => option.id === currentQuestion.answer)?.text ?? '')}</span></p>}
-              {briefExplanation && <div><h3>Fundamento de la respuesta</h3>{explanationSource !== briefExplanation && <p className="mini">Extracto del texto fuente.</p>}<TextoFuente texto={briefExplanation} /></div>}
-              {currentQuestion.objective && explanationSource !== briefExplanation && <details className="nbme-details"><summary>Leer fundamento completo</summary><TextoFuente texto={currentQuestion.objective} /></details>}
-              {currentQuestion.explanation && currentQuestion.explanation !== briefExplanation && <details className="nbme-details"><summary>Leer explicación completa</summary><TextoFuente texto={currentQuestion.explanation} /></details>}
-              {currentQuestion.distractorExplanations && Object.keys(currentQuestion.distractorExplanations).length > 0 && <details className="nbme-details"><summary>Por qué las otras opciones no</summary>
-                <div className="pila nbme-distractores">{currentQuestion.options.filter(option => option.id !== currentQuestion.answer && currentQuestion.distractorExplanations?.[option.id]).map(option => <div key={option.id} className="nbme-distractor"><b>{option.id}. <span lang="en">{normalizarTexto(option.text)}</span></b><TextoFuente texto={currentQuestion.distractorExplanations?.[option.id] ?? ''} /></div>)}</div>
+              {reintentoTrasExplicacion && <p className="mini">Esta corrección tuvo la explicación previa. Se registra aparte de la primera vuelta.</p>}
+              {currentQuestion.objective && <div><h3>Objetivo del aprendizaje</h3><TextoFuente texto={currentQuestion.objective} /></div>}
+              {currentQuestion.explanation && currentQuestion.explanation !== currentQuestion.objective && <div><h3>Fundamento de la respuesta</h3><TextoFuente texto={currentQuestion.explanation} /></div>}
+              {distractorElegido && <div className="nbme-distractor"><h3>Por qué tu opción no responde</h3><b>{feedback.optionId}. <span lang="en">{normalizarTexto(currentQuestion.options.find(option => option.id === feedback.optionId)?.text ?? '')}</span></b><TextoFuente texto={distractorElegido} /></div>}
+              {currentQuestion.options.some(option => option.id !== currentQuestion.answer && (!distractorElegido || option.id !== feedback.optionId) && currentQuestion.distractorExplanations?.[option.id]) && <details className="nbme-details"><summary>Por qué las otras opciones no</summary>
+                <div className="pila nbme-distractores">{currentQuestion.options.filter(option => option.id !== currentQuestion.answer && (!distractorElegido || option.id !== feedback.optionId) && currentQuestion.distractorExplanations?.[option.id]).map(option => <div key={option.id} className="nbme-distractor"><b>{option.id}. <span lang="en">{normalizarTexto(option.text)}</span></b><TextoFuente texto={currentQuestion.distractorExplanations?.[option.id] ?? ''} /></div>)}</div>
               </details>}
               <p className="mini">Fuente: {source}. Explicación procedente del material importado.</p>
               {suggestedLinks && <p className="mini">Relación sugerida; confirma que corresponde al fundamento.</p>}
