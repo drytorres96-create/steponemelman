@@ -83,6 +83,56 @@ describe('el plan de la semana dentro de Hoy', () => {
     expect(host.textContent).not.toContain('AMBOSS Embarazo')
   })
 
+  it('mantiene la semana actual el domingo y muestra sólo su domingo opcional', async () => {
+    vi.setSystemTime(new Date(2026, 8, 20, 10))
+    mock.plan.mockResolvedValue({ ...PLAN, checkpoints: [...PLAN.checkpoints,
+      cp({ id: 77, idx: 7, dia: 0, kind: 'qbank', label: 'Práctica opcional' })] })
+    await pintar()
+    expect(mock.plan).toHaveBeenCalledWith('x'.repeat(30), '2026-09-14')
+    const abiertos = dias().filter(b => b.getAttribute('aria-expanded') === 'true')
+    expect(abiertos).toHaveLength(1)
+    expect(abiertos[0].textContent).toContain('HOY · domingo')
+    expect(abiertos[0].textContent).toContain('20 sep')
+    expect(dias().at(-1)?.textContent).toContain('domingo')
+    expect(host.textContent).toContain('Práctica opcional')
+  })
+
+  it('sin un checkpoint de domingo mantiene la semana sin inventar un día', async () => {
+    vi.setSystemTime(new Date(2026, 8, 20, 10))
+    await pintar()
+    expect(mock.plan).toHaveBeenCalledWith('x'.repeat(30), '2026-09-14')
+    expect(dias().some(b => b.textContent?.includes('domingo'))).toBe(false)
+  })
+
+  it('cambia de semana a las 3:00, también con el calendario abierto', async () => {
+    vi.setSystemTime(new Date(2026, 8, 21, 2, 59))
+    await pintar()
+    expect(mock.plan).toHaveBeenLastCalledWith('x'.repeat(30), '2026-09-14')
+    mock.plan.mockResolvedValue({ ...PLAN, inicio: '2026-09-21', fin: '2026-09-26' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(mock.plan).toHaveBeenLastCalledWith('x'.repeat(30), '2026-09-21')
+    expect(dias().filter(b => b.getAttribute('aria-expanded') === 'true')[0].textContent).toContain('HOY · lunes')
+  })
+
+  it('al llegar la nueva semana abre su lunes, aunque la anterior tuviera un jueves pendiente', async () => {
+    vi.setSystemTime(new Date(2026, 8, 21, 2, 59))
+    mock.plan.mockResolvedValue({ ...PLAN, checkpoints: [cp({ dia: 4, label: 'Pendiente antiguo' }),
+      cp({ id: 2, dia: 0, idx: 2, done: true, label: 'Domingo opcional terminado' })] })
+    await pintar()
+    expect(dias().find(b => b.getAttribute('aria-expanded') === 'true')?.textContent).toContain('domingo')
+    let recibir!: (plan: PlanSemana) => void
+    mock.plan.mockImplementation(() => new Promise<PlanSemana>(resolve => { recibir = resolve }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(mock.plan).toHaveBeenLastCalledWith('x'.repeat(30), '2026-09-21')
+    await act(async () => { recibir({ ...PLAN, inicio: '2026-09-21', fin: '2026-09-26',
+      checkpoints: [cp({ dia: 1, label: 'Lunes nuevo' })] }) })
+    const abiertos = dias().filter(b => b.getAttribute('aria-expanded') === 'true')
+    expect(abiertos).toHaveLength(1)
+    expect(abiertos[0].textContent).toContain('HOY · lunes')
+    expect(host.textContent).toContain('Lunes nuevo')
+    expect(host.textContent).not.toContain('Pendiente antiguo')
+  })
+
   it('cuenta lo hecho sin meter el descanso en el total', async () => {
     await pintar()
     // Cuatro tareas y un descanso; una hecha.

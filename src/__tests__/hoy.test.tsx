@@ -150,6 +150,37 @@ const conceptoX1 = {
 } as unknown as Concepto
 
 describe('portada Hoy', () => {
+  it('recarga el plan al cambiar el día de estudio aunque siga siendo la misma semana', async () => {
+    vi.setSystemTime(new Date(2026, 8, 22, 2, 59))
+    await pintar()
+    expect(mock.plan).toHaveBeenLastCalledWith('x'.repeat(30), '2026-09-21')
+    const lecturas = mock.plan.mock.calls.length
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(mock.plan.mock.calls.length).toBeGreaterThan(lecturas)
+    expect(mock.plan).toHaveBeenLastCalledWith('x'.repeat(30), '2026-09-21')
+  })
+  it('el domingo pide el plan del mismo lunes que sus guiones', async () => {
+    vi.setSystemTime(new Date(2026, 8, 27, 10))
+    datos({ conceptos: ['C1'] })
+    mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, ['C1'])])
+    mock.plan.mockImplementation(async (_token: string, dia: string) => ({
+      eventoId: 'S3', titulo: dia === '2026-09-21' ? 'S3 · 21–26 sep · Tema actual' : 'S4 · 28 sep · Tema próximo',
+      inicio: '2026-09-21', fin: '2026-09-26', nota: null, checkpoints: [cp({})],
+    }))
+    await pintar()
+    expect(mock.plan).toHaveBeenCalledWith('x'.repeat(30), '2026-09-21')
+    expect(host.querySelector('.hoy-tema')?.textContent).toBe('Tema actual')
+    expect(host.textContent).not.toContain('Tema próximo')
+  })
+
+  it('la lectura del plan cambia de semana a las 3:00 del lunes', async () => {
+    vi.setSystemTime(new Date(2026, 8, 28, 2, 59))
+    await pintar()
+    expect(mock.plan).toHaveBeenLastCalledWith('x'.repeat(30), '2026-09-21')
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(mock.plan).toHaveBeenLastCalledWith('x'.repeat(30), '2026-09-28')
+  })
+
   it('con el día completo no se renderiza ningún botón de estudiar', async () => {
     diaCompleto()
     const onNuevo = vi.fn(), onCajas = vi.fn()

@@ -1,0 +1,148 @@
+[
+  {
+    "phase": "antes",
+    "width": 390,
+    "sync": {
+      "diagnostico": {
+        "codigo": "desconocido",
+        "mensaje": "Cambios en este dispositivo; falta sincronizar"
+      },
+      "scrollWidth": 390,
+      "width": 390
+    },
+    "home": {
+      "fecha": "2026-10-11T11:30:01.087Z",
+      "pedidos": [
+        "2026-10-11"
+      ],
+      "scrollWidth": 390,
+      "width": 390,
+      "rotulo": "Cardiovascular · demostración"
+    },
+    "calendar": {
+      "titulo": "S5 · 12–17 oct",
+      "dias": [
+        "12luneslun 12 oct1 pendiente−",
+        "16viernesvie 16 oct1 pendiente+",
+        "17sábadosáb 17 octDescanso+"
+      ],
+      "domingo": false,
+      "texto": "S5 · 12–17 octCardiovascular · demostración0 de 2 compromisos de esta semana12luneslun 12 oct1 pendiente−StepOneMelman · Sesión de la semana 1/3 · Cardiovascular16viernesvie 16 oct1 pendiente+17sábadosáb 17 octDescanso+Por qué esta semana es asíSemana siguiente sintética; no contiene datos clínicos."
+    },
+    "pedidos": [
+      "2026-10-11",
+      "2026-10-11"
+    ],
+    "errores": []
+  },
+  {
+    "phase": "antes",
+    "width": 1280,
+    "sync": {
+      "diagnostico": {
+        "codigo": "desconocido",
+        "mensaje": "Cambios en este dispositivo; falta sincronizar"
+      },
+      "scrollWidth": 1280,
+      "width": 1280
+    },
+    "home": {
+      "fecha": "2026-10-11T11:30:01.027Z",
+      "pedidos": [
+        "2026-10-11"
+      ],
+      "scrollWidth": 1280,
+      "width": 1280,
+      "rotulo": "Cardiovascular · demostración"
+    },
+    "calendar": {
+      "titulo": "S5 · 12–17 oct",
+      "dias": [
+        "12luneslun 12 oct1 pendiente−",
+        "16viernesvie 16 oct1 pendiente+",
+        "17sábadosáb 17 octDescanso+"
+      ],
+      "domingo": false,
+      "texto": "S5 · 12–17 octCardiovascular · demostración0 de 2 compromisos de esta semana12luneslun 12 oct1 pendiente−StepOneMelman · Sesión de la semana 1/3 · Cardiovascular16viernesvie 16 oct1 pendiente+17sábadosáb 17 octDescanso+Por qué esta semana es asíSemana siguiente sintética; no contiene datos clínicos."
+    },
+    "pedidos": [
+      "2026-10-11",
+      "2026-10-11"
+    ],
+    "errores": []
+  },
+  {
+    "phase": "post",
+    "width": 390,
+    "sync": {
+      "diagnostico": {
+        "codigo": "red",
+        "mensaje": "No se pudo contactar con el servidor. Tus cambios están guardados en este dispositivo."
+      },
+      "scrollWidth": 390,
+      "width": 390
+    },
+    "home": {
+      "fecha": "2026-10-11T11:30:00.946Z",
+      "pedidos": [
+        "2026-10-05"
+      ],
+      "scrollWidth": 390,
+      "width": 390,
+      "rotulo": "Renal · demostración"
+    },
+    "calendar": {
+      "titulo": "S4 · 5–10 oct",
+      "dias": [
+        "05luneslun 5 octtodo hecho+",
+        "09viernesvie 9 oct3 pendientes+",
+        "10sábadosáb 10 octDescanso+",
+        "11HOY · domingodom 11 oct1 pendiente−"
+      ],
+      "domingo": true,
+      "texto": "S4 · 5–10 octRenal · demostración1 de 5 compromisos de esta semana05luneslun 5 octtodo hecho+09viernesvie 9 oct3 pendientes+10sábadosáb 10 octDescanso+11HOY · domingodom 11 oct1 pendiente−🎧 Audio opcional del domingo · demostraciónOídoPor qué esta semana es asíPlan sintético: domingo opcional; no contiene datos clínicos."
+    },
+    "pedidos": [
+      "2026-10-05",
+      "2026-10-05"
+    ],
+    "errores": []
+  },
+  {
+    "phase": "post",
+    "width": 1280,
+    "sync": {
+      "diagnostico": {
+        "codigo": "red",
+        "mensaje": "No se pudo contactar con el servidor. Tus cambios están guardados en este dispositivo."
+      },
+      "scrollWidth": 1280,
+      "width": 1280
+    },
+    "home": {
+      "fecha": "2026-10-11T11:30:01.312Z",
+      "pedidos": [
+        "2026-10-05"
+      ],
+      "scrollWidth": 1280,
+      "width": 1280,
+      "rotulo": "Renal · demostración"
+    },
+    "calendar": {
+      "titulo": "S4 · 5–10 oct",
+      "dias": [
+        "05luneslun 5 octtodo hecho+",
+        "09viernesvie 9 oct3 pendientes+",
+        "10sábadosáb 10 octDescanso+",
+        "11HOY · domingodom 11 oct1 pendiente−"
+      ],
+      "domingo": true,
+      "texto": "S4 · 5–10 octRenal · demostración1 de 5 compromisos de esta semana05luneslun 5 octtodo hecho+09viernesvie 9 oct3 pendientes+10sábadosáb 10 octDescanso+11HOY · domingodom 11 oct1 pendiente−🎧 Audio opcional del domingo · demostraciónOídoPor qué esta semana es asíPlan sintético: domingo opcional; no contiene datos clínicos."
+    },
+    "pedidos": [
+      "2026-10-05",
+      "2026-10-05"
+    ],
+    "errores": []
+  }
+]

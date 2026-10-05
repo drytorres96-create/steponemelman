@@ -45,8 +45,10 @@ function hoyDe(url: URL): string {
 function leerCheckpoint(fila: unknown): PlanCheckpoint | null {
   if (!fila || typeof fila !== 'object') return null
   const f = fila as Record<string, unknown>
-  const dia = Number(f.dia)
-  if (!Number.isInteger(Number(f.id)) || !Number.isInteger(dia) || dia < 1 || dia > 6) return null
+  // 0 es domingo opcional; NULL o un valor vacío no son un domingo.
+  const dia = typeof f.dia === 'number' || typeof f.dia === 'string' && f.dia.trim() !== ''
+    ? Number(f.dia) : NaN
+  if (!Number.isInteger(Number(f.id)) || !Number.isInteger(dia) || dia < 0 || dia > 6) return null
   if (!KINDS_CHECKPOINT.includes(f.kind as KindCheckpoint) || typeof f.label !== 'string') return null
   return {
     id: Number(f.id),

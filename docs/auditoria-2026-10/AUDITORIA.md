@@ -172,3 +172,65 @@ conservan fuera del repo; los entregables no contienen corpus ni exportaciones.
   diagnóstico objeto antes/después a 390/1280 px; revisión independiente
   aprobada. Puertas completas: **608 aprobadas/2 omitidas**, build correcto,
   **29/29 e2e**. No se ejecuta transporte remoto.
+
+- Lote 5 · conservar la semana del domingo: H16 (revisor adversarial).
+  Proxy y cliente admiten dia=0 sin convertir NULL/false/vacío; no se crea
+  un domingo sin checkpoint. Hoy y Calendario piden el lunes de la semana
+  de estudio hasta el corte de las 03:00; Hoy conserva su recarga diaria.
+  El calendario cambia de semana abierto y resetea su selección junto al
+  nuevo plan; la regresión domingo opcional terminado + jueves pendiente
+  anterior fallaba antes y ahora abre un único lunes nuevo. No se cambia
+  el contrato 0/1–6/NULL, el rango lunes–sábado ni las tres prioridades.
+  82 pruebas dirigidas aprobadas, capturas actuales antes/después a
+  390/1280 px y revisión adversarial aprobada. Puertas completas:
+  **617 aprobadas/2 omitidas**, build correcto y **29/29 e2e**.
+  Las capturas usan doble de selección/lectura y parser real; no llaman
+  Worker ni base. La prueba nueva del proxy comprueba peticiones GET únicamente.
+
+## 6. Resultado medido y publicación
+
+| Comprobación | Antes | Después de lotes 0–5 |
+|---|---:|---:|
+| Pruebas unitarias aprobadas / omitidas previstas | 575 / 2 | 617 / 2 |
+| Pruebas de navegador | 14 / 14 | 29 / 29 |
+| Portada lista, mediana de cinco aperturas locales | 724 ms | 572 ms |
+| Primer concepto, mediana de cinco aperturas locales | 1.137 ms | 883 ms |
+| Toques al primer concepto | 1 | 1 |
+| Entrada JS / gzip | 539,05 / 155,41 kB | 539,40 / 155,54 kB |
+| App JS / gzip | 78,31 / 27,00 kB | 78,68 / 27,16 kB |
+| Reproductor JS / gzip | 55,35 / 16,11 kB | 55,93 / 16,35 kB |
+| NBME JS, cargado al abrir pregunta / gzip | 14,44 / 4,76 kB | 19,49 / 6,47 kB |
+| CSS / gzip | 153,61 / 32,25 kB | 155,24 / 32,51 kB |
+| Figura sintética fuera del viewport, peticiones | 1 | 0 |
+| Conmutador móvil | 41×44 px | 44×44 px |
+
+Son medidas de Chromium local con fixtures y Vite, sin login ni latencia real.
+La diferencia de segundos no demuestra una mejora causal: no se optimizó la
+selección ni el arranque de Hoy. La entrada crece 0,35 kB; el visor y el
+feedback explican el aumento del chunk NBME, que se carga al entrar.
+Hoy sigue sin materializar módulos completos, verificado por sus rutas de código.
+No se conoce la tasa de fallos de sincronización real antes/después.
+
+H01–H12 y H14–H16 quedan implementados y probados. H13 y H17–H20 siguen
+como propuestas; no se modificaron esquema, corpus/banco, RPC, cuotas ni
+criterios/evaluación. Los parsers públicos leen fixtures reales antiguos y
+actuales de study_state y nbme_state; conservaron historial y continuación.
+Todos los lotes tienen npm ci, pruebas, build, capturas correspondientes y
+revisión adversarial local. Sólo las dos omisiones previas se mantienen.
+
+Publicación y CI del HEAD exacto: [PR #46](https://github.com/drytorres96-create/steponemelman/pull/46).
+CLAUDE.md exige CI verde y mergeable_state clean antes de main. El primer CI
+del lote 1 encontró el selector ambiguo corregido en lote 2; no se desactivó
+ningún caso para alcanzar el verde. La publicación final se confirma en el PR,
+no se deduce de las puertas locales.
+
+Pendiente comprobar con sesión real: sincronización entre dispositivos,
+figuras clínicas privadas, revisión médica del corpus/banco, Safari/iPad y
+notch físico. Este entorno no permite descargar Chromium de Playwright desde
+su CDN (403 de política de red); las pruebas locales usan Chromium del
+sistema y la CI usa la versión instalada por Playwright. La selección diaria
+sigue siendo la existente (10/20 y viernes libre); el contexto de cinco
+conceptos se dejó documentado como decisión de producto.
+
+Para deshacer: Revert del PR completo en GitHub, o git revert <sha-del-lote>
+para una mejora concreta. Si se retiran varios lotes, empezar por el más reciente.

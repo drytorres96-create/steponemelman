@@ -5,6 +5,7 @@ import { tituloDeCheckpoint } from '../plan/enlace'
 import { Enfoque } from '../plan/Enfoque'
 import { DIAS_SEMANA, esTarea, MINUTOS_POR_KIND, type PlanCheckpoint, type PlanSemana } from '../plan/tipos'
 import { fechaISO } from '../lib/tiempo'
+import { inicioDelDia, limitesSemana } from '../lib/dia'
 
 const DIAS = [...DIAS_SEMANA, 'domingo']
 
@@ -62,6 +63,13 @@ function Fila({ cp, hecho, error, onMarcar, onEnfocar }: FilaProps) {
 export function CalendarioSemana() {
   const { session } = useAuth()
   const token = session?.access_token ?? ''
+  const [ahora, setAhora] = useState(() => Date.now())
+  const diaDeEstudio = fechaISO(new Date(inicioDelDia(ahora)))
+  const inicioSemana = limitesSemana(ahora).inicio
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), 60_000)
+    return () => clearInterval(t)
+  }, [])
   const [plan, setPlan] = useState<PlanSemana | null>(null)
   const [planListo, setPlanListo] = useState(false)
   // Marcas optimistas: lo que se ve antes de que la base conteste. Una que no cuaja se revierte.
@@ -74,9 +82,17 @@ export function CalendarioSemana() {
   useEffect(() => {
     let vivo = true
     setPlanListo(false)
-    cargarPlanSemana(token).then(p => { if (vivo) { setPlan(p); setPlanListo(true) } })
+    setMarcas({})
+    setFallos({})
+    setEnfoque(null)
+    cargarPlanSemana(token, inicioSemana).then(p => { if (vivo) {
+      setPlan(p)
+      // Reiniciar la selección junto al plan nuevo evita abrir un día del plan anterior.
+      setDiaAbierto(null)
+      setPlanListo(true)
+    } })
     return () => { vivo = false }
-  }, [token])
+  }, [token, inicioSemana])
 
   const hechoDe = useCallback((cp: PlanCheckpoint) => marcas[cp.id] ?? cp.done, [marcas])
 
@@ -97,18 +113,22 @@ export function CalendarioSemana() {
 
   const porDia = useMemo(() => {
     const mapa = new Map<number, PlanCheckpoint[]>()
-    for (const cp of plan?.checkpoints ?? []) mapa.set(cp.dia, [...(mapa.get(cp.dia) ?? []), cp])
+    for (const cp of plan?.checkpoints ?? []) {
+      // Mantener 0 en el contrato; colocarlo después del sábado sólo para pintar.
+      const dia = cp.dia === 0 ? 7 : cp.dia
+      mapa.set(dia, [...(mapa.get(dia) ?? []), cp])
+    }
     return mapa
   }, [plan])
 
-  // El día de hoy dentro de la semana del plan; `null` si hoy cae fuera (domingo incluido).
+  // El domingo se muestra sólo si el plan lo trae, incluso si su rango acaba el sábado.
   const diaDeHoy = useMemo(() => {
     if (!plan) return null
-    const hoy = fechaISO(new Date())
-    if (hoy < plan.inicio || hoy > plan.fin) return null
-    const dias = Math.round((fechaLocal(hoy).getTime() - fechaLocal(plan.inicio).getTime()) / 86400000) + 1
+    const dias = Math.round((fechaLocal(diaDeEstudio).getTime() - fechaLocal(plan.inicio).getTime()) / 86400000) + 1
+    if (dias === 7 && porDia.has(7)) return 7
+    if (diaDeEstudio < plan.inicio || diaDeEstudio > plan.fin) return null
     return dias >= 1 && dias <= 6 ? dias : null
-  }, [plan])
+  }, [plan, diaDeEstudio, porDia])
 
   const pendientesDe = useCallback((dia: number) =>
     (porDia.get(dia) ?? []).filter(cp => esTarea(cp) && !hechoDe(cp)).length, [porDia, hechoDe])
