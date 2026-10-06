@@ -10,7 +10,11 @@ const conceptos = ids.map((id, i) => ({ ...ConceptoZ.parse({
   pistas: ['uno', 'dos', 'tres'], calidad: { confianza: 1, estado: 'aprobado' },
 }), concept_id: id }) as Concepto)
 export const cargarTodo = async () => conceptos
-export const cargarConceptos = async (lista: string[]) => new Map(conceptos.filter(c => lista.includes(c.concept_id)).map(c => [c.concept_id, c]))
+let cargas = 0
+export const cargarConceptos = async (lista: string[]) => {
+  if (new URLSearchParams(location.search).get('retomar') === 'concepto-error' && ++cargas === 1) throw new Error('No se pudo cargar la sesión sintética. Vuelve a intentarlo.')
+  return new Map(conceptos.filter(c => lista.includes(c.concept_id)).map(c => [c.concept_id, c]))
+}
 export const cargarModulo = async () => conceptos
 export const cargarIndice = async () => { throw new Error('no') }
 export const cargarCuarentena = async () => ({ n: 0, conceptos: [] })

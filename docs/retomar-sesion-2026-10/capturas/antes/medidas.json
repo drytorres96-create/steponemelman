@@ -1,0 +1,22 @@
+[
+  {
+    "width": 390,
+    "escena": "fallo-nbme",
+    "errores": [],
+    "version": "1.27.0",
+    "vista": "progreso",
+    "overflow": false,
+    "controlesPequenos": [],
+    "errorVisible": null
+  },
+  {
+    "width": 1280,
+    "escena": "fallo-nbme",
+    "errores": [],
+    "version": "1.27.0",
+    "vista": "progreso",
+    "overflow": false,
+    "controlesPequenos": [],
+    "errorVisible": null
+  }
+]

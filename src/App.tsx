@@ -135,7 +135,9 @@ export default function App() {
     setCola(null); setSesionSemanal(null); setCajasHoy(null); setVinetasAbiertas(null); setVista(v as Vista); location.hash = v
   }, [vista, nbme.pauseSession])
   const continuarPreguntas = async () => {
-    if (sesionPreguntasPendiente && await nbme.resumeSession(sesionPreguntasPendiente.id)) ir('preguntas')
+    if (!sesionPreguntasPendiente || !await nbme.resumeSession(sesionPreguntasPendiente.id)) return false
+    ir('preguntas')
+    return true
   }
 
   /**
@@ -163,34 +165,42 @@ export default function App() {
     setVista('cajas'); location.hash = 'cajas'
   }, [])
 
+  const prepararCola = useCallback(async (moduloId: string, ruta: RutaId, limite: number, sesionId?: string, presupuestoMinutos?: 10 | 20 | 30): Promise<Cola> => {
+    if (!indice) throw new Error('El material todavía se está preparando. Vuelve a intentarlo en un momento.')
+    let conceptos: Concepto[] = []
+    let titulo = '', subtitulo = ''
+    if (moduloId) {
+      const m = indice.modulos.find(x => x.module_id === moduloId)!
+      conceptos = await cargarModulo(moduloId)
+      if (sesionId) {
+        const ses = m.sesiones.find(s => s.session_id === sesionId)!
+        const ids = new Set(ses.conceptos)
+        conceptos = conceptos.filter(c => ids.has(c.concept_id))
+        titulo = `${m.nombre} · ${ses.titulo}`; subtitulo = ses.objetivo
+      } else { titulo = m.nombre; subtitulo = m.proposito }
+    } else {
+      conceptos = await cargarTodo(indice.modulos)
+      const r = RUTAS.find(x => x.id === ruta)!
+      titulo = r.nombre; subtitulo = r.descripcion
+    }
+    const seleccion = sesionId ? conceptos.slice(0, limite) : construirCola(ruta, conceptos, estado.progreso, limite)
+    const lista = alternarFormatos(seleccion.map(c => ruta === 'aplicacion' ? aplicarVariante(c, siguienteVariante(c, estado.progreso[c.concept_id])) : c), ruta)
+    if (!lista.length) throw new Error('No hay conceptos disponibles para esta ruta ahora mismo.')
+    return { titulo, subtitulo, ruta, modulo: moduloId || ruta, conceptos: lista, presupuestoMinutos }
+  }, [indice, estado.progreso])
+
+  const mostrarCola = useCallback((preparada: Cola, desde: number) => {
+    setError(null); setCola(preparada); setIndiceInicial(desde)
+    setVista('estudio'); location.hash = 'estudio'
+  }, [])
   const abrir = useCallback(async (moduloId: string, ruta: RutaId, limite: number, sesionId?: string, desde = 0, presupuestoMinutos?: 10 | 20 | 30) => {
     if (!indice) return
     setCargando(true); setError(null)
     try {
-      let conceptos: Concepto[] = []
-      let titulo = '', subtitulo = ''
-      if (moduloId) {
-        const m = indice.modulos.find(x => x.module_id === moduloId)!
-        conceptos = await cargarModulo(moduloId)
-        if (sesionId) {
-          const ses = m.sesiones.find(s => s.session_id === sesionId)!
-          const ids = new Set(ses.conceptos)
-          conceptos = conceptos.filter(c => ids.has(c.concept_id))
-          titulo = `${m.nombre} · ${ses.titulo}`; subtitulo = ses.objetivo
-        } else { titulo = m.nombre; subtitulo = m.proposito }
-      } else {
-        conceptos = await cargarTodo(indice.modulos)
-        const r = RUTAS.find(x => x.id === ruta)!
-        titulo = r.nombre; subtitulo = r.descripcion
-      }
-      const seleccion = sesionId ? conceptos.slice(0, limite) : construirCola(ruta, conceptos, estado.progreso, limite)
-      const lista = alternarFormatos(seleccion.map(c => ruta === 'aplicacion' ? aplicarVariante(c, siguienteVariante(c, estado.progreso[c.concept_id])) : c), ruta)
-      if (!lista.length) { setError('No hay conceptos disponibles para esta ruta ahora mismo.'); setCargando(false); return }
-      setIndiceInicial(Math.min(desde, lista.length - 1))
-      setCola({ titulo, subtitulo, ruta, modulo: moduloId || ruta, conceptos: lista, presupuestoMinutos })
-      setVista('estudio'); location.hash = 'estudio'
+      const preparada = await prepararCola(moduloId, ruta, limite, sesionId, presupuestoMinutos)
+      mostrarCola(preparada, Math.min(desde, preparada.conceptos.length - 1))
     } catch (e) { setError(String(e)) } finally { setCargando(false) }
-  }, [indice, estado.progreso])
+  }, [indice, prepararCola, mostrarCola])
 
   const estudiarIds = useCallback(async (ids: string[], opciones: OpcionesSesionPersonalizada = {}) => {
     if (!indice) return
@@ -209,27 +219,36 @@ export default function App() {
     } finally { setCargando(false) }
   }, [indice, estado.progreso])
 
-  const continuar = useCallback(async () => {
+  // La preparación no desmonta la pantalla que contiene el botón: así una carga
+  // fallida puede explicarse allí mismo y reintentarse con la misma sesión.
+  const restaurarConceptos = useCallback(async () => {
     const r = estado.reanudable
-    if (!r) return
-    if (r.conceptIds?.length && indice) {
-      setCargando(true); setError(null)
-      try {
-        const mapa = await cargarConceptos(r.conceptIds, indice.modulos)
-        const faltantes = [...new Set(r.conceptIds.filter(id => !mapa.has(id)))]
-        if (faltantes.length) throw new Error(`No se pudo restaurar la cola exacta: faltan ${faltantes.length} conceptos del corpus actual.`)
-        const conceptos = r.conceptIds.map((id, n) => aplicarVariante(mapa.get(id) as Concepto, r.variantes?.[n]))
-        setCola({
-          titulo: r.titulo ?? 'Sesión reanudada', subtitulo: r.subtitulo ?? 'Continúa exactamente donde la dejaste.',
-          ruta: r.sesion, modulo: r.modulo, conceptos, sessionId: r.sessionId, presupuestoMinutos: r.presupuestoMinutos,
-        })
-        setIndiceInicial(Math.min(r.indice, conceptos.length))
-        setVista('estudio'); location.hash = 'estudio'
-      } catch (e) { setError(String(e)) } finally { setCargando(false) }
+    if (!r) throw new Error('Esta sesión ya no está pendiente. Revisa el siguiente paso de Hoy.')
+    if (!indice) throw new Error('El material todavía se está preparando. Vuelve a intentarlo en un momento.')
+    if (r.conceptIds?.length) {
+      const mapa = await cargarConceptos(r.conceptIds, indice.modulos)
+      const faltantes = [...new Set(r.conceptIds.filter(id => !mapa.has(id)))]
+      if (faltantes.length) throw new Error(`No se pudo restaurar la cola exacta: faltan ${faltantes.length} conceptos del corpus actual.`)
+      const conceptos = r.conceptIds.map((id, n) => aplicarVariante(mapa.get(id) as Concepto, r.variantes?.[n]))
+      mostrarCola({
+        titulo: r.titulo ?? 'Sesión reanudada', subtitulo: r.subtitulo ?? 'Continúa exactamente donde la dejaste.',
+        ruta: r.sesion, modulo: r.modulo, conceptos, sessionId: r.sessionId, presupuestoMinutos: r.presupuestoMinutos,
+      }, Math.min(r.indice, conceptos.length))
       return
     }
-    await abrir(r.modulo && indice?.modulos.some(m => m.module_id === r.modulo) ? r.modulo : '', (r.sesion as RutaId) || 'guiada', 30, undefined, r.indice)
-  }, [estado.reanudable, abrir, indice])
+    const preparada = await prepararCola(r.modulo && indice.modulos.some(m => m.module_id === r.modulo) ? r.modulo : '', (r.sesion as RutaId) || 'guiada', 30)
+    mostrarCola(preparada, Math.min(r.indice, preparada.conceptos.length - 1))
+  }, [estado.reanudable, prepararCola, mostrarCola, indice])
+  const continuar = useCallback(async () => {
+    setCargando(true); setError(null)
+    try { await restaurarConceptos() } catch (e) { setError(String(e)) } finally { setCargando(false) }
+  }, [restaurarConceptos])
+  const retomarPendiente = async () => {
+    if (estado.reanudable) { await restaurarConceptos(); return true }
+    if (!sesionPreguntasPendiente) throw new Error('Esta sesión ya no está pendiente. Revisa el siguiente paso de Hoy.')
+    if (nbme.loading || nbme.busy) throw new Error('Tus preguntas todavía se están preparando. Vuelve a intentarlo en un momento.')
+    return continuarPreguntas()
+  }
 
   if (!listo) return <div className="vacio" style={{ paddingTop: 120 }}>Cargando el material de estudio…</div>
   if (!indice) return <div className="vacio" style={{ paddingTop: 120 }}><p>{errorCarga ?? 'No se pudo cargar el material de estudio.'}</p><button className="btn" onClick={() => location.reload()}>Volver a intentar</button></div>
@@ -289,7 +308,7 @@ export default function App() {
             onEstudiar={ids => { nbme.pauseSession(); void estudiarIds(ids) }}
             onBuscar={q => { nbme.pauseSession(); setFiltrosConceptos({ sistema: q.systems[0] ?? '', disciplina: q.disciplines[0] ?? '' }); setTipoContenido('conceptos'); ir('modulos') }} />}
           {!cargando && vista === 'hoy' && <Hoy onNuevo={abrirNuevo} onCajas={abrirCajas}
-            onRetomar={() => { if (estado.reanudable) void continuar(); else void continuarPreguntas() }}
+            onRetomar={retomarPendiente}
             onBiblioteca={tipo => { setTipoContenido(tipo); ir('modulos') }} />}
           {!cargando && vista === 'cajas' && cajasHoy && <SesionCajas key={cajasHoy.titulo + cajasHoy.items.length}
             items={cajasHoy.items} titulo={cajasHoy.titulo} onSalir={() => ir('hoy')} />}
@@ -320,7 +339,7 @@ export default function App() {
             <button className="btn" onClick={() => { setTipoContenido('vinetas'); ir('modulos') }}>Volver a las viñetas</button></div>}
           {!cargando && vista === 'auditoria' && <Auditoria />}
           {!cargando && vista === 'progreso' && <Progreso onNuevo={abrirNuevo} onCajas={abrirCajas}
-            onRetomar={() => { if (estado.reanudable) void continuar(); else void continuarPreguntas() }} />}
+            onRetomar={retomarPendiente} />}
           {!cargando && vista === 'ajustes' && <Ajustes />}
           </Suspense>
           </Resguardo>

@@ -1,0 +1,62 @@
+[
+  {
+    "width": 390,
+    "escena": "fallo-nbme",
+    "errores": [],
+    "version": "1.27.1",
+    "vista": "progreso",
+    "overflow": false,
+    "controlesPequenos": [],
+    "errorVisible": "No se pudo descargar la pregunta sintética. Comprueba tu conexión."
+  },
+  {
+    "width": 390,
+    "escena": "nbme-retomada",
+    "errores": [],
+    "version": "1.27.1",
+    "vista": "preguntas",
+    "overflow": false,
+    "controlesPequenos": [],
+    "errorVisible": null
+  },
+  {
+    "width": 390,
+    "escena": "conceptos-retomados",
+    "errores": [],
+    "version": "1.27.1",
+    "vista": "estudio",
+    "overflow": false,
+    "controlesPequenos": [],
+    "errorVisible": null
+  },
+  {
+    "width": 1280,
+    "escena": "fallo-nbme",
+    "errores": [],
+    "version": "1.27.1",
+    "vista": "progreso",
+    "overflow": false,
+    "controlesPequenos": [],
+    "errorVisible": "No se pudo descargar la pregunta sintética. Comprueba tu conexión."
+  },
+  {
+    "width": 1280,
+    "escena": "nbme-retomada",
+    "errores": [],
+    "version": "1.27.1",
+    "vista": "preguntas",
+    "overflow": false,
+    "controlesPequenos": [],
+    "errorVisible": null
+  },
+  {
+    "width": 1280,
+    "escena": "conceptos-retomados",
+    "errores": [],
+    "version": "1.27.1",
+    "vista": "estudio",
+    "overflow": false,
+    "controlesPequenos": [],
+    "errorVisible": null
+  }
+]
