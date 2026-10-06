@@ -1,0 +1,382 @@
+[
+  {
+    "width": 390,
+    "escena": "hoy",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "error-concepto",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "chat",
+    "overflow": false,
+    "smallTargets": [
+      {
+        "texto": "Explícame el mecanismo paso a paso",
+        "width": 244.296875,
+        "height": 38
+      }
+    ],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "razonamiento",
+    "overflow": false,
+    "smallTargets": [
+      {
+        "texto": "Explícame el mecanismo paso a paso",
+        "width": 244.296875,
+        "height": 38
+      }
+    ],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "error-opciones",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "progreso",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "errors": [],
+    "llamadas": [
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "X1",
+          "answer": "beta",
+          "questionId": "46c4d4f8-4c4c-46c9-afdb-d63df892d9d2:0:0:X1",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 0,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/ia/error",
+        "body": {
+          "tipo": "concepto",
+          "resultado": "incorrecta",
+          "presentacion": {
+            "conceptId": "X1",
+            "answer": "beta",
+            "questionId": "46c4d4f8-4c4c-46c9-afdb-d63df892d9d2:0:0:X1",
+            "version": "q1-1f848383",
+            "formatVersion": 3,
+            "index": 0,
+            "route": "repaso",
+            "retry": false
+          }
+        }
+      },
+      {
+        "path": "/api/preguntar",
+        "body": {
+          "conceptId": "X1",
+          "pregunta": "Explícame el mecanismo paso a paso",
+          "historial": [],
+          "presentacion": {
+            "conceptId": "X1",
+            "answer": "beta",
+            "questionId": "46c4d4f8-4c4c-46c9-afdb-d63df892d9d2:0:0:X1",
+            "version": "q1-1f848383",
+            "formatVersion": 3,
+            "index": 0,
+            "route": "repaso",
+            "retry": false
+          }
+        }
+      },
+      {
+        "path": "/api/ia/error",
+        "body": {
+          "tipo": "concepto",
+          "resultado": "incorrecta",
+          "presentacion": {
+            "conceptId": "X1",
+            "answer": "beta",
+            "questionId": "46c4d4f8-4c4c-46c9-afdb-d63df892d9d2:0:0:X1",
+            "version": "q1-1f848383",
+            "formatVersion": 3,
+            "index": 0,
+            "route": "repaso",
+            "retry": false
+          },
+          "razonamiento": "Elegí beta por el segundo dato."
+        }
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C4",
+          "answer": "demostración",
+          "questionId": "572a6b9b-6c7e-49a5-b2ed-7fb14f26c888:0:C4",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 0,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C5",
+          "answer": "demostración",
+          "questionId": "572a6b9b-6c7e-49a5-b2ed-7fb14f26c888:1:C5",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 1,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C6",
+          "answer": "demostración",
+          "questionId": "572a6b9b-6c7e-49a5-b2ed-7fb14f26c888:2:C6",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 2,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/ia/error",
+        "body": {
+          "tipo": "nbme",
+          "questionId": "Q1",
+          "revision": "r1",
+          "optionId": "A"
+        }
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "escena": "hoy",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "error-concepto",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "chat",
+    "overflow": false,
+    "smallTargets": [
+      {
+        "texto": "Explícame el mecanismo paso a paso",
+        "width": 244.296875,
+        "height": 38
+      }
+    ],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "razonamiento",
+    "overflow": false,
+    "smallTargets": [
+      {
+        "texto": "Explícame el mecanismo paso a paso",
+        "width": 244.296875,
+        "height": 38
+      }
+    ],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "error-opciones",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "progreso",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "errors": [],
+    "llamadas": [
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "X1",
+          "answer": "beta",
+          "questionId": "ee141ab0-ab8b-418a-b779-f3aacba9b7dd:0:0:X1",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 0,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/ia/error",
+        "body": {
+          "tipo": "concepto",
+          "resultado": "incorrecta",
+          "presentacion": {
+            "conceptId": "X1",
+            "answer": "beta",
+            "questionId": "ee141ab0-ab8b-418a-b779-f3aacba9b7dd:0:0:X1",
+            "version": "q1-1f848383",
+            "formatVersion": 3,
+            "index": 0,
+            "route": "repaso",
+            "retry": false
+          }
+        }
+      },
+      {
+        "path": "/api/preguntar",
+        "body": {
+          "conceptId": "X1",
+          "pregunta": "Explícame el mecanismo paso a paso",
+          "historial": [],
+          "presentacion": {
+            "conceptId": "X1",
+            "answer": "beta",
+            "questionId": "ee141ab0-ab8b-418a-b779-f3aacba9b7dd:0:0:X1",
+            "version": "q1-1f848383",
+            "formatVersion": 3,
+            "index": 0,
+            "route": "repaso",
+            "retry": false
+          }
+        }
+      },
+      {
+        "path": "/api/ia/error",
+        "body": {
+          "tipo": "concepto",
+          "resultado": "incorrecta",
+          "presentacion": {
+            "conceptId": "X1",
+            "answer": "beta",
+            "questionId": "ee141ab0-ab8b-418a-b779-f3aacba9b7dd:0:0:X1",
+            "version": "q1-1f848383",
+            "formatVersion": 3,
+            "index": 0,
+            "route": "repaso",
+            "retry": false
+          },
+          "razonamiento": "Elegí beta por el segundo dato."
+        }
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C4",
+          "answer": "demostración",
+          "questionId": "8f87c7e2-e5ca-4b84-ae7f-919e0463aa05:0:C4",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 0,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C5",
+          "answer": "demostración",
+          "questionId": "8f87c7e2-e5ca-4b84-ae7f-919e0463aa05:1:C5",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 1,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C6",
+          "answer": "demostración",
+          "questionId": "8f87c7e2-e5ca-4b84-ae7f-919e0463aa05:2:C6",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 2,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/ia/error",
+        "body": {
+          "tipo": "nbme",
+          "questionId": "Q1",
+          "revision": "r1",
+          "optionId": "A"
+        }
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      }
+    ]
+  }
+]

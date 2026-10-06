@@ -18,8 +18,8 @@ export async function calificarConIA(peticion: PeticionCalificacion, signal?: Ab
   const r = await solicitarIA<Partial<CoachVeredicto>>('/api/calificar', { ...peticion, answer: peticion.answer.slice(0, 500) }, 15_000, signal)
   if (r.estado === 'sin_ia') return r
   const data = r.data
-  if (!data || !['correcta', 'parcial', 'incorrecta'].includes(data.veredicto ?? '') || typeof data.motivo !== 'string') {
+  if (!data || !['correcta', 'parcial', 'incorrecta'].includes(data.veredicto ?? '') || (data.motivo != null && typeof data.motivo !== 'string')) {
     return { estado: 'sin_ia', motivo: 'La IA no devolvió un veredicto utilizable.' }
   }
-  return { estado: 'ok', veredicto: data.veredicto as CoachVeredicto['veredicto'], motivo: data.motivo.trim() }
+  return { estado: 'ok', veredicto: data.veredicto as CoachVeredicto['veredicto'], motivo: data.motivo?.trim() || '' }
 }

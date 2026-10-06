@@ -1,0 +1,282 @@
+[
+  {
+    "width": 390,
+    "escena": "hoy",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "error-concepto",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "chat",
+    "overflow": false,
+    "smallTargets": [
+      {
+        "texto": "Explícame el mecanismo paso a paso",
+        "width": 244.296875,
+        "height": 38
+      }
+    ],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "error-opciones",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "progreso",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "errors": [],
+    "llamadas": [
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "X1",
+          "answer": "beta",
+          "questionId": "78518dd8-d3c2-4726-a9d7-086576a612c4:0:0:X1",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 0,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/confusion",
+        "body": {
+          "conceptId": "X1",
+          "answer": "beta"
+        }
+      },
+      {
+        "path": "/api/preguntar",
+        "body": {
+          "conceptId": "X1",
+          "pregunta": "Explícame el mecanismo paso a paso",
+          "historial": [],
+          "presentacion": {
+            "conceptId": "X1",
+            "answer": "beta",
+            "questionId": "78518dd8-d3c2-4726-a9d7-086576a612c4:0:0:X1",
+            "version": "q1-1f848383",
+            "formatVersion": 3,
+            "index": 0,
+            "route": "repaso",
+            "retry": false
+          }
+        }
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C4",
+          "answer": "demostración",
+          "questionId": "46ef0afc-3077-4185-bbbf-8e7af5c65e79:0:C4",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 0,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C5",
+          "answer": "demostración",
+          "questionId": "46ef0afc-3077-4185-bbbf-8e7af5c65e79:1:C5",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 1,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C6",
+          "answer": "demostración",
+          "questionId": "46ef0afc-3077-4185-bbbf-8e7af5c65e79:2:C6",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 2,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "escena": "hoy",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "error-concepto",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "chat",
+    "overflow": false,
+    "smallTargets": [
+      {
+        "texto": "Explícame el mecanismo paso a paso",
+        "width": 244.296875,
+        "height": 38
+      }
+    ],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "error-opciones",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "progreso",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "errors": [],
+    "llamadas": [
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "X1",
+          "answer": "beta",
+          "questionId": "0228abd4-06b8-47d0-b6a7-66a5764a1260:0:0:X1",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 0,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/confusion",
+        "body": {
+          "conceptId": "X1",
+          "answer": "beta"
+        }
+      },
+      {
+        "path": "/api/preguntar",
+        "body": {
+          "conceptId": "X1",
+          "pregunta": "Explícame el mecanismo paso a paso",
+          "historial": [],
+          "presentacion": {
+            "conceptId": "X1",
+            "answer": "beta",
+            "questionId": "0228abd4-06b8-47d0-b6a7-66a5764a1260:0:0:X1",
+            "version": "q1-1f848383",
+            "formatVersion": 3,
+            "index": 0,
+            "route": "repaso",
+            "retry": false
+          }
+        }
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C4",
+          "answer": "demostración",
+          "questionId": "25342396-9e33-4f3f-845d-2a8d255cdccf:0:C4",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 0,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C5",
+          "answer": "demostración",
+          "questionId": "25342396-9e33-4f3f-845d-2a8d255cdccf:1:C5",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 1,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C6",
+          "answer": "demostración",
+          "questionId": "25342396-9e33-4f3f-845d-2a8d255cdccf:2:C6",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 2,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      }
+    ]
+  }
+]

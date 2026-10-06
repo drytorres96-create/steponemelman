@@ -60,6 +60,16 @@ describe('transporte gratuito y acotado de IA', () => {
     red.mockResolvedValue(Response.json({ veredicto: 'casi', motivo: 'No sé.' }))
     expect((await calificarConIA({ conceptId: 'QA', answer: 'beta', questionId: 'QA:0', version: 'qa', formatVersion: 3, index: 0, route: 'repaso', retry: false })).estado).toBe('sin_ia')
   })
+
+  it('conserva el contrato antiguo de calificación cuando el motivo opcional no viene', async () => {
+    for (const veredicto of ['correcta', 'parcial', 'incorrecta']) {
+      for (const extra of [{}, { motivo: null }]) {
+        red.mockResolvedValue(Response.json({ veredicto, ...extra }))
+        expect(await calificarConIA({ conceptId: 'QA', answer: 'beta', questionId: 'QA:0', version: 'qa', formatVersion: 3, index: 0, route: 'repaso', retry: false }))
+          .toEqual({ estado: 'ok', veredicto, motivo: '' })
+      }
+    }
+  })
 })
 
 describe('contexto útil del chat sin desbordar el cuerpo', () => {

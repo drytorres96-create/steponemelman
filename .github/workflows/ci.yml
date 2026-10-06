@@ -33,6 +33,12 @@ jobs:
           path: docs/mejora-2026-10/
           retention-days: 7
       - uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request' && github.head_ref == 'mejora/ia-gratuita-eficiente'
+        with:
+          name: ia-recuperacion-melman-2026-10
+          path: docs/ia-recuperacion-2026-10/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: trazas-navegador

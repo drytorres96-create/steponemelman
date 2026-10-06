@@ -1,6 +1,7 @@
 {
-  "name": "Step 1 · Laboratorio de razonamiento médico",
-  "short_name": "Step 1",
+  "id": "/",
+  "name": "Melman · Step One",
+  "short_name": "Melman",
   "description": "Estudio de USMLE Step 1 con sesiones cortas, repaso espaciado y progreso asociado a tu cuenta.",
   "lang": "es",
   "dir": "ltr",
@@ -8,11 +9,11 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#061638",
-  "theme_color": "#061638",
+  "background_color": "#14261f",
+  "theme_color": "#14261f",
   "icons": [
-    { "src": "/brand-v170-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/brand-v170-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/brand-v170-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/brand-v127-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/brand-v127-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/brand-v127-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

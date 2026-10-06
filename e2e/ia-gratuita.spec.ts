@@ -29,6 +29,7 @@ for (const width of [390, 1280]) test.describe(`IA gratuita a ${width}px`, () =>
     await expect(page.locator('.chat-apoyo')).toHaveText(/Cita localizada/)
     await page.getByText('Ver el fragmento citado', { exact: true }).click()
     await expect(page.locator('.chat blockquote')).toHaveText('Sin material clínico')
+    expect((await page.getByRole('button', { name: 'Explícame el mecanismo paso a paso', exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(44)
     expect(consultas).toHaveLength(1)
     expect(consultas[0]).toMatchObject({ historial: [], presentacion: { answer: 'beta', formatVersion: 3, retry: false } })
     await expect(page.getByRole('button', { name: 'Siguiente pregunta', exact: true })).toBeEnabled()
