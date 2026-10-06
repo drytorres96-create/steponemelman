@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
 import {
@@ -6,6 +6,9 @@ import {
 } from '../lib/meta'
 import type { Concepto } from '../schema/concept'
 import { resumenProgresoAprendizaje } from '../lib/progreso-aprendizaje'
+import type { AccionesRecuperacion } from './RecuperarMeta'
+
+const RecuperarMeta = lazy(() => import('./RecuperarMeta').then(m => ({ default: m.RecuperarMeta })))
 
 const diaYMes = (f: Date) => f.toLocaleDateString('es', { day: 'numeric', month: 'short' }).replace('.', '')
 const desdeISO = (iso: string) => {
@@ -50,9 +53,12 @@ function Serie({ titulo, serie, fin }: { titulo: string; serie: SerieMeta; fin: 
  * ellos: ya cuenta con días malos, así que nunca pide más de lo que Hoy da en un día.
  * Ir por debajo no trae alarma ni color; sólo la distancia.
  */
-export function ProgresoMeta({ conceptos, conceptIds }: { conceptos?: Concepto[]; conceptIds?: string[]; cargarDetalleConceptos?: () => Promise<Concepto[]> }) {
+export function ProgresoMeta({ conceptos, conceptIds, ...acciones }: AccionesRecuperacion & { conceptos?: Concepto[]; conceptIds?: string[]; cargarDetalleConceptos?: () => Promise<Concepto[]> }) {
   const { estado } = useApp()
   const nbme = useNbme()
+  const [recuperacionAbierta, setRecuperacionAbierta] = useState(false)
+  const [, tic] = useState(0)
+  useEffect(() => { const t = setInterval(() => tic(n => n + 1), 60_000); return () => clearInterval(t) }, [])
   const ahora = Date.now()
   const preguntas = useMemo(() => primerasRespuestasNbme(nbme.state, nbme.catalog), [nbme.state, nbme.catalog])
   const ids = useMemo(() => conceptIds ?? (conceptos ?? []).map(c => c.concept_id), [conceptIds, conceptos])
@@ -85,6 +91,13 @@ export function ProgresoMeta({ conceptos, conceptIds }: { conceptos?: Concepto[]
     {catalogo ? <Serie titulo="Preguntas NBME respondidas" serie={r.preguntas} fin={fin} />
       : <p className="mini" role="status">{nbme.error ? 'Las preguntas NBME no están disponibles ahora mismo.' : 'Cargando las preguntas NBME…'}</p>}
     {proyeccionPendiente && <p className="mini">La proyección sale el {diaYMes(fechaDelDia(DIAS_PARA_PROYECTAR + 1))}: antes no hay ritmo que proyectar.</p>}
+
+    <details className="hoy-desplegable" onToggle={e => setRecuperacionAbierta(e.currentTarget.open)}>
+      <summary>Ponerme al día con la meta</summary>
+      {recuperacionAbierta && <div className="hoy-desplegable-cuerpo"><Suspense fallback={<p role="status">Comprobando tu siguiente paso…</p>}>
+        <RecuperarMeta {...acciones} />
+      </Suspense></div>}
+    </details>
 
     <div className="scroll-x">
       <table className="tabla meta-tabla">

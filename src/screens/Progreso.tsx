@@ -7,9 +7,10 @@ import { ProgresoMeta } from './ProgresoMeta'
 import { BandaAdherencia } from './ProgresoAdherencia'
 import { CalendarioSemana } from './CalendarioSemana'
 import { resumenProgresoAprendizaje } from '../lib/progreso-aprendizaje'
+import type { AccionesRecuperacion } from './RecuperarMeta'
 
 /** Los indicadores sólo necesitan IDs y progreso. El contenido se carga al pedir su detalle. */
-export function ResumenProgreso() {
+export function ResumenProgreso(acciones: AccionesRecuperacion) {
   const { indice, estado } = useApp()
   const [semanaAbierta, setSemanaAbierta] = useState(false)
   const conceptIds = useMemo(() => [...new Set(indice?.modulos.flatMap(m => m.sesiones.flatMap(s => s.conceptos)) ?? [])], [indice])
@@ -28,16 +29,16 @@ export function ResumenProgreso() {
           {!resumen.dominioDemostrado && ' Se contará al demostrar dominio.'}</p></article>
     </section>
     <BandaDeCifras conceptIds={conceptIds} cargarDetalleConceptos={cargarDetalleConceptos} ventana="semana" />
-    <ProgresoMeta conceptIds={conceptIds} />
+    <ProgresoMeta conceptIds={conceptIds} {...acciones} />
     <details className="hoy-desplegable" onToggle={event => setSemanaAbierta(event.currentTarget.open)}><summary>Mi semana y mi plan</summary>
       {semanaAbierta && <div className="hoy-desplegable-cuerpo pila"><BandaAdherencia /><CalendarioSemana /></div>}
     </details>
   </div>
 }
 
-export function Progreso() {
+export function Progreso(acciones: AccionesRecuperacion) {
   return <div className="pila">
     <ScreenHeading eyebrow="Tu práctica" title="Progreso" description="Lo que hiciste, lo que demostraste y lo que mantienes al día." />
-    <ResumenProgreso />
+    <ResumenProgreso {...acciones} />
   </div>
 }
