@@ -1,0 +1,270 @@
+[
+  {
+    "width": 390,
+    "escena": "hoy",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "error-concepto",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "chat",
+    "overflow": false,
+    "smallTargets": [
+      {
+        "texto": "Explícame el mecanismo paso a paso",
+        "width": 244.296875,
+        "height": 38
+      }
+    ],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "error-opciones",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "escena": "progreso",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 390,
+    "errors": [],
+    "llamadas": [
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "X1",
+          "answer": "beta",
+          "questionId": "33381ff9-e4bb-4224-819e-79b44a720bbf:0:0:X1",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 0,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/confusion",
+        "body": {
+          "conceptId": "X1",
+          "answer": "beta"
+        }
+      },
+      {
+        "path": "/api/preguntar",
+        "body": {
+          "conceptId": "X1",
+          "pregunta": "Explícame el mecanismo paso a paso",
+          "historial": []
+        }
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C4",
+          "answer": "demostración",
+          "questionId": "d46ccba0-fb06-4290-9097-011333022eaf:0:C4",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 0,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C5",
+          "answer": "demostración",
+          "questionId": "d46ccba0-fb06-4290-9097-011333022eaf:1:C5",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 1,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C6",
+          "answer": "demostración",
+          "questionId": "d46ccba0-fb06-4290-9097-011333022eaf:2:C6",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 2,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "escena": "hoy",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "error-concepto",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "chat",
+    "overflow": false,
+    "smallTargets": [
+      {
+        "texto": "Explícame el mecanismo paso a paso",
+        "width": 244.296875,
+        "height": 38
+      }
+    ],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "error-opciones",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "escena": "progreso",
+    "overflow": false,
+    "smallTargets": [],
+    "activeAnimations": []
+  },
+  {
+    "width": 1280,
+    "errors": [],
+    "llamadas": [
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "X1",
+          "answer": "beta",
+          "questionId": "64616c08-263a-4348-b89c-77e1948cdcc8:0:0:X1",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 0,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/confusion",
+        "body": {
+          "conceptId": "X1",
+          "answer": "beta"
+        }
+      },
+      {
+        "path": "/api/preguntar",
+        "body": {
+          "conceptId": "X1",
+          "pregunta": "Explícame el mecanismo paso a paso",
+          "historial": []
+        }
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C4",
+          "answer": "demostración",
+          "questionId": "879d36d7-0ceb-43ce-9708-8d62829ff5f0:0:C4",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 0,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C5",
+          "answer": "demostración",
+          "questionId": "879d36d7-0ceb-43ce-9708-8d62829ff5f0:1:C5",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 1,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/calificar",
+        "body": {
+          "conceptId": "C6",
+          "answer": "demostración",
+          "questionId": "879d36d7-0ceb-43ce-9708-8d62829ff5f0:2:C6",
+          "version": "q1-1f848383",
+          "formatVersion": 3,
+          "index": 2,
+          "route": "repaso",
+          "retry": false
+        }
+      },
+      {
+        "path": "/api/ia/estado",
+        "body": null
+      }
+    ]
+  }
+]

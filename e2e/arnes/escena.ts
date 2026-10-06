@@ -6,7 +6,7 @@ import type { Intento } from '@app/srs/tipos'
 
 /**
  * Escenas sintéticas para las pruebas de navegador: `?escena=abierto` (un día a medias),
- * `cerrado`, `vacio`, `meta` y `muchas` (25 cajas vencidas, para la pausa de las 20).
+ * `cerrado`, `vacio`, `meta`, `atraso` (catálogo amplio con poca práctica) y `muchas`.
  * Ningún dato es clínico: ids inventados y textos de demostración.
  */
 const escena = new URLSearchParams(location.search).get('escena') ?? 'abierto'
@@ -45,12 +45,12 @@ if (escena === 'meta') {
     progreso[`M${i}`] = reconstruirProgreso(`M${i}`, [intento(dia(k) - 5 * 86_400_000), intento(dia(k) - 3 * 86_400_000), intento(dia(k))], CRITERIOS_POR_DEFECTO)
   }
 }
-export const conceptosMeta = escena === 'meta' ? Array.from({ length: 600 }, (_, i) => `M${i}`) : []
+export const conceptosMeta = escena === 'meta' || escena === 'atraso' ? Array.from({ length: 600 }, (_, i) => `M${i}`) : []
 export const respuestasMeta = escena === 'meta' ? Array.from({ length: 90 }, (_, i) => {
   const ts = new Date(2026, 8, 26 + Math.floor(i * 24 / 90), 11).getTime()
   return { id: `r${i}:0`, sessionId: `r${i}`, position: 0, questionId: `P${i}`, revision: 'r1', optionId: 'A', correct: i % 4 !== 0, submittedAt: ts, reviewedAt: ts, durationMs: 1000 }
 }) : []
-export const catalogoMeta = escena === 'meta' ? Array.from({ length: 300 }, (_, i) => ({ id: `P${i}`, revision: 'r1', form: '27', section: 1, item: 1, page: 1, systems: [], disciplines: [], topic: 'T', objective: null, status: 'ready', reasons: [], figureRequired: false, conceptLinks: [] })) : []
+export const catalogoMeta = escena === 'meta' || escena === 'atraso' ? Array.from({ length: 300 }, (_, i) => ({ id: `P${i}`, revision: 'r1', form: '27', section: 1, item: 1, page: 1, systems: [], disciplines: [], topic: 'T', objective: null, status: 'ready', reasons: [], figureRequired: false, conceptLinks: [] })) : []
 
 if (escena === 'muchas') {
   // Veinticinco conceptos vistos hace dos días con un acierto: caja 2, vencidos hoy.

@@ -1,48 +1,28 @@
-import { supabase } from './supabase'
-import { notificarUsoIA } from './cuota-ia'
+import { solicitarIA } from './peticion-ia'
 import type { CoachRespuesta, TurnoChat } from '../server/worker'
-
+import type { PresentacionIA } from './contexto-ia'
 export type { CoachRespuesta, TurnoChat }
-
-export type ResultadoChat =
-  | { estado: 'ok'; respuesta: CoachRespuesta }
-  | { estado: 'sin_ia'; motivo: string }
-
-const LIMITE_MS = 30_000
-/** Lo que se manda de vuelta como contexto. Más historia encarece y no responde mejor. */
+export type ResultadoChat = { estado: 'ok'; respuesta: CoachRespuesta } | { estado: 'sin_ia'; motivo: string }
 export const MAX_HISTORIAL = 8
 
-/**
- * Pregunta una duda concreta sobre un concepto. Nunca lanza: si no se puede, devuelve el
- * motivo y el chat lo enseña como un mensaje más, sin romper la pantalla de estudio.
- */
-export async function preguntarSobreConcepto(
-  conceptId: string, pregunta: string, historial: TurnoChat[] = [], signal?: AbortSignal,
-): Promise<ResultadoChat> {
-  if (!pregunta.trim()) return { estado: 'sin_ia', motivo: 'Escribe una pregunta.' }
-  let limite: AbortSignal | null = null
-  try {
-    limite = AbortSignal.timeout(LIMITE_MS)
-    const señales = signal ? AbortSignal.any([signal, limite]) : limite
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return { estado: 'sin_ia', motivo: 'Sin sesión iniciada.' }
-    const response = await fetch('/api/preguntar', {
-      method: 'POST', signal: señales,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ conceptId, pregunta: pregunta.trim().slice(0, 400), historial: historial.slice(-MAX_HISTORIAL) }),
-    })
-    // Haya ido bien o mal, la llamada puede haber gastado: el medidor tiene que enterarse.
-    notificarUsoIA()
-    if (!response.headers.get('content-type')?.includes('application/json')) {
-      return { estado: 'sin_ia', motivo: 'El chat no está disponible en este entorno.' }
+/** Quita parejas antiguas, nunca recorta a medias una respuesta ni supera 6000 bytes UTF-8. */
+export function cuerpoChat(conceptId: string, pregunta: string, historial: TurnoChat[], presentacion?: PresentacionIA) {
+  const pares: TurnoChat[] = []
+  for (let n = 0; n < historial.length - 1; n++) {
+    if (historial[n].rol === 'yo' && historial[n + 1].rol === 'ia') {
+      pares.push(historial[n], historial[n + 1]); n++
     }
-    const data = await response.json() as Partial<CoachRespuesta> & { error?: string; detalle?: string }
-    if (!response.ok) return { estado: 'sin_ia', motivo: (data.error || 'No se pudo responder.') + (data.detalle ? ` (${data.detalle})` : '') }
-    if (!data.respuesta) return { estado: 'sin_ia', motivo: 'La respuesta llegó vacía.' }
-    return { estado: 'ok', respuesta: { respuesta: data.respuesta, apoyo: data.apoyo === 'material' ? 'material' : 'conocimiento', patron: data.patron } }
-  } catch (causa) {
-    if (signal?.aborted) return { estado: 'sin_ia', motivo: 'Cancelado.' }
-    if (limite?.aborted) return { estado: 'sin_ia', motivo: 'La IA tardó demasiado.' }
-    return { estado: 'sin_ia', motivo: causa instanceof Error && causa.name === 'TypeError' ? 'Sin conexión.' : 'No se pudo responder.' }
   }
+  const cuerpo = { conceptId, pregunta: pregunta.trim().slice(0, 400), historial: pares.slice(-MAX_HISTORIAL), ...(presentacion ? { presentacion } : {}) }
+  while (cuerpo.historial.length && new TextEncoder().encode(JSON.stringify(cuerpo)).byteLength > 6000) cuerpo.historial.splice(0, 2)
+  return cuerpo
+}
+
+export async function preguntarSobreConcepto(conceptId: string, pregunta: string, historial: TurnoChat[] = [], signal?: AbortSignal, presentacion?: PresentacionIA): Promise<ResultadoChat> {
+  if (!pregunta.trim()) return { estado: 'sin_ia', motivo: 'Escribe una pregunta.' }
+  const r = await solicitarIA<Partial<CoachRespuesta>>('/api/preguntar', cuerpoChat(conceptId, pregunta, historial, presentacion), 30_000, signal)
+  if (r.estado === 'sin_ia') return r
+  if (typeof r.data?.respuesta !== 'string' || r.data.respuesta.trim().length < 20) return { estado: 'sin_ia', motivo: 'La respuesta llegó incompleta.' }
+  return { estado: 'ok', respuesta: { respuesta: r.data.respuesta, apoyo: r.data.apoyo === 'material' && typeof r.data.evidencia === 'string' ? 'material' : 'conocimiento',
+    ...(typeof r.data.patron === 'string' ? { patron: r.data.patron } : {}), ...(typeof r.data.evidencia === 'string' ? { evidencia: r.data.evidencia } : {}) } }
 }

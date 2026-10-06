@@ -62,7 +62,7 @@ describe('chat del concepto', () => {
   it('pregunta con un toque y dice de dónde sale la respuesta', async () => {
     mock.preguntar.mockResolvedValue({ estado: 'ok', respuesta: {
       respuesta: 'La tiroxina exógena frena la TSH y la glándula deja de captar.',
-      apoyo: 'material', patron: 'Si ves T4 alta con captación baja, piensa en facticia.' } })
+      apoyo: 'material', evidencia: 'Fragmento sintético literal.', patron: 'Si ves T4 alta con captación baja, piensa en facticia.' } })
     await act(async () => { root.render(<ChatConcepto concepto={concepto} />) })
     expect(mock.preguntar).not.toHaveBeenCalled()
 
@@ -70,15 +70,16 @@ describe('chat del concepto', () => {
     expect(mock.preguntar).toHaveBeenCalledWith('QA-1', '¿Por qué Captación de yodo baja en este caso?', [], expect.anything())
     expect(host.textContent).toContain('la glándula deja de captar')
     expect(host.textContent).toContain('Si ves T4 alta con captación baja')
-    expect(host.textContent).toContain('Apoyado en el material')
+    expect(host.textContent).toContain('Cita localizada en el material')
+    expect(host.textContent).toContain('Fragmento sintético literal.')
   })
 
   it('lo que sale de fisiología general se marca distinto', async () => {
     mock.preguntar.mockResolvedValue({ estado: 'ok', respuesta: { respuesta: 'Depende del eje hipotálamo-hipófisis.', apoyo: 'conocimiento' } })
     await act(async () => { root.render(<ChatConcepto concepto={concepto} />) })
     await pulsar('Explícame el mecanismo')
-    expect(host.textContent).toContain('Fisiología general, fuera del material')
-    expect(host.textContent).not.toContain('Apoyado en el material')
+    expect(host.textContent).toContain('sin cita localizada')
+    expect(host.textContent).not.toContain('Cita localizada en el material')
   })
 
   it('la segunda pregunta lleva la conversación anterior', async () => {
@@ -100,6 +101,6 @@ describe('chat del concepto', () => {
 
     mock.preguntar.mockResolvedValue({ estado: 'ok', respuesta: { respuesta: 'Ya va.', apoyo: 'material' } })
     await pulsar('Explícame el mecanismo')
-    expect(mock.preguntar.mock.calls[1][2]).toEqual([{ rol: 'yo', texto: '¿Por qué TSH baja en este caso?' }])
+    expect(mock.preguntar.mock.calls[1][2]).toEqual([])
   })
 })

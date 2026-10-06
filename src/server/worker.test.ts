@@ -23,7 +23,7 @@ function setup() {
   const call = (key: string, user = 'one') => coach.fetch(new Request('https://coach/explicar', { method: 'POST', body: JSON.stringify({ key, user, reference: fragment, sourceFragment: fragment, question: '¿Primero?', answer: 'beta', canonical: 'alfa', source: { title: 'QA', page: 1 } }) }))
   return { storage, env, call }
 }
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 describe('ayuda de IA con cuota gratuita', () => {
   it('rechaza una cita inventada y JSON incompleto', () => {
     expect(validarRespuesta(output, fragment)).toBeTruthy()
@@ -82,6 +82,58 @@ describe('ayuda de IA con cuota gratuita', () => {
     expect((await call('failed')).status).toBe(503)
     expect(env.AI.run).toHaveBeenCalledTimes(1)
     expect((await storage.get<{ neuronas: number }>('gasto'))!.neuronas).toBeGreaterThan(0)
+  })
+
+  it('repetir un fallo durante un minuto no vuelve a gastar y luego permite un reintento explícito', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const { call, env, storage } = setup()
+    env.AI.run.mockRejectedValue(new Error('quota'))
+    const primera = await call('failed-repeated')
+    expect(primera.status).toBe(503)
+    expect(primera.headers.get('Retry-After')).toBe('60')
+    const gastado = await storage.get('gasto')
+    vi.setSystemTime(Date.now() + 30_000)
+    const segunda = await call('failed-repeated')
+    expect(segunda.headers.get('Retry-After')).toBe('30')
+    expect(env.AI.run).toHaveBeenCalledTimes(1)
+    expect(await storage.get('gasto')).toEqual(gastado)
+    vi.setSystemTime(Date.now() + 31_000)
+    env.AI.run.mockResolvedValue(output)
+    expect((await call('failed-repeated')).status).toBe(200)
+    expect(env.AI.run).toHaveBeenCalledTimes(2)
+  })
+
+  it('una liquidación del día anterior no descuenta el gasto nuevo del mismo usuario', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-05T23:59:58Z'))
+    const { call, env, storage } = setup()
+    let resolver!: (raw: unknown) => void
+    env.AI.run.mockImplementationOnce(() => new Promise(resolve => { resolver = resolve }))
+    const anterior = call('antes-de-medianoche')
+    await vi.waitFor(() => expect(env.AI.run).toHaveBeenCalledTimes(1))
+    vi.setSystemTime(new Date('2026-10-06T00:00:01Z'))
+    env.AI.run.mockResolvedValue({ ...output, usage: { prompt_tokens: 300, completion_tokens: 40 } })
+    expect((await call('nuevo-dia')).status).toBe(200)
+    const nuevo = await storage.get('gasto')
+    resolver({ ...output, usage: { prompt_tokens: 300, completion_tokens: 40 } })
+    expect((await anterior).status).toBe(200)
+    expect(await storage.get('gasto')).toEqual(nuevo)
+    expect(nuevo).toMatchObject({ day: '2026-10-06', llamadas: 1, neuronas: neuronasDe(300, 40) })
+  })
+
+  it('expone el saldo personal y los techos por función sin ampliar ninguna cuota', async () => {
+    const storage = new MemoryStorage()
+    const hoy = new Date().toISOString().slice(0, 10)
+    await storage.put('gasto', { v: 2, day: hoy, neuronas: 6000, llamadas: 20,
+      users: { one: { neuronas: 7600, llamadas: 20 } } })
+    const env = { AI_FREE_ENABLED: 'true', AI: { run: vi.fn() }, ASSETS: { fetch: vi.fn() }, COACH: { idFromName: vi.fn(), get: vi.fn() } }
+    const coach = new StudyCoach({ storage }, env)
+    const response = await coach.fetch(new Request('https://coach/estado', { method: 'POST', body: JSON.stringify({ user: 'one', mode: 'estado' }) }))
+    expect(await response.json()).toMatchObject({ presupuesto: 8500, restantes: 2500, presupuestoUsuario: 7650,
+      restantesUsuario: 50, porModo: { calificar: 50, confusion: 50, chat: 50, explicar: 0, examen: 0 },
+      reiniciaEn: new Date(Date.parse(`${hoy}T00:00:00Z`) + 86_400_000).toISOString() })
+    expect(env.AI.run).not.toHaveBeenCalled()
+    expect(await storage.get('gasto')).toMatchObject({ v: 2, llamadas: 20 })
   })
   it('restablece el contador diario y conserva caché válida', async () => {
     const { call, storage } = setup()
@@ -578,13 +630,14 @@ describe('detección de confusiones por parecido', () => {
  * cliente llegue como turnos con su rol —no como instrucciones dentro del prompt—, que el
  * material lo ponga el corpus, y que una respuesta vacía no se enseñe como respuesta.
  */
-const respuestaChat = { respuesta: 'La captación de yodo baja porque la tiroxina exógena frena la TSH y la glándula deja de captar.', apoyo: 'material', patron: 'Si ves T4 alta con captación baja, piensa en tirotoxicosis facticia.' }
+const respuestaChat = { respuesta: 'Una explicación sintética de un mecanismo de QA.', apoyo: 'material', evidencia: 'Fragmento sintético de prueba.', patron: 'Si ves alfa, distingue beta.' }
 const preguntar = (cuerpo: unknown) => new Request('https://site/api/preguntar', { method: 'POST',
   headers: { Authorization: 'Bearer ' + 'x'.repeat(30) }, body: JSON.stringify(cuerpo) })
 
 describe('chat sobre el concepto', () => {
   it('acepta una respuesta con cuerpo y descarta la vacía', () => {
-    expect(validarRespuestaChat({ response: JSON.stringify(respuestaChat) })).toMatchObject({ apoyo: 'material', patron: respuestaChat.patron })
+    expect(validarRespuestaChat({ response: JSON.stringify(respuestaChat) }, respuestaChat.evidencia)).toMatchObject({ apoyo: 'material', patron: respuestaChat.patron })
+    expect(validarRespuestaChat({ response: JSON.stringify(respuestaChat) }, 'Otra fuente sin esa cita.')).toMatchObject({ apoyo: 'conocimiento' })
     expect(validarRespuestaChat({ response: JSON.stringify({ respuesta: 'Sí.' }) })).toBeNull()
     expect(validarRespuestaChat({ response: 'no es json' })).toBeNull()
     // Sin apoyo declarado, se asume lo prudente: no presentarlo como respaldado por la fuente.
@@ -614,8 +667,9 @@ describe('chat sobre el concepto', () => {
     expect(await respuesta.json()).toMatchObject({ apoyo: 'material', patron: respuestaChat.patron })
 
     const enviado = env.AI.run.mock.calls[0][1] as { messages: { role: string; content: string }[] }
-    expect(enviado.messages.map(m => m.role)).toEqual(['system', 'user', 'assistant', 'user'])
-    expect(enviado.messages[0].content).toContain('Afirmación de QA-1.')
+    expect(enviado.messages.map(m => m.role)).toEqual(['system', 'user', 'user', 'assistant', 'user'])
+    expect(enviado.messages[0].content).not.toContain('Afirmación de QA-1.')
+    expect(enviado.messages[1].content).toContain('Afirmación de QA-1.')
     expect(enviado.messages.at(-1)!.content).toBe('¿Por qué la captación baja?')
   })
 

@@ -73,4 +73,28 @@ describe('reconstrucción de presentación entre navegador y Worker', () => {
     expect((await worker.fetch(request, env)).status).toBe(409)
     expect(enviado).not.toHaveBeenCalled()
   })
+
+  it.each([undefined, 1, 2, 3] as const)('el chat recibe la presentación exacta %s y la respuesta del estudiante', async version => {
+    const { env, enviado } = setup()
+    const { c, request } = peticion(version, undefined, version === 1 || version === undefined ? 2 : 0)
+    const presentacion = await request.json()
+    presentacion.answer = 'beta'
+    const respuesta = await worker.fetch(new Request('https://site/api/preguntar', { method: 'POST',
+      headers: { Authorization: 'Bearer ' + 'x'.repeat(30) }, body: JSON.stringify({ conceptId: original.concept_id, pregunta: '¿Por qué no es beta?', presentacion }) }), env)
+    expect(respuesta.status).toBe(200)
+    const trusted = await enviado.mock.calls[0][0].json()
+    const ref = JSON.parse(trusted.reference)
+    expect(ref.pregunta_del_item).toBe(c.evaluacion.pregunta)
+    expect(ref.respuesta_del_estudiante).toBe('beta')
+    expect(ref.opciones.map((o: { texto: string }) => o.texto)).toEqual((c.evaluacion.opciones ?? []).map(o => o.texto))
+  })
+
+  it('el chat rechaza una presentación cambiada sin llamar a ningún modelo', async () => {
+    const { env, enviado } = setup()
+    const { request } = peticion(3, 'huella-incorrecta')
+    const respuesta = await worker.fetch(new Request('https://site/api/preguntar', { method: 'POST',
+      headers: { Authorization: 'Bearer ' + 'x'.repeat(30) }, body: JSON.stringify({ conceptId: original.concept_id, pregunta: '¿Por qué?', presentacion: await request.json() }) }), env)
+    expect(respuesta.status).toBe(409)
+    expect(enviado).not.toHaveBeenCalled()
+  })
 })

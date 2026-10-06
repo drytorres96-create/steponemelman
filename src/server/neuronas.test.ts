@@ -48,6 +48,16 @@ describe('presupuesto de neuronas', () => {
     expect(costeReal({ response: 'sin uso' }, 120)).toBe(120)
   })
 
+  it('un consumo mal formado nunca devuelve una reserva como si hubiera costado cero', () => {
+    for (const prompt_tokens of [null, '', false, '300', 0, 0.5, Infinity, NaN]) {
+      expect(costeReal({ usage: { prompt_tokens, completion_tokens: 0 } }, 120)).toBe(120)
+    }
+    for (const completion_tokens of [null, '', false, '40', -1, 0.5, Infinity]) {
+      expect(tokensUsados({ usage: { prompt_tokens: 300, completion_tokens } })).toBeNull()
+    }
+    expect(costeReal({ usage: { prompt_tokens: 300, completion_tokens: 0 } }, 120)).toBe(neuronasDe(300, 0))
+  })
+
   it('comparar por parecido cuesta calderilla al lado de escribir', () => {
     // Dos docenas de candidatos cortos: lo que cuesta detectar con qué se confundió algo.
     const candidatos = Array.from({ length: 24 }, () => 'un término de cinco palabras más o menos')

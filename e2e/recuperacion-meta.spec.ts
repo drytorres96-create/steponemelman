@@ -1,0 +1,30 @@
+import { expect, test } from '@playwright/test'
+
+for (const width of [390, 1280]) test.describe(`recuperación de la meta a ${width}px`, () => {
+  test.use({ viewport: { width, height: 844 }, reducedMotion: 'reduce' })
+  test('se abre a petición, distingue dominio y trabajo y retoma la misma cola de Hoy', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-10-05T11:30:00Z') })
+    await page.goto('/?escena=atraso#progreso')
+    const panel = page.locator('details').filter({ has: page.getByText('Ponerme al día con la meta', { exact: true }) })
+    await expect(panel).not.toHaveAttribute('open', '')
+    await expect(page.getByRole('button', { name: 'Empezar recuperación de Hoy' })).toHaveCount(0)
+    await panel.locator('summary').click()
+    await expect(panel).toContainText('dominio demostrado')
+    await expect(panel).toContainText('primeras respuestas')
+    await expect(panel).toContainText('Primero los repasos vencidos')
+    await expect(page.getByRole('button', { name: 'Empezar recuperación de Hoy' })).toBeEnabled()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.getByRole('button', { name: 'Empezar recuperación de Hoy' }).click()
+    await expect(page.getByRole('textbox', { name: 'Tu respuesta', exact: true })).toBeVisible()
+    await expect(page.locator('.session-step-label')).toContainText('Paso 1 de 4')
+  })
+  test('el viernes la distancia es informativa y no abre recuperación', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-10-09T11:30:00Z') })
+    await page.goto('/?escena=atraso#progreso')
+    await page.getByText('Ponerme al día con la meta', { exact: true }).click()
+    await expect(page.locator('.recuperacion-meta')).toContainText('El viernes queda libre')
+    await expect(page.getByRole('button', { name: 'Empezar recuperación de Hoy' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Retomar mi sesión pendiente' })).toHaveCount(0)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  })
+})

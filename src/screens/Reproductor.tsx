@@ -14,8 +14,9 @@ import { EVALUADOR_VERSION } from '../lib/normalize'
 import { prepararConcepto, VERSION_FORMATO_ACTUAL, type VersionFormato } from '../lib/formatos'
 import { AyudaIA } from '../components/AyudaIA'
 import { ExamenIA } from '../components/ExamenIA'
-import { ConfusionIA } from '../components/ConfusionIA'
+import { CorreccionErrorIA } from '../components/CorreccionErrorIA'
 import { ChatConcepto } from '../components/ChatConcepto'
+import type { PresentacionIA } from '../lib/contexto-ia'
 import { Cronometro } from '../components/Cronometro'
 import { BotonPiel, usePielEstudio } from '../components/PielEstudio'
 import { tiempoLegible } from '../lib/tiempo'
@@ -586,9 +587,6 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
           ? 'Este fallo queda guardado; volverá en las cajas de los próximos días.'
           : 'Este concepto volverá al final de la cola hasta que lo aciertes.'}</p>}
         {(res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que) && <p className="session-feedback-key">{res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que}</p>}
-        {/* Solo con respuesta escrita: en un formato de opciones ya se sabe qué se eligió. */}
-        {res.veredicto !== 'correcta' && res.veredicto !== 'revision' && usaTextoLibre(c) && res.respuestaDada.trim()
-          && <ConfusionIA conceptId={c.concept_id} respuesta={res.respuestaDada} />}
         {c.patron && <p className="patron session-feedback-key"><b>Si ves esto → piensa:</b> {c.patron}</p>}
         <p>{c.explicacion}</p>
         {c.confusiones.length > 0 && <p className="mini">No lo confundas con: {c.confusiones.join(' · ')}</p>}
@@ -600,6 +598,11 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
             <button className="btn principal" onClick={() => autocalificar(false)}>No la sabía</button>
           </div>
           : <button ref={siguienteRef} className="btn principal" onClick={avanzar}>Siguiente pregunta</button>}
+        {!presentacionCambio && ['incorrecta', 'parcial', 'ortografia'].includes(res.veredicto) && <CorreccionErrorIA
+          key={`${preguntaId}:${res.respuestaDada}`} peticion={{ tipo: 'concepto', resultado: res.veredicto as 'incorrecta' | 'parcial' | 'ortografia',
+            presentacion: { conceptId: c.concept_id, answer: res.respuestaDada.slice(0, 500), questionId: preguntaId,
+              version: versionPregunta(c), formatVersion: versionFormato, variantId: c.variante_id, index: i,
+              route: cola.ruta as PresentacionIA['route'], retry: reintento } }} />}
         {/* Una respuesta escrita que nadie juzga no acredita nada: la IA puede decidirla si lo prefieres. */}
         {res.veredicto === 'revision' && res.respuestaDada.trim() && usaTextoLibre(c) && !presentacionCambio
           && <div><button className="btn pequeno fantasma" disabled={juzgandoIA} onClick={() => void juzgarConIA()}>
@@ -625,7 +628,10 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
             {/* A diferencia de la ayuda, esto no espera a que falles: sirve igual cuando aciertas. */}
             {!presentacionCambio && <details><summary>Cómo caería en el examen</summary><ExamenIA key={c.concept_id} concepto={c} /></details>}
             {/* Solo después de responder: preguntar antes sería pedirle la respuesta. */}
-            {!presentacionCambio && <details><summary>Preguntar sobre esta pregunta</summary><ChatConcepto key={c.concept_id} concepto={c} /></details>}
+            {!presentacionCambio && <details><summary>Preguntar sobre esta pregunta</summary><ChatConcepto key={preguntaId} concepto={c}
+              presentacion={{ conceptId: c.concept_id, answer: res.respuestaDada.slice(0, 500), questionId: preguntaId,
+                version: versionPregunta(c), formatVersion: versionFormato, variantId: c.variante_id, index: i,
+                route: cola.ruta as PresentacionIA['route'], retry: reintento }} /></details>}
             {res.veredicto !== 'revision' && <details><summary>Ajustar dificultad (opcional)</summary><p className="mini">El resultado ya programó tu repaso. Puedes ajustar cómo te resultó y avanzar.</p>
               <div className="escalera">{(res.veredicto === 'incorrecta' ? [[1, 'Volver a practicar']] as const
                 : res.veredicto === 'parcial' || res.veredicto === 'ortografia' ? [[1, 'Volver a practicar'], [2, 'Difícil']] as const

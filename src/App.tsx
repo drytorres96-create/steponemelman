@@ -289,6 +289,7 @@ export default function App() {
             onEstudiar={ids => { nbme.pauseSession(); void estudiarIds(ids) }}
             onBuscar={q => { nbme.pauseSession(); setFiltrosConceptos({ sistema: q.systems[0] ?? '', disciplina: q.disciplines[0] ?? '' }); setTipoContenido('conceptos'); ir('modulos') }} />}
           {!cargando && vista === 'hoy' && <Hoy onNuevo={abrirNuevo} onCajas={abrirCajas}
+            onRetomar={() => { if (estado.reanudable) void continuar(); else void continuarPreguntas() }}
             onBiblioteca={tipo => { setTipoContenido(tipo); ir('modulos') }} />}
           {!cargando && vista === 'cajas' && cajasHoy && <SesionCajas key={cajasHoy.titulo + cajasHoy.items.length}
             items={cajasHoy.items} titulo={cajasHoy.titulo} onSalir={() => ir('hoy')} />}
@@ -318,7 +319,8 @@ export default function App() {
           {!cargando && vista === 'vinetas' && !vinetasAbiertas && <div className="vacio"><p>Estas viñetas ya no están abiertas.</p>
             <button className="btn" onClick={() => { setTipoContenido('vinetas'); ir('modulos') }}>Volver a las viñetas</button></div>}
           {!cargando && vista === 'auditoria' && <Auditoria />}
-          {!cargando && vista === 'progreso' && <Progreso />}
+          {!cargando && vista === 'progreso' && <Progreso onNuevo={abrirNuevo} onCajas={abrirCajas}
+            onRetomar={() => { if (estado.reanudable) void continuar(); else void continuarPreguntas() }} />}
           {!cargando && vista === 'ajustes' && <Ajustes />}
           </Suspense>
           </Resguardo>

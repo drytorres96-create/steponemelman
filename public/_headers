@@ -21,10 +21,20 @@
   Cache-Control: public, max-age=604800
 
 /icon-192.png
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=0, must-revalidate
 /icon-512.png
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=0, must-revalidate
 /apple-touch-icon.png
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=0, must-revalidate
 /manifest.webmanifest
-  Cache-Control: public, max-age=86400
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Identidad orbital de Melman; nombres nuevos para evitar el icono antiguo de iOS.
+/brand-icon-v127.svg
+  Cache-Control: public, max-age=31536000, immutable
+/brand-v127-180.png
+  Cache-Control: public, max-age=31536000, immutable
+/brand-v127-192.png
+  Cache-Control: public, max-age=31536000, immutable
+/brand-v127-512.png
+  Cache-Control: public, max-age=31536000, immutable

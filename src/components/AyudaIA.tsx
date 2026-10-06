@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Concepto } from '../schema/concept'
-import { supabase } from '../lib/supabase'
+import { explicarRespuesta } from '../lib/explicacion-ia'
+import type { PresentacionIA } from '../lib/contexto-ia'
 import { versionPregunta } from '../screens/sesion'
 import type { CoachAnswer } from '../server/worker'
 import { referenciaPagina } from '../lib/fuente'
@@ -19,16 +20,13 @@ export function AyudaIA({ concepto, respuesta, preguntaId, indice, ruta, reinten
     const abort = new AbortController(); controller.current = abort
     setLoading(true); setError('')
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('Inicia sesión para usar la ayuda.')
-      const response = await fetch('/api/explicar', { method: 'POST', signal: abort.signal,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ conceptId: concepto.concept_id, answer: respuesta.slice(0, 500), questionId: preguntaId,
-          version: versionPregunta(concepto), formatVersion: versionFormato, variantId: concepto.variante_id, index: indice, route: ruta, retry: reintento }) })
-      if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('La ayuda de IA todavía no está disponible en este entorno.')
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'No se pudo abrir la ayuda.')
-      if (!abort.signal.aborted) setAnswer(data)
+      const r = await explicarRespuesta({ conceptId: concepto.concept_id, answer: respuesta.slice(0, 500), questionId: preguntaId,
+        version: versionPregunta(concepto), formatVersion: versionFormato, variantId: concepto.variante_id, index: indice,
+        route: ruta as PresentacionIA['route'], retry: reintento }, abort.signal)
+      if (!abort.signal.aborted) {
+        if (r.estado === 'ok') setAnswer(r.data)
+        else setError(r.motivo)
+      }
     } catch (e) { if (!abort.signal.aborted) setError(e instanceof Error ? e.message : 'No se pudo abrir la ayuda.') }
     finally { if (!abort.signal.aborted) setLoading(false) }
   }

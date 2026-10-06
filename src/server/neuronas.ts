@@ -96,8 +96,11 @@ export function costeReal(raw: unknown, estimado: number): number {
 export function tokensUsados(raw: unknown): { entrada: number; salida: number } | null {
   const uso = (raw as { usage?: Record<string, unknown> } | null)?.usage
   if (!uso) return null
-  const entrada = Number(uso.prompt_tokens)
-  const salida = Number(uso.completion_tokens)
-  if (!Number.isFinite(entrada) || !Number.isFinite(salida) || entrada < 0 || salida < 0) return null
+  const entrada = uso.prompt_tokens
+  const salida = uso.completion_tokens
+  // null, "" y false se convierten en cero con Number(): no son consumo comprobado.
+  if (typeof entrada !== 'number' || typeof salida !== 'number'
+    || !Number.isSafeInteger(entrada) || !Number.isSafeInteger(salida)
+    || entrada <= 0 || salida < 0) return null
   return { entrada, salida }
 }

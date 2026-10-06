@@ -15,6 +15,8 @@ export type { CoachCuota }
 let valor: CoachCuota | null = null
 let pendiente: Promise<void> | null = null
 let ultima = 0
+let avisoUso: ReturnType<typeof setTimeout> | null = null
+let renovacion: ReturnType<typeof setTimeout> | null = null
 const oyentes = new Set<() => void>()
 
 /** Dos usos seguidos no merecen dos consultas: la segunda vería lo mismo. */
@@ -29,9 +31,15 @@ async function consultar(): Promise<CoachCuota | null> {
     const response = await fetch('/api/ia/estado', { headers: { Authorization: `Bearer ${session.access_token}` } })
     if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) return null
     const data = await response.json() as Partial<CoachCuota>
-    if (typeof data.restantes !== 'number' || typeof data.presupuesto !== 'number' || data.presupuesto <= 0) return null
+    if (typeof data.restantes !== 'number' || !Number.isFinite(data.restantes)
+      || typeof data.presupuesto !== 'number' || !Number.isFinite(data.presupuesto) || data.presupuesto <= 0) return null
     return { presupuesto: data.presupuesto, gastadas: data.gastadas ?? 0, restantes: Math.max(0, data.restantes),
-      llamadas: data.llamadas ?? 0, activa: data.activa === true }
+      llamadas: data.llamadas ?? 0, activa: data.activa === true,
+      ...(typeof data.presupuestoUsuario === 'number' && data.presupuestoUsuario > 0 && Number.isFinite(data.presupuestoUsuario)
+        && typeof data.restantesUsuario === 'number' && Number.isFinite(data.restantesUsuario)
+        ? { presupuestoUsuario: data.presupuestoUsuario, restantesUsuario: Math.max(0, data.restantesUsuario) } : {}),
+      ...(data.porModo && Object.values(data.porModo).every(n => typeof n === 'number' && Number.isFinite(n) && n >= 0) ? { porModo: data.porModo } : {}),
+      ...(typeof data.reiniciaEn === 'string' && Number.isFinite(Date.parse(data.reiniciaEn)) ? { reiniciaEn: data.reiniciaEn } : {}) }
   } catch { return null }
 }
 
@@ -44,20 +52,30 @@ export function refrescarCuota(forzar = false): Promise<void> {
   if (!forzar && valor && Date.now() - ultima < ESPERA_MS) return Promise.resolve()
   pendiente = consultar().then(nueva => {
     ultima = Date.now()
-    if (nueva) { valor = nueva; avisar() }
+    if (nueva) {
+      valor = nueva; avisar()
+      if (renovacion) clearTimeout(renovacion)
+      const espera = nueva.reiniciaEn ? Date.parse(nueva.reiniciaEn) - Date.now() : 0
+      if (espera > 0 && espera <= 86_400_000) renovacion = setTimeout(() => { renovacion = null; void refrescarCuota(true) }, espera + 50)
+    }
   }).finally(() => { pendiente = null })
   return pendiente
 }
 
 /** Lo llaman los clientes de IA al terminar: puede haber gastado, así que hay que releer. */
 export function notificarUsoIA() {
-  setTimeout(() => void refrescarCuota(true), ESPERA_MS)
+  if (avisoUso) clearTimeout(avisoUso)
+  avisoUso = setTimeout(() => { avisoUso = null; void refrescarCuota(true) }, ESPERA_MS)
 }
 
 export const leerCuota = () => valor
 
 /** Solo para las pruebas: devuelve el módulo a su estado inicial. */
-export function olvidarCuota() { valor = null; ultima = 0; pendiente = null }
+export function olvidarCuota() {
+  if (avisoUso) clearTimeout(avisoUso)
+  if (renovacion) clearTimeout(renovacion)
+  avisoUso = null; renovacion = null; valor = null; ultima = 0; pendiente = null
+}
 
 function suscribir(fn: () => void) {
   oyentes.add(fn)
@@ -72,5 +90,6 @@ export function useCuotaIA(): CoachCuota | null {
 
 /** Porcentaje que queda, redondeado y acotado, listo para pintar. */
 export function porcentajeRestante(c: CoachCuota): number {
-  return Math.max(0, Math.min(100, Math.round(c.restantes / c.presupuesto * 100)))
+  const saldo = Math.min(c.restantes, c.restantesUsuario ?? c.restantes)
+  return Math.max(0, Math.min(100, Math.round(saldo / (c.presupuestoUsuario ?? c.presupuesto) * 100)))
 }

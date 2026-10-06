@@ -4,8 +4,7 @@ import { ScenePhoto } from '../components/Editorial'
 import { useAuth } from '../auth/AuthProvider'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
-import { deriveNbmeSession } from '../nbme/model'
-import type { NbmeQuestionMeta, NbmeQuestionRef, NbmeState } from '../nbme/types'
+import type { NbmeQuestionMeta } from '../nbme/types'
 import { cargarHistorialSesiones } from '../semana/api'
 import { separarGuion } from '../semana/guion'
 import type { SesionSemanal } from '../semana/tipos'
@@ -14,7 +13,7 @@ import { tituloDeCheckpoint } from '../plan/enlace'
 import { esTarea, type PlanSemana } from '../plan/tipos'
 import { cajaDeConcepto, cajasDelDia, type ItemCaja } from '../lib/cajas'
 import {
-  estadoDelDia, inicioDelDia, limitesSemana, materialNuevo, referenciaDelDia, temaDeLaSemana,
+  estadoDelDia, inicioDelDia, limitesSemana, referenciaDelDia, temaDeLaSemana,
   type EstadoDia, type TemaSemana,
 } from '../lib/dia'
 import type { CriteriosDominio } from '../srs/mastery'
@@ -23,16 +22,12 @@ import { fechaISO } from '../lib/tiempo'
 import { TablaPlanificador } from './TablaPlanificador'
 import { estimarBloque } from '../lib/ritmo'
 import { hitoSemanalAprendizaje } from '../lib/progreso-aprendizaje'
+import { prepararNuevoDeHoy, tituloDeHoy, type MaterialNuevo } from '../lib/nuevo-hoy'
+import type { AccionesRecuperacion } from './RecuperarMeta'
 
 const ResumenProgreso = lazy(() => import('./Progreso').then(m => ({ default: m.ResumenProgreso })))
 
-export interface MaterialNuevo {
-  conceptIds: string[]
-  preguntas: NbmeQuestionRef[]
-  titulo: string
-  /** Sesión NBME de lo nuevo de hoy que puede retomarse en lugar de abrir otra. */
-  nbmeSessionId: string | null
-}
+export type { MaterialNuevo } from '../lib/nuevo-hoy'
 
 interface AnilloSemana {
   valor: number
@@ -89,7 +84,6 @@ function rotuloTema(tema: TemaSemana | null, plan: PlanSemana | null): string {
 }
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
-const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
 /** Lo que hizo hoy, en cifras. Sin frases de ánimo: el anillo cerrado ya lo dice. */
 function fraseCierre(dia: EstadoDia): string {
@@ -101,23 +95,6 @@ function fraseCierre(dia: EstadoDia): string {
   if (!partes.length) return 'Hoy ya está: no tocaba nada nuevo ni ninguna caja.'
   const lista = partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : partes[0]
   return `Hoy ya está: ${lista}.`
-}
-
-/**
- * Una sesión NBME de lo nuevo de hoy que quedó a medias y sigue limpia —su
- * siguiente paso es una pregunta sin responder y le faltan justo las que tocan—
- * se retoma en lugar de abrir otra encima de las mismas preguntas.
- */
-function sesionNuevoReutilizable(state: NbmeState, titulo: string, desde: number, refs: NbmeQuestionRef[]): string | null {
-  if (!refs.length) return null
-  for (const s of Object.values(state.sessions)) {
-    if (s.title !== titulo || s.startedAt < desde) continue
-    const vista = deriveNbmeSession(state, s.id)
-    if (vista?.phase !== 'question' || vista.current?.round !== 0) continue
-    const libres = s.initial.filter((_, posicion) => !state.attempts[`${s.id}:${posicion}`])
-    if (libres.length === refs.length && libres.every((r, k) => r.id === refs[k].id && r.revision === refs[k].revision)) return s.id
-  }
-  return null
 }
 
 /**
@@ -134,8 +111,8 @@ function Desplegable({ titulo, children }: { titulo: string; children: () => Rea
 }
 
 /** «Cómo va todo»: las cifras de la semana, la meta de 60 días, la adherencia y el plan de la semana. */
-function ComoVaTodo() {
-  return <Suspense fallback={<p role="status">Abriendo tu progreso…</p>}><ResumenProgreso /></Suspense>
+function ComoVaTodo(acciones: AccionesRecuperacion) {
+  return <Suspense fallback={<p role="status">Abriendo tu progreso…</p>}><ResumenProgreso {...acciones} /></Suspense>
 }
 
 /** Repinta cada minuto: el día cambia a las 3:00 aunque la pestaña siga abierta. */
@@ -156,10 +133,11 @@ function useTic(cada = 60_000): void {
  * Ningún número de deuda fuera de los desplegables: los techos ya dicen lo que hay
  * que hacer.
  */
-export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
+export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
   onNuevo: (material: MaterialNuevo) => void
   onCajas: (items: ItemCaja[], titulo: string) => void
   onBiblioteca: (tipo: 'conceptos' | 'preguntas') => void
+  onRetomar?: () => void
 }) {
   const { indice, estado, sincronizacion } = useApp()
   const { session } = useAuth()
@@ -231,10 +209,7 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
   if (completo && (esperandoCuenta || esperandoBanco)) return <div className="vacio" role="status">Preparando tu día…</div>
   const fecha = new Date(inicioDelDia(ahora)).toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })
   // El título identifica la sesión NBME de hoy en cualquier dispositivo: no depende del idioma del navegador.
-  const inicioHoy = new Date(inicioDelDia(ahora))
-  const diaMes = `${inicioHoy.getDate()} ${MESES[inicioHoy.getMonth()]}`
-  const tituloCajas = `Cajas de hoy · ${diaMes}`
-  const tituloNuevo = `Nuevo de hoy · ${diaMes}`
+  const tituloCajas = tituloDeHoy('Cajas', ahora)
 
   const hechosNuevo = Math.min(dia.nuevo.conceptos, dia.nuevo.techoConceptos) + Math.min(dia.nuevo.preguntas, dia.nuevo.techoPreguntas)
   const techoNuevo = dia.nuevo.techoConceptos + dia.nuevo.techoPreguntas
@@ -252,11 +227,7 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
     : 'Lo nuevo de la semana no se pudo cargar; las cajas de hoy están hechas.'
 
   const empezarNuevo = () => {
-    const material = materialNuevo(entrada)
-    const preguntas = material.preguntas.map(id => listas.get(id)).filter((q): q is NbmeQuestionMeta => !!q)
-      .map(q => ({ id: q.id, revision: q.revision }))
-    onNuevo({ conceptIds: material.conceptos, preguntas, titulo: tituloNuevo,
-      nbmeSessionId: sesionNuevoReutilizable(nbme.state, tituloNuevo, inicioDelDia(ahora), preguntas) })
+    onNuevo(prepararNuevoDeHoy(entrada, listas, nbme.state))
   }
 
   const { conceptos: c, techoConceptos: tc, preguntas: q, techoPreguntas: tq } = dia.nuevo
@@ -354,7 +325,7 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca }: {
           </section>}
     </div>
 
-    <Desplegable titulo="Cómo va todo">{() => <ComoVaTodo />}</Desplegable>
+    <Desplegable titulo="Cómo va todo">{() => <ComoVaTodo onNuevo={onNuevo} onCajas={onCajas} onRetomar={onRetomar} />}</Desplegable>
     {/* Con el día cerrado no hay nada que mirar por qué ni otra puerta al estudio: el cierre no enlaza a más. */}
     {!completo && <Desplegable titulo="Lo que estoy cerrando">{() => <TablaPlanificador items={cajas.items} ahora={ahora} />}</Desplegable>}
     {!completo && <Desplegable titulo="Quiero hacer algo más">{() => <>
