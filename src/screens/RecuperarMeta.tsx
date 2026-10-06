@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
 import { deriveNbmeSession } from '../nbme/model'
@@ -11,7 +11,7 @@ import { prepararNuevoDeHoy, tituloDeHoy, type MaterialNuevo } from '../lib/nuev
 import type { ItemCaja } from '../lib/cajas'
 import { primerasRespuestasNbme, resumenMeta } from '../lib/meta'
 import { resumenProgresoAprendizaje } from '../lib/progreso-aprendizaje'
-export interface AccionesRecuperacion { onNuevo?: (material: MaterialNuevo) => void; onCajas?: (items: ItemCaja[], titulo: string) => void; onRetomar?: () => void }
+export interface AccionesRecuperacion { onNuevo?: (material: MaterialNuevo) => void; onCajas?: (items: ItemCaja[], titulo: string) => void; onRetomar?: () => Promise<boolean> }
 
 /** Sólo se monta al abrir la opción: usa metadatos y las mismas listas que Hoy. */
 export function RecuperarMeta({ onNuevo, onCajas, onRetomar }: AccionesRecuperacion) {
@@ -20,6 +20,18 @@ export function RecuperarMeta({ onNuevo, onCajas, onRetomar }: AccionesRecuperac
   const [sesiones, setSesiones] = useState<SesionSemanal[] | null>(null)
   const [fallo, setFallo] = useState(false)
   const [semanaCargada, setSemanaCargada] = useState('')
+  const [retomando, setRetomando] = useState(false)
+  const [errorRetomar, setErrorRetomar] = useState<string | null>(null)
+  const [falloPreguntas, setFalloPreguntas] = useState(false)
+  const bloqueoRetomar = useRef(false)
+  const montado = useRef(false)
+  const avisoRetomar = useRef<HTMLParagraphElement>(null)
+  useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
+  useEffect(() => {
+    if (!errorRetomar) return
+    avisoRetomar.current?.scrollIntoView?.({ block: 'nearest' })
+    avisoRetomar.current?.focus({ preventScroll: true })
+  }, [errorRetomar, falloPreguntas, nbme.error])
   const [, tic] = useState(0)
   useEffect(() => { const timer = setInterval(() => tic(n => n + 1), 60_000); return () => clearInterval(timer) }, [])
   const semanaActual = limitesSemana(Date.now()).inicio
@@ -59,6 +71,26 @@ export function RecuperarMeta({ onNuevo, onCajas, onRetomar }: AccionesRecuperac
     if (vigente.accion?.tipo === 'cajas') onCajas?.(vigente.accion.items, tituloDeHoy('Cajas', ahora))
     if (vigente.accion?.tipo === 'nuevo') onNuevo?.(vigente.accion.material)
   }
+  const retomar = async () => {
+    if (bloqueoRetomar.current || !onRetomar) return
+    const vigente = calcular().plan
+    if (!vigente.retomar) { setErrorRetomar(vigente.motivo); setFalloPreguntas(false); return }
+    bloqueoRetomar.current = true
+    setRetomando(true); setErrorRetomar(null); setFalloPreguntas(false)
+    try {
+      if (!await onRetomar() && montado.current) {
+        // NBME devuelve false y publica el motivo en su proveedor. Se lee al
+        // renderizar, después de su actualización, sin capturar un error viejo.
+        setFalloPreguntas(true)
+        setErrorRetomar('No se pudo abrir tu sesión guardada. Vuelve a intentarlo.')
+      }
+    } catch (e) {
+      if (montado.current) setErrorRetomar(e instanceof Error ? e.message : 'No se pudo abrir tu sesión guardada. Vuelve a intentarlo.')
+    } finally {
+      bloqueoRetomar.current = false
+      if (montado.current) setRetomando(false)
+    }
+  }
   const accionDisponible = plan.accion?.tipo === 'cajas' ? !!onCajas : plan.accion?.tipo === 'nuevo' && !!onNuevo
   return <div className="recuperacion-meta pila">
     <p><b>Dominio en esta meta:</b> {meta.conceptos.hechos} frente a {meta.conceptos.linea} previstos al empezar hoy.
@@ -69,7 +101,9 @@ export function RecuperarMeta({ onNuevo, onCajas, onRetomar }: AccionesRecuperac
     {plan.accion?.tipo === 'cajas' && <p>Primer bloque: hasta {Math.min(5, plan.accion.items.length)} repasos. El recorrido conserva el resto de pendientes válidos de Hoy.</p>}
     {plan.accion?.tipo === 'nuevo' && <p>Disponible hoy: {plan.accion.material.conceptIds.length} conceptos nuevos y {plan.accion.material.preguntas.length} preguntas.</p>}
     {accionDisponible && <button className="btn" onClick={empezar}>Empezar recuperación de Hoy</button>}
-    {plan.retomar && onRetomar && <button className="btn" onClick={onRetomar}>Retomar mi sesión pendiente</button>}
+    {plan.retomar && onRetomar && <button className="btn" disabled={retomando} aria-busy={retomando} onClick={() => void retomar()}>{retomando ? 'Retomando tu sesión…' : 'Retomar mi sesión pendiente'}</button>}
+    {retomando && <p className="mini" role="status">Abriendo tu sesión guardada…</p>}
+    {errorRetomar && <p role="alert" tabIndex={-1} ref={avisoRetomar}>{falloPreguntas && nbme.error ? nbme.error : errorRetomar}</p>}
     {!sesiones && !fallo && <p className="mini" role="status">Comprobando el material de la semana…</p>}
     <p className="mini">Intentar un concepto cuenta como trabajo; dominarlo exige tus criterios. Este recorrido conserva los techos de Hoy y los intervalos de repaso. La diferencia se cierra con aprendizaje demostrado a lo largo de varios días.</p>
   </div>

@@ -27,7 +27,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] }); vi.setSystemTime(lunes)
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
-  onNuevo.mockReset(); onCajas.mockReset(); onRetomar.mockReset()
+  onNuevo.mockReset(); onCajas.mockReset(); onRetomar.mockReset().mockResolvedValue(true)
   app = { indice: { modulos: [{ sesiones: [{ conceptos: Array.from({ length: 600 }, (_, i) => `C${i + 1}`) }] }] },
     estado: { ...ESTADO_INICIAL, progreso: { C1: reconstruirProgreso('C1', [intento], CRITERIOS_POR_DEFECTO) } }, sincronizacion: { estado: 'sincronizado', ultima: lunes } }
   banco = { state: emptyNbmeState(), catalog: { questions: Array.from({ length: 300 }, (_, i) => ({ id: `Q${i + 1}`, revision: 'r2', status: i === 1 ? 'withdrawn' : 'ready' })) }, syncStatus: { state: 'synced', lastSyncedAt: lunes } }
@@ -72,6 +72,59 @@ describe('la recuperación valida el progreso y el día al empezar', () => {
     await act(async () => boton('Retomar mi sesión pendiente')!.click())
     expect(onRetomar).toHaveBeenCalledOnce()
     expect(onNuevo).not.toHaveBeenCalled()
+  })
+
+  it('muestra la carga, bloquea dobles toques y enseña el error NBME actualizado junto al botón', async () => {
+    banco.state = { ...startNbmeSession(banco.state, { id: 'pausada', title: 'Sesión pendiente', refs: [{ id: 'Q1', revision: 'r2' }] }, lunes), activeSessionId: null }
+    let terminar!: (ok: boolean) => void
+    onRetomar.mockImplementation(() => new Promise<boolean>(resolve => { terminar = resolve }))
+    await render()
+    const retomar = boton('Retomar mi sesión pendiente')!
+    await act(async () => { retomar.click(); retomar.click() })
+    expect(onRetomar).toHaveBeenCalledOnce()
+    expect(retomar.disabled).toBe(true)
+    expect(retomar.getAttribute('aria-busy')).toBe('true')
+    expect(host.textContent).toContain('Abriendo tu sesión guardada')
+    banco.error = 'Una pregunta de este bloque se retiró del banco.'
+    await act(async () => { terminar(false) })
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(banco.error)
+    expect(retomar.disabled).toBe(false)
+    banco.error = null; onRetomar.mockResolvedValue(true)
+    await act(async () => retomar.click())
+    expect(onRetomar).toHaveBeenCalledTimes(2)
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+  })
+
+  it('un fallo de carga de conceptos conserva el panel y la continuación para reintentar', async () => {
+    app.estado.reanudable = { modulo: 'M', sesion: 'repaso', indice: 0, ts: lunes, conceptIds: ['C1'], sessionId: 'guardada' }
+    const previo = JSON.stringify(app.estado)
+    onRetomar.mockRejectedValue(new Error('No se pudo cargar tu sesión. Comprueba la conexión.'))
+    await render()
+    await act(async () => boton('Retomar mi sesión pendiente')!.click())
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Comprueba la conexión')
+    expect(boton('Retomar mi sesión pendiente')?.disabled).toBe(false)
+    expect(JSON.stringify(app.estado)).toBe(previo)
+    expect(onNuevo).not.toHaveBeenCalled(); expect(onCajas).not.toHaveBeenCalled()
+  })
+
+  it('si NBME devuelve false sin motivo muestra una salida visible', async () => {
+    banco.state = startNbmeSession(banco.state, { id: 'pausada', title: 'Sesión pendiente', refs: [{ id: 'Q1', revision: 'r2' }] }, lunes)
+    onRetomar.mockResolvedValue(false)
+    await render()
+    await act(async () => boton('Retomar mi sesión pendiente')!.click())
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Vuelve a intentarlo')
+    expect(boton('Retomar mi sesión pendiente')?.disabled).toBe(false)
+  })
+
+  it('revalida el día también al retomar una sesión pendiente', async () => {
+    vi.setSystemTime(new Date(2026, 9, 8, 23))
+    banco.state = startNbmeSession(banco.state, { id: 'pausada', title: 'Sesión pendiente', refs: [{ id: 'Q1', revision: 'r2' }] }, lunes)
+    await render()
+    const retomar = boton('Retomar mi sesión pendiente')!
+    vi.setSystemTime(new Date(2026, 9, 9, 4))
+    await act(async () => retomar.click())
+    expect(onRetomar).not.toHaveBeenCalled()
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('El viernes queda libre')
   })
 
   it('revalida el viernes al tocar un botón dibujado el jueves y actualiza la línea sin reabrir la pantalla', async () => {

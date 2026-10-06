@@ -5,7 +5,16 @@ import { CRITERIOS_POR_DEFECTO } from '@app/srs/mastery'
 import { conceptos, progreso } from './escena'
 
 // Doble del proveedor de progreso: el mismo contrato que useApp, en memoria y sin Supabase.
-let estado: any = { ...ESTADO_INICIAL, progreso }
+const reanudar = new URLSearchParams(location.search).get('retomar')
+const guardada = reanudar?.startsWith('concepto') ? {
+  versionFormato: 3, modulo: 'M', sesion: 'repaso', indice: 1, ts: Date.now(), sessionId: 'conceptos-guardados',
+  conceptIds: ['C8', 'C4', 'C8'], variantes: [null, null, null], cantidadInicial: 2,
+  titulo: 'Sesión sintética guardada', subtitulo: 'Cola exacta, incluidos reintentos.',
+  paso: { indice: 1, pistas: 1, fuenteConsultada: false, explicacionPrevia: false, confianza: 2, msActivo: 7000 },
+} : null
+let estado: any = { ...ESTADO_INICIAL, progreso, reanudable: guardada }
+declare global { interface Window { __leerProgresoSintetico: () => any } }
+window.__leerProgresoSintetico = () => estado
 const oyentes = new Set<() => void>()
 const avisar = () => { valor = { ...valor, estado }; oyentes.forEach(f => f()) }
 let valor: any = {

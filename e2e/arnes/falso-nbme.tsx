@@ -34,6 +34,17 @@ const pregunta = (id: string) => ({ id, revision: 'r1', form: '27', section: 1, 
   options: 'ABCDE'.split('').map(l => ({ id: l, text: conTabla ? `${l} first | ${l} second` : `Synthetic option ${l}` })), answer: 'C', explanation: 'Synthetic explanation.', figures: conFigura ? [{ assetId: 'synthetic-figure', alt: 'Synthetic figure' }] : [],
   provenance: { sourceFile: 'demo', sourceRecordId: id, notes: [] } })
 let state: any = { ...emptyNbmeState(), attempts: Object.fromEntries(respuestas.map((r: any) => [r.id, r])) }
+const reanudar = parametros.get('retomar')
+if (reanudar?.startsWith('nbme')) {
+  state = startNbmeSession(state, { id: 'preguntas-guardadas', title: 'Preguntas sintéticas pendientes', refs: [{ id: 'Q3', revision: 'r1' }, { id: 'Q4', revision: 'r1' }] })
+  state = submitNbmeAnswer(state, 'preguntas-guardadas', 0, pregunta('Q3') as any, 'B', 8000)
+  // Se pausa en la explicación; retomar debe conservar la respuesta y no generar otro intento.
+  state = { ...updateNbmeSession(state, 'preguntas-guardadas', { paused: true }), activeSessionId: null }
+}
+let errorReanudar: string | null = null
+let reanudaciones = 0
+declare global { interface Window { __leerNbmeSintetico: () => any } }
+window.__leerNbmeSintetico = () => state
 let seleccion: string | null = null
 let n = 0
 const oyentes = new Set<() => void>()
@@ -45,10 +56,13 @@ function construir() {
   return {
     catalog, state, currentSession: id ? state.sessions[id] : null, sessionView, currentQuestion, sessionQuestions: [],
     selectedOption: seleccion, currentFeedback: sessionView?.phase === 'feedback' ? sessionView.attempt : null,
-    filters: state.filters, loading: false, questionLoading: false, busy: false, elapsedMs: 0, budgetReached: false, error: null,
+    filters: state.filters, loading: false, questionLoading: false, busy: false, elapsedMs: 0, budgetReached: false, error: errorReanudar,
     storageWarning: null, localNotice: null, dismissLocalNotice() {}, syncStatus: { state: 'synced', message: 'Preguntas sincronizadas', lastSyncedAt: Date.now() }, catalogStale: false,
     startSession: async (refs: any[], opciones: any = {}) => { state = startNbmeSession(state, { id: `demo-${++n}`, title: opciones.title ?? 'Demo', refs }); seleccion = null; avisar(); return true },
-    resumeSession: async (sid: string) => { state = activateNbmeSession(state, sid); avisar(); return true },
+    resumeSession: async (sid: string) => {
+      if (reanudar === 'nbme-error' && ++reanudaciones === 1) { errorReanudar = 'No se pudo descargar la pregunta sintética. Comprueba tu conexión.'; avisar(); return false }
+      state = updateNbmeSession(activateNbmeSession(state, sid), sid, { paused: false }); errorReanudar = null; avisar(); return true
+    },
     selectAnswer: (op: string) => { seleccion = op; avisar() },
     checkAnswer: () => { const v = construir(); if (!v.sessionView?.current || !seleccion) return; state = submitNbmeAnswer(state, state.activeSessionId, v.sessionView.current.position, pregunta(v.sessionView.current.id) as any, seleccion, 8000); avisar() },
     nextQuestion: () => { const sid = state.activeSessionId; const v = sid ? deriveNbmeSession(state, sid) : null; if (sid && v?.current) state = reviewNbmeAnswer(state, sid, v.current.position); seleccion = null; avisar() },

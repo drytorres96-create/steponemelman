@@ -137,7 +137,7 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
   onNuevo: (material: MaterialNuevo) => void
   onCajas: (items: ItemCaja[], titulo: string) => void
   onBiblioteca: (tipo: 'conceptos' | 'preguntas') => void
-  onRetomar?: () => void
+  onRetomar?: AccionesRecuperacion['onRetomar']
 }) {
   const { indice, estado, sincronizacion } = useApp()
   const { session } = useAuth()
