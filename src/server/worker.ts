@@ -4,7 +4,9 @@ import { ConceptoZ, IndiceZ, type Concepto, type Indice } from '../schema/concep
 import { prepararConcepto } from '../lib/formatos'
 import { versionPregunta } from '../screens/sesion'
 import { aplicarVariante } from '../lib/variantes'
-import { PresentacionIAZ } from '../lib/contexto-ia'
+import { PeticionErrorIAZ, PresentacionIAZ } from '../lib/contexto-ia'
+import type { NbmeQuestion } from '../nbme/types'
+import { INSTRUCCION_ERROR, MAX_TOKENS_ERROR, materialErrorConcepto, materialErrorNbme, validarCorreccionError, type CorreccionError } from './correccion-error'
 import { NOMBRE_ERROR, type TipoError } from '../srs/tipos'
 import { handleNbme } from './nbme'
 import { handlePlan, type PlanEnv } from './plan'
@@ -38,9 +40,9 @@ interface Env extends PlanEnv {
   COACH: { idFromName(name: string): unknown; get(id: unknown): { fetch(request: Request): Promise<Response> } }
   ASSETS: { fetch(request: Request): Promise<Response> }
 }
-type CoachMode = ModoIA | 'estado'
+type CoachMode = ModoIA | 'estado' | 'error'
 type Candidato = { texto: string; origen: OrigenParecido }
-type CoachInput = { user: string; key: string; mode: CoachMode; reference: string; sourceFragment: string; question: string; answer: string; canonical: string; source: { title: string; page: number }; ids?: string[]; candidatos?: Candidato[]; historial?: TurnoChat[] }
+type CoachInput = { user: string; key: string; mode: CoachMode; reference: string; sourceFragment: string; question: string; answer: string; canonical: string; source: { title: string; page: number }; ids?: string[]; candidatos?: Candidato[]; historial?: TurnoChat[]; reasoning?: string }
 export type CoachAnswer = { diferencia: string; explicacion: string; recordar: string; evidencia: string }
 export type CoachVeredicto = { veredicto: 'correcta' | 'parcial' | 'incorrecta'; motivo: string }
 export type CoachPatron = { titulo: string; porque: string; conceptos: string[]; accion: string }
@@ -279,7 +281,8 @@ export class StudyCoach {
     const espera = fallo ? Math.ceil((fallo.at + 60_000 - Date.now()) / 1000) : 0
     if (espera > 0) return Response.json(fallo!.body, { status: 503,
       headers: { 'Cache-Control': 'no-store', 'Retry-After': String(espera), 'X-Content-Type-Options': 'nosniff' } })
-    const response = await (input.mode === 'calificar' ? this.grade(input)
+    const response = await (input.mode === 'error' ? this.corregirError(input)
+      : input.mode === 'calificar' ? this.grade(input)
       : input.mode === 'analizar' ? this.analyse(input)
       : input.mode === 'examen' ? this.examine(input)
       : input.mode === 'confusion' ? this.compare(input)
@@ -359,6 +362,34 @@ export class StudyCoach {
     const old = [...entries].sort((a, b) => a[1].at - b[1].at)
     const remove = old.filter(([k, v], n) => Date.now() - v.at > (k.startsWith('cache:fallo:') ? 60_000 : 7 * DAY) || n < old.length - 200).map(([k]) => k)
     for (let n = 0; n < remove.length; n += 128) await this.state.storage.delete(remove.slice(n, n + 128))
+  }
+
+  private async corregirError(input: CoachInput): Promise<Response> {
+    const cacheKey = `cache:${input.key}`
+    const saved = await this.state.storage.get<{ at: number; error: CorreccionError }>(cacheKey)
+    if (saved?.error && Date.now() - saved.at < 7 * DAY) return json({ ...saved.error, source: input.source, cached: true })
+    const messages = [{ role: 'system', content: INSTRUCCION_ERROR },
+      { role: 'user', content: JSON.stringify({ material: JSON.parse(input.reference), razonamiento_del_estudiante: input.reasoning ?? '' }) }]
+    const estimado = costeEstimado(JSON.stringify(messages), MAX_TOKENS_ERROR)
+    const diaReservado = await this.admitir(input.user, 'explicar', estimado)
+    if (!diaReservado) return json({ error: 'La corrección personalizada agotó su parte gratuita de hoy. La explicación del material sigue disponible; la cuota se renueva a las 00:00 UTC.' }, 429)
+    let timer: ReturnType<typeof setTimeout> | undefined, raw: unknown
+    try {
+      raw = await Promise.race([this.env.AI.run(MODEL, { stream: false, temperature: 0.1, max_tokens: MAX_TOKENS_ERROR,
+        response_format: { type: 'json_object' }, messages }),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), 20_000) })])
+      const error = validarCorreccionError(raw, input.sourceFragment)
+      if (!error) return unavailable('no_verificable')
+      await this.state.storage.put(cacheKey, { at: Date.now(), error })
+      await this.podarCache()
+      return json({ ...error, source: input.source, cached: false })
+    } catch (causa) {
+      registrar('coach/error', causa)
+      return unavailable('interno')
+    } finally {
+      if (timer) clearTimeout(timer)
+      await this.liquidar(input.user, diaReservado, estimado, costeReal(raw, estimado))
+    }
   }
 
   /** Corrige una respuesta breve. Solo decide equivalencia; no explica ni aconseja. */
@@ -963,6 +994,51 @@ async function handleChat(request: Request, url: URL, env: Env): Promise<Respons
   }
 }
 
+/** Fuente resuelta otra vez y con autorización vigente antes de consultar la caché. */
+async function handleError(request: Request, url: URL, env: Env): Promise<Response> {
+  const parado = preflight(request, url, 'POST')
+  if (parado) return parado
+  try {
+    const body = await boundedBody(request)
+    if (body === null) return json({ error: 'Solicitud demasiado larga.' }, 413)
+    const leido = PeticionErrorIAZ.safeParse(JSON.parse(body))
+    if (!leido.success) return json({ error: 'Solicitud no válida.' }, 400)
+    const input = leido.data
+    const quien = await identificar(request)
+    if (quien instanceof Response) return quien
+    if (env.AI_FREE_ENABLED !== 'true') return unavailable('desactivada')
+    let material, identidad: unknown
+    if (input.tipo === 'concepto') {
+      const publicado = await conceptoPublicado(quien.get, input.presentacion.conceptId)
+      if (publicado instanceof Response) return publicado
+      const c = reconstruirPresentacion(publicado.concepto, input.presentacion)
+      if (c instanceof Response) return c
+      material = materialErrorConcepto(c, input.presentacion.answer.trim().normalize('NFC'), input.resultado)
+      identidad = [publicado.indice.corpus_version, c.concept_id, input.presentacion.version]
+    } else {
+      // Reutiliza la puerta del banco: membresía NBME, disponibilidad y revisión exacta.
+      const response = await handleNbme(new Request(new URL('/api/nbme/questions', url.origin), { method: 'POST',
+        headers: { Authorization: request.headers.get('authorization')!, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refs: [{ id: input.questionId, revision: input.revision }] }) }))
+      if (!response.ok) return response
+      const data = await response.json() as { questions: NbmeQuestion[] }
+      const q = data.questions[0]
+      material = q ? materialErrorNbme(q, input.optionId) : null
+      identidad = [input.questionId, input.revision, input.optionId]
+    }
+    if (!material || material.sourceFragment.length < 15) return unavailable('no_verificable')
+    if (material.reference.length > 11000) return unavailable('concepto_largo')
+    const reasoning = input.razonamiento?.trim().normalize('NFC') ?? ''
+    const trusted: CoachInput = { user: quien.userId, mode: 'error', ...material, reasoning,
+      key: await digest(JSON.stringify([quien.userId, identidad, material.reference, reasoning, MODEL, 'error-v1'])),
+      question: '', answer: '', canonical: '' }
+    return await alCoach(env, 'error', trusted)
+  } catch (causa) {
+    registrar('ia/error', causa)
+    return unavailable('interno')
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -970,6 +1046,7 @@ export default {
     if (url.pathname.startsWith('/api/nbme/')) return handleNbme(request)
     if (url.pathname.startsWith('/api/plan/')) return handlePlan(request, env)
     if (url.pathname === '/api/ia/estado') return handleCuota(request, url, env)
+    if (url.pathname === '/api/ia/error') return handleError(request, url, env)
     if (url.pathname === '/api/analizar') return handleAnalisis(request, url, env)
     if (url.pathname === '/api/aplicar') return handleExamen(request, url, env)
     if (url.pathname === '/api/confusion') return handleConfusion(request, url, env)

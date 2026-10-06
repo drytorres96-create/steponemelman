@@ -10,3 +10,12 @@ export const PresentacionIAZ = z.object({
   retry: z.boolean(),
 })
 export type PresentacionIA = z.infer<typeof PresentacionIAZ>
+
+export const PeticionErrorIAZ = z.discriminatedUnion('tipo', [
+  z.object({ tipo: z.literal('concepto'), presentacion: PresentacionIAZ,
+    resultado: z.enum(['incorrecta', 'parcial', 'ortografia']), razonamiento: z.string().max(500).optional() }).strict(),
+  z.object({ tipo: z.literal('nbme'), questionId: z.string().regex(/^NBME(?:27|28|29)-P\d{4}$/),
+    revision: z.string().regex(/^[a-zA-Z0-9_.-]{1,80}$/), optionId: z.string().min(1).max(10),
+    razonamiento: z.string().max(500).optional() }).strict(),
+])
+export type PeticionErrorIA = z.infer<typeof PeticionErrorIAZ>

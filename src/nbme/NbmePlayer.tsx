@@ -4,6 +4,7 @@ import { FigureViewer } from './FigureViewer'
 import { useNbme } from './NbmeProvider'
 import { analizarColumnasOpciones, analizarEnunciado, normalizarTexto, preguntaConLecturasDudosas } from './texto'
 import type { NbmeQuestion } from './types'
+import { CorreccionErrorIA } from '../components/CorreccionErrorIA'
 import './nbme.css'
 
 interface LoadedFigure { assetId: string; alt: string; url: string }
@@ -295,6 +296,8 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
                 {conceptIds.length > 0 && onEstudiar && <button className="btn fantasma" onClick={() => { pauseSession(); onEstudiar(conceptIds) }}>{suggestedLinks ? 'Explorar conceptos relacionados' : 'Repasar fundamento'}</button>}
                 {conceptIds.length === 0 && onBuscar && <button className="btn fantasma" onClick={() => { pauseSession(); onBuscar(currentQuestion) }}>Explorar fundamentos</button>}
               </div>
+              {!feedback.correct && !feedback.conflict && <CorreccionErrorIA key={`${feedback.id}:${feedback.optionId}`}
+                peticion={{ tipo: 'nbme', questionId: currentQuestion.id, revision: currentQuestion.revision, optionId: feedback.optionId }} />}
             </section>}
           </>}
     <div className="nbme-status" role="status"><span>{syncText}</span>

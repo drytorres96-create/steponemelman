@@ -182,3 +182,11 @@
 @media (prefers-reduced-motion: reduce) {
   .hoy-focus *, .session-focus *, .learning-milestone, .premium-progress-card { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+.correccion-error-ia { border: 1px solid var(--linea); border-radius: 16px; padding: 16px; margin-block: 12px; background: var(--panel); }
+.correccion-error-ia h3 { margin: 0 0 10px; }
+.correccion-error-ia .pila { gap: 8px; }
+.correccion-error-ia p { margin-block: 6px; overflow-wrap: anywhere; }
+.error-razonamiento { margin-top: 10px; }
+.error-razonamiento form { padding-block: 8px; }
+.error-razonamiento label { display: grid; gap: 8px; }
+.error-razonamiento textarea { width: 100%; min-height: 80px; font: inherit; padding: 10px; border: 1px solid var(--linea); border-radius: 10px; background: var(--panel); color: var(--texto); }
