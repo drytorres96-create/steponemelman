@@ -58,6 +58,18 @@ describe('banco privado de preguntas', () => {
     expect((await handleNbme(request())).status).toBe(422)
     expect(mock).toHaveBeenCalledTimes(3)
   })
+  it.each(['ready', 'blocked'] as const)('a newer catalog revision leaves the requested historical asset governed by its own %s status', async (status) => {
+    const oldQuestion = { ...cleanQuestion, status }
+    const mock = vi.fn().mockResolvedValueOnce(Response.json({ id: 'user', email_confirmed_at: '2026-01-01' }))
+      .mockResolvedValueOnce(Response.json([{ user_id: 'user' }]))
+      .mockResolvedValueOnce(Response.json([{ payload: { questions: [{ ...ref, revision: 'synthetic-v2', status: 'ready' }] } }]))
+      .mockResolvedValueOnce(Response.json([assetRow(oldQuestion)]))
+    vi.stubGlobal('fetch', mock)
+    const response = await handleNbme(request())
+    expect(response.status).toBe(status === 'ready' ? 200 : 422)
+    expect(new URL(String(mock.mock.calls[3][0])).searchParams.get('path')).toBe(`in.(questions/${ref.id}/${ref.revision}.json)`)
+    if (status === 'ready') expect((await response.json()).questions).toEqual([oldQuestion])
+  })
   it('consulta 20 revisiones en un lote después de autorizar y conserva el orden solicitado', async () => {
     const batch = Array.from({ length: 20 }, (_, i) => ({ ...cleanQuestion, id: `NBME27-P${String(i + 1).padStart(4, '0')}` }))
     const mock = vi.fn().mockResolvedValueOnce(Response.json({ id: 'user', email_confirmed_at: '2026-01-01' }))

@@ -1,9 +1,11 @@
-import { useSyncExternalStore } from 'react'
+import { useSyncExternalStore, type ReactNode } from 'react'
+import { NbmeProvider as ProveedorReal, useNbme as useNbmeReal } from '@app/nbme/NbmeProvider'
 import { activateNbmeSession, deriveNbmeSession, emptyNbmeState, reviewNbmeAnswer, startNbmeSession, submitNbmeAnswer, updateNbmeSession } from '@app/nbme/model'
 import { catalogo, respuestas } from './escena'
 // Doble del proveedor NBME que usa el modelo real: abre, responde y revisa sesiones de verdad.
 // Las preguntas son texto sintético sin contenido clínico.
 const parametros = new URLSearchParams(location.search)
+const conProveedorReal = parametros.get('proveedor') === 'nbme-real'
 const conFigura = parametros.has('figura')
 const conTabla = parametros.has('tabla')
 const figuraGrande = parametros.get('figura') !== '1'
@@ -74,5 +76,12 @@ function construir() {
 let valor = construir()
 function avisar() { valor = construir(); oyentes.forEach(o => o()) }
 const suscribir = (o: () => void) => { oyentes.add(o); return () => { oyentes.delete(o) } }
-export function useNbme() { return useSyncExternalStore(suscribir, () => valor) }
-export function NbmeProvider({ children }: { children: unknown }) { return children }
+export function useNbme() { return conProveedorReal ? useNbmeReal() : useSyncExternalStore(suscribir, () => valor) }
+function LeerProveedorReal({ children }: { children: ReactNode }) {
+  const real = useNbmeReal()
+  window.__leerNbmeReal = () => real.state
+  return children
+}
+export function NbmeProvider({ children, userId = 'cuenta-demo' }: { children: ReactNode; userId?: string }) {
+  return conProveedorReal ? <ProveedorReal userId={userId}><LeerProveedorReal>{children}</LeerProveedorReal></ProveedorReal> : children
+}

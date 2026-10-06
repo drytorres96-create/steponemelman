@@ -7,7 +7,7 @@ import { createNbmeApi, parseNbmeCatalog, parseNbmeQuestion, questionRefKey, Nbm
 import { preguntaConLecturasDudosas } from './texto'
 import { emptyNbmeState, parseNbmeState, mergeNbmeStates, startNbmeSession, setNbmeDraft,
   submitNbmeAnswer, reviewNbmeAnswer, updateNbmeSession, activateNbmeSession, deriveNbmeSession, updateNbmeFilters,
-  discardNbmeSession, countNbmeSessionAttempts, setNbmeBankVersion } from './model'
+  discardNbmeSession, countNbmeSessionAttempts, setNbmeBankVersion, referenciasPendientesNbme } from './model'
 import { NbmeSyncEngine, parseNbmeSnapshot, stableNbmeJson, type NbmeSnapshot, type NbmeSyncReply } from './sync'
 import type { NbmeAttempt, NbmeCatalog, NbmeFilters, NbmeQuestion, NbmeQuestionRef, NbmeSession,
   NbmeSessionView, NbmeState } from './types'
@@ -105,6 +105,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
   const writes = useRef(Promise.resolve())
   const syncing = useRef<{ engine: NbmeSyncEngine; promise: Promise<boolean> } | null>(null)
   const questions = useRef(new Map<string, NbmeQuestion>())
+  const questionLoadGeneration = useRef(0)
   const controllers = useRef(new Set<AbortController>())
   const loadingContent = useRef<Promise<void> | null>(null)
   const actionLock = useRef(false)
@@ -252,33 +253,49 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     } finally { controllers.current.delete(controller) }
   }, [api, userId, denyAccess, edit])
 
-  const ensureQuestions = useCallback(async (refs: NbmeQuestionRef[]): Promise<void> => {
+  const ensureQuestions = useCallback(async (refs: NbmeQuestionRef[], revalidar: NbmeQuestionRef[] = []): Promise<boolean> => {
     if (accessDenied.current) throw new NbmeAccessError(403, 'Vuelve a comprobar el acceso al banco antes de continuar.')
     const epoch = aliveEpoch.current
-    const isCurrent = () => mounted.current && epoch === aliveEpoch.current
+    const forzadas = new Set(revalidar.map(questionRefKey))
+    const generation = forzadas.size ? ++questionLoadGeneration.current : questionLoadGeneration.current
+    const isCurrent = () => mounted.current && epoch === aliveEpoch.current && generation === questionLoadGeneration.current
+    // Una revisión histórica distinta del catálogo debe seguir autorizada en
+    // el servidor; una copia local anterior a su retirada no basta.
+    for (const key of forzadas) questions.current.delete(key)
+    if (forzadas.size && !navigator.onLine) {
+      throw new Error('Conéctate para comprobar la versión guardada de este bloque. Tu sesión y tus respuestas se conservan.')
+    }
     const missing = refs.filter(ref => !questions.current.has(questionRefKey(ref)))
-    if (!missing.length) return
+    if (!missing.length) return isCurrent()
     await Promise.all(missing.map(async ref => {
+      if (forzadas.has(questionRefKey(ref))) return
       const value = await leer<unknown>(`nbme-question:${userId}:${questionRefKey(ref)}`)
       if (!value || typeof value !== 'object' || !('userId' in value) || value.userId !== userId || !('question' in value)) return
       const question = parseNbmeQuestion(value.question)
       if (question && questionRefKey(question) === questionRefKey(ref) && isCurrent()) questions.current.set(questionRefKey(ref), question)
     }))
-    if (!isCurrent()) return
-    const remaining = refs.filter(ref => !questions.current.has(questionRefKey(ref)))
+    if (!isCurrent()) return false
+    const remaining = refs.filter(ref => forzadas.has(questionRefKey(ref)) || !questions.current.has(questionRefKey(ref)))
     if (remaining.length) {
       const controller = new AbortController()
       controllers.current.add(controller)
       try {
         const received = await api.questions(remaining, controller.signal)
-        if (!isCurrent()) return
+        if (!isCurrent()) return false
         for (const question of received) questions.current.set(questionRefKey(question), question)
         // Content cache is optional; progress persistence has its own strict error handling.
         await Promise.all(received.map(question => escribir(`nbme-question:${userId}:${questionRefKey(question)}`, { userId, question }, { estricto: true }).catch(() => undefined)))
-      } catch (failure) { if (isCurrent()) denyAccess(failure); throw failure }
+      } catch (failure) {
+        if (!isCurrent()) return false
+        for (const key of forzadas) questions.current.delete(key)
+        denyAccess(failure)
+        throw failure
+      }
       finally { controllers.current.delete(controller) }
     }
-    if (isCurrent()) setContentChange(n => n + 1)
+    if (!isCurrent()) return false
+    setContentChange(n => n + 1)
+    return true
   }, [api, userId, denyAccess])
 
   useEffect(() => {
@@ -403,7 +420,13 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     setQuestionLoading(true)
     const operation = (async () => {
       try {
-        await ensureQuestions(session.initial)
+        const refs = referenciasPendientesNbme(actual.current, session.id)
+        const vigente = currentCatalog.current
+        if (!vigente) throw new Error('El catálogo todavía se está preparando. Tu posición y tus respuestas se conservan.')
+        const vigentes = new Map(vigente.questions.map(q => [q.id, q]))
+        const retiradas = refs.some(ref => vigentes.get(ref.id)?.status !== 'ready')
+        if (retiradas) throw new Error('Una pregunta pendiente necesita revisión editorial. Conservamos este bloque y tus respuestas; vuelve a comprobarlo más tarde.')
+        if (!await ensureQuestions(refs, refs.filter(ref => vigentes.get(ref.id)?.revision !== ref.revision))) return
         if (mounted.current && epoch === aliveEpoch.current) setError(null)
       } catch (failure) {
         if (mounted.current && epoch === aliveEpoch.current) setError(userError(failure, 'No se pudieron recuperar las preguntas de tu sesión.'))
@@ -416,8 +439,8 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     return operation
   }, [ensureQuestions])
   useEffect(() => {
-    if (!loading && currentSession && !currentQuestion && sessionView?.phase !== 'complete') void retryQuestionLoad()
-  }, [loading, currentSession?.id, currentKey, currentQuestion, sessionView?.phase, retryQuestionLoad])
+    if (!loading && !busy && catalog && currentSession && !currentSession.paused && !currentQuestion && sessionView?.phase !== 'complete') void retryQuestionLoad()
+  }, [loading, busy, catalog, currentSession?.id, currentSession?.paused, currentKey, currentQuestion, sessionView?.phase, retryQuestionLoad])
   useEffect(() => { if (state.activeSessionId) setShownSessionId(state.activeSessionId) }, [state.activeSessionId])
   useEffect(() => {
     const tick = setInterval(tickTime, 1_000)
@@ -477,7 +500,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
           throw new Error('El banco se ha actualizado. Revisa tu selección e inicia el bloque de nuevo.')
         }
       }
-      await ensureQuestions(refs)
+      if (!await ensureQuestions(refs)) return false
       if (!mounted.current || epoch !== aliveEpoch.current) return false
       const id = crearUUID()
       flushTime()
@@ -505,27 +528,22 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     setBusy(true)
     const epoch = aliveEpoch.current
     try {
+      let vigente = currentCatalog.current
       if (navigator.onLine) {
         const fresh = await api.catalog()
         if (!mounted.current || epoch !== aliveEpoch.current) return false
         accessDenied.current = false
         setCatalog(fresh)
-        // Comparar sólo el id dejaba reanudar un bloque fijado a una revisión anterior y
-        // calificarlo contra el contenido sin corregir.
-        const vigente = new Map(fresh.questions.map(q => [q.id, q]))
-        const retiradas = session.initial.filter(ref => vigente.get(ref.id)?.status !== 'ready')
-        const corregidas = session.initial.filter(ref => {
-          const q = vigente.get(ref.id)
-          return q?.status === 'ready' && q.revision !== ref.revision
-        })
-        if (retiradas.length) {
-          throw new Error(`${retiradas.length === 1 ? 'Una pregunta' : `${retiradas.length} preguntas`} de este bloque se retiraron del banco, así que no puede terminarse. Puedes descartarlo desde la biblioteca; tu progreso del resto se conserva.`)
-        }
-        if (corregidas.length) {
-          throw new Error(`${corregidas.length === 1 ? 'Una pregunta' : `${corregidas.length} preguntas`} de este bloque se corrigieron después de que lo empezaras. No se califica contra la versión antigua: descarta el bloque y empieza uno nuevo.`)
-        }
+        vigente = fresh
       }
-      await ensureQuestions(session.initial)
+      const refs = referenciasPendientesNbme(actual.current, id)
+      const disponibles = new Map((vigente?.questions ?? []).map(q => [q.id, q]))
+      if (refs.some(ref => disponibles.get(ref.id)?.status !== 'ready')) {
+        throw new Error('Una pregunta pendiente necesita revisión editorial. Conservamos este bloque y tus respuestas; vuelve a comprobarlo más tarde.')
+      }
+      // El contrato del banco sirve la revisión fijada cuando su archivo exacto
+      // sigue ready. No sustituir initial: rompería intentos y sincronización.
+      if (!await ensureQuestions(refs, refs.filter(ref => disponibles.get(ref.id)?.revision !== ref.revision))) return false
       if (!mounted.current || epoch !== aliveEpoch.current) return false
       flushTime()
       edit(previous => updateNbmeSession(activateNbmeSession(previous, id), id, { paused: false }))

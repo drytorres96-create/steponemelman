@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import App from '@app/App'
 import { Resguardo, FalloGeneral } from '@app/components/Resguardo'
+import { NbmeProvider } from './falso-nbme'
 import '@app/styles.css'
 import '@app/editorial.css'
 import '@app/organic.css'
@@ -10,4 +11,4 @@ import '@app/hoy.css'
 import '@app/piel-estudio.css'
 import '@app/premium.css'
 
-createRoot(document.getElementById('root')!).render(<Resguardo alFallar={error => <FalloGeneral error={error} />}><App /></Resguardo>)
+createRoot(document.getElementById('root')!).render(<Resguardo alFallar={error => <FalloGeneral error={error} />}><NbmeProvider><App /></NbmeProvider></Resguardo>)

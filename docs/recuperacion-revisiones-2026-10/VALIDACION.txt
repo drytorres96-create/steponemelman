@@ -1,0 +1,316 @@
+Node 22.23.3 · Melman 1.27.2 · 6-oct-2026
+Proveedores, progreso y material de prueba exclusivamente sintéticos. Sin acceso a DB reales.
+Snapshot final de código; Chromium /usr/bin/chromium.
+
+npm ci
+======
+npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+
+added 170 packages in 5s
+
+npm test
+========
+
+> steponemelman@1.27.2 test
+> vitest run --pool=forks --maxWorkers=1
+
+
+ RUN  v4.1.11 /workspace/work/recuperacion-revisiones/final
+
+
+ Test Files  78 passed | 1 skipped (79)
+      Tests  788 passed | 2 skipped (790)
+   Start at  11:26:54
+   Duration  100.55s (transform 7.11s, setup 0ms, import 16.83s, tests 14.84s, environment 50.25s)
+
+
+npm run build
+=============
+
+> steponemelman@1.27.2 build
+> tsc -b && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 180 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                              1.23 kB │ gzip:   0.62 kB
+dist/assets/Vinetas-CDjnbw4M.css             0.98 kB │ gzip:   0.45 kB
+dist/assets/nbme-BuHkj0Xf.css                8.85 kB │ gzip:   2.29 kB
+dist/assets/index-De_TPN4W.css             168.45 kB │ gzip:  34.55 kB
+dist/assets/PausaDeBloque-AYCB23IE.js        0.41 kB │ gzip:   0.28 kB
+dist/assets/Cronometro-Cgd_2ecz.js           1.28 kB │ gzip:   0.64 kB
+dist/assets/SelectorCarga-COzoFVsu.js        1.78 kB │ gzip:   0.80 kB
+dist/assets/PielEstudio-vO1G4JuN.js          1.81 kB │ gzip:   0.91 kB
+dist/assets/CorreccionErrorIA-0kxlA3Zq.js    4.40 kB │ gzip:   1.98 kB
+dist/assets/Ajustes-CzMrAEe8.js              5.84 kB │ gzip:   2.52 kB
+dist/assets/Inicio-DV5z9rOw.js               6.22 kB │ gzip:   2.41 kB
+dist/assets/RecuperarMeta-CmC146jD.js        6.73 kB │ gzip:   2.91 kB
+dist/assets/SesionCajas-Dp0TlNHc.js          8.18 kB │ gzip:   3.24 kB
+dist/assets/SesionMixta-CPxG0WI0.js          8.63 kB │ gzip:   3.48 kB
+dist/assets/NbmeLibrary-znPxwhCY.js          8.89 kB │ gzip:   2.95 kB
+dist/assets/Auditoria-7B72jnrb.js            9.65 kB │ gzip:   3.40 kB
+dist/assets/Vinetas-SG2XGGBP.js             12.43 kB │ gzip:   4.51 kB
+dist/assets/Modulos-C7JMYlOv.js             17.49 kB │ gzip:   5.69 kB
+dist/assets/NbmePlayer-CZ01eBKG.js          20.03 kB │ gzip:   6.66 kB
+dist/assets/Progreso-Q0bomuKd.js            26.00 kB │ gzip:   9.04 kB
+dist/assets/Reproductor-Bs_8DmCv.js         53.56 kB │ gzip:  16.05 kB
+dist/assets/App-B7age7eU.js                 65.73 kB │ gzip:  22.97 kB
+dist/assets/index-DvYACLzC.js              540.63 kB │ gzip: 155.84 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.29s
+
+Playwright (suite completa)
+===========================
+[WebServer] (node:114241) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:114258) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 62 tests using 1 worker
+
+(node:114281) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:114281) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/estudio.spec.ts:53:1 › cajas: Intro comprueba, enseña la corrección y sólo el segundo Intro pasa a la siguiente (3.7s)
+  ✓   2 [chromium] › e2e/estudio.spec.ts:68:1 › cajas: si el corrector no sabe juzgar, «La sabía» cuenta y pasa con un toque (2.1s)
+  ✓   3 [chromium] › e2e/estudio.spec.ts:82:1 › cajas: tras un fallo hay una sola acción principal y el resto queda plegado (1.4s)
+  ✓   4 [chromium] › e2e/estudio.spec.ts:95:1 › cajas: la pregunta NBME se contesta con el teclado y la piel no cambia en toda la sesión (1.8s)
+  ✓   5 [chromium] › e2e/estudio.spec.ts:114:1 › lo nuevo: los tramos de tres conceptos se encadenan sin «Sesión terminada» (2.1s)
+  ✓   6 [chromium] › e2e/estudio.spec.ts:129:1 › lo nuevo: los fallos respetan el techo y llegan al cierre en una sola vuelta (2.8s)
+  ✓   7 [chromium] › e2e/estudio.spec.ts:147:1 › lo nuevo: tras un feedback largo el siguiente enunciado queda visible bajo la cabecera (3.6s)
+  ✓   8 [chromium] › e2e/estudio.spec.ts:185:1 › NBME: la figura se amplía sin revelar la respuesta ni la procedencia antes de comprobar (2.6s)
+  ✓   9 [chromium] › e2e/estudio.spec.ts:207:1 › NBME: laboratorios y columnas conservan sus celdas sin desbordar la pantalla (2.1s)
+  ✓  10 [chromium] › e2e/estudio.spec.ts:227:1 › cajas: tras 20 seguidas la pausa es opcional y permite guardar sin un intento nuevo (4.9s)
+  ✓  11 [chromium] › e2e/estudio.spec.ts:246:1 › viñetas del piloto: la letra elige, Intro comprueba sin saltar la explicación y otro Intro sigue (2.0s)
+  ✓  12 [chromium] › e2e/figuras-csp.spec.ts:4:1 › las figuras descargadas se decodifican con la política de seguridad de producción (355ms)
+  ✓  13 [chromium] › e2e/ia-gratuita.spec.ts:7:3 › IA gratuita a 390px › el chat usa la pregunta respondida, conserva la cita y permite continuar (2.6s)
+  ✓  14 [chromium] › e2e/ia-gratuita.spec.ts:39:3 › IA gratuita a 390px › un fallo genera una corrección individual y el razonamiento sólo se analiza al enviarlo (2.2s)
+  ✓  15 [chromium] › e2e/ia-gratuita.spec.ts:66:3 › IA gratuita a 390px › un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar (3.2s)
+  ✓  16 [chromium] › e2e/ia-gratuita.spec.ts:7:3 › IA gratuita a 1280px › el chat usa la pregunta respondida, conserva la cita y permite continuar (4.9s)
+  ✓  17 [chromium] › e2e/ia-gratuita.spec.ts:39:3 › IA gratuita a 1280px › un fallo genera una corrección individual y el razonamiento sólo se analiza al enviarlo (6.7s)
+  ✓  18 [chromium] › e2e/ia-gratuita.spec.ts:66:3 › IA gratuita a 1280px › un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar (9.8s)
+  ✓  19 [chromium] › e2e/movil-auditoria.spec.ts:60:3 › auditoría móvil · 390px › figura grande sintética: carga, dimensiones, captura y foco del modal (5.3s)
+  ✓  20 [chromium] › e2e/movil-auditoria.spec.ts:88:3 › auditoría móvil · 390px › laboratorios y caption son legibles en ambas pieles (7.1s)
+  ✓  21 [chromium] › e2e/movil-auditoria.spec.ts:99:3 › auditoría móvil · 390px › zoom aumenta la imagen y permite desplazamiento sin perder el foco (12.8s)
+  ✓  22 [chromium] › e2e/movil-auditoria.spec.ts:60:3 › auditoría móvil · 1280px › figura grande sintética: carga, dimensiones, captura y foco del modal (12.7s)
+  ✓  23 [chromium] › e2e/movil-auditoria.spec.ts:88:3 › auditoría móvil · 1280px › laboratorios y caption son legibles en ambas pieles (20.3s)
+  ✓  24 [chromium] › e2e/movil-auditoria.spec.ts:99:3 › auditoría móvil · 1280px › zoom aumenta la imagen y permite desplazamiento sin perder el foco (12.4s)
+  ✓  25 [chromium] › e2e/movil-auditoria.spec.ts:137:3 › auditoría táctil de figuras › el campo de respuesta mantiene un borde visible en ambas pieles y el conmutador mide 44px (4.5s)
+  ✓  26 [chromium] › e2e/movil-auditoria.spec.ts:151:3 › auditoría táctil de figuras › pellizcar amplía y arrastrar desplaza la figura con eventos táctiles del navegador (7.9s)
+  ✓  27 [chromium] › e2e/movil-auditoria.spec.ts:188:3 › auditoría táctil de figuras › las tablas tienen región enfocada con indicador visible (7.0s)
+  ✓  28 [chromium] › e2e/movil-auditoria.spec.ts:201:3 › auditoría táctil de figuras › la descarga espera al viewport y el salto a respuestas no permite omitir la figura necesaria (9.2s)
+  ✓  29 [chromium] › e2e/movil-auditoria.spec.ts:213:59 › auditoría táctil de figuras › error-descarga: aviso claro, bloqueo y reintento (6.8s)
+  ✓  30 [chromium] › e2e/movil-auditoria.spec.ts:213:59 › auditoría táctil de figuras › error-imagen: aviso claro, bloqueo y reintento (7.2s)
+  ✓  31 [chromium] › e2e/movil-auditoria.spec.ts:228:3 › auditoría móvil horizontal › saltos y modal mantienen el foco visible, sin desbordamiento en horizontal (8.7s)
+  ✓  32 [chromium] › e2e/premium-aprendizaje.spec.ts:7:3 › aprendizaje y diseño premium a 390px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar (3.1s)
+  ✓  33 [chromium] › e2e/premium-aprendizaje.spec.ts:24:3 › aprendizaje y diseño premium a 390px › lo nuevo conserva el guion, muestra un final cercano y ofrece pausa al terminar el bloque (7.6s)
+  ✓  34 [chromium] › e2e/premium-aprendizaje.spec.ts:49:3 › aprendizaje y diseño premium a 390px › un concepto con dominio vencido entra en Hoy y Progreso distingue su mantenimiento (7.0s)
+  ✓  35 [chromium] › e2e/premium-aprendizaje.spec.ts:64:3 › aprendizaje y diseño premium a 390px › al completar el día hay un cierre explícito sin acción principal adicional (1.7s)
+  ✓  36 [chromium] › e2e/premium-aprendizaje.spec.ts:7:3 › aprendizaje y diseño premium a 1280px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar (2.9s)
+  ✓  37 [chromium] › e2e/premium-aprendizaje.spec.ts:24:3 › aprendizaje y diseño premium a 1280px › lo nuevo conserva el guion, muestra un final cercano y ofrece pausa al terminar el bloque (3.3s)
+  ✓  38 [chromium] › e2e/premium-aprendizaje.spec.ts:49:3 › aprendizaje y diseño premium a 1280px › un concepto con dominio vencido entra en Hoy y Progreso distingue su mantenimiento (4.7s)
+  ✓  39 [chromium] › e2e/premium-aprendizaje.spec.ts:64:3 › aprendizaje y diseño premium a 1280px › al completar el día hay un cierre explícito sin acción principal adicional (2.2s)
+  ✓  40 [chromium] › e2e/recuperacion-meta.spec.ts:5:3 › recuperación de la meta a 390px › se abre a petición, distingue dominio y trabajo y retoma la misma cola de Hoy (2.9s)
+  ✓  41 [chromium] › e2e/recuperacion-meta.spec.ts:21:3 › recuperación de la meta a 390px › el viernes la distancia es informativa y no abre recuperación (5.0s)
+  ✓  42 [chromium] › e2e/recuperacion-meta.spec.ts:30:3 › recuperación de la meta a 390px › retoma la cola exacta de conceptos en su paso guardado (2.3s)
+  ✓  43 [chromium] › e2e/recuperacion-meta.spec.ts:46:3 › recuperación de la meta a 390px › retoma una sesión NBME pausada en su explicación, conservando el intento (1.7s)
+  ✓  44 [chromium] › e2e/recuperacion-meta.spec.ts:65:3 › recuperación de la meta a 390px › un resumen conceptual terminado no oculta la sesión NBME pendiente (1.8s)
+  ✓  45 [chromium] › e2e/recuperacion-meta.spec.ts:82:44 › recuperación de la meta a 390px › un fallo al retomar concepto se ve junto al botón y permite reintentar (1.7s)
+  ✓  46 [chromium] › e2e/recuperacion-meta.spec.ts:82:44 › recuperación de la meta a 390px › un fallo al retomar nbme se ve junto al botón y permite reintentar (2.1s)
+  ✓  47 [chromium] › e2e/recuperacion-meta.spec.ts:95:3 › recuperación de la meta a 390px › también retoma desde Cómo va todo en Hoy (2.4s)
+  ✓  48 [chromium] › e2e/recuperacion-meta.spec.ts:5:3 › recuperación de la meta a 1280px › se abre a petición, distingue dominio y trabajo y retoma la misma cola de Hoy (3.8s)
+  ✓  49 [chromium] › e2e/recuperacion-meta.spec.ts:21:3 › recuperación de la meta a 1280px › el viernes la distancia es informativa y no abre recuperación (2.2s)
+  ✓  50 [chromium] › e2e/recuperacion-meta.spec.ts:30:3 › recuperación de la meta a 1280px › retoma la cola exacta de conceptos en su paso guardado (2.7s)
+  ✓  51 [chromium] › e2e/recuperacion-meta.spec.ts:46:3 › recuperación de la meta a 1280px › retoma una sesión NBME pausada en su explicación, conservando el intento (2.7s)
+  ✓  52 [chromium] › e2e/recuperacion-meta.spec.ts:65:3 › recuperación de la meta a 1280px › un resumen conceptual terminado no oculta la sesión NBME pendiente (2.5s)
+  ✓  53 [chromium] › e2e/recuperacion-meta.spec.ts:82:44 › recuperación de la meta a 1280px › un fallo al retomar concepto se ve junto al botón y permite reintentar (2.1s)
+  ✓  54 [chromium] › e2e/recuperacion-meta.spec.ts:82:44 › recuperación de la meta a 1280px › un fallo al retomar nbme se ve junto al botón y permite reintentar (3.0s)
+  ✓  55 [chromium] › e2e/recuperacion-meta.spec.ts:95:3 › recuperación de la meta a 1280px › también retoma desde Cómo va todo en Hoy (2.4s)
+  ✓  56 [chromium] › e2e/recuperacion-revisiones.spec.ts:30:3 › revisión histórica con proveedor NBME real a 390px › retoma feedback y termina el mismo bloque conservando letras, revisiones y primer resultado (2.7s)
+  ✓  57 [chromium] › e2e/recuperacion-revisiones.spec.ts:30:3 › revisión histórica con proveedor NBME real a 1280px › retoma feedback y termina el mismo bloque conservando letras, revisiones y primer resultado (4.2s)
+  ✓  58 [chromium] › e2e/recuperacion-revisiones.spec.ts:70:1 › un asset histórico ausente conserva el bloque y permite reintentar sin crear otro (3.5s)
+  ✓  59 [chromium] › e2e/rendimiento.spec.ts:4:1 › un fallo al descargar una pantalla conserva la navegación y permite volver a Hoy (1.4s)
+  ✓  60 [chromium] › e2e/rendimiento.spec.ts:15:1 › navegar no acumula fondos animados invisibles y estudiar retira el paisaje (3.1s)
+  ✓  61 [chromium] › e2e/rendimiento.spec.ts:32:1 › IndexedDB reutiliza una conexión para lecturas y escrituras concurrentes (1.3s)
+  ✓  62 [chromium] › e2e/rendimiento.spec.ts:49:1 › una actualización desde otra pestaña no queda bloqueada por la conexión compartida (1.2s)
+
+  62 passed (4.6m)
+
+Reproducción 1.27.1 (3 fallos esperados)
+========================================
+[WebServer] (node:112566) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:112581) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 3 tests using 1 worker
+
+(node:112741) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:112741) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 [chromium] › e2e/recuperacion-revisiones.spec.ts:30:3 › revisión histórica con proveedor NBME real a 390px › retoma feedback y termina el mismo bloque conservando letras, revisiones y primer resultado (14.2s)
+(node:112967) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:112967) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  2 [chromium] › e2e/recuperacion-revisiones.spec.ts:30:3 › revisión histórica con proveedor NBME real a 1280px › retoma feedback y termina el mismo bloque conservando letras, revisiones y primer resultado (17.5s)
+(node:113255) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:113255) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  3 [chromium] › e2e/recuperacion-revisiones.spec.ts:70:1 › un asset histórico ausente conserva el bloque y permite reintentar sin crear otro (12.8s)
+
+
+  1) [chromium] › e2e/recuperacion-revisiones.spec.ts:30:3 › revisión histórica con proveedor NBME real a 390px › retoma feedback y termina el mismo bloque conservando letras, revisiones y primer resultado 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: locator('.app')
+    Expected string: "preguntas"
+    Received string: "progreso"
+    Timeout: 10000ms
+
+    Call log:
+      - Expect "toHaveAttribute" with timeout 10000ms
+      - waiting for locator('.app')
+        13 × locator resolved to <div data-view="progreso" class="app editorial-app" data-app-version="1.27.1">…</div>
+           - unexpected value "progreso"
+
+
+      33 |     expect(antes.sessions[NBME_REAL_SESSION].initial).toEqual(estadoNbmeReal().sessions[NBME_REAL_SESSION].initial)
+      34 |     await page.getByRole('button', { name: 'Retomar mi sesión pendiente' }).click()
+    > 35 |     await expect(page.locator('.app')).toHaveAttribute('data-view', 'preguntas')
+         |                                        ^
+      36 |     await expect(page.locator('.nbme-feedback')).toContainText('Vamos a repasarla')
+      37 |     await expect(page.locator('.nbme-player')).toContainText('Hay una revisión publicada posterior')
+      38 |     await expect(page.locator('.nbme-option.selected')).toContainText('Synthetic saved option B')
+        at /workspace/work/recuperacion-revisiones/antes/e2e/recuperacion-revisiones.spec.ts:35:40
+
+    Error Context: test-results/recuperacion-revisiones-re-46450-visiones-y-primer-resultado-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/recuperacion-revisiones-re-46450-visiones-y-primer-resultado-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/recuperacion-revisiones-re-46450-visiones-y-primer-resultado-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e/recuperacion-revisiones.spec.ts:30:3 › revisión histórica con proveedor NBME real a 1280px › retoma feedback y termina el mismo bloque conservando letras, revisiones y primer resultado 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: locator('.app')
+    Expected string: "preguntas"
+    Received string: "progreso"
+    Timeout: 10000ms
+
+    Call log:
+      - Expect "toHaveAttribute" with timeout 10000ms
+      - waiting for locator('.app')
+        14 × locator resolved to <div data-view="progreso" class="app editorial-app" data-app-version="1.27.1">…</div>
+           - unexpected value "progreso"
+
+
+      33 |     expect(antes.sessions[NBME_REAL_SESSION].initial).toEqual(estadoNbmeReal().sessions[NBME_REAL_SESSION].initial)
+      34 |     await page.getByRole('button', { name: 'Retomar mi sesión pendiente' }).click()
+    > 35 |     await expect(page.locator('.app')).toHaveAttribute('data-view', 'preguntas')
+         |                                        ^
+      36 |     await expect(page.locator('.nbme-feedback')).toContainText('Vamos a repasarla')
+      37 |     await expect(page.locator('.nbme-player')).toContainText('Hay una revisión publicada posterior')
+      38 |     await expect(page.locator('.nbme-option.selected')).toContainText('Synthetic saved option B')
+        at /workspace/work/recuperacion-revisiones/antes/e2e/recuperacion-revisiones.spec.ts:35:40
+
+    Error Context: test-results/recuperacion-revisiones-re-5ca3b-visiones-y-primer-resultado-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/recuperacion-revisiones-re-5ca3b-visiones-y-primer-resultado-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/recuperacion-revisiones-re-5ca3b-visiones-y-primer-resultado-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › e2e/recuperacion-revisiones.spec.ts:70:1 › un asset histórico ausente conserva el bloque y permite reintentar sin crear otro 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: locator('.recuperacion-meta').getByRole('alert')
+    Expected string: "No está disponible la versión"
+    Received string: "Una pregunta de este bloque se corrigieron después de que lo empezaras. No se califica contra la versión antigua: descarta el bloque y empieza uno nuevo."
+    Timeout: 10000ms
+
+    Call log:
+      - Expect "toContainText" with timeout 10000ms
+      - waiting for locator('.recuperacion-meta').getByRole('alert')
+        14 × locator resolved to <p role="alert" tabindex="-1">Una pregunta de este bloque se corrigieron despué…</p>
+           - unexpected value "Una pregunta de este bloque se corrigieron después de que lo empezaras. No se califica contra la versión antigua: descarta el bloque y empieza uno nuevo."
+
+
+      73 |   await page.getByRole('button', { name: 'Retomar mi sesión pendiente' }).click()
+      74 |   const panel = page.locator('.recuperacion-meta')
+    > 75 |   await expect(panel.getByRole('alert')).toContainText('No está disponible la versión')
+         |                                          ^
+      76 |   await expect(panel.getByRole('alert')).toBeInViewport()
+      77 |   await expect(page.locator('.app')).toHaveAttribute('data-view', 'progreso')
+      78 |   const fallida = await page.evaluate(() => window.__leerNbmeReal())
+        at /workspace/work/recuperacion-revisiones/antes/e2e/recuperacion-revisiones.spec.ts:75:42
+
+    Error Context: test-results/recuperacion-revisiones-un-a57be-e-reintentar-sin-crear-otro-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/recuperacion-revisiones-un-a57be-e-reintentar-sin-crear-otro-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/recuperacion-revisiones-un-a57be-e-reintentar-sin-crear-otro-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3 failed
+    [chromium] › e2e/recuperacion-revisiones.spec.ts:30:3 › revisión histórica con proveedor NBME real a 390px › retoma feedback y termina el mismo bloque conservando letras, revisiones y primer resultado 
+    [chromium] › e2e/recuperacion-revisiones.spec.ts:30:3 › revisión histórica con proveedor NBME real a 1280px › retoma feedback y termina el mismo bloque conservando letras, revisiones y primer resultado 
+    [chromium] › e2e/recuperacion-revisiones.spec.ts:70:1 › un asset histórico ausente conserva el bloque y permite reintentar sin crear otro 
+
+Capturas antes con movimiento reducido
+======================================
+[WebServer] (node:116695) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:116708) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 2 tests using 1 worker
+
+(node:116832) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:116832) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/captura.spec.ts:8:34 › captura sintética antes 390 (5.8s)
+  ✓  2 [chromium] › e2e/captura.spec.ts:8:34 › captura sintética antes 1280 (6.5s)
+
+  2 passed (20.7s)
+
+Capturas después con movimiento reducido
+========================================
+[WebServer] (node:116635) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:116671) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 2 tests using 1 worker
+
+(node:116716) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:116716) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/captura.spec.ts:8:34 › captura sintética despues 390 (7.0s)
+  ✓  2 [chromium] › e2e/captura.spec.ts:8:34 › captura sintética despues 1280 (12.1s)
+
+  2 passed (25.3s)

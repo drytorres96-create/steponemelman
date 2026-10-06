@@ -1,0 +1,62 @@
+{
+  "modo": "despues",
+  "width": 390,
+  "errores": [],
+  "movimientoReducido": true,
+  "vista": "preguntas",
+  "overflow": false,
+  "estado": {
+    "version": 1,
+    "bankVersion": "synthetic-bank-r2",
+    "discarded": {},
+    "sessions": {
+      "preguntas-guardadas-revision": {
+        "id": "preguntas-guardadas-revision",
+        "title": "Preguntas sintéticas pendientes",
+        "initial": [
+          {
+            "id": "Q3",
+            "revision": "synthetic-r1"
+          },
+          {
+            "id": "Q4",
+            "revision": "synthetic-r1"
+          }
+        ],
+        "startedAt": 1791198000000,
+        "controlChangedAt": 1791199803399,
+        "paused": false,
+        "elapsedMs": 12000,
+        "budgetMinutes": 20,
+        "continueUnlimited": false,
+        "drafts": {}
+      }
+    },
+    "attempts": {
+      "preguntas-guardadas-revision:0": {
+        "id": "preguntas-guardadas-revision:0",
+        "sessionId": "preguntas-guardadas-revision",
+        "position": 0,
+        "questionId": "Q3",
+        "revision": "synthetic-r1",
+        "optionId": "B",
+        "correct": false,
+        "submittedAt": 1791198008000,
+        "reviewedAt": null,
+        "durationMs": 8000
+      }
+    },
+    "activeSessionId": "preguntas-guardadas-revision",
+    "activeChangedAt": 1791199803399,
+    "filters": {
+      "form": "all",
+      "system": "",
+      "discipline": "",
+      "status": "all",
+      "quality": "ready",
+      "size": 10,
+      "budgetMinutes": 20
+    },
+    "filtersChangedAt": 0
+  }
+}

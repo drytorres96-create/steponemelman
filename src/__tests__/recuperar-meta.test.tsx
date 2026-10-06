@@ -74,6 +74,17 @@ describe('la recuperación valida el progreso y el día al empezar', () => {
     expect(onNuevo).not.toHaveBeenCalled()
   })
 
+  it('un resumen conceptual terminado no bloquea los repasos elegibles de Hoy', async () => {
+    app.estado.reanudable = { modulo: 'M', sesion: 'repaso', indice: 1, ts: lunes, conceptIds: ['C1'], sessionId: 'terminada' }
+    const previo = JSON.stringify(app.estado)
+    await render()
+    expect(boton('Retomar mi sesión pendiente')).toBeUndefined()
+    await act(async () => boton('Empezar recuperación de Hoy')!.click())
+    expect(onCajas).toHaveBeenCalledOnce()
+    expect(onRetomar).not.toHaveBeenCalled()
+    expect(JSON.stringify(app.estado)).toBe(previo)
+  })
+
   it('muestra la carga, bloquea dobles toques y enseña el error NBME actualizado junto al botón', async () => {
     banco.state = { ...startNbmeSession(banco.state, { id: 'pausada', title: 'Sesión pendiente', refs: [{ id: 'Q1', revision: 'r2' }] }, lunes), activeSessionId: null }
     let terminar!: (ok: boolean) => void

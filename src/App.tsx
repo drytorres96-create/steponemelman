@@ -19,6 +19,7 @@ import { alternarFormatos } from './lib/formatos'
 import { aplicarVariante, siguienteVariante } from './lib/variantes'
 import { useNbme } from './nbme/NbmeProvider'
 import { deriveNbmeSession } from './nbme/model'
+import { hayConceptosPendientes } from './lib/conceptos-pendientes'
 import type { FiltrosBusqueda } from './lib/busqueda'
 import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, type CinematicObject, type CinematicScene } from './components/Editorial'
 import { Resguardo, FalloPantalla } from './components/Resguardo'
@@ -244,7 +245,7 @@ export default function App() {
     try { await restaurarConceptos() } catch (e) { setError(String(e)) } finally { setCargando(false) }
   }, [restaurarConceptos])
   const retomarPendiente = async () => {
-    if (estado.reanudable) { await restaurarConceptos(); return true }
+    if (hayConceptosPendientes(estado.reanudable)) { await restaurarConceptos(); return true }
     if (!sesionPreguntasPendiente) throw new Error('Esta sesión ya no está pendiente. Revisa el siguiente paso de Hoy.')
     if (nbme.loading || nbme.busy) throw new Error('Tus preguntas todavía se están preparando. Vuelve a intentarlo en un momento.')
     return continuarPreguntas()

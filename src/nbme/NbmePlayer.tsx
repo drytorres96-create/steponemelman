@@ -144,6 +144,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
     && !!catalog?.questions.some(q => q.id === currentQuestion.id && q.status === 'ready')
   const requiredFigureUnavailable = !!currentQuestion?.figureRequired && (!currentQuestion.figures.length || !figures.ready)
   const canAnswer = currentReady && !!selectedOption && !questionLoading && !busy && !requiredFigureUnavailable && !feedback
+  const revisionPosterior = !!currentQuestion && !!catalog?.questions.some(q => q.id === currentQuestion.id && q.revision !== currentQuestion.revision)
 
   useEffect(() => {
     setExpandedFigure(null)
@@ -222,6 +223,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
       <div className="nbme-actions"><button className="btn" onClick={pause}>Pausar y guardar</button><button className="btn principal" onClick={continueWithoutBudget}>Continuar sin aviso de tiempo</button></div>
     </section>}
     {error && <div className="nbme-error" role="alert"><p>{error}</p></div>}
+    {revisionPosterior && <p className="mini" role="status">Este bloque conserva su versión guardada. Hay una revisión publicada posterior; tu respuesta se registra contra la versión que estás viendo.</p>}
     {storageWarning && <div className="nbme-error" role="alert"><p>{storageWarning}</p><button className="btn" onClick={() => void syncNow()}>Sincronizar ahora</button></div>}
     {questionLoading ? <div className="tarjeta" role="status">Cargando pregunta…</div>
       : !currentQuestion ? <div className="tarjeta pila"><p>No se pudo cargar esta pregunta. Tu posición está guardada.</p>
