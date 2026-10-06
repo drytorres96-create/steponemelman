@@ -72,5 +72,8 @@ export function MedidorIA() {
       <span className="medidor-valor" aria-hidden="true">{mostrado}<i>%</i></span>
     </div>
     <p className="medidor-detalle" role="status">{estado}</p>
+    {cuota.activa && porcentaje > 0 && cuota.porModo?.explicar === 0 && <p className="mini medidor-reserva">
+      La ayuda extensa agotó su parte. La corrección de respuestas conserva prioridad.
+    </p>}
   </div>
 }

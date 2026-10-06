@@ -127,4 +127,30 @@ describe('medidor de la IA gratuita', () => {
     expect(porcentajeRestante({ presupuesto: 8500, gastadas: 0, restantes: 99999, llamadas: 0, activa: true })).toBe(100)
     expect(porcentajeRestante({ presupuesto: 8500, gastadas: 8500, restantes: -5, llamadas: 0, activa: true })).toBe(0)
   })
+
+  it('el saldo personal agotado no se presenta como cuota disponible', async () => {
+    red.mockResolvedValue(cuota(4250, { presupuestoUsuario: 7650, restantesUsuario: 0 }))
+    await pintar()
+    expect(host.textContent).toContain('Sin cuota hoy')
+  })
+
+  it('distingue una reserva de corrección y agrupa varios avisos de consumo', async () => {
+    vi.useFakeTimers()
+    red.mockResolvedValue(cuota(2500, { porModo: { explicar: 0, calificar: 1000 } }))
+    await pintar()
+    expect(host.textContent).toContain('conserva prioridad')
+    notificarUsoIA(); notificarUsoIA(); notificarUsoIA()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(red).toHaveBeenCalledTimes(2)
+  })
+
+  it('renueva el indicador al cambiar el día UTC sin gastar generación', async () => {
+    vi.useFakeTimers()
+    red.mockResolvedValue(cuota(0, { reiniciaEn: new Date(Date.now() + 2000).toISOString() }))
+    await pintar()
+    red.mockResolvedValue(cuota(8500))
+    await act(async () => { await vi.advanceTimersByTimeAsync(2100) })
+    expect(host.textContent).toContain('100 % disponible')
+    expect(red).toHaveBeenCalledTimes(2)
+  })
 })

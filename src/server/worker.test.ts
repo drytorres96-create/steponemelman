@@ -630,13 +630,14 @@ describe('detección de confusiones por parecido', () => {
  * cliente llegue como turnos con su rol —no como instrucciones dentro del prompt—, que el
  * material lo ponga el corpus, y que una respuesta vacía no se enseñe como respuesta.
  */
-const respuestaChat = { respuesta: 'La captación de yodo baja porque la tiroxina exógena frena la TSH y la glándula deja de captar.', apoyo: 'material', patron: 'Si ves T4 alta con captación baja, piensa en tirotoxicosis facticia.' }
+const respuestaChat = { respuesta: 'Una explicación sintética de un mecanismo de QA.', apoyo: 'material', evidencia: 'Fragmento sintético de prueba.', patron: 'Si ves alfa, distingue beta.' }
 const preguntar = (cuerpo: unknown) => new Request('https://site/api/preguntar', { method: 'POST',
   headers: { Authorization: 'Bearer ' + 'x'.repeat(30) }, body: JSON.stringify(cuerpo) })
 
 describe('chat sobre el concepto', () => {
   it('acepta una respuesta con cuerpo y descarta la vacía', () => {
-    expect(validarRespuestaChat({ response: JSON.stringify(respuestaChat) })).toMatchObject({ apoyo: 'material', patron: respuestaChat.patron })
+    expect(validarRespuestaChat({ response: JSON.stringify(respuestaChat) }, respuestaChat.evidencia)).toMatchObject({ apoyo: 'material', patron: respuestaChat.patron })
+    expect(validarRespuestaChat({ response: JSON.stringify(respuestaChat) }, 'Otra fuente sin esa cita.')).toMatchObject({ apoyo: 'conocimiento' })
     expect(validarRespuestaChat({ response: JSON.stringify({ respuesta: 'Sí.' }) })).toBeNull()
     expect(validarRespuestaChat({ response: 'no es json' })).toBeNull()
     // Sin apoyo declarado, se asume lo prudente: no presentarlo como respaldado por la fuente.
@@ -666,8 +667,9 @@ describe('chat sobre el concepto', () => {
     expect(await respuesta.json()).toMatchObject({ apoyo: 'material', patron: respuestaChat.patron })
 
     const enviado = env.AI.run.mock.calls[0][1] as { messages: { role: string; content: string }[] }
-    expect(enviado.messages.map(m => m.role)).toEqual(['system', 'user', 'assistant', 'user'])
-    expect(enviado.messages[0].content).toContain('Afirmación de QA-1.')
+    expect(enviado.messages.map(m => m.role)).toEqual(['system', 'user', 'user', 'assistant', 'user'])
+    expect(enviado.messages[0].content).not.toContain('Afirmación de QA-1.')
+    expect(enviado.messages[1].content).toContain('Afirmación de QA-1.')
     expect(enviado.messages.at(-1)!.content).toBe('¿Por qué la captación baja?')
   })
 

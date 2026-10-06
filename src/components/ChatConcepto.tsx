@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import type { Concepto } from '../schema/concept'
 import { preguntarSobreConcepto, type TurnoChat } from '../lib/chat-ia'
 import { sugerenciasDePregunta } from '../lib/sugerencias-chat'
+import type { PresentacionIA } from '../lib/contexto-ia'
 
 /** Un turno pintado: los de la IA llevan de dónde sale lo que dicen. */
-type Mensaje = TurnoChat & { apoyo?: 'material' | 'conocimiento'; patron?: string; fallo?: boolean }
+type Mensaje = TurnoChat & { apoyo?: 'material' | 'conocimiento'; patron?: string; evidencia?: string; fallo?: boolean }
 
 /**
  * Chat sobre el ítem que acabas de responder.
@@ -20,7 +21,7 @@ type Mensaje = TurnoChat & { apoyo?: 'material' | 'conocimiento'; patron?: strin
  * Como la viñeta de examen, esto no se califica ni toca tu dominio. Cada respuesta dice si
  * se apoya en el material o en fisiología general, porque no es lo mismo.
  */
-export function ChatConcepto({ concepto }: { concepto: Concepto }) {
+export function ChatConcepto({ concepto, presentacion }: { concepto: Concepto; presentacion?: PresentacionIA }) {
   const [mensajes, setMensajes] = useState<Mensaje[]>([])
   const [texto, setTexto] = useState('')
   const [pensando, setPensando] = useState(false)
@@ -29,7 +30,8 @@ export function ChatConcepto({ concepto }: { concepto: Concepto }) {
   useEffect(() => () => control.current?.abort(), [])
   // El autoscroll es un adorno: donde no exista, el hilo tiene que seguir funcionando igual.
   useEffect(() => {
-    if (mensajes.length) finRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+    const quieto = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (mensajes.length) finRef.current?.scrollIntoView?.({ block: 'nearest', behavior: quieto ? 'auto' : 'smooth' })
   }, [mensajes, pensando])
 
   const sugerencias = sugerenciasDePregunta(concepto)
@@ -42,12 +44,15 @@ export function ChatConcepto({ concepto }: { concepto: Concepto }) {
     const previos = mensajes.filter(m => !m.fallo).map(({ rol, texto }) => ({ rol, texto }))
     setMensajes(m => [...m, { rol: 'yo', texto: limpia }])
     setTexto(''); setPensando(true)
-    const resultado = await preguntarSobreConcepto(concepto.concept_id, limpia, previos, abort.signal)
+    const resultado = presentacion
+      ? await preguntarSobreConcepto(concepto.concept_id, limpia, previos, abort.signal, presentacion)
+      : await preguntarSobreConcepto(concepto.concept_id, limpia, previos, abort.signal)
     if (abort.signal.aborted) return
     setPensando(false)
-    setMensajes(m => [...m, resultado.estado === 'ok'
-      ? { rol: 'ia', texto: resultado.respuesta.respuesta, apoyo: resultado.respuesta.apoyo, patron: resultado.respuesta.patron }
+    setMensajes(m => [...(resultado.estado === 'sin_ia' ? m.map((t, n) => n === m.length - 1 ? { ...t, fallo: true } : t) : m), resultado.estado === 'ok'
+      ? { rol: 'ia', texto: resultado.respuesta.respuesta, apoyo: resultado.respuesta.apoyo, patron: resultado.respuesta.patron, evidencia: resultado.respuesta.evidencia }
       : { rol: 'ia', texto: resultado.motivo, fallo: true }])
+    if (resultado.estado === 'sin_ia') setTexto(limpia)
   }
 
   return <section className="chat" aria-label="Preguntar sobre este concepto">
@@ -66,8 +71,10 @@ export function ChatConcepto({ concepto }: { concepto: Concepto }) {
           <p>{m.texto}</p>
           {m.patron && <p className="chat-patron">🔑 {m.patron}</p>}
           {m.rol === 'ia' && !m.fallo && <p className="chat-apoyo">
-            {m.apoyo === 'material' ? '📗 Apoyado en el material de este concepto' : '💡 Fisiología general, fuera del material: contrástalo'}
+            {m.apoyo === 'material' && m.evidencia ? '📗 Cita localizada en el material' : '💡 Explicación de IA sin cita localizada: contrástala'}
           </p>}
+          {m.evidencia && <details><summary>Ver el fragmento citado</summary><blockquote>{m.evidencia}</blockquote>
+            <p className="mini">La cita coincide con el material; la explicación puede equivocarse.</p></details>}
         </div>
       </div>)}
       {pensando && <div className="chat-turno chat-suyo">
