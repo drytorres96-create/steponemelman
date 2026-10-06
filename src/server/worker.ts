@@ -45,7 +45,8 @@ export type CoachVeredicto = { veredicto: 'correcta' | 'parcial' | 'incorrecta';
 export type CoachPatron = { titulo: string; porque: string; conceptos: string[]; accion: string }
 export type CoachAnalisis = { patrones: CoachPatron[]; enfoque: string }
 /** Lo que queda hoy del regalo diario, para poder enseñarlo antes de gastar. */
-export type CoachCuota = { presupuesto: number; gastadas: number; restantes: number; llamadas: number; activa: boolean }
+export type CoachCuota = { presupuesto: number; gastadas: number; restantes: number; llamadas: number; activa: boolean
+  presupuestoUsuario?: number; restantesUsuario?: number; porModo?: Record<ModoIA, number>; reiniciaEn?: string }
 const json = (value: unknown, status = 200) => Response.json(value, { status,
   headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } })
 
@@ -262,13 +263,29 @@ export class StudyCoach {
     if (this.env.AI_FREE_ENABLED !== 'true') return unavailable('desactivada')
     const current = this.pending.get(input.key)
     if (current) return (await current).clone()
-    const work = input.mode === 'calificar' ? this.grade(input)
+    const work = this.atender(input)
+    this.pending.set(input.key, work)
+    try { return (await work).clone() } finally { this.pending.delete(input.key) }
+  }
+
+  private async atender(input: CoachInput): Promise<Response> {
+    // Un fallo idéntico no debe gastar otra reserva con cada toque. Caduca sin reintentar.
+    const key = `cache:fallo:${input.key}`
+    const fallo = await this.state.storage.get<{ at: number; body: unknown }>(key)
+    const espera = fallo ? Math.ceil((fallo.at + 60_000 - Date.now()) / 1000) : 0
+    if (espera > 0) return Response.json(fallo!.body, { status: 503,
+      headers: { 'Cache-Control': 'no-store', 'Retry-After': String(espera), 'X-Content-Type-Options': 'nosniff' } })
+    const response = await (input.mode === 'calificar' ? this.grade(input)
       : input.mode === 'analizar' ? this.analyse(input)
       : input.mode === 'examen' ? this.examine(input)
       : input.mode === 'confusion' ? this.compare(input)
-      : input.mode === 'chat' ? this.answer(input) : this.explain(input)
-    this.pending.set(input.key, work)
-    try { return (await work).clone() } finally { this.pending.delete(input.key) }
+      : input.mode === 'chat' ? this.answer(input) : this.explain(input))
+    if (response.status === 503) {
+      await this.state.storage.put(key, { at: Date.now(), body: await response.clone().json() })
+      await this.podarCache()
+      response.headers.set('Retry-After', '60')
+    }
+    return response
   }
 
   private async leer(storage: Storage, hoy: string): Promise<Gasto> {
@@ -282,18 +299,18 @@ export class StudyCoach {
    * explicación larga; y cada modo tiene su propio techo para que lo prescindible no se
    * coma lo que sostiene el historial. Una respuesta cacheada no llega hasta aquí.
    */
-  private async admitir(user: string, modo: ModoIA, estimado: number): Promise<boolean> {
-    const hoy = new Date().toISOString().slice(0, 10)
+  private async admitir(user: string, modo: ModoIA, estimado: number): Promise<string | null> {
     return this.state.storage.transaction(async storage => {
+      const hoy = new Date().toISOString().slice(0, 10)
       const g = await this.leer(storage, hoy)
       const mio = g.users[user] ?? { neuronas: 0, llamadas: 0 }
-      if (g.neuronas + estimado > techoDeModo(modo)) return false
-      if (mio.neuronas + estimado > PRESUPUESTO_UTIL * FRACCION_POR_USUARIO) return false
-      if (mio.llamadas >= LIMITE_LLAMADAS_USUARIO) return false
+      if (g.neuronas + estimado > techoDeModo(modo)) return null
+      if (mio.neuronas + estimado > PRESUPUESTO_UTIL * FRACCION_POR_USUARIO) return null
+      if (mio.llamadas >= LIMITE_LLAMADAS_USUARIO) return null
       g.neuronas += estimado; g.llamadas++
       g.users[user] = { neuronas: mio.neuronas + estimado, llamadas: mio.llamadas + 1 }
       await storage.put('gasto', g)
-      return true
+      return hoy
     })
   }
 
@@ -302,11 +319,14 @@ export class StudyCoach {
    * de verdad. Si la llamada falló y no hay consumo que leer, la reserva se queda gastada:
    * sin eso, un modelo que falla en bucle saldría gratis.
    */
-  private async liquidar(user: string, estimado: number, real: number) {
+  private async liquidar(user: string, diaReservado: string, estimado: number, real: number) {
     if (real === estimado) return
     const hoy = new Date().toISOString().slice(0, 10)
+    // La respuesta anterior a medianoche no liquida contra reservas nuevas del mismo usuario.
+    if (diaReservado !== hoy) return
     await this.state.storage.transaction(async storage => {
-      const g = await this.leer(storage, hoy)
+      const g = await storage.get<Gasto>('gasto')
+      if (g?.v !== 2 || g.day !== diaReservado || new Date().toISOString().slice(0, 10) !== diaReservado) return
       const mio = g.users[user]
       // Si el día cambió entre la reserva y la liquidación, el contador ya se reinició.
       if (!mio) return
@@ -321,14 +341,19 @@ export class StudyCoach {
     const hoy = new Date().toISOString().slice(0, 10)
     const g = await this.leer(this.state.storage, hoy)
     const mio = g.users[user] ?? { neuronas: 0, llamadas: 0 }
+    const presupuestoUsuario = Math.floor(PRESUPUESTO_UTIL * FRACCION_POR_USUARIO)
+    const restantesUsuario = mio.llamadas >= LIMITE_LLAMADAS_USUARIO ? 0 : Math.max(0, presupuestoUsuario - mio.neuronas)
+    const modos: ModoIA[] = ['calificar', 'confusion', 'analizar', 'chat', 'explicar', 'examen']
     return { presupuesto: PRESUPUESTO_UTIL, gastadas: g.neuronas, restantes: Math.max(0, PRESUPUESTO_UTIL - g.neuronas),
-      llamadas: mio.llamadas, activa: this.env.AI_FREE_ENABLED === 'true' }
+      llamadas: mio.llamadas, activa: this.env.AI_FREE_ENABLED === 'true', presupuestoUsuario, restantesUsuario,
+      porModo: Object.fromEntries(modos.map(m => [m, Math.max(0, Math.min(restantesUsuario, techoDeModo(m) - g.neuronas))])) as Record<ModoIA, number>,
+      reiniciaEn: new Date(Date.parse(`${hoy}T00:00:00Z`) + DAY).toISOString() }
   }
 
   private async podarCache() {
     const entries = await this.state.storage.list<{ at: number }>({ prefix: 'cache:' })
     const old = [...entries].sort((a, b) => a[1].at - b[1].at)
-    const remove = old.filter(([, v], n) => Date.now() - v.at > 7 * DAY || n < old.length - 200).map(([k]) => k)
+    const remove = old.filter(([k, v], n) => Date.now() - v.at > (k.startsWith('cache:fallo:') ? 60_000 : 7 * DAY) || n < old.length - 200).map(([k]) => k)
     for (let n = 0; n < remove.length; n += 128) await this.state.storage.delete(remove.slice(n, n + 128))
   }
 
@@ -342,7 +367,8 @@ export class StudyCoach {
             { role: 'user', content: JSON.stringify({ material: input.reference, pregunta: input.question, respuesta_referencia: input.canonical, respuesta_estudiante: input.answer }) },
           ]
     const estimado = costeEstimado(JSON.stringify(messages), 160)
-    if (!await this.admitir(input.user, 'calificar', estimado)) return json({ error: 'La cuota de corrección gratuita de hoy se ha agotado. Se renueva a las 00:00 UTC; el corrector propio sigue funcionando.' }, 429)
+    const diaReservado = await this.admitir(input.user, 'calificar', estimado)
+    if (!diaReservado) return json({ error: 'La cuota de corrección gratuita de hoy se ha agotado. Se renueva a las 00:00 UTC; el corrector propio sigue funcionando.' }, 429)
     let timer: ReturnType<typeof setTimeout> | undefined
     let raw: unknown
     try {
@@ -365,7 +391,7 @@ export class StudyCoach {
       return unavailable('interno')
     } finally {
       if (timer) clearTimeout(timer)
-      await this.liquidar(input.user, estimado, costeReal(raw, estimado))
+      await this.liquidar(input.user, diaReservado, estimado, costeReal(raw, estimado))
     }
   }
 
@@ -378,7 +404,8 @@ export class StudyCoach {
             { role: 'user', content: JSON.stringify({ material: input.reference, fragmento_para_citar: input.sourceFragment, pregunta: input.question, respuesta_referencia: input.canonical, respuesta_estudiante: input.answer }) },
           ]
     const estimado = costeEstimado(JSON.stringify(messages), 550)
-    if (!await this.admitir(input.user, 'explicar', estimado)) return json({ error: 'La cuota de ayuda gratuita de hoy se ha agotado. Se renueva a las 00:00 UTC; puedes seguir estudiando.' }, 429)
+    const diaReservado = await this.admitir(input.user, 'explicar', estimado)
+    if (!diaReservado) return json({ error: 'La cuota de ayuda gratuita de hoy se ha agotado. Se renueva a las 00:00 UTC; puedes seguir estudiando.' }, 429)
     // Failed calls keep their reservation. No automatic retries and no paid fallback.
     let timer: ReturnType<typeof setTimeout> | undefined
     let raw: unknown
@@ -401,7 +428,7 @@ export class StudyCoach {
       return unavailable('interno')
     } finally {
       if (timer) clearTimeout(timer)
-      await this.liquidar(input.user, estimado, costeReal(raw, estimado))
+      await this.liquidar(input.user, diaReservado, estimado, costeReal(raw, estimado))
     }
   }
 
@@ -419,7 +446,8 @@ export class StudyCoach {
       { role: 'user', content: input.reference },
     ]
     const estimado = costeEstimado(JSON.stringify(messages), 900)
-    if (!await this.admitir(input.user, 'analizar', estimado)) return json({ error: 'La cuota de análisis gratuito de hoy se ha agotado. Se renueva a las 00:00 UTC; tus cifras de progreso siguen completas.' }, 429)
+    const diaReservado = await this.admitir(input.user, 'analizar', estimado)
+    if (!diaReservado) return json({ error: 'La cuota de análisis gratuito de hoy se ha agotado. Se renueva a las 00:00 UTC; tus cifras de progreso siguen completas.' }, 429)
     let timer: ReturnType<typeof setTimeout> | undefined
     let raw: unknown
     try {
@@ -443,7 +471,7 @@ export class StudyCoach {
       return unavailable('interno')
     } finally {
       if (timer) clearTimeout(timer)
-      await this.liquidar(input.user, estimado, costeReal(raw, estimado))
+      await this.liquidar(input.user, diaReservado, estimado, costeReal(raw, estimado))
     }
   }
 
@@ -465,7 +493,8 @@ export class StudyCoach {
       { role: 'user', content: input.question },
     ]
     const estimado = costeEstimado(JSON.stringify(messages), 650)
-    if (!await this.admitir(input.user, 'chat', estimado)) return json({ error: 'La cuota de preguntas de hoy se ha agotado. Se renueva a las 00:00 UTC; la explicación del concepto sigue aquí.' }, 429)
+    const diaReservado = await this.admitir(input.user, 'chat', estimado)
+    if (!diaReservado) return json({ error: 'La cuota de preguntas de hoy se ha agotado. Se renueva a las 00:00 UTC; la explicación del concepto sigue aquí.' }, 429)
     let timer: ReturnType<typeof setTimeout> | undefined
     let raw: unknown
     try {
@@ -487,7 +516,7 @@ export class StudyCoach {
       return unavailable('interno')
     } finally {
       if (timer) clearTimeout(timer)
-      await this.liquidar(input.user, estimado, costeReal(raw, estimado))
+      await this.liquidar(input.user, diaReservado, estimado, costeReal(raw, estimado))
     }
   }
 
@@ -506,7 +535,8 @@ export class StudyCoach {
     if (saved?.confusion && Date.now() - saved.at < 7 * DAY) return json({ ...saved.confusion, cached: true })
     const textos = [input.answer, ...candidatos.map(c => c.texto)]
     const estimado = costeEmbedding(textos)
-    if (!await this.admitir(input.user, 'confusion', estimado)) return json({ error: 'La cuota gratuita de hoy se ha agotado. Se renueva a las 00:00 UTC.' }, 429)
+    const diaReservado = await this.admitir(input.user, 'confusion', estimado)
+    if (!diaReservado) return json({ error: 'La cuota gratuita de hoy se ha agotado. Se renueva a las 00:00 UTC.' }, 429)
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       const raw = await Promise.race([
@@ -547,7 +577,8 @@ export class StudyCoach {
       { role: 'user', content: input.reference },
     ]
     const estimado = costeEstimado(JSON.stringify(messages), 1000)
-    if (!await this.admitir(input.user, 'examen', estimado)) return json({ error: 'La cuota de viñetas de hoy se ha agotado. Se renueva a las 00:00 UTC; el concepto y su explicación siguen aquí.' }, 429)
+    const diaReservado = await this.admitir(input.user, 'examen', estimado)
+    if (!diaReservado) return json({ error: 'La cuota de viñetas de hoy se ha agotado. Se renueva a las 00:00 UTC; el concepto y su explicación siguen aquí.' }, 429)
     let timer: ReturnType<typeof setTimeout> | undefined
     let raw: unknown
     try {
@@ -570,7 +601,7 @@ export class StudyCoach {
       return unavailable('interno')
     } finally {
       if (timer) clearTimeout(timer)
-      await this.liquidar(input.user, estimado, costeReal(raw, estimado))
+      await this.liquidar(input.user, diaReservado, estimado, costeReal(raw, estimado))
     }
   }
 }
