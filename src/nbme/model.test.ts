@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { NbmeQuestion, NbmeState } from './types'
 import { activateNbmeSession, deriveNbmeSession, emptyNbmeState, mergeNbmeStates, parseNbmeState, questionProgress, reviewNbmeAnswer,
   setNbmeDraft, startNbmeSession, submitNbmeAnswer, summarizeNbmeState, updateNbmeFilters, updateNbmeSession,
-  discardNbmeSession, countNbmeSessionAttempts, setNbmeBankVersion, MAX_LAPIDAS } from './model'
+  discardNbmeSession, countNbmeSessionAttempts, setNbmeBankVersion, MAX_LAPIDAS, referenciasPendientesNbme } from './model'
 
 const question = (id = 'NBME27-P0001'): NbmeQuestion => ({ id, revision: 'rev1', form: '27', section: 1, item: 1, page: 1,
   systems: ['Renal'], disciplines: ['Fisiología'], topic: 'QA', objective: null, status: 'ready', reasons: [], figureRequired: false,
@@ -130,6 +130,32 @@ describe('independent private-question state', () => {
     expect(parseNbmeState({ ...good, activeSessionId: 'missing' })).toBeNull()
     expect(parseNbmeState({ ...good, sessions: JSON.parse('{"__proto__":{}}') })).toBeNull()
     expect(parseNbmeState({ version: 1, progreso: {}, sesiones: [] })).toBeNull()
+  })
+})
+
+describe('referencias necesarias para recuperar el mismo bloque', () => {
+  it('incluye la explicación actual y deduplica una corrección futura sin cambiar el historial', () => {
+    const s = submitNbmeAnswer(start([q, q2]), 'S1', 0, q, 'B', 900, 2000)
+    const previo = structuredClone(s)
+    expect(referenciasPendientesNbme(s, 'S1')).toEqual([{ id: q.id, revision: q.revision }, { id: q2.id, revision: q2.revision }])
+    expect(s).toEqual(previo)
+    expect(parseNbmeState(s)).toEqual(s)
+  })
+  it('omite lo ya cerrado pero conserva el reintento pendiente de un error anterior', () => {
+    let s = reviewNbmeAnswer(submitNbmeAnswer(start([q, q2, q3]), 'S1', 0, q, 'A', 10, 2000), 'S1', 0, 2001)
+    s = reviewNbmeAnswer(submitNbmeAnswer(s, 'S1', 1, q2, 'B', 10, 3000), 'S1', 1, 3001)
+    expect(referenciasPendientesNbme(s, 'S1')).toEqual([{ id: q3.id, revision: q3.revision }, { id: q2.id, revision: q2.revision }])
+    const remoto = updateNbmeSession(s, 'S1', { paused: true }, 4000)
+    const unido = mergeNbmeStates(s, remoto)
+    expect(referenciasPendientesNbme(unido, 'S1')).toEqual(referenciasPendientesNbme(s, 'S1'))
+    expect(unido.sessions.S1.initial).toEqual(s.sessions.S1.initial)
+    expect(unido.attempts).toEqual(s.attempts)
+    expect(parseNbmeState(unido)).toEqual(unido)
+  })
+  it('un bloque terminado o inexistente no necesita cargar preguntas', () => {
+    const s = reviewNbmeAnswer(submitNbmeAnswer(start(), 'S1', 0, q, 'A', 10, 2000), 'S1', 0, 2001)
+    expect(referenciasPendientesNbme(s, 'S1')).toEqual([])
+    expect(referenciasPendientesNbme(s, 'missing')).toEqual([])
   })
 })
 

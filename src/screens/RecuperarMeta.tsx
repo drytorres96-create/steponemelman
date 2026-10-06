@@ -11,6 +11,7 @@ import { prepararNuevoDeHoy, tituloDeHoy, type MaterialNuevo } from '../lib/nuev
 import type { ItemCaja } from '../lib/cajas'
 import { primerasRespuestasNbme, resumenMeta } from '../lib/meta'
 import { resumenProgresoAprendizaje } from '../lib/progreso-aprendizaje'
+import { hayConceptosPendientes } from '../lib/conceptos-pendientes'
 export interface AccionesRecuperacion { onNuevo?: (material: MaterialNuevo) => void; onCajas?: (items: ItemCaja[], titulo: string) => void; onRetomar?: () => Promise<boolean> }
 
 /** Sólo se monta al abrir la opción: usa metadatos y las mismas listas que Hoy. */
@@ -60,7 +61,7 @@ export function RecuperarMeta({ onNuevo, onCajas, onRetomar }: AccionesRecuperac
     const preguntas = primerasRespuestasNbme(nbme.state, nbme.catalog)
     const meta = resumenMeta({ ahora, dominadosEn: aprendizaje.dominadosEn, conceptosPublicados: aprendizaje.total,
       primerasRespuestas: preguntas.marcas, preguntasPublicadas: nbme.catalog ? preguntas.publicadas : Number.POSITIVE_INFINITY })
-    const sesionPendiente = !!estado.reanudable || pendienteNbme
+    const sesionPendiente = hayConceptosPendientes(estado.reanudable) || pendienteNbme
     return { ahora, meta, plan: recuperacionMeta({ meta, dia: estadoDelDia(entrada), datosListos: !!indice && !!nbme.catalog && !esperandoCuenta && !esperandoBanco,
       semanaLista: !!sesiones && semanaCargada === limites.inicio, sesionPendiente, cajas: cajas.items,
       nuevo: prepararNuevoDeHoy(entrada, listas, nbme.state) }) }

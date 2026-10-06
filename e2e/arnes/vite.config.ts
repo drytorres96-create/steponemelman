@@ -33,6 +33,8 @@ export default defineConfig({
       const resuelto = await this.resolve(source, importer, { ...options, skipSelf: true })
       if (!resuelto) return null
       for (const [fin, falso] of Object.entries(SUSTITUTOS)) {
+        // This one import opts into the production provider with synthetic auth/API/state.
+        if (fin === 'src/nbme/NbmeProvider.tsx' && importer.split('?')[0] === path.join(AQUI, 'falso-nbme.tsx')) continue
         if (resuelto.id.endsWith(path.join(REPO, fin))) return path.join(AQUI, falso)
       }
       return null

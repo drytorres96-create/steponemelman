@@ -11,6 +11,10 @@ const guardada = reanudar?.startsWith('concepto') ? {
   conceptIds: ['C8', 'C4', 'C8'], variantes: [null, null, null], cantidadInicial: 2,
   titulo: 'Sesión sintética guardada', subtitulo: 'Cola exacta, incluidos reintentos.',
   paso: { indice: 1, pistas: 1, fuenteConsultada: false, explicacionPrevia: false, confianza: 2, msActivo: 7000 },
+} : reanudar === 'nbme-resumen' ? {
+  versionFormato: 3, modulo: 'M', sesion: 'repaso', indice: 2, ts: Date.now(), sessionId: 'conceptos-terminados',
+  conceptIds: ['C8', 'C4'], variantes: [null, null], cantidadInicial: 2,
+  titulo: 'Resumen sintético terminado', subtitulo: 'Sin pasos de concepto pendientes.',
 } : null
 let estado: any = { ...ESTADO_INICIAL, progreso, reanudable: guardada }
 declare global { interface Window { __leerProgresoSintetico: () => any } }

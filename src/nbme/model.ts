@@ -162,6 +162,18 @@ export function deriveNbmeSession(state: NbmeState, sessionId: string): NbmeSess
   return { queue, index, current, attempt, phase: !current ? 'complete' : attempt ? 'feedback' : 'question',
     initialCount: n, firstAnswered, firstCorrect, firstConflicts, retryCount, pendingErrors, unresolved: pendingErrors }
 }
+/** Cargar la pregunta o explicación actual, las primeras respuestas restantes y
+ * las correcciones pendientes. Un paso cerrado no bloquea la continuación. */
+export function referenciasPendientesNbme(state: NbmeState, sessionId: string): NbmeQuestionRef[] {
+  const view = deriveNbmeSession(state, sessionId)
+  if (!view) return []
+  const refs = new Map<string, NbmeQuestionRef>()
+  for (const { id, revision } of view.queue.slice(view.index)) {
+    const key = JSON.stringify([id, revision])
+    if (!refs.has(key)) refs.set(key, { id, revision })
+  }
+  return [...refs.values()]
+}
 function requireSession(state: NbmeState, sid: string) {
   const s = state.sessions[sid]; if (!s) throw new Error('Sesión de preguntas no disponible.'); return s
 }
