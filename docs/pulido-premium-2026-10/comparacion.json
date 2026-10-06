@@ -1,0 +1,86 @@
+[
+  {
+    "pantalla": "hoy",
+    "ancho": 390,
+    "sinDesbordamiento": true,
+    "sinErrores": true,
+    "movimientoReducido": true
+  },
+  {
+    "pantalla": "biblioteca",
+    "ancho": 390,
+    "sinDesbordamiento": true,
+    "sinErrores": true,
+    "movimientoReducido": true
+  },
+  {
+    "pantalla": "progreso",
+    "ancho": 390,
+    "sinDesbordamiento": true,
+    "sinErrores": true,
+    "movimientoReducido": true
+  },
+  {
+    "pantalla": "cuenta",
+    "ancho": 390,
+    "sinDesbordamiento": true,
+    "sinErrores": true,
+    "movimientoReducido": true
+  },
+  {
+    "pantalla": "concepto",
+    "ancho": 390,
+    "sinDesbordamiento": true,
+    "sinErrores": true,
+    "movimientoReducido": true
+  },
+  {
+    "pantalla": "nbme",
+    "ancho": 390,
+    "sinDesbordamiento": true,
+    "sinErrores": true,
+    "movimientoReducido": true
+  },
+  {
+    "pantalla": "hoy",
+    "ancho": 1280,
+    "sinDesbordamiento": true,
+    "sinErrores": true,
+    "movimientoReducido": true
+  },
+  {
+    "pantalla": "biblioteca",
+    "ancho": 1280,
+    "sinDesbordamiento": true,
+    "sinErrores": true,
+    "movimientoReducido": true
+  },
+  {
+    "pantalla": "progreso",
+    "ancho": 1280,
+    "sinDesbordamiento": true,
+    "sinErrores": true,
+    "movimientoReducido": true
+  },
+  {
+    "pantalla": "cuenta",
+    "ancho": 1280,
+    "sinDesbordamiento": true,
+    "sinErrores": true,
+    "movimientoReducido": true
+  },
+  {
+    "pantalla": "concepto",
+    "ancho": 1280,
+    "sinDesbordamiento": true,
+    "sinErrores": true,
+    "movimientoReducido": true
+  },
+  {
+    "pantalla": "nbme",
+    "ancho": 1280,
+    "sinDesbordamiento": true,
+    "sinErrores": true,
+    "movimientoReducido": true
+  }
+]

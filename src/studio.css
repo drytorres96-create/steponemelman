@@ -1,6 +1,7 @@
 /* Studio · marco, legibilidad y proporción. La piel de lectura se carga después.
    La fotografía conserva el carácter cinematográfico sin desplazar controles. */
 :root {
+  color-scheme:dark;
   --ancho:1280px; --radio:20px; --radio-s:12px;
   --fondo-0:#0b1114; --fondo-1:#0b1114; --fondo-2:#14261f; --fondo-3:#14261f;
   --bg:#0b1114; --bg-2:#14261f; --panel:#14261f; --panel-2:#0b1114;
@@ -114,7 +115,16 @@
 .tabla :where(th,td) { padding:12px 14px; }
 .modal-fondo { padding: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px)); }
 .modal { max-height:calc(100dvh - max(20px, env(safe-area-inset-top, 0px)) - max(20px, env(safe-area-inset-bottom, 0px))); overflow:auto; border-radius:20px; background:var(--panel); }
-.editorial-app:not(.study-focus) :where(input,select,textarea) { font-size:16px; }
+/* Los campos comparten los radios y la tinta del sistema; la piel de estudio
+   conserva sus propios controles cuando está activa. */
+:root:not([data-piel-estudio]) :is(input[type='text'],input[type='search'],input[type='number'],select,textarea,.auth-form input) {
+  font-size:16px; font-weight:400; border-radius:var(--radio-s);
+  color:var(--texto); background:var(--panel-2); border-color:var(--linea-interactiva); box-shadow:none;
+}
+:root:not([data-piel-estudio]) :is(input,textarea)::placeholder { color:var(--texto-3); opacity:1; }
+:root:not([data-piel-estudio]) :focus-visible { outline:2px solid var(--acento); outline-offset:3px; }
+:root:not([data-piel-estudio]) :is(input,select,textarea):focus { outline:2px solid var(--acento); outline-offset:3px; border-color:var(--acento); box-shadow:none; }
+select option { color:var(--texto); background:var(--panel); }
 /* Movimiento de cámara lento; la niebla usa el mismo ciclo y no anima filtros. */
 .cine-escena img { animation-duration:90s; }
 .cine-haz { animation-duration:90s; filter:none; }
@@ -133,6 +143,7 @@
   .editorial-app:not(.study-focus)>.barra { position:relative; padding:max(10px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px)); }
   .editorial-app:not(.study-focus) .barra-in { padding:10px; }
   .editorial-app:not(.study-focus) .nav { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .editorial-app:not(.study-focus) .nav:has(> button:only-child) { grid-template-columns:minmax(0,1fr); }
   .editorial-app:not(.study-focus) .nav button { padding:10px 8px; justify-content:flex-start; font-size:13px; min-width:0; }
   .editorial-app:not(.study-focus) .medidor-ia { display:none; }
   .editorial-app>main>.contenedor { padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
@@ -147,6 +158,8 @@
   .plan-fila-marca { min-width:0; }
   .plan-fila-acciones { margin-left:0; flex-wrap:wrap; }
   .progress-next-session { padding:20px; }
+  .library-composer > .fila > .btn.principal { width:100%; }
+  .library-composer > .fila > [role='status'] { flex-basis:100%; }
   .auth-page { grid-template-columns:minmax(0,1fr); }
 }
 @media(max-width:760px) {

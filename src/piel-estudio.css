@@ -173,7 +173,7 @@
   box-shadow: none;
 }
 :root[data-piel-estudio] .btn:hover:not(:disabled) {
-  border-color: var(--piel-acento-borde);
+  border-color: var(--piel-acento);
   background: var(--piel-superficie-2);
 }
 :root[data-piel-estudio] .btn.principal {
@@ -225,11 +225,16 @@
   border-radius: var(--piel-radio-s);
   background: var(--piel-superficie);
 }
-:root[data-piel-estudio] .opcion:hover:not(:disabled),
-:root[data-piel-estudio] .nbme-option:hover:not(:has(input:disabled)),
-:root[data-piel-estudio] .escalera button:hover {
-  border-color: var(--piel-acento-borde);
+:root[data-piel-estudio] .opcion:not(.elegida, .acierto, .fallo):hover:not(:disabled),
+:root[data-piel-estudio] .nbme-option:not(.selected, .correct, .incorrect):hover:not(:has(input:disabled)),
+:root[data-piel-estudio] .escalera button:hover:not(:disabled) {
+  border-color: var(--piel-acento);
   background: var(--piel-superficie-3);
+}
+/* El teclado enfoca toda la respuesta sin sustituir su estado de selección o resultado. */
+:root[data-piel-estudio] .nbme-option:has(input:focus-visible) {
+  outline: 2px solid var(--piel-acento);
+  outline-offset: 3px;
 }
 :root[data-piel-estudio] .opcion.elegida,
 :root[data-piel-estudio] .ficha.sel,
