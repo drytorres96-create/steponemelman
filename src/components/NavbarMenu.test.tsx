@@ -11,12 +11,13 @@ const items = [
 ] as const
 let host: HTMLDivElement, root: Root, outside: HTMLButtonElement
 let fine: boolean, visibility: DocumentVisibilityState
-let onNavigate: ReturnType<typeof vi.fn>, onSignOut: ReturnType<typeof vi.fn>
+let onNavigate = vi.fn<(id: string) => void>()
+let onSignOut = vi.fn<() => void | Promise<void>>()
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.useFakeTimers()
-  fine = true; visibility = 'visible'; onNavigate = vi.fn(); onSignOut = vi.fn()
+  fine = true; visibility = 'visible'; onNavigate = vi.fn<(id: string) => void>(); onSignOut = vi.fn<() => void | Promise<void>>()
   vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
     matches: query === '(hover: hover) and (pointer: fine)' && fine, media: query,
     addEventListener: vi.fn(), removeEventListener: vi.fn(),
@@ -154,6 +155,32 @@ describe('NavbarMenu: navegación discreta y segura', () => {
     expect(onSignOut).toHaveBeenCalledOnce()
     expect(onNavigate).not.toHaveBeenCalled()
     expect(details().open).toBe(false)
+  })
+
+  it('elegir la ruta actual devuelve el foco a un control visible aunque App no cambie de vista', async () => {
+    await render('progreso'); await click(summary())
+    await act(async () => button('Progreso').focus())
+    expect(document.activeElement).toBe(button('Progreso'))
+    await click(button('Progreso'))
+    expect(onNavigate).toHaveBeenCalledExactlyOnceWith('progreso')
+    expect(details().open).toBe(false)
+    expect(document.activeElement).toBe(summary())
+  })
+
+  it('Salir mantiene un foco visible mientras espera y si el flujo decide conservar la sesión', async () => {
+    let finish!: () => void
+    const decision = new Promise<void>(resolve => { finish = resolve })
+    onSignOut.mockImplementation(() => decision)
+    await render(); await click(summary())
+    await act(async () => button('Salir').focus())
+    await click(button('Salir'))
+    expect(onSignOut).toHaveBeenCalledOnce()
+    expect(details().open).toBe(false)
+    expect(document.activeElement).toBe(summary())
+    // The existing sign-out handler may resolve without leaving, e.g. a cancelled confirmation.
+    await act(async () => { finish(); await decision })
+    expect(document.activeElement).toBe(summary())
+    expect(onNavigate).not.toHaveBeenCalled()
   })
 
   it('al ocultar la pestaña cancela la apertura pendiente y cierra el panel', async () => {
