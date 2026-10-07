@@ -27,7 +27,7 @@ const ids = (p: string, k: number) => Array.from({ length: k }, (_, i) => `${p}$
 const semana = ids('C', 14)
 const vistosHoy = escena === 'cerrado' ? 10 : escena === 'vacio' ? 0 : 3
 export const progreso: Record<string, ReturnType<typeof reconstruirProgreso>> = {}
-if (escena !== 'vacio') {
+if (escena !== 'vacio' && escena !== 'huerfanos') {
   semana.slice(0, vistosHoy).forEach((id, i) => { progreso[id] = reconstruirProgreso(id, [intento(hoy(i))], CRITERIOS_POR_DEFECTO) })
   // Cuatro conceptos de otros días en la escalera y uno ya cerrado.
   progreso.X1 = reconstruirProgreso('X1', [fallo(haceDias(3))], CRITERIOS_POR_DEFECTO)
@@ -61,11 +61,15 @@ if (escena === 'mantenimiento') {
   progreso.C12 = reconstruirProgreso('C12', [intento(haceDias(100)), intento(haceDias(98)), intento(haceDias(96))], CRITERIOS_POR_DEFECTO)
 }
 export const conceptosMuchas = escena === 'muchas' ? Array.from({ length: 25 }, (_, i) => `K${i}`) : []
-export const conceptos = [...semana, 'X1', 'X2', 'X3', ...conceptosMeta, ...conceptosMuchas]
+if (escena === 'huerfanos') {
+  // Only the second ID is published. The first remains in the saved history.
+  for (const id of ['QA-OBSOLETO', 'QA-VALIDO']) progreso[id] = reconstruirProgreso(id, [fallo(haceDias(3))], CRITERIOS_POR_DEFECTO)
+}
+export const conceptos = escena === 'huerfanos' ? ['QA-VALIDO'] : [...semana, 'X1', 'X2', 'X3', ...conceptosMeta, ...conceptosMuchas]
 const preguntas = ids('Q', 5)
 export const respuestasBase = escena === 'cerrado'
   ? preguntas.map((q, i) => ({ id: `n${i}:0`, sessionId: `n${i}`, position: 0, questionId: q, revision: 'r1', optionId: 'A', correct: i !== 1, submittedAt: hoy(40 + i), reviewedAt: hoy(40 + i), durationMs: 1000 }))
-  : escena === 'vacio' ? [] : [{ id: 'm1:0', sessionId: 'm1', position: 0, questionId: 'Q9', revision: 'r1', optionId: 'B', correct: false, submittedAt: haceDias(1), reviewedAt: haceDias(1), durationMs: 1000 }]
+  : escena === 'vacio' || escena === 'huerfanos' ? [] : [{ id: 'm1:0', sessionId: 'm1', position: 0, questionId: 'Q9', revision: 'r1', optionId: 'B', correct: false, submittedAt: haceDias(1), reviewedAt: haceDias(1), durationMs: 1000 }]
 export const catalogoBase = [...preguntas, 'Q9'].map(id => ({ id, revision: 'r1', form: '27', section: 1, item: 1, page: 1, systems: [], disciplines: [], topic: 'T', objective: null, status: 'ready', reasons: [], figureRequired: false, conceptLinks: [] }))
 const lunes = fechaISO(lunesDe(D0))
 const sesion = (id: string, dia: number, cs: string[], qs: string[]) => ({ id, semana: 'S4', semanaInicio: lunes, dia, orden: 1, titulo: id, subtitulo: null,

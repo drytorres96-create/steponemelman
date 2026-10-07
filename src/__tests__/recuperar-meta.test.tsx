@@ -28,9 +28,9 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] }); vi.setSystemTime(lunes)
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
   onNuevo.mockReset(); onCajas.mockReset(); onRetomar.mockReset().mockResolvedValue(true)
-  app = { indice: { modulos: [{ sesiones: [{ conceptos: Array.from({ length: 600 }, (_, i) => `C${i + 1}`) }] }] },
+  app = { indice: { modulos: [{ orden: 1, sistemas: [], disciplinas: [], temas: [], sesiones: [{ conceptos: Array.from({ length: 600 }, (_, i) => `C${i + 1}`) }] }] },
     estado: { ...ESTADO_INICIAL, progreso: { C1: reconstruirProgreso('C1', [intento], CRITERIOS_POR_DEFECTO) } }, sincronizacion: { estado: 'sincronizado', ultima: lunes } }
-  banco = { state: emptyNbmeState(), catalog: { questions: Array.from({ length: 300 }, (_, i) => ({ id: `Q${i + 1}`, revision: 'r2', status: i === 1 ? 'withdrawn' : 'ready' })) }, syncStatus: { state: 'synced', lastSyncedAt: lunes } }
+  banco = { state: emptyNbmeState(), catalog: { questions: Array.from({ length: 300 }, (_, i) => ({ id: `Q${i + 1}`, revision: 'r2', status: i === 1 ? 'withdrawn' : 'ready', systems: [], disciplines: [], topic: 'Synthetic' })) }, syncStatus: { state: 'synced', lastSyncedAt: lunes } }
   mocks.app.mockImplementation(() => app); mocks.nbme.mockImplementation(() => banco); mocks.semana.mockReset().mockResolvedValue([sesion])
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers() })
@@ -50,7 +50,8 @@ describe('la recuperación valida el progreso y el día al empezar', () => {
     app.estado.progreso = {}
     await render()
     await act(async () => boton('Empezar recuperación de Hoy')!.click())
-    expect(onNuevo).toHaveBeenCalledWith({ conceptIds: ['C2', 'C3'], preguntas: [{ id: 'Q1', revision: 'r2' }], titulo: 'Nuevo de hoy · 5 oct', nbmeSessionId: null })
+    expect(onNuevo).toHaveBeenCalledWith({ conceptIds: ['C2', 'C3', 'C1', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10'],
+      preguntas: ['Q1', 'Q3', 'Q4', 'Q5', 'Q6'].map(id => ({ id, revision: 'r2' })), titulo: 'Nuevo de hoy · 5 oct', nbmeSessionId: null })
     expect(onCajas).not.toHaveBeenCalled()
   })
 
@@ -162,12 +163,16 @@ describe('la recuperación valida el progreso y el día al empezar', () => {
     expect(boton('Empezar recuperación de Hoy')).toBeUndefined()
   })
 
-  it('si falla la carga semanal conserva los repasos válidos y no inventa material nuevo', async () => {
+  it('si falla la carga semanal conserva los repasos y completa Nuevo con publicaciones verificadas', async () => {
     mocks.semana.mockRejectedValue(new Error('Synthetic network failure'))
     await render()
     expect(boton('Empezar recuperación de Hoy')).toBeDefined()
     app.estado.progreso = {}; await render()
-    expect(boton('Empezar recuperación de Hoy')).toBeUndefined()
-    expect(host.textContent).toContain('cargar el material de esta semana')
+    expect(boton('Empezar recuperación de Hoy')).toBeDefined()
+    const previo = JSON.stringify(app.estado)
+    await act(async () => boton('Empezar recuperación de Hoy')!.click())
+    expect(onNuevo).toHaveBeenCalledWith(expect.objectContaining({ conceptIds: Array.from({ length: 10 }, (_, i) => `C${i + 1}`),
+      preguntas: ['Q1', 'Q3', 'Q4', 'Q5', 'Q6'].map(id => ({ id, revision: 'r2' })) }))
+    expect(JSON.stringify(app.estado)).toBe(previo)
   })
 })

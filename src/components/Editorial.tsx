@@ -140,13 +140,6 @@ export function NavigationIcon({ name }: { name: string }) {
     strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name] ?? paths.modulos} /></svg>
 }
 
-export function StudyHero() {
-  return <header className="editorial-hero" data-depth-scene>
-    <ScenePhoto scene="dawn" />
-    <div className="editorial-hero-copy"><p className="editorial-eyebrow">Plan diario clásico</p><h1><SynapseHeading text="Tu estudio" /> <em>de hoy.</em></h1><p>Puedes pausar y retomar cuando lo necesites.</p></div>
-  </header>
-}
-
 /** El paisaje de la columna derecha lo pone la aplicación; aquí la foto vive dentro del cristal. */
 export function ScreenHeading({ eyebrow, title, description, scene = 'organic', landscape = 'constellation' }: {
   eyebrow: string; title: string; description: string; scene?: 'membrane' | 'fluid' | 'organic'; landscape?: CinematicScene;

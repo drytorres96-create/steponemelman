@@ -1,9 +1,22 @@
 import { deriveNbmeSession, isNbmeSessionArchived } from '../nbme/model'
 import type { NbmeQuestionMeta, NbmeQuestionRef, NbmeState } from '../nbme/types'
+import type { Modulo } from '../schema/concept'
 import { inicioDelDia, materialNuevo, type EntradaDia } from './dia'
 import { fechaEstudio } from './calendario-estudio'
 export interface MaterialNuevo { conceptIds: string[]; preguntas: NbmeQuestionRef[]; titulo: string; nbmeSessionId: string | null }
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+/**
+ * La semana decide la prioridad, pero su ausencia no reduce el día a lo ya hecho.
+ * Los otros IDs publicados completan las plazas; `materialNuevo` descarta después
+ * cualquier concepto ya resuelto, sin convertir consolidación en material nuevo.
+ */
+export function completarEntradaDeHoy(entrada: EntradaDia, modulos: Modulo[],
+  listas: Map<string, NbmeQuestionMeta>): EntradaDia {
+  const conceptos = [...modulos].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+    .flatMap(m => m.sesiones.flatMap(s => s.conceptos))
+  const preguntas = [...listas.values()].filter(q => q.status === 'ready').map(q => q.id)
+  return { ...entrada, conceptosDisponibles: [...new Set(conceptos)], preguntasDisponibles: [...new Set(preguntas)] }
+}
 export function tituloDeHoy(tipo: 'Cajas' | 'Nuevo', ahora: number): string {
   const f = fechaEstudio(ahora)
   return `${tipo} de hoy · ${f.dia} ${MESES[f.mes - 1]}`

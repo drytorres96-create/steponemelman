@@ -95,9 +95,11 @@ for (const width of [390, 1280]) test.describe(`recuperación de la meta a ${wid
   test('también retoma desde Cómo va todo en Hoy', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-10-05T11:30:00Z') })
     await page.goto('/?escena=atraso&retomar=nbme#hoy')
+    await expect(page.getByRole('region', { name: 'Tu sesión guardada', exact: true })
+      .getByRole('button', { name: 'Retomar mi sesión pendiente', exact: true })).toBeVisible()
     await page.getByText('Cómo va todo', { exact: true }).click()
     await page.getByText('Ponerme al día con la meta', { exact: true }).click()
-    await page.getByRole('button', { name: 'Retomar mi sesión pendiente' }).click()
+    await page.locator('.recuperacion-meta').getByRole('button', { name: 'Retomar mi sesión pendiente', exact: true }).click()
     await expect(page.locator('.app')).toHaveAttribute('data-view', 'preguntas')
     await expect(page.locator('.nbme-feedback')).toContainText('Vamos a repasarla')
   })

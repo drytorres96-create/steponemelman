@@ -1,0 +1,15 @@
+{
+  "baseline": "ef9e3c21514b11a9fd4791cce618e03acdae244b",
+  "captures": [
+    "antes-390x844-cerrado",
+    "antes-390x844-abierto",
+    "antes-1280x900-cerrado",
+    "antes-1280x900-abierto",
+    "despues-390x844-cerrado",
+    "despues-390x844-abierto",
+    "despues-1280x900-cerrado",
+    "despues-1280x900-abierto",
+    "despues-844x390-abierto"
+  ],
+  "errors": []
+}

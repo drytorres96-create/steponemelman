@@ -5,7 +5,7 @@ import { useApp } from '../store/estado'
 import { Interaccion, EscrituraCorrectiva, usaTextoLibre, type Resultado } from '../components/interacciones'
 import { calificarConIA } from '../lib/calificacion-ia'
 import { Modal, PanelFuente, EtiquetaEstado } from '../components/comunes'
-import { NOMBRE_ERROR, type Intento, type TipoError } from '../srs/tipos'
+import { type Intento, type TipoError } from '../srs/tipos'
 import { calcularEstado, resumenDominio } from '../srs/mastery'
 import { antesTeCostaba } from '../lib/progreso-aprendizaje'
 import { cercaniaDominio } from '../srs/cercania'
@@ -609,7 +609,6 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
         {c.patron && <p className="patron session-feedback-key"><b>Si ves esto → piensa:</b> {c.patron}</p>}
         <p>{c.explicacion}</p>
         {c.confusiones.length > 0 && <p className="mini">No lo confundas con: {c.confusiones.join(' · ')}</p>}
-        {c.revision_editorial && <p className="aviso">{c.revision_editorial.nota}</p>}
         {/* Una sola decisión tras responder: seguir o, si el corrector no supo, decir tú si la sabías. */}
         {res.veredicto === 'revision'
           ? <div className="fila autoevaluacion">
@@ -633,7 +632,6 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
             {res.veredicto !== 'correcta' && !presentacionCambio && <details><summary>Sigo sin entender</summary><AyudaIA key={preguntaId} concepto={c} respuesta={res.respuestaDada} preguntaId={preguntaId} indice={i} ruta={cola.ruta} reintento={reintento} versionFormato={versionFormato} /></details>}
             <details><summary>Profundizar</summary>
               {c.contexto && <p>{c.contexto}</p>}
-              <p className="mini">Clasificación para el planificador: {NOMBRE_ERROR[res.tipoError]}</p>
               {c.evaluacion.opciones?.filter(o => !o.correcta && o.texto !== res.respuestaDada && o.por_que).map(o => <p className="mini" key={o.texto}><b>{o.texto}:</b> {o.por_que}</p>)}
               {c.relacionados.length > 0 && <p className="mini">Conecta con: {c.relacionados.join(' · ')}</p>}
               <p className="mini">{dominio.texto}</p>
@@ -641,7 +639,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
               {cercania.esperandoSeparacion && cercania.disponibleDesde !== null
                 ? <p className="mini">Ya tiene los aciertos que pide el umbral. Falta que estén separados {estado.criterios.separacionHoras} h:
                   se acredita a partir del {new Date(cercania.disponibleDesde).toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'short' })}.
-                  Repetirlo antes no adelanta ese reloj.</p>
+</p>
                 : dominio.pendientes.length > 0 && <ul className="mini">{dominio.pendientes.map(criterio => <li key={criterio}>{criterio}</li>)}</ul>}
             </details>
             {/* A diferencia de la ayuda, esto no espera a que falles: sirve igual cuando aciertas. */}

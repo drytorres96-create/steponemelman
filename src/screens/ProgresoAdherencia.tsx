@@ -30,7 +30,6 @@ export function BandaAdherencia() {
   return <section className="tarjeta pila plan-adherencia" aria-labelledby="plan-adherencia-titulo">
     <div>
       <h2 id="plan-adherencia-titulo" className="rotulo">Adherencia al plan</h2>
-      <p className="mini">mide si se hizo, no si se domina</p>
     </div>
     <div className="banda-cifras">
       {semanas.map(s => {

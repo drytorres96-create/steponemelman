@@ -7,6 +7,7 @@ for (const width of [320, 390, 1280]) {
     test.use({ viewport: { width, height: 900 }, reducedMotion: 'reduce' })
 
     test('el menú conserva destinos, teclado y controles sin desbordamientos', async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' })
       await page.clock.install({ time: LUNES })
       await page.goto('/?escena=abierto')
       await expect(page.getByRole('heading', { name: 'Hoy', exact: true })).toBeVisible()

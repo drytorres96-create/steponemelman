@@ -103,6 +103,8 @@ describe('visión a futuro', () => {
     expect(barra('Preguntas NBME respondidas')?.getAttribute('aria-valuetext')).toBe('23 de 255; la línea va por 52')
     expect(texto()).toContain('Para alcanzar la línea: 33. Para superarla: 34. Para completar la meta: 493.')
     expect(texto()).toContain('Para alcanzar la línea: 29. Para superarla: 30. Para completar la meta: 232.')
+    expect(texto()).not.toContain('Cómo avanzan las líneas y el dominio')
+    expect(texto()).not.toContain('Cada concepto conserva un solo historial')
   })
 
   it('sobrepasar la meta conserva el excedente real y un valor accesible dentro del rango de la barra', async () => {

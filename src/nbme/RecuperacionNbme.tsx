@@ -89,7 +89,6 @@ function PanelRecuperacion({ ownerId, origen, onTerminar, puedeSeguir = true, on
       {sesion.cerrada ? <div className="pila" aria-live="polite">
         <h4 ref={titulo} tabIndex={-1}>Recuperación terminada</h4>
         <p>Respondiste {sesion.contenido.ejercicios.length} ejercicios; {sesion.respuestas.filter(r => r.correcta).length} acertados.</p>
-        <p className="mini">Esta práctica no marca conceptos como dominados. Vuelve al NBME para aplicar lo recuperado.</p>
         <div className="recuperacion-acciones"><button className="btn principal" onClick={() => salir('original')}>Volver a la pregunta original</button>
           {puedeSeguir && <button className="btn" onClick={() => salir('siguiente')}>Ir a la siguiente pregunta</button>}</div>
       </div> : ejercicio && <>

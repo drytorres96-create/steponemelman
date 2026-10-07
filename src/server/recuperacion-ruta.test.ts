@@ -43,7 +43,7 @@ class Storage {
 }
 function setup() {
   const permisos = { app: true, nbme: true, ready: true, user: 'synthetic-user', mismatch: false,
-    linked: false, corpusMismatch: false, step2: false, corpusHangs: false }
+    linked: false, editorial: false, corpusMismatch: false, step2: false, corpusHangs: false }
   const remoto = vi.fn(async (url: string) => {
     if (url.includes('/auth/v1/user')) return Response.json({ id: permisos.user, email_confirmed_at: '2026-01-01' })
     if (url.includes('app_members')) return Response.json(permisos.app ? [{ user_id: permisos.user }] : [])
@@ -55,7 +55,9 @@ function setup() {
       if (permisos.corpusHangs) return new Promise<Response>(() => {})
       return Response.json([{ payload: url.includes('index.json') ? indiceRelacionado : {
         corpus_version: permisos.corpusMismatch ? 'synthetic-stale' : indiceRelacionado.corpus_version,
-        conceptos: [{ ...relacionado, step: permisos.step2 ? 'step2' : 'step1' }],
+        conceptos: [{ ...relacionado, step: permisos.step2 ? 'step2' : 'step1',
+          ...(permisos.editorial ? { revision_editorial: { nota: 'Private correction', fuentes: [{ titulo: 'Synthetic reference', url: 'https://example.org/reference' }],
+            fundamento: { texto: fragmentoRelacionado, revision: '1.0.7' } }, source: { ...relacionado.source, fragment: 'Obsolete synthetic claim must not reach AI.' } } : {}) }],
       } }])
     }
     return Response.json([{ path: `questions/${q.id}/${q.revision}.json`,
@@ -171,6 +173,17 @@ describe('puerta de recuperación NBME', () => {
     expect(remoto.mock.calls.some(([url]) => url.includes('corpus_assets'))).toBe(true)
     const sent = env.AI.run.mock.calls[0][1] as { messages: { content: string }[] }
     expect(JSON.parse(sent.messages[1].content).material.conceptos_vinculados).toHaveLength(1)
+  })
+  it('recupera con la evidencia editorial corregida y nunca cita el fragmento obsoleto', async () => {
+    const { call, env, permisos } = setup()
+    permisos.linked = true; permisos.editorial = true
+    expect((await call()).status).toBe(200)
+    const sent = env.AI.run.mock.calls[0][1] as { messages: { content: string }[] }
+    const linked = JSON.parse(sent.messages[1].content).material.conceptos_vinculados
+    expect(linked).toHaveLength(1)
+    expect(JSON.stringify(linked)).toContain(fragmentoRelacionado)
+    expect(JSON.stringify(linked)).not.toContain('Obsolete synthetic claim')
+    expect(linked[0].title).toContain('Revisión docente')
   })
   it.each(['corpusMismatch', 'step2'] as const)('omite el material %s y conserva la explicación NBME sin bloquear el flujo', async invalid => {
     const { call, env, permisos } = setup()

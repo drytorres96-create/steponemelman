@@ -1,0 +1,22 @@
+[1A[2K[2m[WebServer] [22m(node:88936) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K[2m[WebServer] [22m(node:88950) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 4 tests using 1 worker
+
+[1A[2K(node:88974) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:88974) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[1/4] [chromium] › e2e/premium-aprendizaje.spec.ts:11:3 › aprendizaje y diseño premium a 390px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar
+[1A[2K[2/4] [chromium] › e2e/premium-aprendizaje.spec.ts:11:3 › aprendizaje y diseño premium a 1280px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar
+[1A[2K[3/4] [chromium] › e2e/recuperacion-meta.spec.ts:185:3 › recuperación de la meta a 390px › también retoma desde Cómo va todo en Hoy
+[1A[2K[4/4] [chromium] › e2e/recuperacion-meta.spec.ts:185:3 › recuperación de la meta a 1280px › también retoma desde Cómo va todo en Hoy
+[1A[2K  4 passed (12.5s)

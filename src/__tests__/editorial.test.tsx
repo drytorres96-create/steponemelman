@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { AccessScene, CinematicWindow, MedicalImage, ScreenHeading, StudyHero } from '../components/Editorial'
+import { AccessScene, CinematicWindow, MedicalImage, ScreenHeading } from '../components/Editorial'
 
 let host: HTMLDivElement, root: ReturnType<typeof createRoot>
 beforeEach(() => {
@@ -14,10 +14,6 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove() })
 
 describe('diseño cinematográfico decorativo', () => {
   it('recupera la fotografía decorativa sin introducir controles ni material clínico', async () => {
-    await act(async () => root.render(<StudyHero />))
-    expect(host.querySelector('h1')?.textContent).toContain('Tu estudio de hoy')
-    // La cabecera lleva su fotografía dentro del cristal; el paisaje lateral lo pone la aplicación.
-    expect(host.querySelector('.panel-escena img')).not.toBeNull()
     await act(async () => root.render(<AccessScene />))
     const image = host.querySelector('img')!
     expect(image.alt).toBe('')

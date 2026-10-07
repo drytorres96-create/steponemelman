@@ -83,7 +83,6 @@ describe('recuperar un fallo con una pregunta por turno', () => {
     await elegir('gamma'); await pulsar('Comprobar respuesta'); await pulsar('Terminar recuperación')
     expect(host.textContent).toContain('Recuperación terminada')
     expect(host.textContent).toContain('4 ejercicios; 3 acertados')
-    expect(host.textContent).toContain('no marca conceptos como dominados')
     const guardado = JSON.parse(localStorage.getItem(claveRecuperacion('qa-owner', origen)!)!)
     expect(guardado.cerrada).toBe(true)
     expect(guardado.cursor).toBe(4)

@@ -69,6 +69,8 @@ describe('entrada a progreso sin descargar material ni montar el plan cerrado', 
     expect(vistos.value).toBe(0)
     expect(vistos.max).toBe(4)
     expect(host.textContent).toContain('0 con práctica registrada.')
+    expect(host.textContent).not.toContain('Abrir un concepto cuenta como visto')
+    expect(host.textContent).not.toContain('Cumplen tus criterios de evidencia')
     const cifras = mock.cifras.mock.calls[0][0] as PropsIndicadores
     const meta = mock.meta.mock.calls[0][0] as PropsIndicadores
     expect(cifras.conceptIds).toEqual(['A', 'B', 'C', 'D'])

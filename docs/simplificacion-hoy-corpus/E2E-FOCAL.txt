@@ -1,0 +1,118 @@
+[1A[2K[2m[WebServer] [22m(node:74017) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K[2m[WebServer] [22m(node:74030) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 13 tests using 1 worker
+
+[1A[2K(node:74051) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:74051) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[1/13] [chromium] › e2e/faq-hoy.spec.ts:33:3 › FAQ y material disponible a 390px › FAQ se consulta con teclado, usa criterios guardados y carga el índice a petición
+[1A[2K[2/13] [chromium] › e2e/faq-hoy.spec.ts:101:3 › FAQ y material disponible a 390px › cajas omite el material ausente sin perder su historial ni ocupar el lugar válido
+[1A[2K  1) [chromium] › e2e/faq-hoy.spec.ts:101:3 › FAQ y material disponible a 390px › cajas omite el material ausente sin perder su historial ni ocupar el lugar válido 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m()[22m failed
+
+    Locator:  getByRole('img', { name: 'Cajas: 0 de 1', exact: true })
+    Expected: visible
+    Received: <element(s) not found>
+    Timeout:  10000ms
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 10000ms[22m
+    [2m  - waiting for getByRole('img', { name: 'Cajas: 0 de 1', exact: true })[22m
+
+
+      55 |     await expect(page.getByRole('heading', { name: 'Hoy', exact: true })).toBeVisible()
+      56 |     const antes = await page.evaluate(() => window.__leerProgresoSintetico().progreso)
+    > 57 |     await expect(page.getByRole('img', { name: 'Cajas: 0 de 1', exact: true })).toBeVisible()
+         |                                                                                 ^
+      58 |     await page.getByRole('button', { name: /(Empezar|Seguir con) las cajas/ }).click()
+      59 |     await expect(page.getByRole('textbox', { name: 'Tu respuesta', exact: true })).toBeVisible()
+      60 |     await expect(page.locator('.avance')).toHaveAttribute('aria-label', 'Pregunta 1 de 1')
+        at /workspace/work/hoy-faq-corpus/e2e/faq-hoy.spec.ts:57:81
+
+    Error Context: test-results/faq-hoy-FAQ-y-material-dis-2fc7c-l-ni-ocupar-el-lugar-válido-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/faq-hoy-FAQ-y-material-dis-2fc7c-l-ni-ocupar-el-lugar-válido-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/faq-hoy-FAQ-y-material-dis-2fc7c-l-ni-ocupar-el-lugar-válido-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[1A[2K(node:74332) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:74332) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[3/13] [chromium] › e2e/faq-hoy.spec.ts:33:3 › FAQ y material disponible a 1280px › FAQ se consulta con teclado, usa criterios guardados y carga el índice a petición
+[1A[2K[4/13] [chromium] › e2e/faq-hoy.spec.ts:101:3 › FAQ y material disponible a 1280px › cajas omite el material ausente sin perder su historial ni ocupar el lugar válido
+[1A[2K  2) [chromium] › e2e/faq-hoy.spec.ts:101:3 › FAQ y material disponible a 1280px › cajas omite el material ausente sin perder su historial ni ocupar el lugar válido 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m()[22m failed
+
+    Locator:  getByRole('img', { name: 'Cajas: 0 de 1', exact: true })
+    Expected: visible
+    Received: <element(s) not found>
+    Timeout:  10000ms
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 10000ms[22m
+    [2m  - waiting for getByRole('img', { name: 'Cajas: 0 de 1', exact: true })[22m
+
+
+      55 |     await expect(page.getByRole('heading', { name: 'Hoy', exact: true })).toBeVisible()
+      56 |     const antes = await page.evaluate(() => window.__leerProgresoSintetico().progreso)
+    > 57 |     await expect(page.getByRole('img', { name: 'Cajas: 0 de 1', exact: true })).toBeVisible()
+         |                                                                                 ^
+      58 |     await page.getByRole('button', { name: /(Empezar|Seguir con) las cajas/ }).click()
+      59 |     await expect(page.getByRole('textbox', { name: 'Tu respuesta', exact: true })).toBeVisible()
+      60 |     await expect(page.locator('.avance')).toHaveAttribute('aria-label', 'Pregunta 1 de 1')
+        at /workspace/work/hoy-faq-corpus/e2e/faq-hoy.spec.ts:57:81
+
+    Error Context: test-results/faq-hoy-FAQ-y-material-dis-e9df4-l-ni-ocupar-el-lugar-válido-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/faq-hoy-FAQ-y-material-dis-e9df4-l-ni-ocupar-el-lugar-válido-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/faq-hoy-FAQ-y-material-dis-e9df4-l-ni-ocupar-el-lugar-válido-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[1A[2K(node:74571) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:74571) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[5/13] [chromium] › e2e/navbar-menu.spec.ts:37:5 › Menú amplio a 320px › mantiene destinos, alcance táctil y navegación sin iniciar una sesión
+[1A[2K[6/13] [chromium] › e2e/navbar-menu.spec.ts:37:5 › Menú amplio a 390px › mantiene destinos, alcance táctil y navegación sin iniciar una sesión
+[1A[2K[7/13] [chromium] › e2e/navbar-menu.spec.ts:37:5 › Menú amplio a 1280px › mantiene destinos, alcance táctil y navegación sin iniciar una sesión
+[1A[2K[8/13] [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo
+[1A[2K[9/13] [chromium] › e2e/navbar-menu.spec.ts:154:3 › Ratón y teclado › un clic fija la vista previa y el siguiente cierra; Escape y el exterior también la cierran
+[1A[2K[10/13] [chromium] › e2e/navbar-menu.spec.ts:200:3 › Ratón y teclado › el movimiento reducido mantiene los controles visibles y elimina animaciones del panel y sus hijos
+[1A[2K[11/13] [chromium] › e2e/navbar-menu.spec.ts:241:5 › Menú táctil 320×740 › abre por toque y permite alcanzar todos los destinos en poco espacio
+[1A[2K[12/13] [chromium] › e2e/navbar-menu.spec.ts:241:5 › Menú táctil 390×844 › abre por toque y permite alcanzar todos los destinos en poco espacio
+[1A[2K[13/13] [chromium] › e2e/navbar-menu.spec.ts:241:5 › Menú táctil 844×390 › abre por toque y permite alcanzar todos los destinos en poco espacio
+[1A[2K  2 failed
+    [chromium] › e2e/faq-hoy.spec.ts:101:3 › FAQ y material disponible a 390px › cajas omite el material ausente sin perder su historial ni ocupar el lugar válido 
+    [chromium] › e2e/faq-hoy.spec.ts:101:3 › FAQ y material disponible a 1280px › cajas omite el material ausente sin perder su historial ni ocupar el lugar válido 
+  11 passed (1.0m)

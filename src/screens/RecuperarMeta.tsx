@@ -7,7 +7,7 @@ import type { SesionSemanal } from '../semana/tipos'
 import { cajasDelDia, TITULO_NBME_CAJAS } from '../lib/cajas'
 import { estadoDelDia, limitesSemana, referenciaDelDia, temaDeLaSemana } from '../lib/dia'
 import { recuperacionMeta } from '../lib/recuperacion-meta'
-import { prepararNuevoDeHoy, tituloDeHoy, type MaterialNuevo } from '../lib/nuevo-hoy'
+import { completarEntradaDeHoy, prepararNuevoDeHoy, tituloDeHoy, type MaterialNuevo } from '../lib/nuevo-hoy'
 import type { ItemCaja } from '../lib/cajas'
 import { primerasRespuestasNbme, resumenMeta } from '../lib/meta'
 import { resumenProgresoAprendizaje } from '../lib/progreso-aprendizaje'
@@ -52,8 +52,9 @@ export function RecuperarMeta({ onNuevo, onCajas, onRetomar }: AccionesRecuperac
     const cajas = cajasDelDia({ progreso: estado.progreso, criterios: estado.criterios, intentosPreguntas,
       conceptoDisponible: id => publicados.has(id), preguntaDisponible: id => listas.has(id),
       referencia: referenciaDelDia(estado.progreso, intentosPreguntas, ahora), ahora })
-    const entrada = { progreso: estado.progreso, intentosPreguntas, cajas, ahora,
-      conceptosSemana: tema.conceptIds.filter(id => publicados.has(id)), preguntasSemana: tema.preguntaIds.filter(id => listas.has(id)) }
+    const entrada = completarEntradaDeHoy({ progreso: estado.progreso, intentosPreguntas, cajas, ahora,
+      conceptosSemana: tema.conceptIds.filter(id => publicados.has(id)), preguntasSemana: tema.preguntaIds.filter(id => listas.has(id)) },
+    indice?.modulos ?? [], listas)
     const pendienteNbme = Object.values(nbme.state.sessions).some(s => !isNbmeSessionArchived(nbme.state, s.id) && s.title !== TITULO_NBME_CAJAS && deriveNbmeSession(nbme.state, s.id)?.phase !== 'complete')
     const esperandoCuenta = !sincronizacion?.ultima && sincronizacion?.estado !== 'sincronizado'
     const esperandoBanco = !nbme.syncStatus?.lastSyncedAt && nbme.syncStatus?.state !== 'synced'
@@ -63,7 +64,7 @@ export function RecuperarMeta({ onNuevo, onCajas, onRetomar }: AccionesRecuperac
       primerasRespuestas: preguntas.marcas, preguntasPublicadas: nbme.catalog ? preguntas.publicadas : Number.POSITIVE_INFINITY })
     const sesionPendiente = hayConceptosPendientes(estado.reanudable) || pendienteNbme
     return { ahora, meta, plan: recuperacionMeta({ meta, dia: estadoDelDia(entrada), datosListos: !!indice && !!nbme.catalog && !esperandoCuenta && !esperandoBanco,
-      semanaLista: !!sesiones && semanaCargada === limites.inicio, sesionPendiente, cajas: cajas.items,
+      semanaLista: (!!sesiones && semanaCargada === limites.inicio) || fallo, sesionPendiente, cajas: cajas.items,
       nuevo: prepararNuevoDeHoy(entrada, listas, nbme.state) }) }
   }
   const { plan, meta } = calcular()
@@ -101,13 +102,12 @@ export function RecuperarMeta({ onNuevo, onCajas, onRetomar }: AccionesRecuperac
       {plan.faltanPreguntas > 0 && <> La diferencia es de {plan.faltanPreguntas} primeras respuestas.</>}
       {plan.paraSuperarPreguntas > 0 && <> Para superar la línea: {plan.paraSuperarPreguntas}.</>} Para completar la meta: {plan.faltanMetaPreguntas}.</p>
     <p className="mini">{plan.motivo}</p>
-    {plan.accion?.tipo === 'cajas' && <p>Primer bloque: hasta {Math.min(5, plan.accion.items.length)} repasos. El recorrido conserva el resto de pendientes válidos de Hoy.</p>}
+    {plan.accion?.tipo === 'cajas' && <p>Primer bloque: hasta {Math.min(5, plan.accion.items.length)} repasos.</p>}
     {plan.accion?.tipo === 'nuevo' && <p>Disponible hoy: {plan.accion.material.conceptIds.length} conceptos nuevos y {plan.accion.material.preguntas.length} preguntas.</p>}
     {accionDisponible && <button className="btn" onClick={empezar}>Empezar recuperación de Hoy</button>}
     {plan.retomar && onRetomar && <button className="btn" disabled={retomando} aria-busy={retomando} onClick={() => void retomar()}>{retomando ? 'Retomando tu sesión…' : 'Retomar mi sesión pendiente'}</button>}
     {retomando && <p className="mini" role="status">Abriendo tu sesión guardada…</p>}
     {errorRetomar && <p role="alert" tabIndex={-1} ref={avisoRetomar}>{falloPreguntas && nbme.error ? nbme.error : errorRetomar}</p>}
     {!sesiones && !fallo && <p className="mini" role="status">Comprobando el material de la semana…</p>}
-    <p className="mini">Intentar un concepto cuenta como trabajo; dominarlo exige tus criterios. Este recorrido conserva los techos de Hoy y los intervalos de repaso. La diferencia se cierra con aprendizaje demostrado a lo largo de varios días.</p>
   </div>
 }

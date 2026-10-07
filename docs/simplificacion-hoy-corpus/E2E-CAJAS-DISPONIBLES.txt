@@ -1,0 +1,20 @@
+[1A[2K[2m[WebServer] [22m(node:75887) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K[2m[WebServer] [22m(node:75909) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 2 tests using 1 worker
+
+[1A[2K(node:75941) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:75941) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[1/2] [chromium] › e2e/faq-hoy.spec.ts:101:3 › FAQ y material disponible a 390px › cajas omite el material ausente sin perder su historial ni ocupar el lugar válido
+[1A[2K[2/2] [chromium] › e2e/faq-hoy.spec.ts:101:3 › FAQ y material disponible a 1280px › cajas omite el material ausente sin perder su historial ni ocupar el lugar válido
+[1A[2K  2 passed (8.5s)

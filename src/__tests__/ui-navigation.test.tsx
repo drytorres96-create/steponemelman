@@ -81,13 +81,13 @@ describe('continuidad y navegación accesible', () => {
     // Mi semana, Recuperación y Progreso viven ya dentro de Hoy: el menú discreto guarda
     // lo demás, y estudiar más es ir a «Elegir contenido» a propósito.
     const menu = [...host.querySelectorAll('.menu-cuenta-opciones button')].map(b => b.getAttribute('aria-label'))
-    expect(menu).toEqual(['Biblioteca', 'Progreso', 'Ajustes y respaldo', 'Calidad del material', 'Plan diario clásico', 'Salir'])
+    expect(menu).toEqual(['Biblioteca', 'Progreso', 'Ajustes y respaldo', 'Salir'])
     await act(async () => { boton('Biblioteca').click() })
     expect(window.location.hash).toBe('#modulos')
     expect(host.textContent).toContain('Mi espacio / Biblioteca')
   })
 
-  it.each(['#semana', '#recuperacion', '#repaso'])('el enlace guardado %s aterriza en Hoy', async hash => {
+  it.each(['#semana', '#recuperacion', '#repaso', '#inicio', '#auditoria', '#vinetas', '#cobertura'])('el enlace guardado %s aterriza en Hoy', async hash => {
     window.history.replaceState(null, '', `/${hash}`)
     await pintar()
     expect(host.textContent).toContain('Mi espacio / Hoy')
@@ -104,10 +104,18 @@ describe('continuidad y navegación accesible', () => {
     expect([...host.querySelectorAll('nav button')].map(b => b.textContent)).toEqual(['Hoy'])
   })
 
-  it('recargar #estudio aterriza en Hoy y el plan clásico permite recuperar el resumen pendiente', async () => {
+  it('la biblioteca ofrece conceptos y preguntas sin accesos al piloto ni herramientas de revisión', async () => {
+    window.history.replaceState(null, '', '/#modulos')
+    await pintar()
+    const tipos = host.querySelector('[aria-label="Tipo de contenido"]')!
+    expect([...tipos.querySelectorAll('button')].map(b => b.textContent)).toEqual(['Conceptos', 'Preguntas'])
+    expect(host.textContent).not.toMatch(/Viñetas|Calidad del material|Plan diario clásico|Exportar notas|CSV/)
+  })
+
+  it('recargar #estudio aterriza en Hoy y permite retomar la cola exacta guardada', async () => {
     window.history.replaceState(null, '', '/#estudio')
     app.estado = { ...ESTADO_INICIAL, reanudable: {
-      modulo: 'modulo-1', sesion: 'guiada', indice: 1, ts: 1, conceptIds: ['concepto-1'], titulo: 'Bioquímica',
+      modulo: 'modulo-1', sesion: 'guiada', indice: 1, ts: 1, conceptIds: ['concepto-1', 'concepto-1'], titulo: 'Bioquímica',
     } }
     await act(async () => { root.render(<App />) })
     // Una cola nunca se restaura desde la URL: se aterriza en la portada.
@@ -115,10 +123,8 @@ describe('continuidad y navegación accesible', () => {
     expect(host.textContent).not.toContain('Sesión restaurada')
     // Fuera de la sesión la barra sí navega.
     expect(host.querySelector('nav')).not.toBeNull()
-    await act(async () => { boton('Plan diario clásico').click() })
     await act(async () => { await vi.dynamicImportSettled() })
-    expect(host.textContent).toContain('Tu estudio de hoy')
-    await act(async () => { boton('Continuar sesión guardada').click() })
+    await act(async () => { boton('Retomar mi sesión pendiente').click() })
     await act(async () => { await vi.dynamicImportSettled() })
     expect(host.textContent).toContain('Sesión restaurada')
     expect(mock.reproductor.mock.calls.at(-1)?.[0].indiceInicial).toBe(1)

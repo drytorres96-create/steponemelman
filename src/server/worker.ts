@@ -2,6 +2,7 @@ import config from '../../project.config.json'
 import { registrar } from './registro'
 import { ConceptoZ, IndiceZ, type Concepto, type Indice } from '../schema/concept'
 import { prepararConcepto } from '../lib/formatos'
+import { fragmentoDocente, fundamentoEditorial, materialAptoParaIA, referenciaDocente } from '../lib/fuente-docente'
 import { versionPregunta } from '../screens/sesion'
 import { aplicarVariante } from '../lib/variantes'
 import { PeticionErrorIAZ, PresentacionIAZ } from '../lib/contexto-ia'
@@ -758,7 +759,7 @@ async function conceptoPublicado(get: Lector, conceptId: string): Promise<{ indi
   const leido = ConceptoZ.safeParse(data.conceptos?.find(c => (c as { concept_id: string }).concept_id === conceptId))
   if (!leido.success) return json({ error: 'Concepto no disponible.' }, 404)
   const concepto = leido.data
-  if (concepto.revision_editorial) return json({ error: 'Este concepto tiene una aclaración editorial. Consulta su explicación y las referencias en «Ver la fuente».' }, 422)
+  if (concepto.revision_editorial && !fundamentoEditorial(concepto)) return json({ error: 'Este concepto tiene una aclaración editorial. Consulta su explicación y las referencias en «Ver la fuente».' }, 422)
   if (concepto.calidad.estado !== 'aprobado' || concepto.calidad.confianza < 0.7 || concepto.step === 'step2') return json({ error: 'Concepto no disponible.' }, 404)
   return { indice, concepto }
 }
@@ -845,7 +846,7 @@ async function handleAnalisis(request: Request, url: URL, env: Env): Promise<Res
         const leido = ConceptoZ.safeParse(data.conceptos?.find(c => (c as { concept_id: string }).concept_id === id))
         if (!leido.success) continue
         const c = leido.data
-        if (c.calidad.estado !== 'aprobado' || c.step === 'step2' || c.revision_editorial) continue
+        if (!materialAptoParaIA(c)) continue
         const f = fallos.find(x => x.id === id)
         if (!f) continue
         resumen.push({
@@ -899,14 +900,14 @@ async function handleExamen(request: Request, url: URL, env: Env): Promise<Respo
       distractores: concepto.distractores_cercanos.slice(0, 5).map(d => d.texto),
       disciplina: concepto.clasificacion.disciplina_primaria, sistema: concepto.clasificacion.sistema_primario,
       tema: concepto.clasificacion.tema, tipo: concepto.clasificacion.tipo_conocimiento,
-      fragmento: concepto.source.fragment,
+      fragmento: fragmentoDocente(concepto),
     })
     if (reference.length > 11000) return unavailable('concepto_largo')
     const trusted: CoachInput = {
       user: quien.userId, mode: 'examen',
       key: await digest(JSON.stringify([quien.userId, indice.corpus_version, concepto.concept_id, reference, MODEL, 'examen-v1'])),
-      reference, sourceFragment: concepto.source.fragment, question: '', answer: '', canonical: concepto.respuesta_canonica,
-      source: { title: concepto.source.doc_title, page: concepto.source.pdf_page ?? concepto.source.page },
+      reference, sourceFragment: fragmentoDocente(concepto), question: '', answer: '', canonical: concepto.respuesta_canonica,
+      source: referenciaDocente(concepto),
     }
     return await alCoach(env, 'examen', trusted)
   } catch (causa) {
@@ -1017,15 +1018,15 @@ async function handleChat(request: Request, url: URL, env: Env): Promise<Respons
       confusiones: concepto.confusiones.slice(0, 5),
       distractores: concepto.distractores_cercanos.slice(0, 5),
       disciplina: concepto.clasificacion.disciplina_primaria, sistema: concepto.clasificacion.sistema_primario,
-      fragmento_de_la_fuente: concepto.source.fragment,
+      fragmento_de_la_fuente: fragmentoDocente(concepto),
       ...(input.presentacion ? { respuesta_del_estudiante: PresentacionIAZ.parse(input.presentacion).answer } : {}),
     })
     if (reference.length > 11000) return unavailable('concepto_largo')
     const trusted: CoachInput = {
       user: quien.userId, mode: 'chat', historial, question: pregunta,
       key: await digest(JSON.stringify([quien.userId, indice.corpus_version, concepto.concept_id, reference, historial, pregunta, MODEL, 'chat-v2'])),
-      reference, sourceFragment: concepto.source.fragment, answer: '', canonical: concepto.respuesta_canonica,
-      source: { title: concepto.source.doc_title, page: concepto.source.pdf_page ?? concepto.source.page },
+      reference, sourceFragment: fragmentoDocente(concepto), answer: '', canonical: concepto.respuesta_canonica,
+      source: referenciaDocente(concepto),
     }
     return await alCoach(env, 'chat', trusted)
   } catch (causa) {
@@ -1123,13 +1124,11 @@ async function leerFuentesRecuperacion(get: Lector, q: NbmeQuestion,
       if (data?.corpus_version !== indice.corpus_version || !Array.isArray(data.conceptos)) continue
       for (const bruto of data.conceptos) {
         const c = ConceptoZ.safeParse(bruto)
-        if (!c.success || !ids.includes(c.data.concept_id) || c.data.revision_editorial
-          || c.data.step === 'step2' || c.data.calidad.estado !== 'aprobado'
-          || c.data.calidad.confianza < 0.7 || c.data.source.fragment.length < 15
-          || c.data.source.fragment.length > 1600 || c.data.source.doc_title.length > 300
+        if (!c.success || !ids.includes(c.data.concept_id) || !materialAptoParaIA(c.data)) continue
+        const fragment = fragmentoDocente(c.data), source = referenciaDocente(c.data)
+        if (fragment.length < 15 || fragment.length > 1600 || source.title.length > 300
           || !/^[a-zA-Z0-9_.:-]{1,200}$/.test(c.data.concept_id)) continue
-        fuentes.push({ fragment: c.data.source.fragment, title: c.data.source.doc_title,
-          page: c.data.source.pdf_page ?? c.data.source.page, conceptId: c.data.concept_id })
+        fuentes.push({ fragment, ...source, conceptId: c.data.concept_id })
       }
     }
     return fuentes.slice(0, 4)
@@ -1241,19 +1240,19 @@ export default {
         return unavailable('material')
       }
       const original = ConceptoZ.parse(data.conceptos?.find(c => (c as { concept_id: string }).concept_id === input.conceptId))
-      if (original.revision_editorial) return json({ error: 'Este concepto tiene una aclaración editorial. Consulta su explicación y las referencias en «Ver la fuente».' }, 422)
+      if (original.revision_editorial && !fundamentoEditorial(original)) return json({ error: 'Este concepto tiene una aclaración editorial. Consulta su explicación y las referencias en «Ver la fuente».' }, 422)
       if (original.calidad.estado !== 'aprobado' || original.calidad.confianza < 0.7 || original.step === 'step2') return json({ error: 'Concepto no disponible.' }, 404)
       // Los clientes 1.4 abiertos antes del despliegue no envían formatVersion.
       const c = prepararConcepto(aplicarVariante(original, input.variantId), { semilla: input.questionId, indice: input.index, ruta: input.route, forzarReconocimiento: input.retry, version: input.formatVersion ?? 1 })
       if (versionPregunta(c) !== input.version) return json({ error: 'La pregunta ha cambiado. Recarga el material para usar la ayuda.' }, 409)
-      const reference = `${original.source.fragment}\n${c.afirmacion}\n${c.respuesta_canonica}\n${c.explicacion}\n${JSON.stringify(c.evaluacion.opciones ?? [])}`
+      const reference = `${fragmentoDocente(original)}\n${c.afirmacion}\n${c.respuesta_canonica}\n${c.explicacion}\n${JSON.stringify(c.evaluacion.opciones ?? [])}`
       if (reference.length > 11000 || c.evaluacion.pregunta.length > 1500) return unavailable('concepto_largo')
       const answer = input.answer.trim().normalize('NFC')
       const trusted: CoachInput = { user: userId, mode: modo,
         // El modo entra en la clave: una explicación cacheada nunca puede servirse como veredicto.
         key: await digest(JSON.stringify([userId, index.corpus_version, c.concept_id, input.version, answer, reference, MODEL, modo, modo === 'explicar' ? 'coach-v2' : 'coach-v1'])),
-        reference, sourceFragment: original.source.fragment, question: c.evaluacion.pregunta, answer, canonical: c.respuesta_canonica,
-        source: { title: original.source.doc_title, page: original.source.pdf_page ?? original.source.page } }
+        reference, sourceFragment: fragmentoDocente(original), question: c.evaluacion.pregunta, answer, canonical: c.respuesta_canonica,
+        source: referenciaDocente(original) }
       return await alCoach(env, modo, trusted)
     } catch (causa) {
       registrar('explicar', causa)

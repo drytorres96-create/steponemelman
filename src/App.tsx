@@ -21,28 +21,23 @@ import { useNbme } from './nbme/NbmeProvider'
 import { deriveNbmeSession, isNbmeSessionArchived } from './nbme/model'
 import { hayConceptosPendientes } from './lib/conceptos-pendientes'
 import type { FiltrosBusqueda } from './lib/busqueda'
-import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, type CinematicObject, type CinematicScene } from './components/Editorial'
+import { Brand, NavigationIcon, CinematicBackdrop, type CinematicObject, type CinematicScene } from './components/Editorial'
 import { Resguardo, FalloPantalla } from './components/Resguardo'
-import type { Vineta } from './vinetas/modelo'
 import { NavbarMenu } from './components/NavbarMenu'
 import './styles/respuestas-contraste.css'
 
 // Hoy se abre enseguida. El resto se descarga al entrar y queda en la caché del navegador.
-const Inicio = lazy(() => import('./screens/Inicio').then(m => ({ default: m.Inicio })))
 const Progreso = lazy(() => import('./screens/Progreso').then(m => ({ default: m.Progreso })))
 const Modulos = lazy(() => import('./screens/Modulos').then(m => ({ default: m.Modulos })))
 const SesionCajas = lazy(() => import('./screens/SesionCajas').then(m => ({ default: m.SesionCajas })))
 const SesionMixta = lazy(() => import('./semana/SesionMixta').then(m => ({ default: m.SesionMixta })))
-const Auditoria = lazy(() => import('./screens/Auditoria').then(m => ({ default: m.Auditoria })))
 const Ajustes = lazy(() => import('./screens/Ajustes').then(m => ({ default: m.Ajustes })))
 const Reproductor = lazy(() => import('./screens/Reproductor').then(m => ({ default: m.Reproductor })))
 const NbmeLibrary = lazy(() => import('./nbme/NbmeLibrary').then(m => ({ default: m.NbmeLibrary })))
 const NbmePlayer = lazy(() => import('./nbme/NbmePlayer').then(m => ({ default: m.NbmePlayer })))
-const VinetasInicio = lazy(() => import('./vinetas/Vinetas').then(m => ({ default: m.VinetasInicio })))
-const VinetasSesion = lazy(() => import('./vinetas/Vinetas').then(m => ({ default: m.VinetasSesion })))
 
-type Vista = 'hoy' | 'inicio' | 'modulos' | 'auditoria' | 'ajustes' | 'progreso'
-  | 'estudio' | 'preguntas' | 'sesion' | 'cajas' | 'vinetas'
+type Vista = 'hoy' | 'modulos' | 'ajustes' | 'progreso'
+  | 'estudio' | 'preguntas' | 'sesion' | 'cajas'
 /**
  * Una sola entrada: la portada pone el techo del día y absorbe lo que antes eran Mi
  * semana, Recuperación y Progreso. Para estudiar más hay que abrir el menú discreto
@@ -53,10 +48,9 @@ const SECUNDARIAS: { id: Vista; txt: string }[] = [
   { id: 'modulos', txt: 'Biblioteca' },
   { id: 'progreso', txt: 'Progreso' },
   { id: 'ajustes', txt: 'Ajustes y respaldo' },
-  { id: 'auditoria', txt: 'Calidad del material' }, { id: 'inicio', txt: 'Plan diario clásico' },
 ]
 /** Las vistas de concentración no llevan navegación ni migas. */
-const CONCENTRACION: Vista[] = ['estudio', 'preguntas', 'sesion', 'cajas', 'vinetas']
+const CONCENTRACION: Vista[] = ['estudio', 'preguntas', 'sesion', 'cajas']
 /** Vistas que recorren una sesión NBME: al salir de ellas se pausa. */
 const CON_PREGUNTAS: Vista[] = ['preguntas', 'sesion', 'cajas']
 
@@ -66,19 +60,16 @@ const CON_PREGUNTAS: Vista[] = ['preguntas', 'sesion', 'cajas']
  */
 const SCENES: Record<Vista, { fondo: CinematicScene; ventana: CinematicScene; objeto: CinematicObject }> = {
   hoy: { fondo: 'dawn', ventana: 'constellation', objeto: 'crystal' },
-  inicio: { fondo: 'dawn', ventana: 'forest', objeto: 'crystal' },
   modulos: { fondo: 'ribbons', ventana: 'constellation', objeto: 'crystal' },
-  auditoria: { fondo: 'stone', ventana: 'lens', objeto: 'neural-violet' },
   ajustes: { fondo: 'smoke', ventana: 'stone', objeto: 'optical-violet' },
   progreso: { fondo: 'forest', ventana: 'forest', objeto: 'crystal' },
   estudio: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
   preguntas: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
   sesion: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
   cajas: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
-  vinetas: { fondo: 'smoke', ventana: 'smoke', objeto: 'optical-violet' },
 }
 /** Pantallas que Hoy absorbió: los enlaces guardados siguen llegando, ahora a la portada. */
-const ABSORBIDAS = ['semana', 'recuperacion', 'repaso']
+const ABSORBIDAS = ['semana', 'recuperacion', 'repaso', 'inicio', 'auditoria', 'vinetas', 'cobertura']
 
 // A session queue is restored from the saved study state, never from the URL alone.
 export function vistaDesdeHash(): Vista {
@@ -97,9 +88,7 @@ export default function App() {
   const [seleccionManual, setSeleccionManual] = useState<string[]>([])
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [tipoContenido, setTipoContenido] = useState<'conceptos' | 'preguntas' | 'vinetas'>('conceptos')
-  /** Las viñetas del piloto abiertas ahora mismo; no se guardan como sesión. */
-  const [vinetasAbiertas, setVinetasAbiertas] = useState<Vineta[] | null>(null)
+  const [tipoContenido, setTipoContenido] = useState<'conceptos' | 'preguntas'>('conceptos')
   const [sesionSemanal, setSesionSemanal] = useState<SesionSemanal | null>(null)
   const [cajasHoy, setCajasHoy] = useState<{ items: ItemCaja[]; titulo: string } | null>(null)
   const [filtrosConceptos, setFiltrosConceptos] = useState<Partial<FiltrosBusqueda> | undefined>()
@@ -133,9 +122,11 @@ export default function App() {
     if (CON_PREGUNTAS.includes(vistaAnterior.current) && vista !== vistaAnterior.current) nbme.pauseSession()
     vistaAnterior.current = vista
   }, [vista, nbme.pauseSession])
-  const ir = useCallback((v: string) => {
+  const ir = useCallback((destino: string) => {
+    const v = [...NAV, ...SECUNDARIAS].find(n => n.id === destino)?.id
+      ?? CONCENTRACION.find(n => n === destino) ?? 'hoy'
     if (CON_PREGUNTAS.includes(vista) && v !== vista) nbme.pauseSession()
-    setCola(null); setSesionSemanal(null); setCajasHoy(null); setVinetasAbiertas(null); setVista(v as Vista); location.hash = v
+    setCola(null); setSesionSemanal(null); setCajasHoy(null); setVista(v); location.hash = v
   }, [vista, nbme.pauseSession])
   const continuarPreguntas = async () => {
     if (!sesionPreguntasPendiente || !await nbme.resumeSession(sesionPreguntasPendiente.id)) return false
@@ -196,14 +187,6 @@ export default function App() {
     setError(null); setCola(preparada); setIndiceInicial(desde)
     setVista('estudio'); location.hash = 'estudio'
   }, [])
-  const abrir = useCallback(async (moduloId: string, ruta: RutaId, limite: number, sesionId?: string, desde = 0, presupuestoMinutos?: 10 | 20 | 30) => {
-    if (!indice) return
-    setCargando(true); setError(null)
-    try {
-      const preparada = await prepararCola(moduloId, ruta, limite, sesionId, presupuestoMinutos)
-      mostrarCola(preparada, Math.min(desde, preparada.conceptos.length - 1))
-    } catch (e) { setError(String(e)) } finally { setCargando(false) }
-  }, [indice, prepararCola, mostrarCola])
 
   const estudiarIds = useCallback(async (ids: string[], opciones: OpcionesSesionPersonalizada = {}) => {
     if (!indice) return
@@ -242,10 +225,6 @@ export default function App() {
     const preparada = await prepararCola(r.modulo && indice.modulos.some(m => m.module_id === r.modulo) ? r.modulo : '', (r.sesion as RutaId) || 'guiada', 30)
     mostrarCola(preparada, Math.min(r.indice, preparada.conceptos.length - 1))
   }, [estado.reanudable, prepararCola, mostrarCola, indice])
-  const continuar = useCallback(async () => {
-    setCargando(true); setError(null)
-    try { await restaurarConceptos() } catch (e) { setError(String(e)) } finally { setCargando(false) }
-  }, [restaurarConceptos])
   const retomarPendiente = async () => {
     if (hayConceptosPendientes(estado.reanudable)) { await restaurarConceptos(); return true }
     if (!sesionPreguntasPendiente) throw new Error('Esta sesión ya no está pendiente. Revisa el siguiente paso de Hoy.')
@@ -321,26 +300,11 @@ export default function App() {
             sesion={sesionSemanal} efimera onSalir={() => ir('hoy')} etiquetaSalida="Volver a Hoy" />}
           {!cargando && vista === 'sesion' && !sesionSemanal && <div className="vacio"><p>Esta sesión ya no está abierta.</p>
             <button className="btn" onClick={() => ir('hoy')}>Volver a Hoy</button></div>}
-          {!cargando && vista === 'inicio' && <div className="pila"><StudyHero />
-            {sesionPreguntasPendiente && <section className="tarjeta home-session"><div className="pila">
-              <p className="editorial-eyebrow">Tu sesión guardada</p><h2>Continúa tus preguntas</h2><p className="sutil">{sesionPreguntasPendiente.title}</p>
-              <div><button className="btn principal" disabled={nbme.loading || nbme.busy} onClick={() => void continuarPreguntas()}>Continuar sesión de preguntas</button></div>
-              {nbme.error && <p role="alert">{nbme.error}</p>}
-            </div></section>}
-            <Inicio embedded onIr={ir} onContinuar={continuar} onEmpezar={(limite, tiempo) => abrir('', 'guiada', limite, undefined, 0, tiempo)} />
-          </div>}
           {!cargando && vista === 'modulos' && <div className="section-workspace"><div className="section-toolbar fila" role="group" aria-label="Tipo de contenido">
             <button className={`btn${tipoContenido === 'conceptos' ? ' principal' : ' fantasma'}`} aria-pressed={tipoContenido === 'conceptos'} onClick={() => setTipoContenido('conceptos')}>Conceptos</button>
             <button className={`btn${tipoContenido === 'preguntas' ? ' principal' : ' fantasma'}`} aria-pressed={tipoContenido === 'preguntas'} onClick={() => setTipoContenido('preguntas')}>Preguntas</button>
-            <button className={`btn${tipoContenido === 'vinetas' ? ' principal' : ' fantasma'}`} aria-pressed={tipoContenido === 'vinetas'} onClick={() => setTipoContenido('vinetas')}>Viñetas (piloto)</button>
           </div>{tipoContenido === 'preguntas' ? <NbmeLibrary onStart={() => ir('preguntas')} />
-            : tipoContenido === 'vinetas' ? <VinetasInicio onEmpezar={lista => { setVinetasAbiertas(lista); setVista('vinetas'); location.hash = 'vinetas' }} />
             : <Modulos onEstudiar={estudiarIds} seleccion={seleccionManual} onSeleccion={setSeleccionManual} filtrosIniciales={filtrosConceptos} />}</div>}
-          {!cargando && vista === 'vinetas' && vinetasAbiertas && <VinetasSesion vinetas={vinetasAbiertas}
-            onSalir={() => { setTipoContenido('vinetas'); ir('modulos') }} />}
-          {!cargando && vista === 'vinetas' && !vinetasAbiertas && <div className="vacio"><p>Estas viñetas ya no están abiertas.</p>
-            <button className="btn" onClick={() => { setTipoContenido('vinetas'); ir('modulos') }}>Volver a las viñetas</button></div>}
-          {!cargando && vista === 'auditoria' && <Auditoria />}
           {!cargando && vista === 'progreso' && <Progreso onNuevo={abrirNuevo} onCajas={abrirCajas}
             onRetomar={retomarPendiente} />}
           {!cargando && vista === 'ajustes' && <Ajustes />}

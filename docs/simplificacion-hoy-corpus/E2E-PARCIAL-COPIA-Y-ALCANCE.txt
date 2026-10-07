@@ -1,0 +1,230 @@
+
+> steponemelman@1.31.0 e2e
+> playwright test
+
+[2m[WebServer] [22m(node:81144) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m(node:81159) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 97 tests using 1 worker
+
+(node:81185) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:81185) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/estudio.spec.ts:61:1 › cajas: Intro comprueba, enseña la corrección y sólo el segundo Intro pasa a la siguiente (2.5s)
+  ✓   2 [chromium] › e2e/estudio.spec.ts:81:1 › cajas: si el corrector no sabe juzgar, «La sabía» cuenta y pasa con un toque (2.7s)
+  ✓   3 [chromium] › e2e/estudio.spec.ts:108:1 › cajas: tras un fallo hay una sola acción principal y el resto queda plegado (2.3s)
+  ✓   4 [chromium] › e2e/estudio.spec.ts:124:1 › cajas: la pregunta NBME se contesta con el teclado y la piel no cambia en toda la sesión (1.9s)
+  ✓   5 [chromium] › e2e/estudio.spec.ts:148:1 › lo nuevo: los tramos de tres conceptos se encadenan sin «Sesión terminada» (2.2s)
+  ✓   6 [chromium] › e2e/estudio.spec.ts:168:1 › lo nuevo: los fallos respetan el techo y llegan al cierre en una sola vuelta (3.6s)
+  ✓   7 [chromium] › e2e/estudio.spec.ts:196:1 › lo nuevo: tras un feedback largo el siguiente enunciado queda visible bajo la cabecera (5.5s)
+  ✓   8 [chromium] › e2e/estudio.spec.ts:245:1 › NBME: la figura se amplía sin revelar la respuesta ni la procedencia antes de comprobar (2.5s)
+  ✓   9 [chromium] › e2e/estudio.spec.ts:280:1 › NBME: laboratorios y columnas conservan sus celdas sin desbordar la pantalla (2.4s)
+  ✓  10 [chromium] › e2e/estudio.spec.ts:309:1 › cajas: tras 20 seguidas la pausa es opcional y permite guardar sin un intento nuevo (5.6s)
+  ✓  11 [chromium] › e2e/estudio.spec.ts:336:1 › Biblioteca ofrece conceptos y preguntas; los destinos retirados vuelven a Hoy sin iniciar sesiones (1.8s)
+  ✓  12 [chromium] › e2e/faq-hoy.spec.ts:33:3 › FAQ y material disponible a 390px › FAQ se consulta con teclado, usa criterios guardados y carga el índice a petición (2.7s)
+  ✓  13 [chromium] › e2e/faq-hoy.spec.ts:101:3 › FAQ y material disponible a 390px › cajas omite el material ausente sin perder su historial ni ocupar el lugar válido (2.0s)
+  ✓  14 [chromium] › e2e/faq-hoy.spec.ts:33:3 › FAQ y material disponible a 1280px › FAQ se consulta con teclado, usa criterios guardados y carga el índice a petición (3.1s)
+  ✓  15 [chromium] › e2e/faq-hoy.spec.ts:101:3 › FAQ y material disponible a 1280px › cajas omite el material ausente sin perder su historial ni ocupar el lugar válido (2.1s)
+  ✓  16 [chromium] › e2e/figuras-csp.spec.ts:3:1 › las figuras descargadas se decodifican con la política de seguridad de producción (397ms)
+  ✓  17 [chromium] › e2e/ia-gratuita.spec.ts:18:3 › IA gratuita a 390px › el chat usa la pregunta respondida, conserva la cita y permite continuar (2.6s)
+  ✓  18 [chromium] › e2e/ia-gratuita.spec.ts:95:3 › IA gratuita a 390px › un fallo genera una corrección individual y el razonamiento sólo se analiza al enviarlo (2.3s)
+  ✓  19 [chromium] › e2e/ia-gratuita.spec.ts:154:3 › IA gratuita a 390px › un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar (3.5s)
+  ✓  20 [chromium] › e2e/ia-gratuita.spec.ts:18:3 › IA gratuita a 1280px › el chat usa la pregunta respondida, conserva la cita y permite continuar (4.0s)
+  ✓  21 [chromium] › e2e/ia-gratuita.spec.ts:95:3 › IA gratuita a 1280px › un fallo genera una corrección individual y el razonamiento sólo se analiza al enviarlo (2.7s)
+  ✓  22 [chromium] › e2e/ia-gratuita.spec.ts:154:3 › IA gratuita a 1280px › un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar (3.8s)
+  ✓  23 [chromium] › e2e/movil-auditoria.spec.ts:87:3 › auditoría móvil · 390px › figura grande sintética: carga, dimensiones, captura y foco del modal (3.3s)
+  ✓  24 [chromium] › e2e/movil-auditoria.spec.ts:139:3 › auditoría móvil · 390px › laboratorios y caption son legibles en ambas pieles (3.1s)
+  ✓  25 [chromium] › e2e/movil-auditoria.spec.ts:151:3 › auditoría móvil · 390px › zoom aumenta la imagen y permite desplazamiento sin perder el foco (3.7s)
+  ✓  26 [chromium] › e2e/movil-auditoria.spec.ts:87:3 › auditoría móvil · 1280px › figura grande sintética: carga, dimensiones, captura y foco del modal (3.6s)
+  ✓  27 [chromium] › e2e/movil-auditoria.spec.ts:139:3 › auditoría móvil · 1280px › laboratorios y caption son legibles en ambas pieles (3.9s)
+  ✓  28 [chromium] › e2e/movil-auditoria.spec.ts:151:3 › auditoría móvil · 1280px › zoom aumenta la imagen y permite desplazamiento sin perder el foco (4.6s)
+  ✓  29 [chromium] › e2e/movil-auditoria.spec.ts:224:3 › auditoría táctil de figuras › el campo de respuesta mantiene un borde visible en ambas pieles y el conmutador mide 44px (2.2s)
+  ✓  30 [chromium] › e2e/movil-auditoria.spec.ts:239:3 › auditoría táctil de figuras › pellizcar amplía y arrastrar desplaza la figura con eventos táctiles del navegador (4.7s)
+  ✓  31 [chromium] › e2e/movil-auditoria.spec.ts:332:3 › auditoría táctil de figuras › las tablas tienen región enfocada con indicador visible (3.8s)
+  ✓  32 [chromium] › e2e/movil-auditoria.spec.ts:346:3 › auditoría táctil de figuras › la descarga espera al viewport y el salto a respuestas no permite omitir la figura necesaria (3.5s)
+  ✓  33 [chromium] › e2e/movil-auditoria.spec.ts:368:59 › auditoría táctil de figuras › error-descarga: aviso claro, bloqueo y reintento (3.3s)
+  ✓  34 [chromium] › e2e/movil-auditoria.spec.ts:368:59 › auditoría táctil de figuras › error-imagen: aviso claro, bloqueo y reintento (3.5s)
+  ✓  35 [chromium] › e2e/movil-auditoria.spec.ts:405:3 › auditoría móvil horizontal › saltos y modal mantienen el foco visible, sin desbordamiento en horizontal (3.3s)
+  ✓  36 [chromium] › e2e/navbar-menu.spec.ts:37:5 › Menú amplio a 320px › mantiene destinos, alcance táctil y navegación sin iniciar una sesión (2.8s)
+  ✓  37 [chromium] › e2e/navbar-menu.spec.ts:37:5 › Menú amplio a 390px › mantiene destinos, alcance táctil y navegación sin iniciar una sesión (2.5s)
+  ✓  38 [chromium] › e2e/navbar-menu.spec.ts:37:5 › Menú amplio a 1280px › mantiene destinos, alcance táctil y navegación sin iniciar una sesión (3.4s)
+  ✓  39 [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo (2.0s)
+  ✓  40 [chromium] › e2e/navbar-menu.spec.ts:154:3 › Ratón y teclado › un clic fija la vista previa y el siguiente cierra; Escape y el exterior también la cierran (2.2s)
+  ✓  41 [chromium] › e2e/navbar-menu.spec.ts:200:3 › Ratón y teclado › el movimiento reducido mantiene los controles visibles y elimina animaciones del panel y sus hijos (1.5s)
+  ✓  42 [chromium] › e2e/navbar-menu.spec.ts:241:5 › Menú táctil 320×740 › abre por toque y permite alcanzar todos los destinos en poco espacio (1.6s)
+  ✓  43 [chromium] › e2e/navbar-menu.spec.ts:241:5 › Menú táctil 390×844 › abre por toque y permite alcanzar todos los destinos en poco espacio (1.8s)
+  ✓  44 [chromium] › e2e/navbar-menu.spec.ts:241:5 › Menú táctil 844×390 › abre por toque y permite alcanzar todos los destinos en poco espacio (1.8s)
+  ✘  45 [chromium] › e2e/premium-aprendizaje.spec.ts:11:3 › aprendizaje y diseño premium a 390px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar (11.1s)
+(node:84543) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:84543) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  46 [chromium] › e2e/premium-aprendizaje.spec.ts:37:3 › aprendizaje y diseño premium a 390px › lo nuevo conserva el guion, muestra un final cercano y ofrece pausa al terminar el bloque (3.3s)
+  ✓  47 [chromium] › e2e/premium-aprendizaje.spec.ts:79:3 › aprendizaje y diseño premium a 390px › un concepto con dominio vencido entra en Hoy y Progreso distingue su mantenimiento (2.7s)
+  ✓  48 [chromium] › e2e/premium-aprendizaje.spec.ts:105:3 › aprendizaje y diseño premium a 390px › al completar el día hay un cierre explícito sin acción principal adicional (1.7s)
+  ✘  49 [chromium] › e2e/premium-aprendizaje.spec.ts:11:3 › aprendizaje y diseño premium a 1280px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar (11.4s)
+(node:85198) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:85198) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  50 [chromium] › e2e/premium-aprendizaje.spec.ts:37:3 › aprendizaje y diseño premium a 1280px › lo nuevo conserva el guion, muestra un final cercano y ofrece pausa al terminar el bloque (2.1s)
+  ✓  51 [chromium] › e2e/premium-aprendizaje.spec.ts:79:3 › aprendizaje y diseño premium a 1280px › un concepto con dominio vencido entra en Hoy y Progreso distingue su mantenimiento (2.5s)
+  ✓  52 [chromium] › e2e/premium-aprendizaje.spec.ts:105:3 › aprendizaje y diseño premium a 1280px › al completar el día hay un cierre explícito sin acción principal adicional (1.4s)
+  ✓  53 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas (2.6s)
+  ✓  54 [chromium] › e2e/pulido-premium.spec.ts:113:5 › detalles premium a 390px en light › hover conserva límites visibles de controles y la pausa sigue siendo accesible (2.2s)
+  ✓  55 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas (2.5s)
+  ✓  56 [chromium] › e2e/pulido-premium.spec.ts:113:5 › detalles premium a 390px en dark › hover conserva límites visibles de controles y la pausa sigue siendo accesible (2.2s)
+  ✓  57 [chromium] › e2e/pulido-premium.spec.ts:147:5 › biblioteca y navegación coherentes a 390px › los filtros nativos comparten paleta y el acceso a Hoy aprovecha su fila móvil (1.5s)
+  ✓  58 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas (2.7s)
+  ✓  59 [chromium] › e2e/pulido-premium.spec.ts:113:5 › detalles premium a 1280px en light › hover conserva límites visibles de controles y la pausa sigue siendo accesible (2.6s)
+  ✓  60 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas (3.0s)
+  ✓  61 [chromium] › e2e/pulido-premium.spec.ts:113:5 › detalles premium a 1280px en dark › hover conserva límites visibles de controles y la pausa sigue siendo accesible (2.6s)
+  ✓  62 [chromium] › e2e/pulido-premium.spec.ts:147:5 › biblioteca y navegación coherentes a 1280px › los filtros nativos comparten paleta y el acceso a Hoy aprovecha su fila móvil (1.5s)
+  ✓  63 [chromium] › e2e/recuperacion-meta.spec.ts:10:3 › recuperación de la meta a 390px › se abre a petición, distingue dominio y trabajo y retoma la misma cola de Hoy (1.9s)
+  ✓  64 [chromium] › e2e/recuperacion-meta.spec.ts:43:3 › recuperación de la meta a 390px › el viernes la distancia es informativa y no abre recuperación (1.6s)
+  ✓  65 [chromium] › e2e/recuperacion-meta.spec.ts:62:3 › recuperación de la meta a 390px › retoma la cola exacta de conceptos en su paso guardado (1.8s)
+  ✓  66 [chromium] › e2e/recuperacion-meta.spec.ts:101:3 › recuperación de la meta a 390px › retoma una sesión NBME pausada en su explicación, conservando el intento (2.0s)
+  ✓  67 [chromium] › e2e/recuperacion-meta.spec.ts:137:3 › recuperación de la meta a 390px › un resumen conceptual terminado no oculta la sesión NBME pendiente (2.0s)
+  ✓  68 [chromium] › e2e/recuperacion-meta.spec.ts:162:44 › recuperación de la meta a 390px › un fallo al retomar concepto se ve junto al botón y permite reintentar (2.1s)
+  ✓  69 [chromium] › e2e/recuperacion-meta.spec.ts:162:44 › recuperación de la meta a 390px › un fallo al retomar nbme se ve junto al botón y permite reintentar (2.1s)
+  ✘  70 [chromium] › e2e/recuperacion-meta.spec.ts:185:3 › recuperación de la meta a 390px › también retoma desde Cómo va todo en Hoy (2.0s)
+(node:86517) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:86517) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  71 [chromium] › e2e/recuperacion-meta.spec.ts:10:3 › recuperación de la meta a 1280px › se abre a petición, distingue dominio y trabajo y retoma la misma cola de Hoy (3.3s)
+  ✓  72 [chromium] › e2e/recuperacion-meta.spec.ts:43:3 › recuperación de la meta a 1280px › el viernes la distancia es informativa y no abre recuperación (2.4s)
+  ✓  73 [chromium] › e2e/recuperacion-meta.spec.ts:62:3 › recuperación de la meta a 1280px › retoma la cola exacta de conceptos en su paso guardado (2.1s)
+  ✓  74 [chromium] › e2e/recuperacion-meta.spec.ts:101:3 › recuperación de la meta a 1280px › retoma una sesión NBME pausada en su explicación, conservando el intento (2.4s)
+  ✓  75 [chromium] › e2e/recuperacion-meta.spec.ts:137:3 › recuperación de la meta a 1280px › un resumen conceptual terminado no oculta la sesión NBME pendiente (2.2s)
+  ✓  76 [chromium] › e2e/recuperacion-meta.spec.ts:162:44 › recuperación de la meta a 1280px › un fallo al retomar concepto se ve junto al botón y permite reintentar (2.3s)
+  ✓  77 [chromium] › e2e/recuperacion-meta.spec.ts:162:44 › recuperación de la meta a 1280px › un fallo al retomar nbme se ve junto al botón y permite reintentar (2.2s)
+  ✓  78 [chromium] › e2e/recuperacion-meta.spec.ts:185:3 › recuperación de la meta a 1280px › también retoma desde Cómo va todo en Hoy (2.6s)
+  ✓  79 [chromium] › e2e/recuperacion-nbme.spec.ts:170:3 › recuperación desde NBME a 390px › ofrece más fundamentos, registra el concepto practicado y regresa a la misma pregunta (4.3s)
+  ✓  80 [chromium] › e2e/recuperacion-nbme.spec.ts:260:3 › recuperación desde NBME a 390px › IA manual conserva ejercicios al recargar y avanza una sola vez dentro del bloque original (4.6s)
+  ✓  81 [chromium] › e2e/recuperacion-nbme.spec.ts:417:3 › recuperación desde NBME a 390px › una cuota agotada deja volver sin cambiar el intento ni crear una sesión (2.5s)
+  ✓  82 [chromium] › e2e/recuperacion-nbme.spec.ts:443:3 › recuperación desde NBME a 390px › la biblioteca conserva el primer resultado al revisar falladas y borrar sólo la sesión visible (3.8s)
+  ✓  83 [chromium] › e2e/recuperacion-nbme.spec.ts:170:3 › recuperación desde NBME a 1280px › ofrece más fundamentos, registra el concepto practicado y regresa a la misma pregunta (5.2s)
+  ✓  84 [chromium] › e2e/recuperacion-nbme.spec.ts:260:3 › recuperación desde NBME a 1280px › IA manual conserva ejercicios al recargar y avanza una sola vez dentro del bloque original (7.3s)
+  ✓  85 [chromium] › e2e/recuperacion-nbme.spec.ts:417:3 › recuperación desde NBME a 1280px › una cuota agotada deja volver sin cambiar el intento ni crear una sesión (3.6s)
+  ✓  86 [chromium] › e2e/recuperacion-nbme.spec.ts:443:3 › recuperación desde NBME a 1280px › la biblioteca conserva el primer resultado al revisar falladas y borrar sólo la sesión visible (5.3s)
+  ✓  87 [chromium] › e2e/recuperacion-revisiones.spec.ts:64:3 › revisión histórica con proveedor NBME real a 390px › retoma feedback y termina el mismo bloque conservando letras, revisiones y primer resultado (3.3s)
+  ✓  88 [chromium] › e2e/recuperacion-revisiones.spec.ts:64:3 › revisión histórica con proveedor NBME real a 1280px › retoma feedback y termina el mismo bloque conservando letras, revisiones y primer resultado (3.5s)
+  ✓  89 [chromium] › e2e/recuperacion-revisiones.spec.ts:154:1 › un asset histórico ausente conserva el bloque y permite reintentar sin crear otro (2.0s)
+  ✓  90 [chromium] › e2e/rendimiento.spec.ts:3:1 › un fallo al descargar una pantalla conserva la navegación y permite volver a Hoy (1.5s)
+  ✓  91 [chromium] › e2e/rendimiento.spec.ts:22:1 › navegar no acumula fondos animados invisibles y estudiar retira el paisaje (3.3s)
+  ✓  92 [chromium] › e2e/rendimiento.spec.ts:46:1 › IndexedDB reutiliza una conexión para lecturas y escrituras concurrentes (987ms)
+  ✓  93 [chromium] › e2e/rendimiento.spec.ts:83:1 › una actualización desde otra pestaña no queda bloqueada por la conexión compartida (954ms)
+  ✓  94 [chromium] › e2e/synapse.spec.ts:12:5 › Synapse en Melman a 320px › el menú conserva destinos, teclado y controles sin desbordamientos (1.7s)
+  ✓  95 [chromium] › e2e/synapse.spec.ts:12:5 › Synapse en Melman a 390px › el menú conserva destinos, teclado y controles sin desbordamientos (1.7s)
+  ✓  96 [chromium] › e2e/synapse.spec.ts:12:5 › Synapse en Melman a 1280px › el menú conserva destinos, teclado y controles sin desbordamientos (2.4s)
+  ✓  97 [chromium] › e2e/synapse.spec.ts:76:1 › el movimiento es breve, responde a la preferencia y no depende de las imágenes (1.3s)
+
+
+  1) [chromium] › e2e/premium-aprendizaje.spec.ts:11:3 › aprendizaje y diseño premium a 390px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('.hoy-next-block')
+    Expected string: [32m"Tu objetivo de hoy:"[39m
+    Received string: [31m"Retomamos aquíRepasar y mantener lo aprendido3 conceptos + 1 pregunta en el siguiente bloque.Empezar las cajasObjetivo de hoy: 19 pasos. 3 hechos · quedan 16."[39m
+    Timeout: 10000ms
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 10000ms[22m
+    [2m  - waiting for locator('.hoy-next-block')[22m
+    [2m    14 × locator resolved to <section class="tarjeta hoy-next-block" aria-labelledby="siguiente-bloque">…</section>[22m
+    [2m       - unexpected value "Retomamos aquíRepasar y mantener lo aprendido3 conceptos + 1 pregunta en el siguiente bloque.Empezar las cajasObjetivo de hoy: 19 pasos. 3 hechos · quedan 16."[22m
+
+
+       9 |     await page.goto('/?escena=abierto')
+      10 |     await expect(page.locator('.hoy-next-block')).toBeVisible()
+    > 11 |     await expect(page.locator('.hoy-next-block')).toContainText('Tu objetivo de hoy:')
+         |                                                   ^
+      12 |     await expect(page.locator('.hoy-next-block')).toContainText('quedan')
+      13 |     await expect(page.locator('.hoy .btn.principal:visible')).toHaveCount(1)
+      14 |     // La escena de 1s no basta para estimar cuánto tardará una persona real.
+        at /workspace/work/hoy-faq-corpus/e2e/premium-aprendizaje.spec.ts:11:51
+
+    Error Context: test-results/premium-aprendizaje-aprend-3bb52-ira-fotografías-al-estudiar-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/premium-aprendizaje-aprend-3bb52-ira-fotografías-al-estudiar-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/premium-aprendizaje-aprend-3bb52-ira-fotografías-al-estudiar-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e/premium-aprendizaje.spec.ts:11:3 › aprendizaje y diseño premium a 1280px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('.hoy-next-block')
+    Expected string: [32m"Tu objetivo de hoy:"[39m
+    Received string: [31m"Retomamos aquíRepasar y mantener lo aprendido3 conceptos + 1 pregunta en el siguiente bloque.Empezar las cajasObjetivo de hoy: 19 pasos. 3 hechos · quedan 16."[39m
+    Timeout: 10000ms
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 10000ms[22m
+    [2m  - waiting for locator('.hoy-next-block')[22m
+    [2m    14 × locator resolved to <section class="tarjeta hoy-next-block" aria-labelledby="siguiente-bloque">…</section>[22m
+    [2m       - unexpected value "Retomamos aquíRepasar y mantener lo aprendido3 conceptos + 1 pregunta en el siguiente bloque.Empezar las cajasObjetivo de hoy: 19 pasos. 3 hechos · quedan 16."[22m
+
+
+       9 |     await page.goto('/?escena=abierto')
+      10 |     await expect(page.locator('.hoy-next-block')).toBeVisible()
+    > 11 |     await expect(page.locator('.hoy-next-block')).toContainText('Tu objetivo de hoy:')
+         |                                                   ^
+      12 |     await expect(page.locator('.hoy-next-block')).toContainText('quedan')
+      13 |     await expect(page.locator('.hoy .btn.principal:visible')).toHaveCount(1)
+      14 |     // La escena de 1s no basta para estimar cuánto tardará una persona real.
+        at /workspace/work/hoy-faq-corpus/e2e/premium-aprendizaje.spec.ts:11:51
+
+    Error Context: test-results/premium-aprendizaje-aprend-ffc9e-ira-fotografías-al-estudiar-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/premium-aprendizaje-aprend-ffc9e-ira-fotografías-al-estudiar-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/premium-aprendizaje-aprend-ffc9e-ira-fotografías-al-estudiar-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › e2e/recuperacion-meta.spec.ts:185:3 › recuperación de la meta a 390px › también retoma desde Cómo va todo en Hoy 
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: 'Retomar mi sesión pendiente' }) resolved to 2 elements:
+        1) <button class="btn" aria-busy="false">Retomar mi sesión pendiente</button> aka getByLabel('Tu sesión guardada').getByRole('button', { name: 'Retomar mi sesión pendiente' })
+        2) <button class="btn" aria-busy="false">Retomar mi sesión pendiente</button> aka getByLabel('Meta de 60 días: 510').getByRole('button', { name: 'Retomar mi sesión pendiente' })
+
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Retomar mi sesión pendiente' })[22m
+
+
+       98 |     await page.getByText('Cómo va todo', { exact: true }).click()
+       99 |     await page.getByText('Ponerme al día con la meta', { exact: true }).click()
+    > 100 |     await page.getByRole('button', { name: 'Retomar mi sesión pendiente' }).click()
+          |                                                                             ^
+      101 |     await expect(page.locator('.app')).toHaveAttribute('data-view', 'preguntas')
+      102 |     await expect(page.locator('.nbme-feedback')).toContainText('Vamos a repasarla')
+      103 |   })
+        at /workspace/work/hoy-faq-corpus/e2e/recuperacion-meta.spec.ts:100:77
+
+    Error Context: test-results/recuperacion-meta-recupera-870b0-a-desde-Cómo-va-todo-en-Hoy-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/recuperacion-meta-recupera-870b0-a-desde-Cómo-va-todo-en-Hoy-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/recuperacion-meta-recupera-870b0-a-desde-Cómo-va-todo-en-Hoy-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3 failed
+    [chromium] › e2e/premium-aprendizaje.spec.ts:11:3 › aprendizaje y diseño premium a 390px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar 
+    [chromium] › e2e/premium-aprendizaje.spec.ts:11:3 › aprendizaje y diseño premium a 1280px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar 
+    [chromium] › e2e/recuperacion-meta.spec.ts:185:3 › recuperación de la meta a 390px › también retoma desde Cómo va todo en Hoy 
+  94 passed (4.9m)

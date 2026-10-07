@@ -2,7 +2,7 @@ import { mkdir, access, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
-import { chromium } from '@playwright/test'
+import { chromium, expect } from '@playwright/test'
 
 /**
  * Visual review uses the exact same App and synthetic providers as e2e.
@@ -16,7 +16,7 @@ await mkdir(output, { recursive: true })
 try { await access(path.join(baseline, 'node_modules')) } catch {
   await symlink(path.join(repo, 'node_modules'), path.join(baseline, 'node_modules'), 'dir')
 }
-const browser = await chromium.launch()
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {})
 const errors = []
 const captures = []
 
@@ -53,7 +53,13 @@ async function captureTree(root, phase, port) {
             await menu.locator('summary').click()
             await page.clock.runFor(350)
             await menu.locator('.menu-cuenta-opciones').waitFor()
+            if (phase === 'despues') {
+              await expect(menu.locator('button')).toHaveCount(4)
+              expect(await menu.locator('button').evaluateAll(bs => bs.map(b => b.getAttribute('aria-label'))))
+                .toEqual(['Biblioteca', 'Progreso', 'Ajustes y respaldo', 'Salir'])
+            }
           }
+          expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
           const name = `${phase}-${viewport.width}x${viewport.height}-${state}`
           await page.screenshot({ path: path.join(output, name + '.png'), fullPage: true, animations: 'disabled' })
           const jpeg = await page.screenshot({

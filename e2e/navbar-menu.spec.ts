@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 const LUNES = new Date('2026-10-05T07:30:00-04:00')
-const destinos = ['Biblioteca', 'Progreso', 'Ajustes y respaldo', 'Calidad del material', 'Plan diario clásico', 'Salir']
+const destinos = ['Biblioteca', 'Progreso', 'Ajustes y respaldo', 'Salir']
 const menu = (page: Page) => page.locator('.navbar-menu')
 const summary = (page: Page) => menu(page).locator('summary')
 const panel = (page: Page) => menu(page).locator('.navbar-menu-panel')
