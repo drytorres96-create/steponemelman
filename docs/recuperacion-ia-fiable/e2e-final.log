@@ -1,0 +1,21 @@
+[2m[WebServer] [22m(node:124216) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m(node:124276) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 8 tests using 1 worker
+
+(node:124334) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:124334) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/recuperacion-ia-fiable.spec.ts:42:3 › recuperación IA fiable a 390px › 503 con saldo conserva el error; retry manual espera más de 25 s y la recuperación retoma tras reload (10.8s)
+  ✓  2 [chromium] › e2e/recuperacion-ia-fiable.spec.ts:204:3 › recuperación IA fiable a 390px › timeout a 90 s quita el estado de espera y conserva el intento original (3.4s)
+  ✓  3 [chromium] › e2e/recuperacion-ia-fiable.spec.ts:242:52 › recuperación IA fiable a 390px › cancelar hacia original ignora el 200 tardío y conserva la sesión (3.2s)
+  ✓  4 [chromium] › e2e/recuperacion-ia-fiable.spec.ts:242:52 › recuperación IA fiable a 390px › cancelar hacia siguiente ignora el 200 tardío y conserva la sesión (3.0s)
+  ✓  5 [chromium] › e2e/recuperacion-ia-fiable.spec.ts:42:3 › recuperación IA fiable a 1280px › 503 con saldo conserva el error; retry manual espera más de 25 s y la recuperación retoma tras reload (8.3s)
+  ✓  6 [chromium] › e2e/recuperacion-ia-fiable.spec.ts:204:3 › recuperación IA fiable a 1280px › timeout a 90 s quita el estado de espera y conserva el intento original (3.6s)
+  ✓  7 [chromium] › e2e/recuperacion-ia-fiable.spec.ts:242:52 › recuperación IA fiable a 1280px › cancelar hacia original ignora el 200 tardío y conserva la sesión (2.5s)
+  ✓  8 [chromium] › e2e/recuperacion-ia-fiable.spec.ts:242:52 › recuperación IA fiable a 1280px › cancelar hacia siguiente ignora el 200 tardío y conserva la sesión (2.7s)
+
+  8 passed (42.1s)

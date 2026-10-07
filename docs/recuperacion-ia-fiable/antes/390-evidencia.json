@@ -1,0 +1,39 @@
+{
+  "fase": "antes",
+  "width": 390,
+  "browser": "151.0.7922.173",
+  "build": "/workspace/work/recuperacion-ia-qa-antes",
+  "head": "463c1771b12445110874f7b0ea28195703f133c2",
+  "javascript": [
+    "/assets/index-Bu-Dv-wC.js"
+  ],
+  "respuesta503Sintetica": {
+    "error": "Error del servidor."
+  },
+  "saldoPorcentaje": 80,
+  "segundosSimulados": 26,
+  "generaciones": [
+    {
+      "method": "POST",
+      "body": {
+        "questionId": "Q3",
+        "revision": "synthetic-r1",
+        "optionId": "B"
+      },
+      "authorization": "Bearer QA-token-sintetico-sin-acceso-real"
+    },
+    {
+      "method": "POST",
+      "body": {
+        "questionId": "Q3",
+        "revision": "synthetic-r1",
+        "optionId": "B"
+      },
+      "authorization": "Bearer QA-token-sintetico-sin-acceso-real"
+    }
+  ],
+  "intentoOriginalConservado": true,
+  "sinRecuperacionGuardadaDuranteEspera": true,
+  "compiladoSinHMR": true,
+  "sinErroresDePagina": true
+}

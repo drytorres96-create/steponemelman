@@ -78,7 +78,11 @@ function PanelRecuperacion({ ownerId, origen, onTerminar, puedeSeguir = true, on
             <textarea value={razonamiento} maxLength={500} rows={2} onChange={e => setRazonamiento(e.target.value)} placeholder="Elegí esa opción porque…" /></label></details>
           <button className="btn" disabled={pensando} onClick={() => void generar()}>Practicar este error con IA</button>
         </>}
-      {pensando && <p className="mini" role="status">Preparando una recuperación breve… Puedes volver a la pregunta cuando quieras.</p>}
+      {pensando && <div className="pila" role="status">
+        <p><b>Preparando una recuperación breve…</b></p>
+        <progress aria-label="Generando ejercicios de recuperación" style={{ width: '100%', height: 8, accentColor: 'var(--verde)' }} />
+        <p className="mini">Puede tardar hasta un minuto. Puedes volver a la pregunta cuando quieras.</p>
+      </div>}
       {aviso && <p className="recuperacion-aviso" role="status">{aviso} Conservas el material y puedes continuar.</p>}
       <div className="recuperacion-acciones"><button className="btn fantasma" onClick={() => salir('original')}>Volver a la pregunta original</button>
         {puedeSeguir && <button className="btn fantasma" onClick={() => salir('siguiente')}>Ir a la siguiente pregunta</button>}</div>

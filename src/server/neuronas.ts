@@ -39,7 +39,7 @@ export const FRACCION_POR_USUARIO = 0.9
 /** Cortafuegos contra un bucle del cliente: ninguna sesión legítima se acerca a esto. */
 export const LIMITE_LLAMADAS_USUARIO = 300
 
-export type ModoIA = 'calificar' | 'explicar' | 'analizar' | 'examen' | 'confusion' | 'chat'
+export type ModoIA = 'calificar' | 'explicar' | 'analizar' | 'examen' | 'confusion' | 'chat' | 'recuperar'
 
 /**
  * Hasta qué parte del presupuesto puede llegar cada modo.
@@ -56,6 +56,9 @@ export type ModoIA = 'calificar' | 'explicar' | 'analizar' | 'examen' | 'confusi
  */
 export const TECHO_POR_MODO: Record<ModoIA, number> = {
   calificar: 1, confusion: 1, analizar: 0.85, chat: 0.75, explicar: 0.7, examen: 0.6,
+  // Recuperar un error tiene prioridad sobre una explicación adicional. Mantiene
+  // margen para calificar y comparte los mismos 8500 de la cuenta, no otro bote.
+  recuperar: 0.85,
 }
 
 export const techoDeModo = (modo: ModoIA) => Math.floor(PRESUPUESTO_UTIL * TECHO_POR_MODO[modo])

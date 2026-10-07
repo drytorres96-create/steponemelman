@@ -155,6 +155,59 @@ describe('recuperar un fallo con una pregunta por turno', () => {
     expect(actividad.mock.calls.map(c => c[0])).toEqual([true, false])
   })
 
+  it('un error del servidor permite un reintento manual y muestra la espera mientras se prepara', async () => {
+    let completar: (v: unknown) => void = () => {}
+    mock.generar.mockResolvedValueOnce({ estado: 'sin_ia', motivo: 'No se pudo preparar la recuperación. Puedes volver a intentarlo en 60 s.' })
+      .mockImplementationOnce(() => new Promise(resolve => { completar = resolve }))
+    await renderizar(); await pulsar('Practicar este error con IA')
+    expect(host.textContent).toContain('Puedes volver a intentarlo en 60 s.')
+    expect(host.querySelector('section')!.getAttribute('aria-busy')).toBe('false')
+    expect(mock.generar).toHaveBeenCalledOnce()
+    expect(localStorage.getItem(claveRecuperacion('qa-owner', origen)!)).toBeNull()
+    await pulsar('Practicar este error con IA')
+    expect(mock.generar).toHaveBeenCalledTimes(2)
+    expect(host.querySelector('section')!.getAttribute('aria-busy')).toBe('true')
+    expect(host.querySelector('progress')!.getAttribute('aria-label')).toBe('Generando ejercicios de recuperación')
+    expect(host.querySelector('progress')!.hasAttribute('value')).toBe(false)
+    expect(host.textContent).toContain('Puede tardar hasta un minuto.')
+    expect(host.textContent).not.toContain('Puedes volver a intentarlo en 60 s.')
+    expect(boton('Practicar este error con IA').disabled).toBe(true)
+    expect(boton('Volver a la pregunta original').disabled).toBe(false)
+    expect(boton('Ir a la siguiente pregunta').disabled).toBe(false)
+    expect(localStorage.getItem(claveRecuperacion('qa-owner', origen)!)).toBeNull()
+    await act(async () => { completar({ estado: 'ok', data: contenido }) })
+    expect(host.textContent).toContain('Ejercicio 1 de 4')
+    expect(host.querySelector('progress')).toBeNull()
+    expect(host.querySelector('section')!.getAttribute('aria-busy')).toBe('false')
+    expect(mock.generar).toHaveBeenCalledTimes(2)
+    expect(terminar).not.toHaveBeenCalled()
+    expect(actividad.mock.calls.map(c => c[0])).toEqual([true, false, true])
+    expect(localStorage.getItem(claveRecuperacion('qa-owner', origen)!)).not.toBeNull()
+  })
+
+  it.each([
+    ['Volver a la pregunta original', 'original'],
+    ['Ir a la siguiente pregunta', 'siguiente'],
+  ] as const)('%s cancela la generación pendiente e ignora una respuesta tardía', async (botonSalida, destino) => {
+    let completar: (v: unknown) => void = () => {}
+    mock.generar.mockImplementation(() => new Promise(resolve => { completar = resolve }))
+    await renderizar(); await pulsar('Practicar este error con IA')
+    const signal = mock.generar.mock.calls[0][1] as AbortSignal
+    expect(host.textContent).toContain('Puede tardar hasta un minuto.')
+    expect(boton(botonSalida).disabled).toBe(false)
+    await pulsar(botonSalida)
+    expect(signal.aborted).toBe(true)
+    expect(terminar).toHaveBeenCalledExactlyOnceWith(destino)
+    expect(host.querySelector('section')!.getAttribute('aria-busy')).toBe('false')
+    expect(host.querySelector('progress')).toBeNull()
+    await act(async () => { completar({ estado: 'ok', data: contenido }) })
+    expect(host.textContent).not.toContain(contenido.objetivo)
+    expect(host.textContent).not.toContain('Ejercicio 1 de 4')
+    expect(localStorage.getItem(claveRecuperacion('qa-owner', origen)!)).toBeNull()
+    expect(mock.generar).toHaveBeenCalledOnce()
+    expect(terminar).toHaveBeenCalledOnce()
+  })
+
   it('una copia ilegible no se usa ni modifica el intento, y una falla de guardado queda visible', async () => {
     localStorage.setItem(claveRecuperacion('qa-owner', origen)!, '{ broken')
     await renderizar()

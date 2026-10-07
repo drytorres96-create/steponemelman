@@ -2,8 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { NbmeQuestion } from '../nbme/types'
 import { ConceptoZ } from '../schema/concept'
-import worker, { StudyCoach } from './worker'
-import { LIMITE_LLAMADAS_USUARIO, techoDeModo } from './neuronas'
+import worker, { StudyCoach, TIEMPO_RECUPERACION_MS } from './worker'
+import { LIMITE_LLAMADAS_USUARIO, PRESUPUESTO_UTIL, costeEstimado, techoDeModo } from './neuronas'
 import { MAX_TOKENS_RECUPERACION } from './recuperacion-nbme'
 
 const frases = ['Alpha is the first synthetic element.', 'Beta is the second synthetic element.', 'Gamma is the third synthetic element.']
@@ -20,6 +20,7 @@ const q: NbmeQuestion = { id: 'NBME27-P0001', revision: 'synthetic-old-r1', form
   explanation: fuente, objective: objetivo, figures: [], provenance: { sourceFile: 'Synthetic fixture', sourceRecordId: 'QA', notes: [] },
   systems: [], disciplines: [], topic: 'Synthetic order', reasons: [], figureRequired: false, conceptLinks: [] }
 const input = { questionId: q.id, revision: q.revision, optionId: 'B' }
+const planCompacto = { objetivo, ejercicios: salida.ejercicios.map(({ pregunta: _pregunta, explicacion: _explicacion, ...e }) => e) }
 const fragmentoRelacionado = 'Delta is a linked synthetic mechanism component.'
 const relacionado = ConceptoZ.parse({ concept_id: 'QA-C1',
   source: { doc: 'QA-linked', doc_title: 'Synthetic linked source', page: 2, item_id: 'QA-C1', fragment: fragmentoRelacionado },
@@ -133,7 +134,7 @@ describe('puerta de recuperación NBME', () => {
   it('respeta el techo gratuito y el límite de llamadas ya existentes', async () => {
     const { call, env, storage } = setup()
     const day = new Date().toISOString().slice(0, 10)
-    await storage.put('gasto', { v: 2, day, neuronas: techoDeModo('explicar'), llamadas: 0, users: {} })
+    await storage.put('gasto', { v: 2, day, neuronas: techoDeModo('recuperar'), llamadas: 0, users: {} })
     expect((await call()).status).toBe(429)
     await storage.put('gasto', { v: 2, day, neuronas: 0, llamadas: LIMITE_LLAMADAS_USUARIO,
       users: { 'synthetic-user': { neuronas: 0, llamadas: LIMITE_LLAMADAS_USUARIO } } })
@@ -206,10 +207,85 @@ describe('puerta de recuperación NBME', () => {
     env.AI.run.mockImplementation(() => new Promise(() => {}))
     const pending = call()
     await vi.waitFor(() => expect(env.AI.run).toHaveBeenCalledOnce())
-    await vi.advanceTimersByTimeAsync(20001)
+    const signal = (env.AI.run.mock.calls[0][2] as { signal: AbortSignal }).signal
+    await vi.advanceTimersByTimeAsync(TIEMPO_RECUPERACION_MS + 1)
     const res = await pending
     expect(res.status).toBe(503)
-    expect(await res.json()).toMatchObject({ available: false, codigo: 'interno' })
+    expect(await res.json()).toMatchObject({ available: false, codigo: 'tiempo' })
+    expect(signal.aborted).toBe(true)
     expect(await storage.get('gasto')).toMatchObject({ llamadas: 1, neuronas: expect.any(Number) })
+  })
+  it('una generación de 35 segundos funciona con 80 % libre y sin el antiguo corte de 20 segundos', async () => {
+    vi.useFakeTimers()
+    const { call, env, storage } = setup()
+    const day = new Date().toISOString().slice(0, 10)
+    const previo = Math.floor(PRESUPUESTO_UTIL * 0.2)
+    await storage.put('gasto', { v: 2, day, neuronas: previo, llamadas: 9,
+      users: { 'synthetic-user': { neuronas: previo, llamadas: 9 } } })
+    env.AI.run.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({
+      response: JSON.stringify(planCompacto), usage: { prompt_tokens: 700, completion_tokens: 500 },
+    }), 35_000)))
+    let terminada = false
+    const pending = call().then(r => { terminada = true; return r })
+    await vi.waitFor(() => expect(env.AI.run).toHaveBeenCalledOnce())
+    await vi.advanceTimersByTimeAsync(25_001)
+    expect(terminada).toBe(false)
+    await vi.advanceTimersByTimeAsync(10_000)
+    const res = await pending
+    expect(res.status).toBe(200)
+    expect((await res.json()).ejercicios[0]).toMatchObject(salida.ejercicios[0])
+    expect(env.AI.run.mock.calls[0][0]).toBe('@cf/meta/llama-3.3-70b-instruct-fp8-fast')
+    expect((env.AI.run.mock.calls[0][2] as { signal: AbortSignal }).signal.aborted).toBe(false)
+    const gasto = await storage.get<{ v: number; neuronas: number; llamadas: number }>('gasto')
+    expect(gasto).toMatchObject({ v: 2, llamadas: 10 })
+    expect(gasto!.neuronas).toBeGreaterThan(previo)
+    expect(gasto!.neuronas).toBeLessThan(previo + costeEstimado('', MAX_TOKENS_RECUPERACION))
+  })
+  it('recuperación conserva capacidad después del techo de explicación sin reiniciar el contador', async () => {
+    const { call, env, storage } = setup()
+    const day = new Date().toISOString().slice(0, 10)
+    const previo = techoDeModo('explicar') + 1
+    await storage.put('gasto', { v: 2, day, neuronas: previo, llamadas: 12,
+      users: { 'synthetic-user': { neuronas: previo, llamadas: 12 } } })
+    expect((await call()).status).toBe(200)
+    expect(env.AI.run).toHaveBeenCalledOnce()
+    expect(await storage.get('gasto')).toMatchObject({ v: 2, day, llamadas: 13 })
+    expect((await storage.get<{ neuronas: number }>('gasto'))!.neuronas).toBeGreaterThan(previo)
+  })
+  it.each([
+    ['3040: Capacity exceeded. Private prompt must stay private.', 503, 'capacidad'],
+    ['3036: Daily neuron limit reached. Private prompt must stay private.', 429, 'cuota_proveedor'],
+    ['3007: Inference timeout. Private prompt must stay private.', 503, 'tiempo'],
+    ['JSON Mode couldn\'t be met. Private prompt must stay private.', 503, 'proveedor'],
+  ] as const)('distingue el error de Cloudflare sin publicar ni registrar material (%s)', async (mensaje, status, codigo) => {
+    const { call, env } = setup()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      env.AI.run.mockRejectedValue(new Error(mensaje))
+      const response = await call()
+      expect(response.status).toBe(status)
+      const body = await response.json()
+      expect(body).toMatchObject({ available: false, codigo })
+      expect(JSON.stringify(body)).not.toContain('Private prompt')
+      expect(JSON.stringify(log.mock.calls)).not.toContain('Private prompt')
+      if (codigo === 'cuota_proveedor') expect(response.headers.get('Retry-After')).toBeNull()
+    } finally { log.mockRestore() }
+  })
+  it('un modelo que termina después del límite no guarda ejercicios ni inicia otra inferencia', async () => {
+    vi.useFakeTimers()
+    const { call, env, storage } = setup()
+    env.AI.run.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({
+      response: JSON.stringify(planCompacto),
+    }), TIEMPO_RECUPERACION_MS + 10_000)))
+    const pending = call()
+    await vi.waitFor(() => expect(env.AI.run).toHaveBeenCalledOnce())
+    await vi.advanceTimersByTimeAsync(TIEMPO_RECUPERACION_MS + 1)
+    expect((await pending).status).toBe(503)
+    await vi.advanceTimersByTimeAsync(10_000)
+    const entries = await storage.list({ prefix: 'cache:' })
+    expect([...entries.keys()].every(k => k.startsWith('cache:fallo:'))).toBe(true)
+    expect(env.AI.run).toHaveBeenCalledOnce()
+    expect((await call()).status).toBe(503)
+    expect(env.AI.run).toHaveBeenCalledOnce()
   })
 })

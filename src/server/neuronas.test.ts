@@ -32,6 +32,13 @@ describe('presupuesto de neuronas', () => {
     expect(techoDeModo('analizar')).toBeLessThan(techoDeModo('calificar'))
   })
 
+  it('recuperación aprovecha más del mismo presupuesto y conserva capacidad para calificar', () => {
+    expect(techoDeModo('recuperar')).toBe(7225)
+    expect(techoDeModo('recuperar')).toBeGreaterThan(techoDeModo('explicar'))
+    expect(techoDeModo('calificar') - techoDeModo('recuperar')).toBeGreaterThanOrEqual(1275)
+    expect(PRESUPUESTO_UTIL * FRACCION_POR_USUARIO - techoDeModo('recuperar')).toBeGreaterThanOrEqual(425)
+  })
+
   it('la estimación sobrestima antes que quedarse corta', () => {
     const texto = 'x'.repeat(3500)
     expect(tokensDeTexto(texto)).toBe(1000)

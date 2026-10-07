@@ -328,6 +328,9 @@ describe('NBME study interface', () => {
     context.selectedOption = 'I'
     await act(async () => root.render(<NbmePlayer onSalir={exit} />))
     expect(context.loadFigure).not.toHaveBeenCalled()
+    expect(host.textContent).not.toContain('Esta pregunta incluye una figura')
+    expect(host.querySelector('.nbme-figure-notice')).toBeNull()
+    expect([...host.querySelectorAll('a')].some(a => /Ir a (la figura|las respuestas)/.test(a.textContent ?? ''))).toBe(false)
     expect(button('Comprobar respuesta').disabled).toBe(true)
     await act(async () => figures.show())
     expect(context.loadFigure).toHaveBeenCalledOnce()

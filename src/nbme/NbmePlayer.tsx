@@ -137,7 +137,6 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   const feedbackRef = useRef<HTMLHeadingElement>(null)
   const continuarRef = useRef<HTMLButtonElement>(null)
   const figureRef = useRef<HTMLDivElement>(null)
-  const answersRef = useRef<HTMLFieldSetElement>(null)
   const figures = useQuestionFigures(currentQuestion, figureRef)
   const columnasOpciones = useMemo(() => currentQuestion ? analizarColumnasOpciones(currentQuestion.stem, currentQuestion.options) : null, [currentQuestion])
   const feedback = sessionView?.phase === 'feedback' ? currentFeedback : null
@@ -252,13 +251,6 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
               <h1 id="nbme-question-title" className="nbme-question-heading" tabIndex={-1} ref={titleRef}>
                 {sessionView.current?.round ? 'Vuelve a intentarlo' : modoPaso ? 'Pregunta NBME' : `Pregunta ${(sessionView.current?.position ?? 0) + 1} de ${sessionView.initialCount}`}
               </h1>
-              {!!currentQuestion.figures.length && <div className="nbme-figure-notice">
-                <p>Esta pregunta incluye una figura.{currentQuestion.figureRequired && ' Consúltala para responder.'}</p>
-                <div className="nbme-figure-links">
-                  <a href="#nbme-figures" onClick={event => { event.preventDefault(); figureRef.current?.focus(); figureRef.current?.scrollIntoView({ block: 'start' }) }}>Ir a la figura</a>
-                  <a href="#nbme-answers" onClick={event => { event.preventDefault(); answersRef.current?.focus(); answersRef.current?.scrollIntoView({ block: 'start' }) }}>Ir a las respuestas</a>
-                </div>
-              </div>}
               <p className="mini">{yaPracticada ? 'Pregunta ya practicada aquí' : 'Pregunta nueva aquí'}
                 {reintentoTrasExplicacion && ' · Corrección tras ver la explicación'}</p>
               <Enunciado texto={columnasOpciones?.enunciado ?? currentQuestion.stem} />
@@ -272,7 +264,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
                 <img src={figure.url} alt={figure.alt || 'Figura de la pregunta'} decoding="async" /><span>Ampliar figura</span>
               </button>)}</div>}
               <form onSubmit={event => { event.preventDefault(); if (canAnswer) checkAnswer() }}>
-                <fieldset id="nbme-answers" ref={answersRef} tabIndex={-1} className="nbme-options" disabled={!!feedback || busy}>
+                <fieldset id="nbme-answers" tabIndex={-1} className="nbme-options" disabled={!!feedback || busy}>
                   <legend>Selecciona una respuesta</legend>
                   {currentQuestion.options.map(option => {
                     const isSelected = selectedOption === option.id

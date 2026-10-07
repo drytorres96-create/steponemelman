@@ -1,0 +1,15 @@
+[2m[WebServer] [22m(node:125245) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m(node:125259) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 2 tests using 1 worker
+
+(node:125273) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:125273) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 docs/recuperacion-ia-fiable/capturas.spec.ts:30:34 › comparación compilada antes a 390px (3.4s)
+  ✓  2 docs/recuperacion-ia-fiable/capturas.spec.ts:30:34 › comparación compilada antes a 1280px (4.3s)
+
+  2 passed (10.2s)
