@@ -1,0 +1,30 @@
+[WebServer] (node:115790) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+[WebServer] (node:115805) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 12 tests using 1 worker
+
+(node:115830) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:115830) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/12] [chromium] › e2e/aplicacion-dominio.spec.ts:55:3 › aplicación para dominio a 390px › Hoy y Cajas ofrecen el caso menos visto y retoman su respuesta exacta sin otro intento
+[2/12] [chromium] › e2e/aplicacion-dominio.spec.ts:133:3 › aplicación para dominio a 390px › repaso NBME conserva la variante local y devuelve el mismo intento, revisión y posición
+[3/12] [chromium] › e2e/aplicacion-dominio.spec.ts:245:3 › aplicación para dominio a 390px › un fallo de Cajas repite el mismo caso como corrección y cuenta una sola caja
+[4/12] [chromium] › e2e/aplicacion-dominio.spec.ts:289:3 › aplicación para dominio a 390px › el primer intento de Hoy mantiene las opciones base y el recuerdo breve sigue siendo escrito
+[5/12] [chromium] › e2e/aplicacion-dominio.spec.ts:332:3 › aplicación para dominio a 390px › la base guardada se retoma sin promoción y una selección nueva sí prepara su caso
+[6/12] [chromium] › e2e/aplicacion-dominio.spec.ts:385:3 › aplicación para dominio a 390px › examen mantiene la pregunta base y su corrección sin convertirla en otro caso
+[7/12] [chromium] › e2e/aplicacion-dominio.spec.ts:55:3 › aplicación para dominio a 1280px › Hoy y Cajas ofrecen el caso menos visto y retoman su respuesta exacta sin otro intento
+[8/12] [chromium] › e2e/aplicacion-dominio.spec.ts:133:3 › aplicación para dominio a 1280px › repaso NBME conserva la variante local y devuelve el mismo intento, revisión y posición
+[9/12] [chromium] › e2e/aplicacion-dominio.spec.ts:245:3 › aplicación para dominio a 1280px › un fallo de Cajas repite el mismo caso como corrección y cuenta una sola caja
+[10/12] [chromium] › e2e/aplicacion-dominio.spec.ts:289:3 › aplicación para dominio a 1280px › el primer intento de Hoy mantiene las opciones base y el recuerdo breve sigue siendo escrito
+[11/12] [chromium] › e2e/aplicacion-dominio.spec.ts:332:3 › aplicación para dominio a 1280px › la base guardada se retoma sin promoción y una selección nueva sí prepara su caso
+[12/12] [chromium] › e2e/aplicacion-dominio.spec.ts:385:3 › aplicación para dominio a 1280px › examen mantiene la pregunta base y su corrección sin convertirla en otro caso
+  12 passed (35.1s)

@@ -14,6 +14,8 @@ import { guardarAvance } from './api'
 import { coberturaSesion } from './cobertura'
 import { pasoActual, separarGuion, tramoDeConceptos } from './guion'
 import type { EstadoSesion, SesionSemanal } from './tipos'
+import { prepararPracticaConcepto } from '../lib/practica-aplicacion'
+import { aplicarVariante } from '../lib/variantes'
 
 /**
  * Orquestador del recorrido mixto. No reescribe ninguno de los dos reproductores:
@@ -44,6 +46,7 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
   const [tramoListo, setTramoListo] = useState<string | null>(null)
   const [estadoGuardado, setEstadoGuardado] = useState<EstadoSesion>(sesion.estado)
   const esperandoId = useRef(false)
+  const colasPreparadas = useRef(new Map<string, Concepto[]>())
 
   // Una sesión de recuperación se arma al vuelo y no tiene fila que actualizar:
   // lo estudiado se registra igual en `study_state` y `nbme_state`.
@@ -125,7 +128,14 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
     && idsTramo.every((id, n) => guardadaTramo.conceptIds![n] === id)
     && guardadaTramo.conceptIds.slice(idsTramo.length).every(id => idsTramo.includes(id))
       ? guardadaTramo : null
-  const colaTramo = reanudableTramo?.conceptIds?.map(id => conceptos!.get(id)!) ?? conceptosTramo
+  const colaTramo = useMemo(() => {
+    if (reanudableTramo?.conceptIds) {
+      try {
+        return reanudableTramo.conceptIds.map((id, n) => aplicarVariante(conceptos!.get(id)!, reanudableTramo.variantes?.[n]))
+      } catch { return [] }
+    }
+    return (claveTramo ? colasPreparadas.current.get(claveTramo) : undefined) ?? conceptosTramo
+  }, [reanudableTramo, conceptos, claveTramo, conceptosTramo])
 
   // El cursor sólo dice por dónde va el recorrido. Si la sesión está hecha lo decide
   // la evidencia registrada, en el efecto de abajo, no el hecho de llegar al final.
@@ -147,15 +157,24 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
       setTramoListo(claveTramo)
       return
     }
+    // La elección se fija una vez para este tramo, antes de guardar su presentación.
+    let preparada = colasPreparadas.current.get(claveTramo)
+    if (!preparada) {
+      const ahora = Date.now()
+      preparada = conceptosTramo.map(c => prepararPracticaConcepto(c, estado.progreso[c.concept_id], estado.criterios,
+        { ruta: 'repaso', ahora }))
+      colasPreparadas.current.set(claveTramo, preparada)
+    }
     guardarReanudable({
       versionFormato: 3, modulo: `semana:${sesion.id}`, sesion: 'repaso',
       indice: Math.min(tramo.desde, ids.length), ts: Date.now(), sessionId: sesion.id, conceptIds: ids,
+      variantes: preparada.map(c => c.variante_id ?? null),
       titulo: sesion.titulo, subtitulo: sesion.subtitulo ?? 'Sesión de la semana',
       cantidadInicial: ids.length, revisionInicialHecha: false, msVisibles: 0,
     })
-  }, [claveTramo, tramo, tramoListo, conceptosTramo, reanudableTramo, guardarReanudable, sesion])
+  }, [claveTramo, tramo, tramoListo, conceptosTramo, reanudableTramo, guardarReanudable, sesion, estado.progreso, estado.criterios])
 
-  const cola: Cola | null = tramo && conceptosTramo.length ? {
+  const cola: Cola | null = tramo && conceptosTramo.length && colaTramo.length ? {
     titulo: sesion.titulo, subtitulo: sesion.subtitulo ?? 'Sesión de la semana',
     ruta: 'repaso', modulo: `semana:${sesion.id}`, conceptos: colaTramo, sessionId: sesion.id,
   } : null

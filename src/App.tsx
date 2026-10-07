@@ -17,6 +17,7 @@ import { MedidorIA } from './components/MedidorIA'
 import type { OpcionesSesionPersonalizada } from './lib/busqueda'
 import { alternarFormatos } from './lib/formatos'
 import { aplicarVariante, siguienteVariante } from './lib/variantes'
+import { prepararPracticaConcepto } from './lib/practica-aplicacion'
 import { useNbme } from './nbme/NbmeProvider'
 import { deriveNbmeSession, isNbmeSessionArchived } from './nbme/model'
 import { hayConceptosPendientes } from './lib/conceptos-pendientes'
@@ -159,7 +160,7 @@ export default function App() {
     setVista('cajas'); location.hash = 'cajas'
   }, [])
 
-  const prepararCola = useCallback(async (moduloId: string, ruta: RutaId, limite: number, sesionId?: string, presupuestoMinutos?: 10 | 20 | 30): Promise<Cola> => {
+  const prepararCola = useCallback(async (moduloId: string, ruta: RutaId, limite: number, sesionId?: string, presupuestoMinutos?: 10 | 20 | 30, restaurando = false): Promise<Cola> => {
     if (!indice) throw new Error('El material todavía se está preparando. Vuelve a intentarlo en un momento.')
     let conceptos: Concepto[] = []
     let titulo = '', subtitulo = ''
@@ -178,10 +179,12 @@ export default function App() {
       titulo = r.nombre; subtitulo = r.descripcion
     }
     const seleccion = sesionId ? conceptos.slice(0, limite) : construirCola(ruta, conceptos, estado.progreso, limite)
-    const lista = alternarFormatos(seleccion.map(c => ruta === 'aplicacion' ? aplicarVariante(c, siguienteVariante(c, estado.progreso[c.concept_id])) : c), ruta)
+    const lista = alternarFormatos(seleccion.map(c => ruta === 'aplicacion' && !restaurando
+      ? aplicarVariante(c, siguienteVariante(c, estado.progreso[c.concept_id]))
+      : prepararPracticaConcepto(c, estado.progreso[c.concept_id], estado.criterios, { ruta, restaurando, ahora: Date.now() })), ruta)
     if (!lista.length) throw new Error('No hay conceptos disponibles para esta ruta ahora mismo.')
     return { titulo, subtitulo, ruta, modulo: moduloId || ruta, conceptos: lista, presupuestoMinutos }
-  }, [indice, estado.progreso])
+  }, [indice, estado.progreso, estado.criterios])
 
   const mostrarCola = useCallback((preparada: Cola, desde: number) => {
     setError(null); setCola(preparada); setIndiceInicial(desde)
@@ -194,7 +197,9 @@ export default function App() {
     try {
       const mapa = await cargarConceptos(ids, indice.modulos)
       const seleccion = [...new Set(ids)].map(i => mapa.get(i)).filter(Boolean) as Concepto[]
-      const lista = alternarFormatos(seleccion.map(c => opciones.ruta === 'aplicacion' ? aplicarVariante(c, siguienteVariante(c, estado.progreso[c.concept_id], opciones.nivelVariante)) : c), opciones.ruta ?? 'repaso')
+      const lista = alternarFormatos(seleccion.map(c => opciones.ruta === 'aplicacion'
+        ? aplicarVariante(c, siguienteVariante(c, estado.progreso[c.concept_id], opciones.nivelVariante))
+        : prepararPracticaConcepto(c, estado.progreso[c.concept_id], estado.criterios, { ruta: opciones.ruta, ahora: Date.now() })), opciones.ruta ?? 'repaso')
       if (!lista.length) throw new Error('No hay conceptos disponibles para esta sesión.')
       setIndiceInicial(0)
       setCola({ titulo: opciones.titulo ?? 'Mi selección de estudio', subtitulo: opciones.subtitulo ?? 'Practica los conceptos que has elegido',
@@ -203,7 +208,7 @@ export default function App() {
     } catch {
       setError('No se pudo preparar el repaso. Comprueba la conexión y vuelve a intentarlo.')
     } finally { setCargando(false) }
-  }, [indice, estado.progreso])
+  }, [indice, estado.progreso, estado.criterios])
 
   // La preparación no desmonta la pantalla que contiene el botón: así una carga
   // fallida puede explicarse allí mismo y reintentarse con la misma sesión.
@@ -222,7 +227,7 @@ export default function App() {
       }, Math.min(r.indice, conceptos.length))
       return
     }
-    const preparada = await prepararCola(r.modulo && indice.modulos.some(m => m.module_id === r.modulo) ? r.modulo : '', (r.sesion as RutaId) || 'guiada', 30)
+    const preparada = await prepararCola(r.modulo && indice.modulos.some(m => m.module_id === r.modulo) ? r.modulo : '', (r.sesion as RutaId) || 'guiada', 30, undefined, undefined, true)
     mostrarCola(preparada, Math.min(r.indice, preparada.conceptos.length - 1))
   }, [estado.reanudable, prepararCola, mostrarCola, indice])
   const retomarPendiente = async () => {

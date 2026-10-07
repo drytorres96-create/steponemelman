@@ -50,5 +50,14 @@ migraciones de identidad; añade sesiones sin reemplazar las anteriores. No toca
 `study_state`, `nbme_state`, el banco NBME ni los intentos. Preparar una reversión protegida
 por CAS y comprobar hashes, cantidades, pertenencias y presentaciones antes y después.
 
+Comprobar también que cada concepto pueda cumplir los criterios de dominio vigentes.
+Una canónica extensa evaluada únicamente con opciones no demuestra recuerdo activo.
+Proporcionar una variante de aplicación clínica real y revisada cuando haga falta; no
+renombrar una pregunta factual para conceder ese crédito. El caso debe poder justificarse
+con el fundamento docente y los datos explícitos del enunciado. Si la pregunta ya contiene
+una respuesta aceptada, revisar esa pista antes de ofrecer recuerdo sin alternativas.
+`prepararPracticaConcepto` selecciona aplicaciones al crear prácticas nuevas; la restauración
+usa los IDs y variantes guardados sin volver a escoger a partir del progreso mutable.
+
 Una pestaña abierta con un índice anterior puede requerir recargar la página. No aceptar
 módulos de otra versión ni borrar progreso para resolver ese cambio.

@@ -33,6 +33,9 @@ export function PreguntasFrecuentes({ criterios }: { criterios: CriteriosDominio
         <p>Una respuesta independiente se obtiene sin pistas, sin consultar la fuente y sin ver antes la explicación.
           {criterios.exigirSinPistas && ' También está activada la exigencia de al menos una respuesta sin pistas.'}
           {criterios.exigirRecuperacionActiva && ' Además, al menos una debe ser un recuerdo sin alternativas o una aplicación clínica independiente.'}</p>
+        {criterios.exigirRecuperacionActiva && <p>Cuando un mecanismo necesita una respuesta extensa, se practica con opciones. Si ya lo respondiste y todavía falta evidencia activa,
+          una nueva práctica puede ofrecer su caso de aplicación revisado. Conserva el mismo historial del concepto;
+          una sesión que retomas conserva la pregunta que tenía guardada.</p>}
         <p>{criterios.ventanaConfusionDias > 0
           ? `Una confusión entre conceptos bloquea la acreditación durante ${criterios.ventanaConfusionDias} días.`
           : 'No hay una ventana de bloqueo por confusiones activada.'}

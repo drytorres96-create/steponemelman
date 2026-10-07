@@ -1,7 +1,8 @@
 import { ConceptoZ, type Concepto } from '@app/schema/concept'
 import { conceptos as ids } from './escena'
+import { conceptoAplicacionSintetico, IDS_APLICACION } from './aplicacion-fixture'
 // Se valida una plantilla con un id largo y luego se le pone el id corto de la escena: así trae todos los valores por defecto.
-const conceptos = ids.map((id, i) => ({ ...ConceptoZ.parse({
+const conceptos = ids.map((id, i) => IDS_APLICACION.includes(id) ? conceptoAplicacionSintetico(id) : ({ ...ConceptoZ.parse({
   concept_id: `DEMO-${i + 1}`, source: { doc: 'DEMO', doc_title: 'Fuente sintética', page: 1, item_id: String(i + 1), fragment: 'Sin material clínico' },
   objetivo: `Objetivo de práctica ${id}`, afirmacion: 'Contenido sintético de demostración.', respuesta_canonica: 'demostración', sinonimos: [], explicacion: 'Ejemplo de interfaz: aquí iría la explicación del concepto.',
   distractores_cercanos: [{ texto: 'otra cosa', por_que_incorrecto: 'Es un distractor sintético.' }],

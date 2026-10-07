@@ -11,6 +11,8 @@ import { recomendarConceptosNbme } from './relacionados'
 import { guardarRepasoRelacionado, leerRepasoRelacionado, type OrigenRepasoNbme, type RepasoRelacionadoGuardado } from './repaso-relacionado-modelo'
 import { useNbme } from './NbmeProvider'
 import type { NbmeAttempt, NbmeQuestion } from './types'
+import { prepararPracticaConcepto } from '../lib/practica-aplicacion'
+import { aplicarVariante } from '../lib/variantes'
 import './recuperacion-flujo.css'
 
 interface Props {
@@ -25,7 +27,7 @@ export function RecuperacionTrasFallo(props: Props) {
 }
 
 function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId }: Props & { ownerId: string }) {
-  const { indice, iniciarSesion } = useApp()
+  const { indice, estado, iniciarSesion } = useApp()
   const nbme = useNbme()
   const origen: OrigenRepasoNbme = { sessionId: intento.sessionId, attemptId: intento.id,
     questionId: pregunta.id, revision: pregunta.revision, position: intento.position }
@@ -62,10 +64,15 @@ function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId }: Props &
     conceptos, limite: 12 }), [pregunta, nbme.catalog, conceptos])
   const seleccion = elegidos ?? recomendaciones.slice(0, 6).map(r => r.concepto.concept_id)
   const mapa = useMemo(() => new Map(conceptos.map(c => [c.concept_id, c])), [conceptos])
-  const cola: Cola | null = guardada && !guardada.terminado && guardada.continuacion && guardada.ids.every(id => mapa.has(id))
-    ? { titulo: 'Repaso de esta pregunta NBME', subtitulo: 'Al terminar vuelves a tu pregunta y a este bloque.',
-      ruta: 'repaso', modulo: `nbme:${origen.sessionId}`, conceptos: alternarFormatos(guardada.ids.map(id => mapa.get(id)!), 'repaso'),
-      sessionId: guardada.continuacion.sessionId } : null
+  const cola: Cola | null = useMemo(() => {
+    if (!guardada || guardada.terminado || !guardada.continuacion || !guardada.ids.every(id => mapa.has(id))) return null
+    try {
+      return { titulo: 'Repaso de esta pregunta NBME', subtitulo: 'Al terminar vuelves a tu pregunta y a este bloque.',
+        ruta: 'repaso', modulo: `nbme:${origen.sessionId}`,
+        conceptos: guardada.ids.map((id, n) => aplicarVariante(mapa.get(id)!, guardada.continuacion!.variantes?.[n])),
+        sessionId: guardada.continuacion.sessionId }
+    } catch { return null }
+  }, [guardada, mapa, origen.sessionId])
   const vigente = () => {
     const n = actual.current
     return n.currentSession?.id === origen.sessionId && n.sessionView?.phase === 'feedback'
@@ -124,13 +131,18 @@ function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId }: Props &
     if (retomar) {
       if (!cola) { setError('Faltan conceptos para retomar la cola exacta. El NBME y tus intentos se conservan.'); return }
     } else {
-      const ids = seleccion.filter(id => mapa.has(id))
-      if (!ids.length) return
+      const seleccionados = seleccion.filter(id => mapa.has(id))
+      if (!seleccionados.length) return
+      const ahora = Date.now()
+      const preparados = alternarFormatos(seleccionados.map(id => prepararPracticaConcepto(mapa.get(id)!,
+        estado.progreso[id], estado.criterios, { ruta: 'repaso', ahora })), 'repaso')
+      const ids = preparados.map(c => c.concept_id)
       const sessionId = iniciarSesion(`nbme:${origen.sessionId}`, 'repaso')
       if (!sessionId) { setError('El guardado del progreso todavía se está preparando. Vuelve a intentarlo.'); return }
       const valor: RepasoRelacionadoGuardado = { version: 1, ownerId, origen, ids, terminado: false,
         continuacion: { versionFormato: VERSION_FORMATO_ACTUAL, modulo: `nbme:${origen.sessionId}`, sesion: 'repaso', indice: 0, ts: Date.now(), sessionId,
-          conceptIds: ids, titulo: 'Repaso de esta pregunta NBME', subtitulo: 'Al terminar vuelves a tu pregunta y a este bloque.' } }
+          conceptIds: ids, variantes: preparados.map(c => c.variante_id ?? null),
+          titulo: 'Repaso de esta pregunta NBME', subtitulo: 'Al terminar vuelves a tu pregunta y a este bloque.' } }
       persistir(valor)
     }
     actual.current.pauseSession(); setModo('repaso'); onActividad(true)

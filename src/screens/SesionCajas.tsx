@@ -13,6 +13,8 @@ import type { Concepto } from '../schema/concept'
 import type { Intento } from '../srs/tipos'
 import { Reproductor, type Cola } from './Reproductor'
 import { necesitaReintento } from './sesion'
+import { prepararPracticaConcepto } from '../lib/practica-aplicacion'
+import { aplicarVariante } from '../lib/variantes'
 
 const SUBTITULO = 'Consolidación y mantenimiento de lo que ya estudiaste.'
 /**
@@ -98,7 +100,19 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
     let vivo = true
     const ids = [...new Set(items.filter(i => i.tipo === 'concepto').map(i => i.id))]
     if (!ids.length || !indice) { setConceptos(new Map()); return }
-    cargarConceptos(ids, indice.modulos).then(mapa => { if (vivo) setConceptos(mapa) })
+    cargarConceptos(ids, indice.modulos).then(mapa => {
+      if (!vivo) return
+      const actual = estadoRef.current
+      const guardada = actual.reanudable
+      const ahora = Date.now()
+      setConceptos(new Map([...mapa].map(([id, c]) => {
+        // Una continuación existente tiene prioridad, incluso si conservó la base.
+        const restaurando = guardada?.sessionId === sesionPaso && guardada.modulo === modulo
+          && guardada.conceptIds?.length === 1 && guardada.conceptIds[0] === id
+        return [id, restaurando ? aplicarVariante(c, guardada.variantes?.[0])
+          : prepararPracticaConcepto(c, actual.progreso[id], actual.criterios, { ruta: 'repaso', ahora })]
+      })))
+    })
       .catch(() => { if (vivo) setError('No se pudieron cargar los conceptos de tus cajas. Comprueba la conexión y vuelve a intentarlo.') })
     return () => { vivo = false }
     // Las cajas se preparan una vez al entrar: estudiar no cambia qué hay que cargar.
@@ -116,7 +130,8 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
       return
     }
     guardarReanudable({ versionFormato: 3, modulo, sesion: 'repaso', indice: 0, ts: Date.now(), sessionId: sesionPaso,
-      conceptIds: [c.concept_id], titulo, subtitulo: SUBTITULO, cantidadInicial: 1, revisionInicialHecha: false, msVisibles: 0 })
+      conceptIds: [c.concept_id], variantes: [c.variante_id ?? null], titulo, subtitulo: SUBTITULO,
+      cantidadInicial: 1, revisionInicialHecha: false, msVisibles: 0 })
   }, [paso, cursor, conceptos, preparado, estado.reanudable, guardarReanudable, sesionPaso, modulo, titulo])
 
   // Paso de pregunta: la primera vez abre su sesión; una reinserción retoma la misma, que ya trae el reintento.
