@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { SynapseHeading } from './SynapseHeading'
+import { useSynapseScroll } from './useSynapseScroll'
 
 /** Public, decorative scenery is independent of study content and user state. */
 export type CinematicScene = 'forest' | 'dawn' | 'constellation' | 'lens' | 'ribbons' | 'horizon' | 'stone' | 'smoke' | 'sunrise' | 'sunset' | 'luminous/ocean'
@@ -41,6 +43,8 @@ function SceneImage({ scene, className = '', priority = false, sizes = '100vw' }
  * conservan la escena entrante y la anterior; las demás imágenes las recuerda el navegador.
  */
 export function CinematicBackdrop({ scene, quiet = false }: { scene: CinematicScene; quiet?: boolean }) {
+  const fondoRef = useRef<HTMLDivElement>(null)
+  useSynapseScroll(fondoRef, quiet)
   const [montadas, setMontadas] = useState<CinematicScene[]>(() => [scene])
   const [activa, setActiva] = useState<CinematicScene>(scene)
   const [oculta, setOculta] = useState(() => document.visibilityState === 'hidden')
@@ -56,7 +60,7 @@ export function CinematicBackdrop({ scene, quiet = false }: { scene: CinematicSc
     const cuadro = requestAnimationFrame(() => setActiva(scene))
     return () => cancelAnimationFrame(cuadro)
   }, [scene, montadas])
-  return <div className={`cinematic-backdrop${quiet ? ' cinematic-backdrop-quiet' : ''}`} data-scene={scene} data-paused={quiet || oculta ? 'true' : 'false'} aria-hidden="true">
+  return <div ref={fondoRef} className={`cinematic-backdrop${quiet ? ' cinematic-backdrop-quiet' : ''}`} data-scene={scene} data-paused={quiet || oculta ? 'true' : 'false'} aria-hidden="true">
     {montadas.map(id => {
       const fondo = FONDOS.find(f => f.id === id)
       return fondo && <picture key={id} className="cine-escena" data-activa={id === activa ? 'true' : 'false'}>
@@ -65,7 +69,7 @@ export function CinematicBackdrop({ scene, quiet = false }: { scene: CinematicSc
       </picture>
     })}
     <div className="cine-velo" /><div className="cine-haz" /><div className="cine-niebla" />
-    <div className="cine-halo" /><div className="cine-vineta" />
+    <div className="cine-halo" /><div className="cine-vineta" /><div className="cine-bottom-blur" />
   </div>
 }
 
@@ -139,7 +143,7 @@ export function NavigationIcon({ name }: { name: string }) {
 export function StudyHero() {
   return <header className="editorial-hero" data-depth-scene>
     <ScenePhoto scene="dawn" />
-    <div className="editorial-hero-copy"><p className="editorial-eyebrow">Plan diario clásico</p><h1>Tu estudio <em>de hoy.</em></h1><p>Puedes pausar y retomar cuando lo necesites.</p></div>
+    <div className="editorial-hero-copy"><p className="editorial-eyebrow">Plan diario clásico</p><h1><SynapseHeading text="Tu estudio" /> <em>de hoy.</em></h1><p>Puedes pausar y retomar cuando lo necesites.</p></div>
   </header>
 }
 
@@ -149,6 +153,6 @@ export function ScreenHeading({ eyebrow, title, description, scene = 'organic', 
 }) {
   return <header className={`screen-heading screen-heading-${scene}`} data-depth-scene>
     <ScenePhoto scene={landscape} />
-    <div className="screen-heading-copy"><p className="editorial-eyebrow">{eyebrow}</p><h1>{title}</h1><p className="sutil">{description}</p></div>
+    <div className="screen-heading-copy"><p className="editorial-eyebrow">{eyebrow}</p><h1><SynapseHeading text={title} /></h1><p className="sutil">{description}</p></div>
   </header>
 }
