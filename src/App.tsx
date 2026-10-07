@@ -24,6 +24,7 @@ import type { FiltrosBusqueda } from './lib/busqueda'
 import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, type CinematicObject, type CinematicScene } from './components/Editorial'
 import { Resguardo, FalloPantalla } from './components/Resguardo'
 import type { Vineta } from './vinetas/modelo'
+import { NavbarMenu } from './components/NavbarMenu'
 
 // Hoy se abre enseguida. El resto se descarga al entrar y queda en la caché del navegador.
 const Inicio = lazy(() => import('./screens/Inicio').then(m => ({ default: m.Inicio })))
@@ -272,16 +273,11 @@ export default function App() {
             {!enConcentracion && <MedidorIA />}
             {sincronizacionVisible && <button className="btn pequeno fantasma" title="Comprobar y sincronizar el progreso"
               onClick={() => { void sincronizarTodo() }} aria-live="polite">{sincronizacionVisible}</button>}
-            {!enConcentracion && <details className="menu-cuenta study-secondary-nav" onKeyDown={event => {
-              if (event.key !== 'Escape') return
-              event.preventDefault()
-              event.currentTarget.open = false
-              event.currentTarget.querySelector('summary')?.focus()
-            }}><summary><span className="synapse-menu-icon" aria-hidden="true"><span /><span /><span /></span><span>Biblioteca, progreso y cuenta</span></summary><div className="menu-cuenta-opciones">{SECUNDARIAS.map(n => <button className="btn pequeno fantasma" key={n.id} onClick={e => { ir(n.id); e.currentTarget.closest('details')?.removeAttribute('open') }}>{n.txt}</button>)}<button className="btn pequeno fantasma" onClick={async () => {
+            {!enConcentracion && <NavbarMenu active={vista} items={SECUNDARIAS} onNavigate={ir} onSignOut={async () => {
               const guardado = await sincronizarTodo()
               if (!guardado && !confirm('Puede haber cambios pendientes. Se conservarán en este navegador para esta cuenta. ¿Cerrar sesión?')) return
               try { await signOut() } catch { setError('No se pudo cerrar la sesión. Vuelve a intentarlo.') }
-            }}>Salir</button></div></details>}
+            }} />}
           </div>
         </div>
       </header>

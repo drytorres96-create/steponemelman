@@ -80,7 +80,7 @@ describe('continuidad y navegación accesible', () => {
     expect(host.textContent).toContain('Hoy ya está')
     // Mi semana, Recuperación y Progreso viven ya dentro de Hoy: el menú discreto guarda
     // lo demás, y estudiar más es ir a «Elegir contenido» a propósito.
-    const menu = [...host.querySelectorAll('.menu-cuenta-opciones button')].map(b => b.textContent)
+    const menu = [...host.querySelectorAll('.menu-cuenta-opciones button')].map(b => b.getAttribute('aria-label'))
     expect(menu).toEqual(['Biblioteca', 'Progreso', 'Ajustes y respaldo', 'Calidad del material', 'Plan diario clásico', 'Salir'])
     await act(async () => { boton('Biblioteca').click() })
     expect(window.location.hash).toBe('#modulos')
