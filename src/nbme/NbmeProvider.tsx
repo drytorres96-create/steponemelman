@@ -7,10 +7,10 @@ import { createNbmeApi, parseNbmeCatalog, parseNbmeQuestion, questionRefKey, Nbm
 import { preguntaConLecturasDudosas } from './texto'
 import { emptyNbmeState, parseNbmeState, mergeNbmeStates, startNbmeSession, setNbmeDraft,
   submitNbmeAnswer, reviewNbmeAnswer, updateNbmeSession, activateNbmeSession, deriveNbmeSession, updateNbmeFilters,
-  discardNbmeSession, countNbmeSessionAttempts, setNbmeBankVersion, referenciasPendientesNbme } from './model'
+  discardNbmeSession, archiveNbmeSession, isNbmeSessionArchived, countNbmeSessionAttempts, setNbmeBankVersion, referenciasPendientesNbme } from './model'
 import { NbmeSyncEngine, parseNbmeSnapshot, stableNbmeJson, type NbmeSnapshot, type NbmeSyncReply } from './sync'
 import type { NbmeAttempt, NbmeCatalog, NbmeFilters, NbmeQuestion, NbmeQuestionRef, NbmeSession,
-  NbmeSessionView, NbmeState } from './types'
+  NbmeSessionView, NbmeState, NbmeFailedReview } from './types'
 
 export interface NbmeSyncStatus {
   state: 'initializing' | 'pending' | 'syncing' | 'synced' | 'offline' | 'error'
@@ -51,6 +51,10 @@ interface NbmeContextValue {
   resumeSession(id: string): Promise<boolean>
   /** Salida siempre disponible para un bloque que ya no puede terminarse. */
   discardSession(id: string): boolean
+  /** Quita el bloque de la biblioteca; conserva todas sus respuestas y progreso. */
+  archiveSession(id: string): boolean
+  /** Lectura de los errores originales: no activa ni crea una sesión. */
+  reviewSessionFailures(id: string, signal?: AbortSignal): Promise<NbmeFailedReview[]>
   attemptsInSession(id: string): number
   continueSession(): void
   continueWithoutBudget(): void
@@ -403,8 +407,8 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
   }, [key, userId, reloadCatalog, replace, persist, syncNow])
 
   const displaySessionId = state.activeSessionId ?? shownSessionId
-  const currentSession = displaySessionId ? state.sessions[displaySessionId] ?? null : null
-  const sessionView = useMemo(() => displaySessionId ? deriveNbmeSession(state, displaySessionId) : null, [state, displaySessionId])
+  const currentSession = displaySessionId && !isNbmeSessionArchived(state, displaySessionId) ? state.sessions[displaySessionId] ?? null : null
+  const sessionView = useMemo(() => currentSession ? deriveNbmeSession(state, currentSession.id) : null, [state, currentSession])
   const currentRef = sessionView?.current ?? null
   const currentKey = currentRef ? questionRefKey(currentRef) : null
   const currentQuestion = currentKey ? questions.current.get(currentKey) ?? null : null
@@ -523,7 +527,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
   const resumeSession = useCallback(async (id: string): Promise<boolean> => {
     if (actionLock.current || !engineRef.current) return false
     const session = actual.current.sessions[id]
-    if (!session) return false
+    if (!session || isNbmeSessionArchived(actual.current, id)) return false
     actionLock.current = true
     setBusy(true)
     const epoch = aliveEpoch.current
@@ -545,6 +549,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       // sigue ready. No sustituir initial: rompería intentos y sincronización.
       if (!await ensureQuestions(refs, refs.filter(ref => disponibles.get(ref.id)?.revision !== ref.revision))) return false
       if (!mounted.current || epoch !== aliveEpoch.current) return false
+      if (isNbmeSessionArchived(actual.current, id)) return false
       flushTime()
       edit(previous => updateNbmeSession(activateNbmeSession(previous, id), id, { paused: false }))
       setShownSessionId(id)
@@ -625,13 +630,34 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     return true
   }, [edit, shownSessionId])
   const attemptsInSession = useCallback((id: string) => countNbmeSessionAttempts(actual.current, id), [])
+  const archiveSession = useCallback((id: string): boolean => {
+    if (!engineRef.current || !actual.current.sessions[id] || isNbmeSessionArchived(actual.current, id)) return false
+    flushTime()
+    if (shownSessionId === id) setShownSessionId(null)
+    if (engagedSession.current === id) engagedSession.current = null
+    edit(previous => archiveNbmeSession(previous, id))
+    setError(null)
+    return true
+  }, [edit, shownSessionId, flushTime])
+  const reviewSessionFailures = useCallback(async (id: string, signal?: AbortSignal): Promise<NbmeFailedReview[]> => {
+    const session = actual.current.sessions[id]
+    if (!session || isNbmeSessionArchived(actual.current, id)) throw new Error('Esta sesión ya no está en la biblioteca.')
+    const attempts = session.initial.map((_, position) => actual.current.attempts[`${id}:${position}`])
+      .filter((attempt): attempt is NbmeAttempt => !!attempt && !attempt.correct && !attempt.conflict)
+    if (!attempts.length) return []
+    const epoch = aliveEpoch.current
+    const loaded = await api.questions(attempts.map(attempt => ({ id: attempt.questionId, revision: attempt.revision })), signal)
+    if (!mounted.current || epoch !== aliveEpoch.current || signal?.aborted) throw new Error('La revisión se ha cerrado.')
+    if (isNbmeSessionArchived(actual.current, id)) throw new Error('Esta sesión ya no está en la biblioteca.')
+    return loaded.map((question, index) => ({ question, attempt: attempts[index] }))
+  }, [api])
 
   const value: NbmeContextValue = { catalog, state, currentSession, sessionView, currentQuestion, sessionQuestions,
     selectedOption, currentFeedback: sessionView?.attempt ?? null, filters: state.filters, loading, questionLoading, busy,
     elapsedMs, budgetReached, error: error ?? storageWarning, storageWarning, syncStatus, catalogStale,
     localNotice, dismissLocalNotice: () => setLocalNotice(null),
     startSession, selectAnswer, checkAnswer, nextQuestion,
-    pauseSession, resumeSession, discardSession, attemptsInSession, continueSession,
+    pauseSession, resumeSession, discardSession, archiveSession, reviewSessionFailures, attemptsInSession, continueSession,
     continueWithoutBudget: continueSession, setFilters, syncNow, reloadCatalog, retryQuestionLoad, loadFigure }
   return <NbmeContext.Provider value={value}>{children}</NbmeContext.Provider>
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cargarConceptos } from '../data/corpus'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
-import { deriveNbmeSession } from '../nbme/model'
+import { deriveNbmeSession, isNbmeSessionArchived } from '../nbme/model'
 import { NbmePlayer } from '../nbme/NbmePlayer'
 import { usePielEstudio } from '../components/PielEstudio'
 import { PausaDeBloque } from '../components/PausaDeBloque'
@@ -39,6 +39,7 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
   const [nbmeId, setNbmeId] = useState<string | null>(sesion.nbmeSessionId)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [recuperando, setRecuperando] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
   const [tramoListo, setTramoListo] = useState<string | null>(null)
   const [estadoGuardado, setEstadoGuardado] = useState<EstadoSesion>(sesion.estado)
@@ -63,13 +64,19 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
     setError(null)
     void (async () => {
       try {
+        if (sesion.nbmeSessionId && isNbmeSessionArchived(nbmeRef.current.state, sesion.nbmeSessionId)) {
+          throw new Error('sesion_borrada')
+        }
         const mapa = conceptIds.length && indice ? await cargarConceptos(conceptIds, indice.modulos) : new Map<string, Concepto>()
         if (!vivo) return
+        if (sesion.nbmeSessionId && isNbmeSessionArchived(nbmeRef.current.state, sesion.nbmeSessionId)) {
+          throw new Error('sesion_borrada')
+        }
         setConceptos(mapa)
         if (preguntas.length > 20) throw new Error('demasiadas preguntas')
         if (preguntas.length) {
           const guardadaId = sesion.nbmeSessionId
-          if (guardadaId && nbmeRef.current.state.sessions[guardadaId]) {
+          if (guardadaId && nbmeRef.current.state.sessions[guardadaId] && !isNbmeSessionArchived(nbmeRef.current.state, guardadaId)) {
             await nbmeRef.current.resumeSession(guardadaId)
           } else {
             esperandoId.current = true
@@ -78,9 +85,11 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
           }
         }
       } catch (fallo) {
-        if (vivo) setError(fallo instanceof Error && fallo.message === 'demasiadas preguntas'
-          ? 'Esta sesión tiene más de veinte preguntas y no puede abrirse como un solo bloque.'
-          : 'No se pudo preparar esta sesión. Comprueba la conexión y vuelve a intentarlo.')
+        if (vivo) setError(fallo instanceof Error && fallo.message === 'sesion_borrada'
+          ? 'El bloque NBME de esta sesión se borró de la biblioteca. Tus respuestas y progreso se conservan.'
+          : fallo instanceof Error && fallo.message === 'demasiadas preguntas'
+            ? 'Esta sesión tiene más de veinte preguntas y no puede abrirse como un solo bloque.'
+            : 'No se pudo preparar esta sesión. Comprueba la conexión y vuelve a intentarlo.')
       } finally {
         if (vivo) setCargando(false)
       }
@@ -154,11 +163,11 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
   // En un paso de pregunta la sesión NBME tiene que estar activa y sin pausar. Durante el
   // respiro no se retoma: ese tiempo no debe contar como tiempo en la pregunta.
   useEffect(() => {
-    if (paso?.kind !== 'pregunta' || !nbmeId || nbme.busy || nbme.loading) return
+    if (recuperando || paso?.kind !== 'pregunta' || !nbmeId || nbme.busy || nbme.loading) return
     const guardada = nbme.state.sessions[nbmeId]
-    if (!guardada) return
+    if (!guardada || isNbmeSessionArchived(nbme.state, nbmeId)) return
     if (nbme.state.activeSessionId !== nbmeId || guardada.paused) void nbmeRef.current.resumeSession(nbmeId)
-  }, [paso?.kind, nbmeId, nbme.busy, nbme.loading, nbme.state])
+  }, [recuperando, paso?.kind, nbmeId, nbme.busy, nbme.loading, nbme.state])
 
   const vista = nbmeId ? deriveNbmeSession(nbme.state, nbmeId) : null
   const intentosSesion = Object.values(estado.progreso).flatMap(p => p.intentos).filter(t => t.session_id === sesion.id)
@@ -239,7 +248,7 @@ export function SesionMixta({ sesion, onSalir, efimera = false, onCompletada, et
   return <div className="pila">{encabezado}
     {aviso && <p className="mini">{aviso}</p>}
     {!nbmeId && nbme.error && <div className="tarjeta" role="alert"><p>{nbme.error}</p></div>}
-    <NbmePlayer modoPaso etiquetaSalida={etiquetaSalida} onSalir={onSalir}
+    <NbmePlayer recuperarErrores onRecuperacion={setRecuperando} modoPaso etiquetaSalida={etiquetaSalida} onSalir={onSalir}
       avisoFallo="Vuelve en las cajas de los próximos días."
       onPasoCompleto={() => { nbme.nextQuestion(); avanzarA(cursor + 1) }} />
   </div>

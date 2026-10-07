@@ -34,6 +34,7 @@ beforeEach(() => {
     syncStatus: { state: 'synced', message: '', lastSyncedAt: 1 },
     startSession: vi.fn().mockResolvedValue(true), selectAnswer: vi.fn(), checkAnswer: vi.fn(), nextQuestion: vi.fn(),
     discardSession: vi.fn().mockReturnValue(true), attemptsInSession: vi.fn().mockReturnValue(0),
+    archiveSession: vi.fn().mockReturnValue(true), reviewSessionFailures: vi.fn().mockResolvedValue([]),
     catalogStale: false,
     pauseSession: vi.fn(), resumeSession: vi.fn().mockResolvedValue(true), continueSession: vi.fn(), continueWithoutBudget: vi.fn(),
     setFilters: vi.fn(), syncNow: vi.fn().mockResolvedValue(true), reloadCatalog: vi.fn().mockResolvedValue(undefined),
@@ -48,6 +49,42 @@ const prepareSession = () => {
   const state = startNbmeSession(emptyNbmeState(), { id: 'QA-session', title: 'Synthetic session', refs: [{ id: question.id, revision: question.revision }] }, 100)
   context = { ...context, state, currentSession: state.sessions['QA-session'], sessionView: deriveNbmeSession(state, 'QA-session'), currentQuestion: question }
 }
+
+it('offers per-session actions, explains preserved progress and shows completion with first-round colors', async () => {
+  prepareSession()
+  context.state = submitNbmeAnswer(context.state, 'QA-session', 0, question, 'A', 10, 200)
+  context.state = reviewNbmeAnswer(context.state, 'QA-session', 0, 201)
+  context.state = submitNbmeAnswer(context.state, 'QA-session', 1, question, 'I', 10, 300)
+  context.state = reviewNbmeAnswer(context.state, 'QA-session', 1, 301)
+  await act(async () => root.render(<NbmeLibrary onStart={exit} />))
+  expect(host.textContent).toContain('Completada')
+  const bar = host.querySelector('[role="img"]')!
+  expect(bar.getAttribute('aria-label')).toContain('0 correctas (0%), 1 equivocadas (100%), 0 sin respuesta válida (0%)')
+  expect(button('Continuar').disabled).toBe(true)
+  await click('Borrar sesión')
+  expect(host.textContent).toContain('Tus respuestas, aciertos, errores y el progreso de conceptos se conservan.')
+  expect(context.discardSession).not.toHaveBeenCalled()
+  await click('Sí, borrar sesión')
+  expect(context.archiveSession).toHaveBeenCalledExactlyOnceWith('QA-session')
+  expect(context.discardSession).not.toHaveBeenCalled()
+})
+
+it('opens a failed-question review without starting a new block and returns to the saved sessions', async () => {
+  prepareSession()
+  context.state = submitNbmeAnswer(context.state, 'QA-session', 0, question, 'A', 10, 200)
+  const original = context.state.attempts['QA-session:0']
+  vi.mocked(context.reviewSessionFailures).mockResolvedValue([{ question, attempt: original }])
+  await act(async () => root.render(<NbmeLibrary onStart={exit} />))
+  await click('Ver solo falladas (1)')
+  expect(context.reviewSessionFailures).toHaveBeenCalledWith('QA-session', expect.any(AbortSignal))
+  expect(host.querySelector('[role="dialog"]')?.textContent).toContain('Tu respuesta original')
+  expect(host.querySelector('[role="dialog"]')?.textContent).toContain('Respuesta correcta')
+  expect(context.startSession).not.toHaveBeenCalled()
+  expect(context.nextQuestion).not.toHaveBeenCalled()
+  await click('Volver a mis sesiones')
+  expect(host.querySelector('[role="dialog"]')).toBeNull()
+  expect(context.state.attempts['QA-session:0']).toEqual(original)
+})
 
 function mockFigures() {
   const observers: IntersectionObserverCallback[] = []

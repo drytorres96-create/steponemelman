@@ -90,8 +90,8 @@ export function evidenciaIndependiente(i: Intento): boolean {
     && i.pistas_usadas === 0 && i.fuente_consultada === false && i.explicacion_previa === false
 }
 
-function ultimoResuelto(p: ProgresoConcepto): Intento | undefined {
-  return [...p.intentos].reverse().find(i => i.resultado !== 'revision')
+function ultimoResuelto(p: ProgresoConcepto, ahora: number): Intento | undefined {
+  return [...p.intentos].reverse().find(i => i.ts <= ahora && i.resultado !== 'revision')
 }
 
 /**
@@ -99,9 +99,11 @@ function ultimoResuelto(p: ProgresoConcepto): Intento | undefined {
  * se reconstruye tras el último fallo comprobado. Exportado porque la cercanía al
  * dominio necesita saber desde cuándo corre el reloj de la separación.
  */
-export function aciertosVigentes(p: ProgresoConcepto): Intento[] {
+export function aciertosVigentes(p: ProgresoConcepto, ahora = Infinity): Intento[] {
   const vigentes: Intento[] = []
   for (const intento of p.intentos) {
+    // Consultar una fecha pasada no permite usar aciertos ni fallos posteriores.
+    if (intento.ts > ahora) continue
     // Una respuesta por revisar no es evidencia de saber ni de olvidar: no suma ni resta.
     if (intento.resultado === 'revision') continue
     if (intentoCorrecto(intento)) {
@@ -114,12 +116,12 @@ export function aciertosVigentes(p: ProgresoConcepto): Intento[] {
 }
 
 export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): EvidenciaDominio {
-  const correctas = aciertosVigentes(p)
+  const correctas = aciertosVigentes(p, ahora)
   const requeridas = c.recuperaciones
   const recuperacion = correctas.some(evidenciaActiva)
   // Retención estimada hoy según el planificador. Es la señal continua: sube con cada
   // acierto bien espaciado y baja sola con los días, así que el avance se ve sin puertas.
-  const dias = p.ultimo ? Math.max(0, (ahora - p.ultimo) / DIA) : 0
+  const dias = p.ultimo !== null ? Math.max(0, (ahora - p.ultimo) / DIA) : 0
   const prevista = p.estabilidad > 0 ? retencion(dias, p.estabilidad) : 0
   const sesiones = new Set(correctas.map(i => i.session_id || `legacy-dia-${Math.floor(i.ts / DIA)}`))
   const separadas = c.separacionHoras === 0 || c.sesiones < 2
@@ -128,7 +130,7 @@ export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora =
       (correctas[correctas.length - 1].ts - correctas[0].ts) >= c.separacionHoras * 3_600_000
   const sinPistas = correctas.some(i => i.pistas_usadas === 0)
   const confusionReciente = p.intentos.some(i =>
-    i.tipo_error === 'confusion_conceptos' && (ahora - i.ts) < c.ventanaConfusionDias * DIA)
+    i.ts <= ahora && i.tipo_error === 'confusion_conceptos' && (ahora - i.ts) < c.ventanaConfusionDias * DIA)
 
   const detalle: EvidenciaDominio['detalle'] = [
     { clave: 'aciertos', criterio: `${requeridas} respuestas correctas independientes`, cumplido: correctas.length >= requeridas, valor: `${correctas.length}` },
@@ -164,15 +166,26 @@ export function evaluarDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora =
  */
 export function resumenDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): { texto: string; pendientes: string[] } {
   const ev = evaluarDominio(p, c, ahora)
-  const pendientes = ev.detalle.filter(d => !d.cumplido).map(d => d.criterio)
+  const pendientes = ev.detalle.filter(d => d.clave !== 'retencion' && !d.cumplido).map(d => d.criterio)
   const de = (clave: ClaveCriterio) => ev.detalle.find(d => d.clave === clave)?.valor ?? '—'
   const senales = `retención estimada hoy ${de('retencion')}`
 
-  if (ev.cumple) return {
-    texto: estaVencido(p, ahora)
-      ? `Criterios de dominio alcanzados · repaso pendiente · ${senales}`
-      : `Dominio acreditado · ${senales}`,
-    pendientes: estaVencido(p, ahora) ? ['Completar el repaso pendiente para mantener el dominio vigente'] : [],
+  if (ev.cumple) {
+    const ultimo = ultimoResuelto(p, ahora)
+    if (ultimo && !intentoCorrecto(ultimo)) return {
+      texto: `Criterios de dominio alcanzados · recuperación pendiente · ${senales}`,
+      pendientes: ['Recuperar el concepto tras la última respuesta fallada'],
+    }
+    if (proximaRevision(p) === null) return {
+      texto: `Criterios de dominio alcanzados · mantenimiento por comprobar · ${senales}`,
+      pendientes: ['Completar un repaso para comprobar el mantenimiento y su próxima fecha'],
+    }
+    return {
+      texto: estaVencido(p, ahora)
+        ? `Criterios de dominio alcanzados · repaso pendiente · ${senales}`
+        : `Dominio acreditado · ${senales}`,
+      pendientes: estaVencido(p, ahora) ? ['Completar el repaso pendiente para mantener el dominio vigente'] : [],
+    }
   }
   return {
     texto: `Dominio: ${de('aciertos')}/${ev.requeridas} aciertos independientes · ${de('sesiones')}/${c.sesiones} sesiones · ${senales}`,
@@ -181,10 +194,10 @@ export function resumenDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora =
 }
 
 export function calcularEstado(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): EstadoDominio {
-  if (!p.intentos.length) return 'nuevo'
+  if (!p.intentos.some(i => i.ts <= ahora)) return 'nuevo'
   const ev = evaluarDominio(p, c, ahora)
-  const ultimo = ultimoResuelto(p)
-  if (p.dominado_en && ultimo && !intentoCorrecto(ultimo)) return 'reaprendizaje'
+  const ultimo = ultimoResuelto(p, ahora)
+  if (p.dominado_en && p.dominado_en <= ahora && ultimo && !intentoCorrecto(ultimo)) return 'reaprendizaje'
   if (ev.cumple) return estaVencido(p, ahora) ? 'requiere_repaso' : 'dominado'
   if (estaVencido(p, ahora)) return 'requiere_repaso'
   const correctas = Number(ev.detalle[0].valor)
@@ -201,9 +214,9 @@ export function dominioVigente(p: ProgresoConcepto, c: CriteriosDominio, ahora =
 /** Etapas visibles del aprendizaje, para diferenciarlas en la interfaz. */
 export type Etapa = 'exposicion' | 'comprension' | 'recuperacion' | 'consolidacion' | 'dominio'
 export function etapa(p: ProgresoConcepto, c = CRITERIOS_POR_DEFECTO, ahora = Date.now()): Etapa {
-  if (!p.intentos.length) return 'exposicion'
+  if (!p.intentos.some(i => i.ts <= ahora)) return 'exposicion'
   if (dominioVigente(p, c, ahora)) return 'dominio'
-  const correctas = aciertosVigentes(p).length
+  const correctas = aciertosVigentes(p, ahora).length
   if (correctas >= 2) return 'consolidacion'
   if (correctas >= 1) return 'recuperacion'
   return 'comprension'

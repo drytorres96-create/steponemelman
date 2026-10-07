@@ -3,7 +3,7 @@ import { sesionesDeLaSemana } from '../plan/enlace'
 import { separarGuion } from '../semana/guion'
 import type { SesionSemanal } from '../semana/tipos'
 import type { ProgresoConcepto } from '../srs/tipos'
-import { fechaISO, lunesDe } from './tiempo'
+import { desplazarFechaEstudio, diaSemanaEstudio, fechaEstudio, fechaISOEstudio, finDiaEstudio, inicioDiaEstudio } from './calendario-estudio'
 
 /**
  * El día de estudio como techo. Lo que toca hoy es una cantidad finita y visible,
@@ -32,15 +32,12 @@ export const TECHOS: Record<TipoDia, { conceptos: number; preguntas: number; caj
 }
 /** Los viernes van vacíos a propósito: un plan sin holgura muere el primer día malo. */
 export const DIA_VACIO = 5 // viernes, getDay()
-/** El día empieza a las 3:00 locales: una sesión a las 2 AM cuenta como la del día anterior. */
+/** El día empieza a las 3:00 de Nueva York: una sesión a las 2 AM cuenta como la del día anterior. */
 export const INICIO_DIA_HORA = 3
 
-/** Instante local en que empezó el día de estudio que contiene `ahora`. */
+/** Instante en que empezó el día de estudio de Nueva York que contiene `ahora`. */
 export function inicioDelDia(ahora: number): number {
-  const f = new Date(ahora)
-  const inicio = new Date(f.getFullYear(), f.getMonth(), f.getDate(), INICIO_DIA_HORA)
-  if (inicio.getTime() > ahora) inicio.setDate(inicio.getDate() - 1)
-  return inicio.getTime()
+  return inicioDiaEstudio(ahora, INICIO_DIA_HORA)
 }
 
 /**
@@ -48,16 +45,14 @@ export function inicioDelDia(ahora: number): number {
  * va vacío, sábado y domingo son fin de semana y el resto, días entre semana.
  */
 export function tipoDeDia(ahora: number): TipoDia {
-  const dia = new Date(inicioDelDia(ahora)).getDay()
+  const dia = diaSemanaEstudio(fechaEstudio(ahora, INICIO_DIA_HORA))
   if (dia === DIA_VACIO) return 'vacio'
   return dia === 0 || dia === 6 ? 'finde' : 'semana'
 }
 
-/** Instante local en que empieza el día de estudio siguiente. Aritmética de calendario, no 24 h fijas. */
+/** Instante en que empieza el siguiente día de Nueva York; respeta días de 23 o 25 horas. */
 export function finDelDia(ahora: number): number {
-  const inicio = new Date(inicioDelDia(ahora))
-  inicio.setDate(inicio.getDate() + 1)
-  return inicio.getTime()
+  return finDiaEstudio(ahora, INICIO_DIA_HORA)
 }
 
 /** Primer intento resuelto de un concepto. Una respuesta por revisar no acredita haberlo visto. */
@@ -89,11 +84,11 @@ export function referenciaDelDia(progreso: Record<string, ProgresoConcepto>, int
   return primero
 }
 
-/** Lunes y domingo, en fechas locales, de la semana que contiene el día de estudio de `ahora`. */
+/** Lunes y domingo de Nueva York de la semana que contiene el día de estudio de `ahora`. */
 export function limitesSemana(ahora: number): { inicio: string; fin: string } {
-  const lunes = lunesDe(inicioDelDia(ahora))
-  const domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6)
-  return { inicio: fechaISO(lunes), fin: fechaISO(domingo) }
+  const fecha = fechaEstudio(ahora, INICIO_DIA_HORA)
+  const lunes = desplazarFechaEstudio(fecha, -((diaSemanaEstudio(fecha) + 6) % 7))
+  return { inicio: fechaISOEstudio(lunes), fin: fechaISOEstudio(desplazarFechaEstudio(lunes, 6)) }
 }
 
 export interface TemaSemana {

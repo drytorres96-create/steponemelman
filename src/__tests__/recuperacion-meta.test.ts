@@ -19,6 +19,16 @@ const entrada = (extra: Partial<EntradaRecuperacion> = {}): EntradaRecuperacion 
 })
 
 describe('ponerse al día sin cambiar qué cuenta como dominio ni añadir deuda diaria', () => {
+  it('distingue recuperar la marca, superar por una unidad y completar la meta sin prometerlo por una cola', () => {
+    const e = entrada({ meta: { ...meta(17, 50), preguntas: { ...serie(23, 52), meta: 255 } } })
+    const antes = JSON.stringify(e)
+    expect(recuperacionMeta(e)).toMatchObject({ faltaDominio: 33, paraSuperarDominio: 34, faltanMetaDominio: 493,
+      faltanPreguntas: 29, paraSuperarPreguntas: 30, faltanMetaPreguntas: 232 })
+    expect(JSON.stringify(e)).toBe(antes)
+    const igual = recuperacionMeta(entrada({ meta: meta(57, 57) }))
+    expect(igual).toMatchObject({ faltaDominio: 0, paraSuperarDominio: 1, accion: null })
+  })
+
   it('50 frente a 57 muestra la diferencia exacta y propone los repasos de Hoy antes de lo nuevo', () => {
     const r = recuperacionMeta(entrada())
     expect(r.faltaDominio).toBe(7)

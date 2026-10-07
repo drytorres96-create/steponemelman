@@ -5,6 +5,7 @@ import { proximaRevision } from '../srs/fsrs'
 import { reconstruirProgreso } from '../store/model'
 import { TECHOS, inicioDelDia, tipoDeDia } from './dia'
 import { ultimoIntentoResuelto } from './plan-estudio'
+import { desplazarFechaEstudio, fechaEstudio, instanteEstudio } from './calendario-estudio'
 
 /** Identifica las sesiones NBME de cajas sin cargar su reproductor. */
 export const TITULO_NBME_CAJAS = 'Cajas'
@@ -46,11 +47,11 @@ const HORA = 3_600_000
  * devuelve a la caja 1 aunque el descuento le deje algún acierto vigente.
  */
 export function cajaDeConcepto(p: ProgresoConcepto, criterios: CriteriosDominio, ahora: number): Escalon | null {
-  const ultimo = ultimoIntentoResuelto(p)
+  const ultimo = ultimoIntentoResuelto({ ...p, intentos: p.intentos.filter(i => i.ts <= ahora) })
   if (!ultimo) return null
-  if (evaluarDominio(p, criterios, ahora).cumple) return 'cerrado'
   if (!intentoCorrecto(ultimo)) return 1
-  const vigentes = aciertosVigentes(p).filter(evidenciaIndependiente).length
+  if (evaluarDominio(p, criterios, ahora).cumple) return 'cerrado'
+  const vigentes = aciertosVigentes(p, ahora).filter(evidenciaIndependiente).length
   return vigentes >= 2 ? 3 : vigentes === 1 ? 2 : 1
 }
 
@@ -62,9 +63,8 @@ export function cajaDeConcepto(p: ProgresoConcepto, criterios: CriteriosDominio,
  * 72 horas: el cambio de hora no la alarga.
  */
 export function techoCaja(ultimo: number, caja: Caja): number {
-  const dia = new Date(inicioDelDia(ultimo))
-  dia.setDate(dia.getDate() + DIAS_CAJA[caja])
-  return Math.min(dia.getTime(), ultimo + HORAS_CAJA[caja] * HORA)
+  const siguiente = desplazarFechaEstudio(fechaEstudio(ultimo), DIAS_CAJA[caja])
+  return Math.min(instanteEstudio(siguiente), ultimo + HORAS_CAJA[caja] * HORA)
 }
 
 /** Vence a lo que proponga el planificador, pero nunca más tarde que el techo de su caja. */

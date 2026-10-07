@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useApp } from '../store/estado'
 import { cargarTodo } from '../data/corpus'
 import { ScreenHeading } from '../components/Editorial'
@@ -13,15 +13,18 @@ import type { AccionesRecuperacion } from './RecuperarMeta'
 export function ResumenProgreso(acciones: AccionesRecuperacion) {
   const { indice, estado } = useApp()
   const [semanaAbierta, setSemanaAbierta] = useState(false)
+  const [, tic] = useState(0)
+  useEffect(() => { const timer = setInterval(() => tic(n => n + 1), 60_000); return () => clearInterval(timer) }, [])
   const conceptIds = useMemo(() => [...new Set(indice?.modulos.flatMap(m => m.sesiones.flatMap(s => s.conceptos)) ?? [])], [indice])
   const ahora = Date.now()
-  const resumen = useMemo(() => resumenProgresoAprendizaje(conceptIds, estado.progreso, estado.criterios, ahora),
-    [conceptIds, estado.progreso, estado.criterios, ahora])
+  const resumen = useMemo(() => resumenProgresoAprendizaje(conceptIds, estado.progreso, estado.criterios, ahora, estado.conceptosVistos),
+    [conceptIds, estado.progreso, estado.criterios, estado.conceptosVistos, ahora])
   const cargarDetalleConceptos = useCallback(() => cargarTodo(indice?.modulos ?? []), [indice])
   return <div className="pila premium-progress">
     <section className="premium-progress-grid" aria-label="Estado de tu aprendizaje">
-      <article className="premium-progress-card"><h2>Trabajo realizado</h2><strong>{resumen.actividad}</strong>
-        <p className="mini">De {resumen.total} conceptos, estos tienen práctica registrada. Intentarlo ya cuenta como trabajo.</p></article>
+      <article className="premium-progress-card"><h2>Conceptos vistos</h2><strong>{resumen.vistos} / {resumen.total}</strong>
+        <progress max={resumen.total || 1} value={resumen.vistos} aria-label="Progreso de conceptos vistos" />
+        <p className="mini">{resumen.actividad} con práctica registrada. Abrir un concepto cuenta como visto; responderlo registra práctica.</p></article>
       <article className="premium-progress-card"><h2>Dominio demostrado</h2><strong>{resumen.dominioDemostrado}</strong>
         <p className="mini">Cumplen tus criterios de evidencia. Un repaso vencido conserva esa evidencia.</p></article>
       <article className="premium-progress-card"><h2>Mantenimiento al día</h2><strong>{resumen.mantenimientoAlDia} / {resumen.dominioDemostrado}</strong>

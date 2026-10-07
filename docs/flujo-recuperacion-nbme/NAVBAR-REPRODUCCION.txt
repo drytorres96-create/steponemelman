@@ -1,0 +1,96 @@
+[WebServer] (node:47926) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:47940) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 3 tests using 1 worker
+
+(node:47960) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:47960) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo (5.2s)
+(node:48133) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:48133) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  2 [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo (16.2s)
+(node:48339) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:48339) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  3 [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo (16.4s)
+
+
+  1) [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: locator('.navbar-menu')
+    Expected string: ""
+    Received string: serializes to the same string
+    Timeout: 10000ms
+
+    Call log:
+      - Expect "toHaveAttribute" with timeout 10000ms
+      - waiting for locator('.navbar-menu')
+        14 × locator resolved to <details class="menu-cuenta study-secondary-nav navbar-menu">…</details>
+           - unexpected value "null"
+
+
+      100 |     await page.mouse.move(5, 880)
+      101 |     await page.clock.runFor(90)
+    > 102 |     await expect(menu(page)).toHaveAttribute('open', '')
+          |                              ^
+      103 |     await page.clock.runFor(200)
+      104 |     await expect(menu(page)).not.toHaveAttribute('open')
+      105 |     expect(await page.evaluate(() => JSON.stringify(window.__leerProgresoSintetico()))).toBe(progreso)
+        at /workspace/work/nbme-recuperacion/e2e/navbar-menu.spec.ts:102:30
+
+    Error Context: test-results/navbar-menu-Ratón-y-teclad-a3fec-de-salida-permiten-cruzarlo-chromium-repeat1/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/navbar-menu-Ratón-y-teclad-a3fec-de-salida-permiten-cruzarlo-chromium-repeat1/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/navbar-menu-Ratón-y-teclad-a3fec-de-salida-permiten-cruzarlo-chromium-repeat1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: locator('.navbar-menu')
+    Expected string: ""
+    Received string: serializes to the same string
+    Timeout: 10000ms
+
+    Call log:
+      - Expect "toHaveAttribute" with timeout 10000ms
+      - waiting for locator('.navbar-menu')
+        13 × locator resolved to <details class="menu-cuenta study-secondary-nav navbar-menu">…</details>
+           - unexpected value "null"
+
+
+      100 |     await page.mouse.move(5, 880)
+      101 |     await page.clock.runFor(90)
+    > 102 |     await expect(menu(page)).toHaveAttribute('open', '')
+          |                              ^
+      103 |     await page.clock.runFor(200)
+      104 |     await expect(menu(page)).not.toHaveAttribute('open')
+      105 |     expect(await page.evaluate(() => JSON.stringify(window.__leerProgresoSintetico()))).toBe(progreso)
+        at /workspace/work/nbme-recuperacion/e2e/navbar-menu.spec.ts:102:30
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/navbar-menu-Ratón-y-teclad-a3fec-de-salida-permiten-cruzarlo-chromium-repeat2/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/navbar-menu-Ratón-y-teclad-a3fec-de-salida-permiten-cruzarlo-chromium-repeat2/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2 failed
+    [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo
+    [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo
+  1 passed (46.6s)

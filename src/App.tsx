@@ -18,13 +18,14 @@ import type { OpcionesSesionPersonalizada } from './lib/busqueda'
 import { alternarFormatos } from './lib/formatos'
 import { aplicarVariante, siguienteVariante } from './lib/variantes'
 import { useNbme } from './nbme/NbmeProvider'
-import { deriveNbmeSession } from './nbme/model'
+import { deriveNbmeSession, isNbmeSessionArchived } from './nbme/model'
 import { hayConceptosPendientes } from './lib/conceptos-pendientes'
 import type { FiltrosBusqueda } from './lib/busqueda'
 import { Brand, NavigationIcon, StudyHero, CinematicBackdrop, type CinematicObject, type CinematicScene } from './components/Editorial'
 import { Resguardo, FalloPantalla } from './components/Resguardo'
 import type { Vineta } from './vinetas/modelo'
 import { NavbarMenu } from './components/NavbarMenu'
+import './styles/respuestas-contraste.css'
 
 // Hoy se abre enseguida. El resto se descarga al entrar y queda en la caché del navegador.
 const Inicio = lazy(() => import('./screens/Inicio').then(m => ({ default: m.Inicio })))
@@ -116,7 +117,7 @@ export default function App() {
     : (sincronizacion.estado === 'error' ? sincronizacion.mensaje : null)
   // Las sesiones de las cajas las retoma Hoy cuando vuelve a tocar su pregunta: no se ofrecen aparte.
   const sesionPreguntasPendiente = Object.values(nbme.state.sessions)
-    .filter(s => s.title !== TITULO_NBME_CAJAS && deriveNbmeSession(nbme.state, s.id)?.phase !== 'complete')
+    .filter(s => !isNbmeSessionArchived(nbme.state, s.id) && s.title !== TITULO_NBME_CAJAS && deriveNbmeSession(nbme.state, s.id)?.phase !== 'complete')
     .sort((a, b) => b.controlChangedAt - a.controlChangedAt)[0]
   const sincronizarTodo = async () => {
     const resultados = await Promise.all([sincronizarAhora(), nbme.catalog ? nbme.syncNow() : Promise.resolve(true)])
@@ -306,7 +307,7 @@ export default function App() {
               <Reproductor cola={cola} indiceInicial={indiceInicial} onSalir={() => ir('hoy')} />
             </>
           )}
-          {!cargando && vista === 'preguntas' && <NbmePlayer onSalir={() => { setTipoContenido('preguntas'); ir('modulos') }}
+          {!cargando && vista === 'preguntas' && <NbmePlayer recuperarErrores onSalir={() => { setTipoContenido('preguntas'); ir('modulos') }}
             onEstudiar={ids => { nbme.pauseSession(); void estudiarIds(ids) }}
             onBuscar={q => { nbme.pauseSession(); setFiltrosConceptos({ sistema: q.systems[0] ?? '', disciplina: q.disciplines[0] ?? '' }); setTipoContenido('conceptos'); ir('modulos') }} />}
           {!cargando && vista === 'hoy' && <Hoy onNuevo={abrirNuevo} onCajas={abrirCajas}

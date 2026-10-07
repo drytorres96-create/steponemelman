@@ -12,14 +12,14 @@ import type { SesionSemanal } from '../semana/tipos'
 import { cargarPlanSemana } from '../plan/api'
 import { tituloDeCheckpoint } from '../plan/enlace'
 import { esTarea, type PlanSemana } from '../plan/tipos'
-import { cajaDeConcepto, cajasDelDia, type ItemCaja } from '../lib/cajas'
+import { cajasDelDia, type ItemCaja } from '../lib/cajas'
 import {
   estadoDelDia, inicioDelDia, limitesSemana, referenciaDelDia, temaDeLaSemana,
   type EstadoDia, type TemaSemana,
 } from '../lib/dia'
-import type { CriteriosDominio } from '../srs/mastery'
+import { evaluarDominio, type CriteriosDominio } from '../srs/mastery'
 import type { ProgresoConcepto } from '../srs/tipos'
-import { fechaISO } from '../lib/tiempo'
+import { fechaEstudio, fechaISOEstudio, instanteEstudioISO, ZONA_ESTUDIO } from '../lib/calendario-estudio'
 import { TablaPlanificador } from './TablaPlanificador'
 import { estimarBloque } from '../lib/ritmo'
 import { hitoSemanalAprendizaje } from '../lib/progreso-aprendizaje'
@@ -50,10 +50,15 @@ function anilloDeLaSemana(tema: TemaSemana | null, plan: PlanSemana | null,
   if (tema?.sesiones.length) {
     const cerrado = (id: string) => {
       const p = progreso[id]
-      return !!p && cajaDeConcepto(p, criterios, ahora) === 'cerrado'
+      return !!p && evaluarDominio(p, criterios, ahora).cumple
     }
+    const asignados = new Set<string>()
     const segmentos = tema.sesiones.map(s => {
-      const ids = [...new Set(separarGuion(s.guion).conceptIds)]
+      const ids = [...new Set(separarGuion(s.guion).conceptIds)].filter(id => {
+        if (asignados.has(id)) return false
+        asignados.add(id)
+        return true
+      })
       return { valor: ids.filter(cerrado).length, total: ids.length }
     })
     const valor = tema.conceptIds.filter(cerrado).length, total = tema.conceptIds.length
@@ -148,7 +153,7 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
   // Se lee en cada render: lo recién respondido nunca queda por delante del reloj de la portada.
   const ahora = Date.now()
   const limites = limitesSemana(ahora)
-  const diaDeEstudio = fechaISO(new Date(inicioDelDia(ahora)))
+  const diaDeEstudio = fechaISOEstudio(fechaEstudio(ahora))
   const [sesiones, setSesiones] = useState<SesionSemanal[] | null>(null)
   const [fallo, setFallo] = useState(false)
   const [reintento, setReintento] = useState(0)
@@ -191,7 +196,7 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
   const dia = estadoDelDia(entrada)
   const anillo = anilloDeLaSemana(tema, plan, estado.progreso, estado.criterios, ahora)
   const hito = useMemo(() => hitoSemanalAprendizaje(Object.values(estado.progreso).filter(p => publicados.has(p.concept_id)),
-    new Date(`${limites.inicio}T03:00:00`).getTime(), ahora, estado.criterios), [estado.progreso, estado.criterios, publicados, limites.inicio, ahora])
+    instanteEstudioISO(limites.inicio), ahora, estado.criterios), [estado.progreso, estado.criterios, publicados, limites.inicio, ahora])
 
   // Sin el banco de preguntas no se sabe qué entra hoy; sin él tras un fallo, el día sigue sin preguntas.
   const bancoListo = !!nbme.catalog || (!nbme.loading && !!nbme.error)
@@ -208,7 +213,7 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
   const esperandoCuenta = (sincronizacion?.estado === 'inicializando' || sincronizacion?.estado === 'sincronizando') && !sincronizacion?.ultima
   const esperandoBanco = (nbme.syncStatus?.state === 'initializing' || nbme.syncStatus?.state === 'syncing') && !nbme.syncStatus?.lastSyncedAt
   if (completo && (esperandoCuenta || esperandoBanco)) return <div className="vacio" role="status">Preparando tu día…</div>
-  const fecha = new Date(inicioDelDia(ahora)).toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })
+  const fecha = new Date(inicioDelDia(ahora)).toLocaleDateString('es', { timeZone: ZONA_ESTUDIO, weekday: 'long', day: 'numeric', month: 'long' })
   // El título identifica la sesión NBME de hoy en cualquier dispositivo: no depende del idioma del navegador.
   const tituloCajas = tituloDeHoy('Cajas', ahora)
 

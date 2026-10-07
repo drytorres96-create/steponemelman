@@ -1,6 +1,8 @@
 import { dominioVigente, evaluarDominio, CRITERIOS_POR_DEFECTO, type CriteriosDominio } from '../srs/mastery'
 import { estaVencido } from '../srs/fsrs'
 import type { Intento, ProgresoConcepto } from '../srs/tipos'
+import type { VistaConcepto } from '../store/model'
+import { fechaEstudio, fechaISOEstudio } from './calendario-estudio'
 import { intentoObservable, respuestaCorrectaObservada, tipoEvidenciaObservada, type TipoEvidenciaObservada } from './retencion-observada'
 
 const DIA = 86_400_000
@@ -12,6 +14,7 @@ export const ETIQUETAS_APRENDIZAJE: Record<EstadoAprendizaje, string> = {
   mantenimiento_por_comprobar: 'Dominio demostrado · mantenimiento por comprobar',
 }
 export interface ProgresoAprendizaje {
+  visto: boolean
   actividad: boolean
   dominioDemostrado: boolean
   mantenimientoAlDia: boolean
@@ -22,30 +25,37 @@ export interface ProgresoAprendizaje {
 
 /** Un contrato compartido de presentación; no reescribe el estado histórico ni selecciona material. */
 export function resumenProgresoAprendizaje(ids: Iterable<string>, progreso: Record<string, ProgresoConcepto>,
-  criterios: CriteriosDominio, ahora = Date.now()) {
+  criterios: CriteriosDominio, ahora = Date.now(), conceptosVistos: Record<string, VistaConcepto> = {}) {
   const porConcepto = new Map<string, ProgresoAprendizaje>()
   const dominadosEn: number[] = []
-  let actividad = 0, dominioDemostrado = 0, mantenimientoAlDia = 0, mantenimientoPendiente = 0, mantenimientoPorComprobar = 0
+  const primerasAcreditaciones: number[] = []
+  let vistos = 0, actividad = 0, dominioDemostrado = 0, mantenimientoAlDia = 0, mantenimientoPendiente = 0, mantenimientoPorComprobar = 0
   for (const id of new Set(ids)) {
     const p = progreso[id]
-    const activo = !!p?.intentos.length
+    const activo = !!p?.intentos.some(i => i.ts <= ahora)
+    const visto = activo || (Object.hasOwn(conceptosVistos, id) && conceptosVistos[id].primera <= ahora)
     const demostrado = !!p && evaluarDominio(p, criterios, ahora).cumple
+    const hito = p?.dominado_en
+    const hitoValido = typeof hito === 'number' && Number.isFinite(hito) && hito > 0 && hito <= ahora
+      && evaluarDominio({ ...p!, intentos: p!.intentos.filter(i => i.ts <= hito) }, criterios, hito).cumple
     const alDia = demostrado && dominioVigente(p!, criterios, ahora)
     const pendiente = demostrado && estaVencido(p!, ahora)
     const porComprobar = demostrado && !alDia && !pendiente
     const estado: EstadoAprendizaje = !activo ? 'sin_actividad' : !demostrado ? 'en_aprendizaje'
       : pendiente ? 'mantenimiento_pendiente' : alDia ? 'mantenimiento_al_dia' : 'mantenimiento_por_comprobar'
-    porConcepto.set(id, { actividad: activo, dominioDemostrado: demostrado, mantenimientoAlDia: alDia,
+    porConcepto.set(id, { visto, actividad: activo, dominioDemostrado: demostrado, mantenimientoAlDia: alDia,
       mantenimientoPendiente: pendiente, mantenimientoPorComprobar: porComprobar, estado })
+    if (visto) vistos++
     if (activo) actividad++
-    if (demostrado) { dominioDemostrado++; dominadosEn.push(p!.dominado_en ?? 0) }
+    if (hitoValido) primerasAcreditaciones.push(hito)
+    if (demostrado) { dominioDemostrado++; if (hitoValido) dominadosEn.push(hito) }
     if (alDia) mantenimientoAlDia++
     if (pendiente) mantenimientoPendiente++
     if (porComprobar) mantenimientoPorComprobar++
   }
-  return { total: porConcepto.size, actividad, sinActividad: porConcepto.size - actividad,
+  return { total: porConcepto.size, vistos, sinVer: porConcepto.size - vistos, actividad, sinActividad: porConcepto.size - actividad,
     enAprendizaje: actividad - dominioDemostrado, dominioDemostrado, mantenimientoAlDia, mantenimientoPendiente, mantenimientoPorComprobar,
-    porConcepto, dominadosEn }
+    porConcepto, dominadosEn, primerasAcreditaciones }
 }
 
 /** Un hito requiere un acierto verificable después de ≥24 h desde la exposición inmediatamente anterior. */
@@ -79,11 +89,11 @@ export function hitoSemanalAprendizaje(progresos: ProgresoConcepto[], desde: num
     mantenimientoConfirmado: mantenimientoConfirmado.size, primerTs, ultimoTs }
 }
 
-/** Feedback retrospectivo: compara el mismo instrumento, sin ayuda, con un fallo de otro día y ≥24 h atrás. */
+/** Feedback retrospectivo: mismo instrumento, sin ayuda, con un fallo de otro día de estudio NY y ≥24 h atrás. */
 export function antesTeCostaba(p: ProgresoConcepto, actual: Intento): boolean {
   if (!intentoObservable(actual) || !respuestaCorrectaObservada(actual)) return false
   return p.intentos.some(previo => previo !== actual && intentoObservable(previo)
     && !respuestaCorrectaObservada(previo) && previo.pregunta_version === actual.pregunta_version
     && actual.ts - previo.ts >= DIA
-    && new Date(previo.ts).toDateString() !== new Date(actual.ts).toDateString())
+    && fechaISOEstudio(fechaEstudio(previo.ts)) !== fechaISOEstudio(fechaEstudio(actual.ts)))
 }

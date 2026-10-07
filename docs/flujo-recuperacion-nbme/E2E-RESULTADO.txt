@@ -1,0 +1,21 @@
+[WebServer] (node:38624) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:38638) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 8 tests using 1 worker
+
+(node:38661) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:38661) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/recuperacion-nbme.spec.ts:170:3 › recuperación desde NBME a 390px › ofrece más fundamentos, registra el concepto practicado y regresa a la misma pregunta (4.5s)
+  ✓  2 [chromium] › e2e/recuperacion-nbme.spec.ts:260:3 › recuperación desde NBME a 390px › IA manual conserva ejercicios al recargar y avanza una sola vez dentro del bloque original (5.2s)
+  ✓  3 [chromium] › e2e/recuperacion-nbme.spec.ts:417:3 › recuperación desde NBME a 390px › una cuota agotada deja volver sin cambiar el intento ni crear una sesión (2.7s)
+  ✓  4 [chromium] › e2e/recuperacion-nbme.spec.ts:443:3 › recuperación desde NBME a 390px › la biblioteca conserva el primer resultado al revisar falladas y borrar sólo la sesión visible (4.4s)
+  ✓  5 [chromium] › e2e/recuperacion-nbme.spec.ts:170:3 › recuperación desde NBME a 1280px › ofrece más fundamentos, registra el concepto practicado y regresa a la misma pregunta (4.9s)
+  ✓  6 [chromium] › e2e/recuperacion-nbme.spec.ts:260:3 › recuperación desde NBME a 1280px › IA manual conserva ejercicios al recargar y avanza una sola vez dentro del bloque original (8.2s)
+  ✓  7 [chromium] › e2e/recuperacion-nbme.spec.ts:417:3 › recuperación desde NBME a 1280px › una cuota agotada deja volver sin cambiar el intento ni crear una sesión (3.9s)
+  ✓  8 [chromium] › e2e/recuperacion-nbme.spec.ts:443:3 › recuperación desde NBME a 1280px › la biblioteca conserva el primer resultado al revisar falladas y borrar sólo la sesión visible (8.1s)
+
+  8 passed (45.9s)

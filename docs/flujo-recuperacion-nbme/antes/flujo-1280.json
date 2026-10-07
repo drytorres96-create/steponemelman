@@ -1,0 +1,14 @@
+{
+  "viewport": 1280,
+  "conceptosLimitados": [
+    "C4",
+    "C5",
+    "C6"
+  ],
+  "origenNbme": null,
+  "salidaDelRepaso": "hoy",
+  "sesionesNbme": [
+    "preguntas-guardadas-revision"
+  ],
+  "intentoNbmePreservado": true
+}

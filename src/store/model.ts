@@ -48,6 +48,13 @@ export interface Reanudable {
   }
 }
 
+/** Presentación real de material Melman; no es una respuesta ni evidencia de dominio. */
+export interface VistaConcepto {
+  primera: number
+  ultima: number
+  preguntaId: string
+}
+
 export interface EstadoApp {
   version: 1
   corpus_version: typeof CORPUS_VERSION
@@ -57,6 +64,8 @@ export interface EstadoApp {
   reanudable: Reanudable | null
   msEstudio: number
   vistoAlguna: boolean
+  /** Opcional para conservar la compatibilidad con estados anteriores. */
+  conceptosVistos?: Record<string, VistaConcepto>
   /** Marcas de modificación; reanudable también conserva una marca al borrarse. */
   fieldUpdatedAt?: { criterios: number; reanudable: number }
 }
@@ -165,6 +174,17 @@ function leerSesion(v: unknown): RegistroSesion | null {
     vistos: v.vistos, correctos: v.correctos, ms: v.ms }
 }
 
+function leerConceptosVistos(v: unknown): Record<string, VistaConcepto> | null {
+  if (!esObjeto(v) || Object.keys(v).length > 100_000) return null
+  const vistas: Record<string, VistaConcepto> = {}
+  for (const [id, vista] of Object.entries(v)) {
+    if (!idSeguro(id) || !esObjeto(vista) || !numero(vista.primera)
+      || !numero(vista.ultima, vista.primera) || !idSeguro(vista.preguntaId)) return null
+    vistas[id] = { primera: vista.primera, ultima: vista.ultima, preguntaId: vista.preguntaId }
+  }
+  return vistas
+}
+
 function leerCriterios(v: unknown): CriteriosDominio | null {
   if (!esObjeto(v) || !entero(v.recuperaciones, 1) || !entero(v.sesiones, 1)
       || !numero(v.separacionHoras) || typeof v.exigirSinPistas !== 'boolean'
@@ -174,7 +194,7 @@ function leerCriterios(v: unknown): CriteriosDominio | null {
     ventanaConfusionDias: v.ventanaConfusionDias }
 }
 
-function leerReanudable(v: unknown): Reanudable | null | false {
+export function leerReanudable(v: unknown): Reanudable | null | false {
   if (v === null || v === undefined) return null
   if (!esObjeto(v) || !texto(v.modulo) || !texto(v.sesion) || !entero(v.indice) || !numero(v.ts)) return false
   if (v.conceptIds !== undefined && (!Array.isArray(v.conceptIds) || !v.conceptIds.length
@@ -262,6 +282,8 @@ export function leerEstadoDesconocido(v: unknown): EstadoApp | null {
   if (!criterios || reanudable === false) return null
   if (v.msEstudio !== undefined && !numero(v.msEstudio)) return null
   if (v.vistoAlguna !== undefined && typeof v.vistoAlguna !== 'boolean') return null
+  const conceptosVistos = v.conceptosVistos === undefined ? undefined : leerConceptosVistos(v.conceptosVistos)
+  if (conceptosVistos === null) return null
   if (v.fieldUpdatedAt !== undefined && (!esObjeto(v.fieldUpdatedAt)
     || !numero(v.fieldUpdatedAt.criterios) || !numero(v.fieldUpdatedAt.reanudable))) return null
 
@@ -273,7 +295,9 @@ export function leerEstadoDesconocido(v: unknown): EstadoApp | null {
     criterios,
     reanudable,
     msEstudio: (v.msEstudio as number | undefined) ?? 0,
-    vistoAlguna: (v.vistoAlguna as boolean | undefined) ?? Object.keys(progreso).length > 0,
+    vistoAlguna: ((v.vistoAlguna as boolean | undefined) ?? Object.keys(progreso).length > 0)
+      || Object.keys(conceptosVistos ?? {}).length > 0,
+    ...(conceptosVistos !== undefined ? { conceptosVistos } : {}),
     ...(esObjeto(v.fieldUpdatedAt) ? { fieldUpdatedAt: {
       criterios: v.fieldUpdatedAt.criterios as number, reanudable: v.fieldUpdatedAt.reanudable as number,
     } } : {}),
@@ -344,6 +368,21 @@ export function reconstruirProgreso(id: string, registros: Intento[], criterios:
 
 const compararTexto = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0
 
+function unirVista(a: VistaConcepto, b: VistaConcepto): VistaConcepto {
+  const ultima = a.ultima > b.ultima || (a.ultima === b.ultima && a.preguntaId >= b.preguntaId) ? a : b
+  return { primera: Math.min(a.primera, b.primera), ultima: ultima.ultima, preguntaId: ultima.preguntaId }
+}
+
+/** Una presentación ya registrada no añade respuestas ni modifica la agenda SRS. */
+export function registrarVistaConceptoEstado(estado: EstadoApp, id: string, preguntaId: string, ts = Date.now()): EstadoApp {
+  if (!idSeguro(id) || !idSeguro(preguntaId) || !numero(ts)) return estado
+  const anterior = estado.conceptosVistos?.[id]
+  if (anterior?.preguntaId === preguntaId) return estado
+  const nueva = { primera: ts, ultima: ts, preguntaId }
+  return { ...estado, vistoAlguna: true, conceptosVistos: { ...estado.conceptosVistos,
+    [id]: anterior ? unirVista(anterior, nueva) : nueva } }
+}
+
 function marca(e: EstadoApp, campo: 'criterios' | 'reanudable'): number {
   return e.fieldUpdatedAt?.[campo] ?? (campo === 'reanudable' ? e.reanudable?.ts ?? 0 : 0)
 }
@@ -374,12 +413,19 @@ export function combinarEstados(a: EstadoApp, b: EstadoApp): EstadoApp {
       ...(s.msVisibles !== undefined || anterior.msVisibles !== undefined ? { msVisibles: Math.max(s.msVisibles ?? 0, anterior.msVisibles ?? 0) } : {}) })
   }
   const msIntentos = Object.values(progreso).reduce((total, p) => total + p.intentos.reduce((n, i) => n + i.ms, 0), 0)
+  const conceptosVistos: Record<string, VistaConcepto> = {}
+  for (const id of [...new Set([...Object.keys(a.conceptosVistos ?? {}), ...Object.keys(b.conceptosVistos ?? {})])].sort()) {
+    const x = a.conceptosVistos?.[id], y = b.conceptosVistos?.[id]
+    conceptosVistos[id] = x && y ? unirVista(x, y) : (x ?? y)!
+  }
   return { version: 1, corpus_version: CORPUS_VERSION, progreso,
     sesiones: [...porSesion.values()].sort((x, y) => x.inicio - y.inicio || compararTexto(x.id, y.id)),
     criterios, reanudable: unirReanudable(a, b),
     fieldUpdatedAt: { criterios: Math.max(marca(a, 'criterios'), marca(b, 'criterios')),
       reanudable: Math.max(marca(a, 'reanudable'), marca(b, 'reanudable')) },
-    msEstudio: Math.max(a.msEstudio, b.msEstudio, msIntentos), vistoAlguna: a.vistoAlguna || b.vistoAlguna || ids.length > 0 }
+    ...(a.conceptosVistos !== undefined || b.conceptosVistos !== undefined ? { conceptosVistos } : {}),
+    msEstudio: Math.max(a.msEstudio, b.msEstudio, msIntentos),
+    vistoAlguna: a.vistoAlguna || b.vistoAlguna || ids.length > 0 || Object.keys(conceptosVistos).length > 0 }
 }
 
 function unirReanudable(a: EstadoApp, b: EstadoApp): Reanudable | null {
@@ -406,7 +452,13 @@ export function migrarConceptIds(estado: EstadoApp, mapa: Record<string, string>
     ? { ...estado.reanudable, conceptIds: estado.reanudable.conceptIds.map(id =>
       Object.hasOwn(mapa, id) && idSeguro(mapa[id]) ? mapa[id] : id) }
     : estado.reanudable
-  return { ...estado, corpus_version: CORPUS_VERSION, progreso, reanudable }
+  const conceptosVistos: Record<string, VistaConcepto> = {}
+  for (const [anterior, vista] of Object.entries(estado.conceptosVistos ?? {})) {
+    const id = Object.hasOwn(mapa, anterior) && idSeguro(mapa[anterior]) ? mapa[anterior] : anterior
+    conceptosVistos[id] = Object.hasOwn(conceptosVistos, id) ? unirVista(conceptosVistos[id], vista) : vista
+  }
+  return { ...estado, corpus_version: CORPUS_VERSION, progreso, reanudable,
+    ...(estado.conceptosVistos !== undefined ? { conceptosVistos } : {}) }
 }
 
 /** UUID v4 también en navegadores que todavía no exponen crypto.randomUUID(). */

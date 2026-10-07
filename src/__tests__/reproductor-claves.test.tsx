@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ESTADO_INICIAL } from '../store/model'
 import { ConceptoZ, type Concepto } from '../schema/concept'
 
-const mock = vi.hoisted(() => ({ app: vi.fn() }))
+const mock = vi.hoisted(() => ({ app: vi.fn(), vista: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../components/AyudaIA', () => ({ AyudaIA: () => <div>ayuda</div> }))
 
@@ -42,6 +42,7 @@ beforeEach(() => {
   estado = { ...ESTADO_INICIAL, reanudable: null, progreso: {} }
   mock.app.mockImplementation(() => ({
     estado,
+    registrarVistaConcepto: mock.vista,
     registrarIntento: vi.fn(),
     cerrarSesion: vi.fn(),
     iniciarSesion: () => 'sesion-qa',

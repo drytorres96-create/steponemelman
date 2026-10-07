@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { nuevoProgreso, programar, DIA } from '../srs/fsrs'
-import { CRITERIOS_POR_DEFECTO, CRITERIOS_HEREDADOS, CRITERIOS_96H, sonCriteriosHeredados, evaluarDominio, calcularEstado, dominioVigente, evidenciaActiva, evidenciaIndependiente, etapa, resumenDominio, tipoEvidenciaDeIntento } from '../srs/mastery'
+import { CRITERIOS_POR_DEFECTO, CRITERIOS_HEREDADOS, CRITERIOS_96H, sonCriteriosHeredados, aciertosVigentes, evaluarDominio, calcularEstado, dominioVigente, evidenciaActiva, evidenciaIndependiente, etapa, resumenDominio, tipoEvidenciaDeIntento } from '../srs/mastery'
+import { reconstruirProgreso } from '../store/model'
 import type { Intento } from '../srs/tipos'
 
 const it3 = (ts: number, extra: Partial<Intento> = {}): Intento => ({
@@ -10,6 +11,76 @@ const it3 = (ts: number, extra: Partial<Intento> = {}): Intento => ({
 })
 
 describe('criterios de dominio', () => {
+  it('el mismo concepto acumula evidencia entre Hoy, meta y repaso NBME sin duplicar un envío', () => {
+    const t = Date.parse('2026-10-01T12:00:00-04:00')
+    const envios = [
+      it3(t, { attempt_id: 'hoy-1', session_id: 'hoy' }),
+      it3(t + 2 * DIA, { attempt_id: 'meta-1', session_id: 'meta' }),
+      it3(t + 5 * DIA, { attempt_id: 'nbme-1', session_id: 'nbme-relacionado' }),
+    ]
+    const p = reconstruirProgreso('CONCEPTO-UNICO', [...envios, envios[2]], CRITERIOS_POR_DEFECTO)
+    expect(p.intentos).toHaveLength(3)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA).cumple).toBe(true)
+    const guiado = reconstruirProgreso('CONCEPTO-UNICO', [...envios.slice(0, 2),
+      { ...envios[2], explicacion_previa: true }], CRITERIOS_POR_DEFECTO)
+    expect(evaluarDominio(guiado, CRITERIOS_POR_DEFECTO, t + 5 * DIA).cumple).toBe(false)
+  })
+  it('consultar una fecha no acredita intentos del futuro ni modifica el historial', () => {
+    const t = Date.parse('2026-10-01T12:00:00-04:00')
+    const intentos = [1, 3, 5].map(d => it3(t + d * DIA))
+    const p = reconstruirProgreso('FUTURO', intentos, CRITERIOS_POR_DEFECTO)
+    const antes = structuredClone(p)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t).cumple).toBe(false)
+    expect(calcularEstado(p, CRITERIOS_POR_DEFECTO, t)).toBe('nuevo')
+    expect(etapa(p, CRITERIOS_POR_DEFECTO, t)).toBe('exposicion')
+    expect(aciertosVigentes(p, t + 3 * DIA)).toHaveLength(2)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA).cumple).toBe(true)
+    expect(p).toEqual(antes)
+  })
+  it('un fallo y una confusión futuros no retiran evidencia de una fecha anterior', () => {
+    const t = Date.parse('2026-10-01T12:00:00-04:00')
+    const intentos = [0, 2, 4].map(d => it3(t + d * DIA))
+    intentos.push(it3(t + 5 * DIA, { resultado: 'incorrecta', tipo_error: 'confusion_conceptos' }))
+    const p = reconstruirProgreso('PASADO', intentos, CRITERIOS_POR_DEFECTO)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 4 * DIA).cumple).toBe(true)
+    expect(calcularEstado(p, CRITERIOS_POR_DEFECTO, t + 4 * DIA)).not.toBe('reaprendizaje')
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 5 * DIA).cumple).toBe(false)
+  })
+  it('un último fallo con evidencia anterior suficiente pide recuperación, no declara mantenimiento al día', () => {
+    const t = Date.parse('2026-10-01T12:00:00-04:00')
+    const intentos = [0, 2, 4, 6, 8].map(d => it3(t + d * DIA))
+    intentos.push(it3(t + 9 * DIA, { resultado: 'incorrecta', tipo_error: 'desconocimiento' }))
+    const p = reconstruirProgreso('ERROR-NUEVO', intentos, CRITERIOS_POR_DEFECTO)
+    const antes = structuredClone(p)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 9 * DIA).cumple).toBe(true)
+    expect(dominioVigente(p, CRITERIOS_POR_DEFECTO, t + 9 * DIA)).toBe(false)
+    expect(resumenDominio(p, CRITERIOS_POR_DEFECTO, t + 9 * DIA)).toMatchObject({
+      texto: expect.stringContaining('recuperación pendiente'),
+      pendientes: ['Recuperar el concepto tras la última respuesta fallada'],
+    })
+    expect(p).toEqual(antes)
+  })
+  it('sin agenda explica que falta comprobar mantenimiento sin inventar una fecha', () => {
+    const t = Date.parse('2026-10-01T12:00:00-04:00')
+    const p = { ...reconstruirProgreso('AGENDA', [0, 2, 4].map(d => it3(t + d * DIA)), CRITERIOS_POR_DEFECTO), proxima: null }
+    expect(resumenDominio(p, CRITERIOS_POR_DEFECTO, t + 4 * DIA)).toMatchObject({
+      texto: expect.stringContaining('mantenimiento por comprobar'),
+      pendientes: ['Completar un repaso para comprobar el mantenimiento y su próxima fecha'],
+    })
+    expect(p.proxima).toBeNull()
+  })
+  it('la espera por confusión puede terminar por tiempo, sin crear una respuesta ni un primer hito', () => {
+    const t = Date.parse('2026-10-01T12:00:00-04:00')
+    const intentos = [it3(t, { resultado: 'incorrecta', tipo_error: 'confusion_conceptos' }),
+      ...[1, 2, 3].map(d => it3(t + d * DIA))]
+    const p = reconstruirProgreso('ESPERA', intentos, CRITERIOS_POR_DEFECTO)
+    const antes = structuredClone(p)
+    expect(p.dominado_en).toBeNull()
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 7 * DIA - 1).cumple).toBe(false)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, t + 7 * DIA).cumple).toBe(true)
+    expect(p).toEqual(antes)
+    expect(p.dominado_en).toBeNull()
+  })
   it('un solo acierto no basta para dominar', () => {
     const t = Date.now()
     const p = programar(nuevoProgreso('X'), it3(t), t)
@@ -191,13 +262,13 @@ describe('criterios de dominio', () => {
   it('las etapas visibles progresan', () => {
     const t = Date.now()
     let p = nuevoProgreso('X')
-    expect(etapa(p)).toBe('exposicion')
+    expect(etapa(p, CRITERIOS_POR_DEFECTO, t)).toBe('exposicion')
     p = programar(p, { ...it3(t), resultado: 'incorrecta', calificacion: 1, tipo_error: 'desconocimiento' }, t)
-    expect(etapa(p)).toBe('comprension')
+    expect(etapa(p, CRITERIOS_POR_DEFECTO, t)).toBe('comprension')
     p = programar(p, it3(t + DIA), t + DIA)
-    expect(etapa(p)).toBe('recuperacion')
+    expect(etapa(p, CRITERIOS_POR_DEFECTO, t + DIA)).toBe('recuperacion')
     p = programar(p, it3(t + 2 * DIA), t + 2 * DIA)
-    expect(etapa(p)).toBe('consolidacion')
+    expect(etapa(p, CRITERIOS_POR_DEFECTO, t + 2 * DIA)).toBe('consolidacion')
   })
   it('cuenta sesiones reales por UUID aunque ocurran el mismo día', () => {
     const t = Date.now()

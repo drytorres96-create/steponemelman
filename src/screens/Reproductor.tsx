@@ -9,7 +9,7 @@ import { NOMBRE_ERROR, type Intento, type TipoError } from '../srs/tipos'
 import { calcularEstado, resumenDominio } from '../srs/mastery'
 import { antesTeCostaba } from '../lib/progreso-aprendizaje'
 import { cercaniaDominio } from '../srs/cercania'
-import { crearUUID } from '../store/model'
+import { crearUUID, type Reanudable } from '../store/model'
 import { EVALUADOR_VERSION } from '../lib/normalize'
 import { prepararConcepto, VERSION_FORMATO_ACTUAL, type VersionFormato } from '../lib/formatos'
 import { AyudaIA } from '../components/AyudaIA'
@@ -52,15 +52,21 @@ export interface ModoCaja {
   avisoFallo: string
 }
 
-export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto, modoCaja, unaVuelta = false }:
+export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto, modoCaja, unaVuelta = false, continuacion, etiquetaSalida, apoyoPrevio = false }:
   { cola: Cola; onSalir: () => void; indiceInicial?: number; onTramoCompleto?: () => void; modoCaja?: ModoCaja
     /** Consume la cola guardada sin añadir reintentos: las cajas recuperan los fallos otro día. */
-    unaVuelta?: boolean }) {
-  const { registrarIntento, progresoDe, estado, guardarReanudable, iniciarSesion, cerrarSesion } = useApp()
+    unaVuelta?: boolean
+    continuacion?: { valor: Reanudable | null; guardar: (valor: Reanudable | null) => void }
+    etiquetaSalida?: string
+    /** Se llega después de leer una explicación relacionada: la práctica cuenta, sin acreditar independencia. */
+    apoyoPrevio?: boolean }) {
+  const { registrarIntento, progresoDe, estado, guardarReanudable: guardarGeneral, registrarVistaConcepto, iniciarSesion, cerrarSesion } = useApp()
+  const guardarReanudable = continuacion?.guardar ?? guardarGeneral
+  const reanudable = continuacion ? continuacion.valor : estado.reanudable
   const pielEstudio = usePielEstudio()
   /** Un paso dentro de un recorrido (cajas o lo nuevo): quien orquesta pone la cuenta y decide qué sigue. */
   const enSesion = !!modoCaja || !!onTramoCompleto
-  const guardada = cola.sessionId && estado.reanudable?.sessionId === cola.sessionId ? estado.reanudable : null
+  const guardada = cola.sessionId && reanudable?.sessionId === cola.sessionId ? reanudable : null
   const [versionFormato] = useState<VersionFormato>(guardada ? guardada.versionFormato ?? 1 : VERSION_FORMATO_ACTUAL)
   const [presupuesto] = useState(guardada?.presupuestoMinutos ?? cola.presupuestoMinutos)
   const [relojSesion] = useState(() => { const r = new RelojActividad(); r.reiniciar(guardada?.msVisibles ?? 0); return r })
@@ -123,7 +129,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
   })
   const guardarPaso = (cambios: Partial<{ ensenanzaAbierta: boolean; pistas: number; fuenteConsultada: boolean; explicacionPrevia: boolean; confianza: 1 | 2 | 3 | null }> = {}) => {
     if (!sesionLista || !sesionId.current || pasoListo.current !== i || !c) return
-    const saved = estado.reanudable
+    const saved = reanudable
     if (!saved || saved.sessionId !== sesionId.current || saved.indice !== i || saved.conceptIds?.join('|') !== orden.map(x => x.concept_id).join('|')) return
     guardarReanudable({
       modulo: cola.modulo, sesion: cola.ruta, indice: i, ts: Date.now(), sessionId: sesionId.current,
@@ -166,10 +172,10 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     const progreso = progresoDe(c.concept_id)
     const id = identificarPregunta(sesionId.current, i, c.concept_id)
     const anterior = buscarIntentoPaso(progreso, sesionId.current, id)
-    const paso = estado.reanudable?.sessionId === sesionId.current && estado.reanudable.paso?.indice === i
-      ? estado.reanudable.paso : null
+    const paso = reanudable?.sessionId === sesionId.current && reanudable.paso?.indice === i
+      ? reanudable.paso : null
     const mostrarEnsenanza = !examenSinAyuda && paso?.ensenanzaAbierta === true
-    const previa = anterior?.explicacion_previa ?? paso?.explicacionPrevia ?? reintento
+    const previa = anterior?.explicacion_previa ?? (apoyoPrevio || paso?.explicacionPrevia || reintento)
     const fuente = anterior?.fuente_consultada ?? paso?.fuenteConsultada ?? false
     const ayudas = anterior?.pistas_usadas ?? paso?.pistas ?? 0
     const seguridad = anterior?.confianza_declarada ?? paso?.confianza ?? null
@@ -193,7 +199,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
   useEffect(() => {
     const actualizar = (guardar = false) => {
       const visible = document.visibilityState === 'visible'
-      reloj.current.activar(sesionLista && !pausaTiempo && visible && !!c && !revisionExamen && vistaActual.current.fase === 'tarea' && !vistaActual.current.verFuente)
+      reloj.current.activar(!saliendo.current && sesionLista && !pausaTiempo && visible && !!c && !revisionExamen && vistaActual.current.fase === 'tarea' && !vistaActual.current.verFuente)
       if (guardar && !visible) guardarPasoActual.current()
     }
     actualizar()
@@ -204,7 +210,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
 
   useEffect(() => {
     const visible = () => document.visibilityState === 'visible'
-    const activar = () => relojSesion.activar(sesionLista && !!c && !pausaTiempo && visible())
+    const activar = () => relojSesion.activar(!saliendo.current && sesionLista && !!c && !pausaTiempo && visible())
     const checkpoint = () => { activar(); if (c && !saliendo.current && !tiempoRef.current.pausa) guardarPasoActual.current() }
     const alSalirPagina = () => { relojSesion.activar(false); reloj.current.activar(false); if (c && !saliendo.current) guardarPasoActual.current() }
     activar()
@@ -215,11 +221,11 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     return () => { clearInterval(timer); relojSesion.activar(false); document.removeEventListener('visibilitychange', checkpoint); window.removeEventListener('pagehide', alSalirPagina) }
   }, [sesionLista, !!c, pausaTiempo, relojSesion])
   useEffect(() => {
-    const saved = estado.reanudable
+    const saved = reanudable
     if (!saved || saved.sessionId !== sesionId.current) return
-    if ((saved.msVisibles ?? 0) > relojSesion.leer()) { const activo = sesionLista && !!c && !pausaTiempo && document.visibilityState === 'visible'; relojSesion.reiniciar(saved.msVisibles!); relojSesion.activar(activo); setMsVisibles(saved.msVisibles!) }
+    if ((saved.msVisibles ?? 0) > relojSesion.leer()) { const activo = !saliendo.current && sesionLista && !!c && !pausaTiempo && document.visibilityState === 'visible'; relojSesion.reiniciar(saved.msVisibles!); relojSesion.activar(activo); setMsVisibles(saved.msVisibles!) }
     if (saved.continuarSinLimite && !tiempoRef.current.sinLimite) { tiempoRef.current = { pausa: false, sinLimite: true }; setSinLimite(true); setPausaTiempo(false) }
-  }, [estado.reanudable, relojSesion, sesionLista, !!c, pausaTiempo])
+  }, [reanudable, relojSesion, sesionLista, !!c, pausaTiempo])
   useEffect(() => () => { if (!saliendo.current && !tiempoRef.current.pausa) guardarPasoActual.current() }, [])
 
   // Cuando el reproductor es un tramo dentro de una sesión mixta, el final de la cola
@@ -309,7 +315,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     const ayuda = pistas > 0 || fuenteConsultada || explicacionPrevia
     if (r.veredicto === 'correcta' && ayuda) tipo = 'correcta_con_pistas'
     else if (r.veredicto === 'correcta' && confianza === 1) tipo = 'correcta_baja_confianza'
-    else if (r.veredicto === 'incorrecta' && confianza === 3) tipo = 'incorrecta_exceso_confianza'
+    else if (r.veredicto === 'incorrecta' && confianza === 3 && tipo !== 'confusion_conceptos') tipo = 'incorrecta_exceso_confianza'
     const intento: Intento = {
       attempt_id: crearUUID(), session_id: sesionId.current,
       ts: Math.max(Date.now(), (progresoDe(c.concept_id).intentos.at(-1)?.ts ?? 0) + 1),
@@ -461,15 +467,28 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     else if (fase === 'retro') siguienteRef.current?.focus({ preventScroll: true })
   }, [fase, preguntaId, sesionLista, enSesion])
 
+  const presentacionLista = sesionLista && !!c && !pausaTiempo && !revisionExamen
+    && reanudable?.sessionId === sesionId.current && reanudable.indice === i
+    && reanudable.conceptIds?.join('|') === orden.map(x => x.concept_id).join('|')
+  useEffect(() => {
+    if (!presentacionLista || !c || !preguntaId) return
+    const registrar = () => {
+      if (document.visibilityState === 'visible') registrarVistaConcepto(c.concept_id, preguntaId)
+    }
+    registrar()
+    document.addEventListener('visibilitychange', registrar)
+    return () => document.removeEventListener('visibilitychange', registrar)
+  }, [presentacionLista, c?.concept_id, preguntaId, registrarVistaConcepto])
+
   if (!sesionLista) return <p role="status">Preparando tu sesión…</p>
-  if (!estado.reanudable || estado.reanudable.sessionId !== sesionId.current || estado.reanudable.indice !== i || estado.reanudable.conceptIds?.join('|') !== orden.map(x => x.concept_id).join('|')) return <div className="tarjeta pila" role="status">
+  if (!reanudable || reanudable.sessionId !== sesionId.current || reanudable.indice !== i || reanudable.conceptIds?.join('|') !== orden.map(x => x.concept_id).join('|')) return <div className="tarjeta pila" role="status">
     <h2>Tu sesión cambió en otra ventana</h2><p>Las respuestas registradas se conservan. Vuelve a tu plan para abrir el punto de continuación más reciente.</p>
-    <button className="btn principal" onClick={() => { saliendo.current = true; relojSesion.activar(false); onSalir() }}>Volver a mi plan</button>
+    <button className="btn principal" onClick={() => { saliendo.current = true; relojSesion.activar(false); onSalir() }}>{etiquetaSalida ?? 'Volver a mi plan'}</button>
   </div>
   if (pausaTiempo && c) return <div className="reproductor tarjeta pila" role="status">
     <span className="rotulo">Objetivo de tiempo alcanzado</span><h2>Has estudiado {tiempoLegible(relojSesion.leer())}</h2>
     <p>La última respuesta está guardada. Quedan {new Set(orden.slice(i).map(x => x.concept_id)).size} conceptos en esta sesión, incluidos los errores que vuelven a aparecer.</p>
-    <div className="fila"><button className="btn principal" onClick={pausar}>Pausar y guardar</button>
+    <div className="fila"><button className="btn principal" onClick={pausar}>{etiquetaSalida ?? 'Pausar y guardar'}</button>
       <button className="btn" onClick={() => { tiempoRef.current = { pausa: false, sinLimite: true }; setSinLimite(true); setPausaTiempo(false) }}>Continuar sin límite</button></div>
   </div>
   if (revisionExamen) return <div className="reproductor pila">

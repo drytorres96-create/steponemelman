@@ -20,6 +20,39 @@ const dominado = (id: string, extra: Partial<ProgresoConcepto> = {}) => p(id, [i
 })
 
 describe('un único resumen de aprendizaje', () => {
+  it('un reloj adelantado no presenta intentos ni vistas futuros como actividad de hoy', () => {
+    const progreso = { futuro: p('futuro', [i(1)]) }
+    const vistas = { futuro: { primera: HOY + DIA, ultima: HOY + DIA, preguntaId: 'paso:futuro' } }
+    const r = resumenProgresoAprendizaje(['futuro'], progreso, CRITERIOS_POR_DEFECTO, HOY, vistas)
+    expect(r).toMatchObject({ actividad: 0, vistos: 0, dominioDemostrado: 0, dominadosEn: [], primerasAcreditaciones: [] })
+  })
+
+  it('separa el primer hito histórico validado del dominio vigente sin inventar fechas', () => {
+    const perdido = dominado('perdido', { intentos: [i(-7), i(-4), i(-2), i(-1, { resultado: 'incorrecta' })] })
+    const sinFecha = dominado('sinFecha', { dominado_en: null })
+    const futura = dominado('futura', { dominado_en: HOY + DIA })
+    const demasiadoPronto = dominado('temprano', { dominado_en: HOY - 6 * DIA })
+    const progreso = { perdido, sinFecha, futura, temprano: demasiadoPronto }
+    const antes = JSON.stringify(progreso)
+    const r = resumenProgresoAprendizaje(Object.keys(progreso), progreso, CRITERIOS_POR_DEFECTO, HOY)
+    expect(r.dominioDemostrado).toBe(3)
+    expect(r.primerasAcreditaciones).toEqual([HOY - 2 * DIA])
+    expect(r.dominadosEn).toEqual([])
+    expect(JSON.stringify(progreso)).toBe(antes)
+  })
+
+  it('cuenta presentaciones reales como vistas y la práctica histórica una vez, sin conceder dominio', () => {
+    const progreso = { practico: p('practico', [i(-1)]) }
+    const vistas = { visto: { primera: HOY - DIA, ultima: HOY, preguntaId: 'paso:visto' },
+      practico: { primera: HOY, ultima: HOY, preguntaId: 'paso:practico' },
+      fuera: { primera: HOY, ultima: HOY, preguntaId: 'paso:fuera' } }
+    const r = resumenProgresoAprendizaje(['visto', 'practico', 'nuevo', 'visto'], progreso, CRITERIOS_POR_DEFECTO, HOY, vistas)
+    expect(r).toMatchObject({ total: 3, vistos: 2, sinVer: 1, actividad: 1, dominioDemostrado: 0, mantenimientoAlDia: 0 })
+    expect(r.porConcepto.get('visto')).toMatchObject({ visto: true, actividad: false, dominioDemostrado: false, estado: 'sin_actividad' })
+    expect(r.porConcepto.get('nuevo')?.visto).toBe(false)
+    expect(resumenProgresoAprendizaje(['practico'], progreso, CRITERIOS_POR_DEFECTO, HOY).vistos).toBe(1)
+  })
+
   it('cuenta IDs únicos y distingue actividad, dominio y mantenimiento sin confiar en la etiqueta guardada', () => {
     const progreso = {
       nuevo: nuevoProgreso('nuevo'), legado: p('legado', [i(-1, { resultado: undefined, fuente_consultada: undefined })]),
@@ -51,7 +84,7 @@ describe('un único resumen de aprendizaje', () => {
 
   it('un mantenimiento vencido conserva los criterios cumplidos y no inventa una fecha de dominio', () => {
     const r = resumenProgresoAprendizaje(['X'], { X: dominado('X', { proxima: HOY - DIA, dominado_en: null }) }, CRITERIOS_POR_DEFECTO, HOY)
-    expect(r).toMatchObject({ dominioDemostrado: 1, mantenimientoAlDia: 0, mantenimientoPendiente: 1, dominadosEn: [0] })
+    expect(r).toMatchObject({ dominioDemostrado: 1, mantenimientoAlDia: 0, mantenimientoPendiente: 1, dominadosEn: [], primerasAcreditaciones: [] })
   })
 
   it('un historial sin agenda conserva dominio demostrado sin suponer mantenimiento al día ni inventar fecha', () => {
@@ -119,6 +152,13 @@ describe('hito semanal sustentado en respuestas separadas', () => {
 })
 
 describe('esto antes te costaba', () => {
+  it('compara días de estudio NY también durante la hora extra de otoño', () => {
+    const previo = i(0, { ts: Date.parse('2026-11-01T00:30:00-04:00'), resultado: 'incorrecta' })
+    const actual = i(0, { ts: Date.parse('2026-11-01T23:40:00-05:00') })
+    expect(actual.ts - previo.ts).toBeGreaterThan(24 * 3_600_000)
+    expect(antesTeCostaba(p('X', [previo]), actual)).toBe(true)
+  })
+
   it('sólo reconoce una corrección independiente de otro día tras un fallo ≥24 h antes', () => {
     const actual = i(0)
     expect(antesTeCostaba(p('X', [i(-1, { resultado: 'incorrecta' }), actual]), actual)).toBe(true)

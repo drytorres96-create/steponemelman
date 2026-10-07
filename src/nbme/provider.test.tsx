@@ -64,6 +64,44 @@ beforeEach(() => {
 })
 afterEach(async () => { if (root) await unmount(); vi.unstubAllGlobals() })
 
+it('removes a session from the library and across reload while retaining every NBME response', async () => {
+  await mount()
+  await act(async () => { expect(await current.startSession(questions)).toBe(true) })
+  const id = current.currentSession!.id
+  await act(async () => current.selectAnswer('A'))
+  await act(async () => current.checkAnswer())
+  const attempts = structuredClone(current.state.attempts)
+  const refs = structuredClone(current.state.sessions[id].initial)
+  await act(async () => { expect(current.archiveSession(id)).toBe(true) })
+  expect(current.currentSession).toBeNull()
+  expect(current.state.attempts).toEqual(attempts)
+  expect(current.state.sessions[id].initial).toEqual(refs)
+  expect(current.state.archivedSessions?.[id]).toBeGreaterThan(0)
+  await act(async () => { expect(await current.syncNow()).toBe(true) })
+  await unmount(); memory.db.clear(); localStorage.clear()
+  await mount()
+  expect(current.currentSession).toBeNull()
+  expect(current.state.attempts).toEqual(attempts)
+  expect(current.state.sessions[id].initial).toEqual(refs)
+  await act(async () => { expect(await current.resumeSession(id)).toBe(false) })
+})
+
+it('views only the originally failed questions using their exact revisions without starting or advancing a block', async () => {
+  await mount()
+  await act(async () => { expect(await current.startSession(questions)).toBe(true) })
+  const id = current.currentSession!.id
+  await act(async () => current.selectAnswer('A'))
+  await act(async () => current.checkAnswer())
+  const before = structuredClone(current.state)
+  let failed: Awaited<ReturnType<typeof current.reviewSessionFailures>> = []
+  await act(async () => { failed = await current.reviewSessionFailures(id) })
+  expect(failed).toEqual([{ question, attempt: before.attempts[`${id}:0`] }])
+  expect(requestedRefs().at(-1)).toEqual({ id: question.id, revision: question.revision })
+  expect(current.state).toEqual(before)
+  expect(current.sessionView?.phase).toBe('feedback')
+  expect(current.currentSession?.id).toBe(id)
+})
+
 it('sets aside a corrupt local copy and recovers the questions from the account instead of blocking the bank', async () => {
   await mount()
   await act(async () => { expect(await current.startSession([question])).toBe(true) })

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
-import { deriveNbmeSession } from '../nbme/model'
+import { deriveNbmeSession, isNbmeSessionArchived } from '../nbme/model'
 import { cargarHistorialSesiones } from '../semana/api'
 import type { SesionSemanal } from '../semana/tipos'
 import { cajasDelDia, TITULO_NBME_CAJAS } from '../lib/cajas'
@@ -54,12 +54,12 @@ export function RecuperarMeta({ onNuevo, onCajas, onRetomar }: AccionesRecuperac
       referencia: referenciaDelDia(estado.progreso, intentosPreguntas, ahora), ahora })
     const entrada = { progreso: estado.progreso, intentosPreguntas, cajas, ahora,
       conceptosSemana: tema.conceptIds.filter(id => publicados.has(id)), preguntasSemana: tema.preguntaIds.filter(id => listas.has(id)) }
-    const pendienteNbme = Object.values(nbme.state.sessions).some(s => s.title !== TITULO_NBME_CAJAS && deriveNbmeSession(nbme.state, s.id)?.phase !== 'complete')
+    const pendienteNbme = Object.values(nbme.state.sessions).some(s => !isNbmeSessionArchived(nbme.state, s.id) && s.title !== TITULO_NBME_CAJAS && deriveNbmeSession(nbme.state, s.id)?.phase !== 'complete')
     const esperandoCuenta = !sincronizacion?.ultima && sincronizacion?.estado !== 'sincronizado'
     const esperandoBanco = !nbme.syncStatus?.lastSyncedAt && nbme.syncStatus?.state !== 'synced'
     const aprendizaje = resumenProgresoAprendizaje([...publicados], estado.progreso, estado.criterios, ahora)
     const preguntas = primerasRespuestasNbme(nbme.state, nbme.catalog)
-    const meta = resumenMeta({ ahora, dominadosEn: aprendizaje.dominadosEn, conceptosPublicados: aprendizaje.total,
+    const meta = resumenMeta({ ahora, dominadosEn: aprendizaje.dominadosEn, primerasAcreditaciones: aprendizaje.primerasAcreditaciones, conceptosPublicados: aprendizaje.total,
       primerasRespuestas: preguntas.marcas, preguntasPublicadas: nbme.catalog ? preguntas.publicadas : Number.POSITIVE_INFINITY })
     const sesionPendiente = hayConceptosPendientes(estado.reanudable) || pendienteNbme
     return { ahora, meta, plan: recuperacionMeta({ meta, dia: estadoDelDia(entrada), datosListos: !!indice && !!nbme.catalog && !esperandoCuenta && !esperandoBanco,
@@ -95,9 +95,11 @@ export function RecuperarMeta({ onNuevo, onCajas, onRetomar }: AccionesRecuperac
   const accionDisponible = plan.accion?.tipo === 'cajas' ? !!onCajas : plan.accion?.tipo === 'nuevo' && !!onNuevo
   return <div className="recuperacion-meta pila">
     <p><b>Dominio en esta meta:</b> {meta.conceptos.hechos} frente a {meta.conceptos.linea} previstos al empezar hoy.
-      {plan.faltaDominio > 0 && <> La diferencia exacta es de {plan.faltaDominio} conceptos con dominio demostrado.</>}</p>
+      {plan.faltaDominio > 0 && <> La diferencia exacta es de {plan.faltaDominio} conceptos con dominio demostrado.</>}
+      {plan.paraSuperarDominio > 0 && <> Para superar la línea: {plan.paraSuperarDominio}.</>} Para completar la meta: {plan.faltanMetaDominio}.</p>
     <p><b>Preguntas nuevas en esta meta:</b> {meta.preguntas.hechos} frente a {meta.preguntas.linea} previstas.
-      {plan.faltanPreguntas > 0 && <> La diferencia es de {plan.faltanPreguntas} primeras respuestas.</>}</p>
+      {plan.faltanPreguntas > 0 && <> La diferencia es de {plan.faltanPreguntas} primeras respuestas.</>}
+      {plan.paraSuperarPreguntas > 0 && <> Para superar la línea: {plan.paraSuperarPreguntas}.</>} Para completar la meta: {plan.faltanMetaPreguntas}.</p>
     <p className="mini">{plan.motivo}</p>
     {plan.accion?.tipo === 'cajas' && <p>Primer bloque: hasta {Math.min(5, plan.accion.items.length)} repasos. El recorrido conserva el resto de pendientes válidos de Hoy.</p>}
     {plan.accion?.tipo === 'nuevo' && <p>Disponible hoy: {plan.accion.material.conceptIds.length} conceptos nuevos y {plan.accion.material.preguntas.length} preguntas.</p>}

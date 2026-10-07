@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  cajaDeConcepto, cajasDelDia, escalonDePregunta, reinsertarFallo, vencimientoConcepto,
+  cajaDeConcepto, cajasDelDia, escalonDePregunta, reinsertarFallo, techoCaja, vencimientoConcepto,
   DISTANCIA_REINSERCION, HORAS_CAJA, MAX_REINSERCIONES, VENTANA_PENDIENTE_HORAS, type EntradaCajas,
 } from '../lib/cajas'
 import { estadoDelDia, TECHOS } from '../lib/dia'
@@ -13,7 +13,7 @@ import { reconstruirProgreso } from '../store/model'
 const HORA = 3_600_000
 const DIA = 24 * HORA
 /** Jueves 24 de septiembre de 2026: un día entre semana. El viernes 25 va vacío. */
-const F = (d: number, h: number, m = 0) => new Date(2026, 8, d, h, m).getTime()
+const F = (d: number, h: number, m = 0) => Date.parse(`2026-09-${String(d).padStart(2, '0')}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00-04:00`)
 const AHORA = F(24, 10)
 
 let serie = 0
@@ -47,6 +47,31 @@ function contiene(valor: unknown, n: number): boolean {
 }
 
 describe('escalera de cajas', () => {
+  it('un fallo reciente vuelve a caja 1 incluso si sobreviven tres aciertos de un dominio previo', () => {
+    const historial = [10, 12, 14, 16, 18].map((d, n) => acierto(F(d, 9), `s${n}`))
+    const p = progreso('ERROR-NUEVO', [...historial, fallo(F(23, 9), 'nuevo')])
+    const antes = structuredClone(p)
+    expect(cajaDeConcepto(p, CRITERIOS_POR_DEFECTO, AHORA)).toBe(1)
+    const hoy = cajasDelDia(entrada({ progreso: { 'ERROR-NUEVO': p } }))
+    expect(hoy.items[0]).toMatchObject({ tipo: 'concepto', id: 'ERROR-NUEVO', caja: 1, hecho: false })
+    expect(hoy.items[0].mantenimiento).toBeUndefined()
+    expect(p).toEqual(antes)
+  })
+  it('una respuesta futura no cierra ni cambia la caja calculada antes de verla', () => {
+    const intentos = [acierto(F(19, 9), 's1'), acierto(F(21, 9), 's2'), acierto(F(26, 9), 'futuro')]
+    expect(caja(intentos)).toBe(3)
+    expect(caja(intentos, F(18, 9))).toBeNull()
+  })
+  it('el techo de caja usa días de Nueva York y conserva el máximo durante cambios de hora', () => {
+    const invierno = Date.parse('2026-10-31T03:05:00-04:00')
+    expect(techoCaja(invierno, 1)).toBe(invierno + DIA)
+    const verano = Date.parse('2026-03-07T20:00:00-05:00')
+    expect(techoCaja(verano, 1)).toBe(Date.parse('2026-03-08T03:00:00-04:00'))
+    for (const fecha of [invierno, verano]) for (const c of [1, 2, 3] as const) {
+      expect(techoCaja(fecha, c)).toBeGreaterThan(fecha)
+      expect(techoCaja(fecha, c)).toBeLessThanOrEqual(fecha + HORAS_CAJA[c] * HORA)
+    }
+  })
   it('la caja sale de los aciertos vigentes independientes: 0, 1 y 2 → cajas 1, 2 y 3', () => {
     expect(caja([fallo(F(19, 9), 's1')])).toBe(1)
     expect(caja([acierto(F(19, 9), 's1')])).toBe(2)

@@ -6,6 +6,16 @@ import type { Concepto } from '../schema/concept'
 const intento=(dia:number,extra:Partial<Intento>={}):Intento=>({ts:dia*DIA,calificacion:3,resultado:'correcta',interaccion:'recuperacion_libre',recuperacion_activa:true,pistas_usadas:0,fuente_consultada:false,explicacion_previa:false,pregunta_version:'v1',ms:1000,tipo_error:'ninguno',confianza_declarada:null,...extra})
 const medir=(intentos:Intento[],desde=0,hasta=100*DIA)=>evidenciaDiferida([{...nuevoProgreso('X'),intentos}],desde,hasta)
 describe('evidencia observada, separada del modelo SRS',()=>{
+ it('el límite de treinta días se decide por el instante exacto y excluye respuestas futuras',()=>{
+  const primero=intento(1),segundo=intento(31)
+  expect(medir([primero,{...segundo,ts:segundo.ts-1}]).retencion.n).toBe(0)
+  expect(medir([primero,segundo],0,segundo.ts-1).retencion.n).toBe(0)
+  expect(medir([primero,segundo],0,segundo.ts).retencion).toEqual({favorables:1,n:1})
+ })
+ it('cambiar una calificación no sustituye el resultado observado',()=>{
+  expect(medir([intento(1),intento(31,{resultado:'incorrecta',calificacion:4})]).retencion).toEqual({favorables:0,n:1})
+  expect(medir([intento(1),intento(31,{resultado:'correcta',calificacion:1})]).retencion).toEqual({favorables:1,n:1})
+ })
  it('no inventa cero por ciento sin observaciones',()=>expect(porcentajeObservado(medir([]).retencion)).toBeNull())
  it('incluye exactamente treinta días, excluye intervalos menores',()=>{
   expect(medir([intento(1),intento(31)]).retencion).toEqual({favorables:1,n:1})

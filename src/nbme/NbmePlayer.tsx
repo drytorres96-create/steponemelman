@@ -5,6 +5,7 @@ import { useNbme } from './NbmeProvider'
 import { analizarColumnasOpciones, analizarEnunciado, normalizarTexto, preguntaConLecturasDudosas } from './texto'
 import type { NbmeQuestion } from './types'
 import { CorreccionErrorIA } from '../components/CorreccionErrorIA'
+import { RecuperacionTrasFallo } from './RecuperacionTrasFallo'
 import './nbme.css'
 
 interface LoadedFigure { assetId: string; alt: string; url: string }
@@ -122,14 +123,15 @@ function useQuestionFigures(question: NbmeQuestion | null, target: RefObject<HTM
  * fallo. Corregida la respuesta, el foco va a «Continuar»: con el teclado basta con
  * la letra, Intro, leer, Intro.
  */
-export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, onPasoCompleto, etiquetaSalida, avisoFallo }:
+export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, onPasoCompleto, etiquetaSalida, avisoFallo, recuperarErrores = false, onRecuperacion }:
   { onSalir: () => void; onEstudiar?: (ids: string[]) => void; onBuscar?: (question: NbmeQuestion) => void
-    modoPaso?: boolean; onPasoCompleto?: () => void; etiquetaSalida?: string; avisoFallo?: string }) {
+    modoPaso?: boolean; onPasoCompleto?: () => void; etiquetaSalida?: string; avisoFallo?: string; recuperarErrores?: boolean; onRecuperacion?: (activa: boolean) => void }) {
   const {
     catalog, state, currentSession, sessionView, currentQuestion, selectedOption, currentFeedback, questionLoading,
     loading, busy, error, storageWarning, syncStatus, selectAnswer, checkAnswer, nextQuestion, pauseSession,
     retryQuestionLoad, syncNow, budgetReached, continueWithoutBudget,
   } = useNbme()
+  const [recuperando, setRecuperando] = useState(false)
   const [expandedFigure, setExpandedFigure] = useState<LoadedFigure | null>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
   const feedbackRef = useRef<HTMLHeadingElement>(null)
@@ -139,6 +141,18 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   const figures = useQuestionFigures(currentQuestion, figureRef)
   const columnasOpciones = useMemo(() => currentQuestion ? analizarColumnasOpciones(currentQuestion.stem, currentQuestion.options) : null, [currentQuestion])
   const feedback = sessionView?.phase === 'feedback' ? currentFeedback : null
+  const preguntaFeedback = useRef<{ clave: string; pregunta: NbmeQuestion } | null>(null)
+  const claveFeedback = feedback ? `${currentSession?.id}:${feedback.id}:${feedback.questionId}:${feedback.revision}` : ''
+  if (feedback && !feedback.conflict && currentQuestion?.id === feedback.questionId && currentQuestion.revision === feedback.revision) {
+    preguntaFeedback.current = { clave: claveFeedback, pregunta: currentQuestion }
+  } else if (!claveFeedback || preguntaFeedback.current?.clave !== claveFeedback || feedback?.conflict) {
+    preguntaFeedback.current = null
+  }
+  // La revalidación histórica puede retirar momentáneamente el objeto del caché.
+  // Conservar sólo este host mientras carga evita perder su devolución asíncrona.
+  const preguntaRecuperacion = currentQuestion ?? ((busy || questionLoading) && preguntaFeedback.current?.clave === claveFeedback
+    ? preguntaFeedback.current.pregunta : null)
+
   const currentReady = !!currentQuestion && currentQuestion.status === 'ready' && currentQuestion.id === sessionView?.current?.id
     && !preguntaConLecturasDudosas(currentQuestion)
     && !!catalog?.questions.some(q => q.id === currentQuestion.id && q.status === 'ready')
@@ -151,6 +165,10 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
     if (!questionLoading && sessionView?.phase === 'question') titleRef.current?.focus()
     if (sessionView?.phase === 'feedback') (modoPaso ? continuarRef : feedbackRef).current?.focus({ preventScroll: modoPaso })
   }, [sessionView?.current?.position, sessionView?.phase, currentQuestion?.id, currentQuestion?.revision, questionLoading, modoPaso])
+
+  useEffect(() => {
+    setRecuperando(false); onRecuperacion?.(false)
+  }, [currentSession?.id, sessionView?.current?.position, sessionView?.phase, sessionView?.current?.id, sessionView?.current?.revision, feedback?.conflict, onRecuperacion])
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
@@ -211,7 +229,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   const conceptIds = [...new Set(relatedLinks.map(link => link.conceptId))].slice(0, 3)
   const suggestedLinks = conceptIds.length > 0 && !reviewedLinks.length
 
-  return <div className="nbme-player pila">
+  return <div className={`nbme-player pila${recuperando ? ' recuperando' : ''}`}>
     <p className="mini">National Board of Medical Examiners (NBME)</p>
     <header className={`nbme-player-header${modoPaso ? ' paso' : ''}`}>
       {!modoPaso && <div><p className="mini">{currentSession.title}</p><p className="sutil">Primera vuelta: {sessionView.firstAnswered}/{sessionView.initialCount} · Correcciones pendientes: {sessionView.pendingErrors}</p></div>}
@@ -266,8 +284,8 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
                         {columnasOpciones ? <span className="nbme-option-cells" style={{ gridTemplateColumns: `repeat(${columnasOpciones.columnas.length}, minmax(0, 1fr))` }}>
                           {columnasOpciones.filas[option.id].map((valor, i) => <span key={i} className="nbme-option-cell"><small>{columnasOpciones.columnas[i]}</small><span>{valor}</span></span>)}
                         </span> : normalizarTexto(option.text)}
-                        {isCorrect && <span className="nbme-option-state" lang="es">Respuesta correcta</span>}
-                        {isIncorrect && <span className="nbme-option-state" lang="es">Tu respuesta</span>}
+                        {isCorrect && <span className="nbme-option-state" lang="es"><span aria-hidden="true">✓</span> Respuesta correcta</span>}
+                        {isIncorrect && <span className="nbme-option-state" lang="es"><span aria-hidden="true">×</span> Tu respuesta incorrecta</span>}
                       </span>
                     </label>
                   })}
@@ -277,7 +295,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
               </form>
             </section>
 
-            {feedback && <section className={`tarjeta nbme-feedback pila ${feedback.correct ? 'correct' : 'incorrect'}`} aria-labelledby="nbme-feedback-title">
+            {feedback && <section className={`tarjeta nbme-feedback pila ${feedback.conflict ? 'conflict' : feedback.correct ? 'correct' : 'incorrect'}`} aria-labelledby="nbme-feedback-title">
               <div><h2 ref={feedbackRef} tabIndex={-1} id="nbme-feedback-title">{feedback.conflict ? 'Respuesta por revisar' : feedback.correct ? 'Respuesta correcta' : 'Vamos a repasarla'}</h2>
                 <p className="sutil" role="status">{feedback.conflict ? 'Se recibieron respuestas distintas desde varios dispositivos. Este intento no cuenta como acierto inicial.'
                   : feedback.correct ? 'Tu respuesta quedó registrada.'
@@ -295,13 +313,16 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
               {suggestedLinks && <p className="mini">Relación sugerida; confirma que corresponde al fundamento.</p>}
               <div className="nbme-actions"><button ref={continuarRef} className="btn principal" disabled={busy}
                 onClick={modoPaso && onPasoCompleto ? onPasoCompleto : nextQuestion}>Continuar</button>
-                {conceptIds.length > 0 && onEstudiar && <button className="btn fantasma" onClick={() => { pauseSession(); onEstudiar(conceptIds) }}>{suggestedLinks ? 'Explorar conceptos relacionados' : 'Repasar fundamento'}</button>}
-                {conceptIds.length === 0 && onBuscar && <button className="btn fantasma" onClick={() => { pauseSession(); onBuscar(currentQuestion) }}>Explorar fundamentos</button>}
+                {!recuperarErrores && conceptIds.length > 0 && onEstudiar && <button className="btn fantasma" onClick={() => { pauseSession(); onEstudiar(conceptIds) }}>{suggestedLinks ? 'Explorar conceptos relacionados' : 'Repasar fundamento'}</button>}
+                {!recuperarErrores && conceptIds.length === 0 && onBuscar && <button className="btn fantasma" onClick={() => { pauseSession(); onBuscar(currentQuestion) }}>Explorar fundamentos</button>}
               </div>
-              {!feedback.correct && !feedback.conflict && <CorreccionErrorIA key={`${feedback.id}:${feedback.optionId}`}
+              {!recuperarErrores && !feedback.correct && !feedback.conflict && <CorreccionErrorIA key={`${feedback.id}:${feedback.optionId}`}
                 peticion={{ tipo: 'nbme', questionId: currentQuestion.id, revision: currentQuestion.revision, optionId: feedback.optionId }} />}
             </section>}
           </>}
+    {recuperarErrores && feedback && !feedback.conflict && preguntaRecuperacion && <RecuperacionTrasFallo
+      key={`${feedback.id}:${preguntaRecuperacion.revision}`} pregunta={preguntaRecuperacion} intento={feedback}
+      onActividad={activa => { setRecuperando(activa); onRecuperacion?.(activa) }} onSiguiente={modoPaso && onPasoCompleto ? onPasoCompleto : nextQuestion} />}
     <div className="nbme-status" role="status"><span>{syncText}</span>
       {(syncStatus.state === 'error' || syncStatus.state === 'offline') && <button className="btn pequeno fantasma" disabled={busy} style={{ marginLeft: 8 }} onClick={() => void syncNow()}>Reintentar</button>}
     </div>

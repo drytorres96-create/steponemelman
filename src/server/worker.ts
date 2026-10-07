@@ -7,6 +7,8 @@ import { aplicarVariante } from '../lib/variantes'
 import { PeticionErrorIAZ, PresentacionIAZ } from '../lib/contexto-ia'
 import type { NbmeQuestion } from '../nbme/types'
 import { INSTRUCCION_ERROR, MAX_TOKENS_ERROR, materialErrorConcepto, materialErrorNbme, validarCorreccionError, type CorreccionError } from './correccion-error'
+import { INSTRUCCION_RECUPERACION, MAX_TOKENS_RECUPERACION, PeticionRecuperacionNbmeZ,
+  validarRecuperacionNbme, type FuenteRecuperacion, type RecuperacionNbme } from './recuperacion-nbme'
 import { NOMBRE_ERROR, type TipoError } from '../srs/tipos'
 import { handleNbme } from './nbme'
 import { handlePlan, type PlanEnv } from './plan'
@@ -40,9 +42,9 @@ interface Env extends PlanEnv {
   COACH: { idFromName(name: string): unknown; get(id: unknown): { fetch(request: Request): Promise<Response> } }
   ASSETS: { fetch(request: Request): Promise<Response> }
 }
-type CoachMode = ModoIA | 'estado' | 'error'
+type CoachMode = ModoIA | 'estado' | 'error' | 'recuperacion-nbme'
 type Candidato = { texto: string; origen: OrigenParecido }
-type CoachInput = { user: string; key: string; mode: CoachMode; reference: string; sourceFragment: string; question: string; answer: string; canonical: string; source: { title: string; page: number }; ids?: string[]; candidatos?: Candidato[]; historial?: TurnoChat[]; reasoning?: string }
+type CoachInput = { user: string; key: string; mode: CoachMode; reference: string; sourceFragment: string; question: string; answer: string; canonical: string; source: { title: string; page: number }; ids?: string[]; candidatos?: Candidato[]; historial?: TurnoChat[]; reasoning?: string; recoverySources?: FuenteRecuperacion[] }
 export type CoachAnswer = { diferencia: string; explicacion: string; recordar: string; evidencia: string }
 export type CoachVeredicto = { veredicto: 'correcta' | 'parcial' | 'incorrecta'; motivo: string }
 export type CoachPatron = { titulo: string; porque: string; conceptos: string[]; accion: string }
@@ -64,6 +66,8 @@ export const MOTIVOS = {
 } as const
 export type Motivo = keyof typeof MOTIVOS
 const unavailable = (codigo: Motivo = 'ia') => json({ error: MOTIVOS[codigo], codigo }, 503)
+const recuperacionUnavailable = (codigo: Motivo = 'ia') =>
+  json({ available: false, error: MOTIVOS[codigo], codigo }, 503)
 
 async function digest(value: string) {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
@@ -281,7 +285,8 @@ export class StudyCoach {
     const espera = fallo ? Math.ceil((fallo.at + 60_000 - Date.now()) / 1000) : 0
     if (espera > 0) return Response.json(fallo!.body, { status: 503,
       headers: { 'Cache-Control': 'no-store', 'Retry-After': String(espera), 'X-Content-Type-Options': 'nosniff' } })
-    const response = await (input.mode === 'error' ? this.corregirError(input)
+    const response = await (input.mode === 'recuperacion-nbme' ? this.recuperarNbme(input)
+      : input.mode === 'error' ? this.corregirError(input)
       : input.mode === 'calificar' ? this.grade(input)
       : input.mode === 'analizar' ? this.analyse(input)
       : input.mode === 'examen' ? this.examine(input)
@@ -386,6 +391,41 @@ export class StudyCoach {
     } catch (causa) {
       registrar('coach/error', causa)
       return unavailable('interno')
+    } finally {
+      if (timer) clearTimeout(timer)
+      await this.liquidar(input.user, diaReservado, estimado, costeReal(raw, estimado))
+    }
+  }
+
+  /** Optional, finite practice shares the existing explanation budget and account cache. */
+  private async recuperarNbme(input: CoachInput): Promise<Response> {
+    const cacheKey = `cache:${input.key}`
+    const saved = await this.state.storage.get<{ at: number; recuperacion: RecuperacionNbme }>(cacheKey)
+    if (saved?.recuperacion && Date.now() - saved.at < 7 * DAY) {
+      return json({ ...saved.recuperacion, source: input.source, cached: true })
+    }
+    const messages = [{ role: 'system', content: INSTRUCCION_RECUPERACION },
+      { role: 'user', content: JSON.stringify({ material: JSON.parse(input.reference),
+        razonamiento_del_estudiante: input.reasoning ?? '' }) }]
+    const estimado = costeEstimado(JSON.stringify(messages), MAX_TOKENS_RECUPERACION)
+    const diaReservado = await this.admitir(input.user, 'explicar', estimado)
+    if (!diaReservado) return json({ available: false,
+      error: 'La recuperación agotó su parte gratuita de hoy. Puedes repasar los conceptos y continuar la pregunta; la cuota se renueva a las 00:00 UTC.' }, 429)
+    let timer: ReturnType<typeof setTimeout> | undefined, raw: unknown
+    try {
+      raw = await Promise.race([this.env.AI.run(MODEL, { stream: false, temperature: 0.1,
+        max_tokens: MAX_TOKENS_RECUPERACION, response_format: { type: 'json_object' }, messages }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), 20_000) })])
+      const recuperacion = validarRecuperacionNbme(raw, input.sourceFragment,
+        (JSON.parse(input.reference) as { alternativas_originales: string[] }).alternativas_originales,
+        input.recoverySources)
+      if (!recuperacion) return recuperacionUnavailable('no_verificable')
+      await this.state.storage.put(cacheKey, { at: Date.now(), recuperacion })
+      await this.podarCache()
+      return json({ ...recuperacion, source: input.source, cached: false })
+    } catch (causa) {
+      registrar('coach/recuperacion-nbme', causa)
+      return recuperacionUnavailable('interno')
     } finally {
       if (timer) clearTimeout(timer)
       await this.liquidar(input.user, diaReservado, estimado, costeReal(raw, estimado))
@@ -1039,6 +1079,121 @@ async function handleError(request: Request, url: URL, env: Env): Promise<Respon
   }
 }
 
+/**
+ * Bounded supplementary reading through the same member's RLS. Current links, rather than
+ * historical annotations, select at most three published Step 1 fragments. Failure here
+ * leaves the original explanation usable, and never creates a study session or writes data.
+ */
+async function fuentesRecuperacion(get: Lector, q: NbmeQuestion,
+  nbme: FuenteRecuperacion): Promise<FuenteRecuperacion[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([leerFuentesRecuperacion(get, q, nbme),
+      new Promise<FuenteRecuperacion[]>(resolve => { timer = setTimeout(() => resolve([nbme]), 3000) })])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+async function leerFuentesRecuperacion(get: Lector, q: NbmeQuestion,
+  nbme: FuenteRecuperacion): Promise<FuenteRecuperacion[]> {
+  const fuentes = [nbme]
+  try {
+    const response = await get('/rest/v1/nbme_assets?select=payload&path=eq.catalog-index.json')
+    if (!response.ok) return fuentes
+    const catalog = (await response.json() as { payload?: { questions?: NbmeQuestion[] } }[])[0]?.payload
+    const actual = catalog?.questions?.find(item => item.id === q.id && item.status === 'ready')
+    const links = [...(actual?.conceptLinks ?? [])].filter(link =>
+      typeof link.conceptId === 'string' && link.conceptId.length <= 200
+      && ['tested', 'foundation'].includes(link.relation)
+      && Number.isFinite(link.confidence) && link.confidence >= 0.7)
+      .sort((a, b) => Number(b.relation === 'tested') - Number(a.relation === 'tested')
+        || b.confidence - a.confidence || a.conceptId.localeCompare(b.conceptId))
+    const ids = [...new Set(links.map(link => link.conceptId))].slice(0, 3)
+    if (!ids.length) return fuentes
+    const asset = activos(get)
+    const parsed = IndiceZ.safeParse(await asset('index.json'))
+    if (!parsed.success) return fuentes
+    const indice = parsed.data
+    const modulos = indice.modulos.filter(m => m.sesiones.some(s => s.conceptos.some(id => ids.includes(id)))).slice(0, 3)
+    const lecturas = await Promise.allSettled(modulos.map(m => asset(`modules/${m.module_id}.json`)))
+    for (const lectura of lecturas) {
+      if (lectura.status !== 'fulfilled') continue
+      const data = lectura.value as { corpus_version?: string; conceptos?: unknown[] } | null
+      if (data?.corpus_version !== indice.corpus_version || !Array.isArray(data.conceptos)) continue
+      for (const bruto of data.conceptos) {
+        const c = ConceptoZ.safeParse(bruto)
+        if (!c.success || !ids.includes(c.data.concept_id) || c.data.revision_editorial
+          || c.data.step === 'step2' || c.data.calidad.estado !== 'aprobado'
+          || c.data.calidad.confianza < 0.7 || c.data.source.fragment.length < 15
+          || c.data.source.fragment.length > 1600 || c.data.source.doc_title.length > 300
+          || !/^[a-zA-Z0-9_.:-]{1,200}$/.test(c.data.concept_id)) continue
+        fuentes.push({ fragment: c.data.source.fragment, title: c.data.source.doc_title,
+          page: c.data.source.pdf_page ?? c.data.source.page, conceptId: c.data.concept_id })
+      }
+    }
+    return fuentes.slice(0, 4)
+  } catch {
+    return fuentes
+  }
+}
+
+/** Always reauthorizes and resolves the exact pinned question before touching AI/cache. */
+async function handleRecuperacionNbme(request: Request, url: URL, env: Env): Promise<Response> {
+  const parado = preflight(request, url, 'POST')
+  if (parado) return parado
+  try {
+    const body = await boundedBody(request)
+    if (body === null) return json({ error: 'Solicitud demasiado larga.' }, 413)
+    let parsed: unknown
+    try { parsed = JSON.parse(body) } catch { return json({ error: 'Solicitud no válida.' }, 400) }
+    const leido = PeticionRecuperacionNbmeZ.safeParse(parsed)
+    if (!leido.success) return json({ error: 'Solicitud no válida.' }, 400)
+    const input = leido.data
+    const quien = await identificar(request)
+    if (quien instanceof Response) return quien
+    if (env.AI_FREE_ENABLED !== 'true') return recuperacionUnavailable('desactivada')
+    const response = await handleNbme(new Request(new URL('/api/nbme/questions', url.origin), {
+      method: 'POST', headers: { Authorization: request.headers.get('authorization')!,
+        'Content-Type': 'application/json' },
+      body: JSON.stringify({ refs: [{ id: input.questionId, revision: input.revision }] }),
+    }))
+    if (!response.ok) return response
+    const data = await response.json() as { questions: NbmeQuestion[] }
+    const q = data.questions[0]
+    if (!q || !q.options.some(o => o.id === input.optionId) || q.answer === input.optionId) {
+      return json({ error: 'La recuperación necesita una opción incorrecta de esta pregunta.' }, 422)
+    }
+    const material = materialErrorNbme(q, input.optionId)
+    if (!material) return recuperacionUnavailable('no_verificable')
+    const fuentes = await fuentesRecuperacion(quien.get, q, {
+      fragment: material.sourceFragment, ...material.source,
+    })
+    const formarReferencia = () => JSON.stringify({ ...JSON.parse(material.reference),
+      alternativas_originales: q.options.map(o => o.text),
+      fragmento_para_citar: fuentes.map(f => f.fragment).join('\n'),
+      objetivo_original_para_citar: material.sourceFragment.slice(0, 600),
+      conceptos_vinculados: fuentes.slice(1),
+    })
+    let reference = formarReferencia()
+    while (reference.length > 11000 && fuentes.length > 1) {
+      fuentes.pop(); reference = formarReferencia()
+    }
+    if (reference.length > 11000) return recuperacionUnavailable('concepto_largo')
+    const sourceFragment = fuentes.map(f => f.fragment).join('\n')
+    const reasoning = input.razonamiento?.trim().normalize('NFC') ?? ''
+    const trusted: CoachInput = { user: quien.userId, mode: 'recuperacion-nbme', ...material, reference,
+      sourceFragment, recoverySources: fuentes, reasoning,
+      key: await digest(JSON.stringify([quien.userId, input.questionId, input.revision, input.optionId,
+        reference, reasoning, MODEL, 'recuperacion-nbme-v1'])),
+      question: '', answer: '', canonical: '' }
+    return alCoach(env, 'recuperacion-nbme', trusted)
+  } catch (causa) {
+    registrar('ia/recuperacion-nbme', causa)
+    return recuperacionUnavailable('interno')
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -1047,6 +1202,7 @@ export default {
     if (url.pathname.startsWith('/api/plan/')) return handlePlan(request, env)
     if (url.pathname === '/api/ia/estado') return handleCuota(request, url, env)
     if (url.pathname === '/api/ia/error') return handleError(request, url, env)
+    if (url.pathname === '/api/ia/recuperacion-nbme') return handleRecuperacionNbme(request, url, env)
     if (url.pathname === '/api/analizar') return handleAnalisis(request, url, env)
     if (url.pathname === '/api/aplicar') return handleExamen(request, url, env)
     if (url.pathname === '/api/confusion') return handleConfusion(request, url, env)

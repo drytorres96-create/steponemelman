@@ -8,6 +8,75 @@ const intento = (g: 1|2|3|4, extra: Partial<Intento> = {}): Intento => ({
 })
 
 describe('planificador de repetición espaciada', () => {
+  it('la curva es finita, acotada y decreciente para distintas escalas de estabilidad', () => {
+    for (const estabilidad of [0.1, 0.4, 1, 12, 100, 1_000_000]) {
+      let anterior = 1
+      for (const dias of [0, 0.1, 1, 30, 1_000, 1_000_000]) {
+        const r = retencion(dias, estabilidad)
+        expect(Number.isFinite(r)).toBe(true)
+        expect(r).toBeGreaterThanOrEqual(0)
+        expect(r).toBeLessThanOrEqual(anterior)
+        anterior = r
+      }
+      expect(retencion(estabilidad, estabilidad)).toBeCloseTo(0.9, 12)
+    }
+  })
+  it('la inversión del intervalo alcanza su objetivo sin confundirlo con datos observados', () => {
+    for (const estabilidad of [0.1, 3.173, 12, 1_000]) {
+      for (const objetivo of [0.5, 0.8, 0.9, 0.99, 1]) {
+        expect(retencion(intervalo(estabilidad, objetivo), estabilidad)).toBeCloseTo(objetivo, 12)
+      }
+    }
+  })
+  it('un reloj adelantado no produce retención superior a cien por ciento', () => {
+    expect(retencion(-5, 10)).toBe(1)
+    expect(retencion(-1_000, 0.1)).toBe(1)
+    for (const estabilidad of [0, -1, NaN, Infinity]) expect(retencion(1, estabilidad)).toBe(0)
+    expect(retencion(NaN, 10)).toBe(0)
+    expect(retencion(Infinity, 10)).toBe(0)
+  })
+  it('el instante cero es una revisión previa válida, sin borrar el tiempo transcurrido', () => {
+    const primero = programar(nuevoProgreso('EPOCH'), intento(3, { ts: 0 }), 0)
+    const segundo = programar(primero, intento(3, { ts: 3 * DIA }), 3 * DIA)
+    expect(segundo.estabilidad).toBeGreaterThan(primero.estabilidad)
+  })
+  it('una repetición inmediata o un desfase del reloj no alargan la estabilidad por tiempo negativo', () => {
+    const t = Date.parse('2026-10-01T12:00:00-04:00')
+    const base = programar(nuevoProgreso('RELOJ'), intento(3, { ts: t }), t)
+    const inmediato = programar(base, intento(3, { ts: t }), t)
+    const desfase = programar(base, intento(3, { ts: t - DIA }), t - DIA)
+    expect(inmediato.estabilidad).toBe(base.estabilidad)
+    expect(desfase.estabilidad).toBe(inmediato.estabilidad)
+    expect(Number.isFinite(desfase.proxima)).toBe(true)
+  })
+  it('secuencias con ayuda, aciertos y fallos mantienen D, S y agenda válidas', () => {
+    const t = Date.parse('2026-10-01T12:00:00-04:00')
+    let p = nuevoProgreso('LIMITES')
+    for (let n = 0; n < 100; n++) {
+      const ts = t + n * 3_600_000
+      const g = (n % 4 + 1) as 1 | 2 | 3 | 4
+      p = programar(p, intento(g, { ts, resultado: g === 1 ? 'incorrecta' : 'correcta',
+        pistas_usadas: n % 3 === 0 ? 1 : 0 }), ts)
+      expect(p.dificultad).toBeGreaterThanOrEqual(1)
+      expect(p.dificultad).toBeLessThanOrEqual(10)
+      expect(Number.isFinite(p.estabilidad)).toBe(true)
+      expect(p.estabilidad).toBeGreaterThan(0)
+      expect(p.proxima!).toBeGreaterThanOrEqual(ts)
+      expect(Number.isFinite(p.proxima)).toBe(true)
+    }
+  })
+  it('conserva el intervalo de exceso de confianza sin borrar la confusión conceptual', () => {
+    const t = Date.parse('2026-10-01T12:00:00-04:00')
+    const base = programar(nuevoProgreso('CONFUSION'), intento(3, { ts: t }), t)
+    const datos = { ts: t + DIA, resultado: 'incorrecta' as const, confianza_declarada: 3 as const }
+    const antes = programar(base, intento(1, { ...datos, tipo_error: 'incorrecta_exceso_confianza' }), datos.ts)
+    const despues = programar(base, intento(1, { ...datos, tipo_error: 'confusion_conceptos' }), datos.ts)
+    expect(despues.proxima).toBe(antes.proxima)
+    expect(despues.estabilidad).toBe(antes.estabilidad)
+    expect(despues.intentos.at(-1)?.tipo_error).toBe('confusion_conceptos')
+    const normal = programar(base, intento(1, { ...datos, confianza_declarada: 2, tipo_error: 'confusion_conceptos' }), datos.ts)
+    expect(despues.proxima!).toBeLessThan(normal.proxima!)
+  })
   it('la retención decae con el tiempo', () => {
     expect(retencion(0, 10)).toBeCloseTo(1, 5)
     expect(retencion(10, 10)).toBeLessThan(1)

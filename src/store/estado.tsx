@@ -8,7 +8,7 @@ import { calcularEstado, evaluarDominio, type CriteriosDominio } from '../srs/ma
 import { supabase } from '../lib/supabase'
 import { leer, escribir } from './db'
 import { apartarCopia } from './apartar'
-import { ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, combinarEstados, reconstruirProgreso, serializarEstable, type EstadoApp, type Reanudable } from './model'
+import { ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, combinarEstados, reconstruirProgreso, registrarVistaConceptoEstado, serializarEstable, type EstadoApp, type Reanudable } from './model'
 import { StudySyncEngine, leerSnapshot, diagnosticoSync, type CloudSnapshot, type SyncReply, type CodigoSync } from './sync'
 export type { EstadoApp, RegistroSesion, Reanudable } from './model'
 
@@ -20,6 +20,7 @@ interface Ctx {
   sincronizacion: { estado: 'inicializando' | 'pendiente' | 'sincronizando' | 'sincronizado' | 'error'; mensaje: string; ultima: number | null; codigo?: CodigoSync }
   sincronizarAhora: () => Promise<boolean>
   registrarIntento: (id: string, intento: Intento) => ProgresoConcepto
+  registrarVistaConcepto: (id: string, preguntaId: string) => void
   progresoDe: (id: string) => ProgresoConcepto
   guardarReanudable: (r: Reanudable | null) => void
   iniciarSesion: (modulo: string, ruta: string) => string
@@ -236,8 +237,16 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
     })
     return resultado
   }, [editar])
+  const conceptosPublicados = useMemo(() => new Set(indice?.modulos.flatMap(m => m.sesiones.flatMap(s => s.conceptos)) ?? []), [indice])
+  const registrarVistaConcepto = useCallback((id: string, preguntaId: string) => {
+    if (!conceptosPublicados.has(id)) return
+    // Evita sincronizaciones extra al reanudar exactamente el mismo paso.
+    const ts = Date.now()
+    if (registrarVistaConceptoEstado(actual.current, id, preguntaId, ts) === actual.current) return
+    editar(p => registrarVistaConceptoEstado(p, id, preguntaId, ts))
+  }, [conceptosPublicados, editar])
   const api = useMemo<Ctx>(() => ({
-    listo, indice, estado, errorCarga, sincronizacion, sincronizarAhora, registrarIntento,
+    listo, indice, estado, errorCarga, sincronizacion, sincronizarAhora, registrarIntento, registrarVistaConcepto,
     progresoDe: id => estado.progreso[id] ?? nuevoProgreso(id),
     guardarReanudable: r => editar(p => ({ ...p, reanudable: r, fieldUpdatedAt: { criterios: p.fieldUpdatedAt?.criterios ?? 0,
       reanudable: Math.max(Date.now(), (p.fieldUpdatedAt?.reanudable ?? p.reanudable?.ts ?? 0) + 1) } })),
@@ -289,7 +298,7 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
         if (vivo.current && motor.current === engine) setSync({ estado: 'sincronizado', ultima: Date.now(), mensaje: 'Progreso reiniciado en tu cuenta' })
       } finally { if (motor.current === engine) reiniciando.current = false }
     },
-  }), [listo, indice, estado, errorCarga, avisoLocal, sincronizacion, sincronizarAhora, registrarIntento, editar, persistir])
+  }), [listo, indice, estado, errorCarga, avisoLocal, sincronizacion, sincronizarAhora, registrarIntento, registrarVistaConcepto, editar, persistir])
   return <C.Provider value={api}>{children}</C.Provider>
 }
 export function useApp() {

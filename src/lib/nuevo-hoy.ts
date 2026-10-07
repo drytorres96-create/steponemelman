@@ -1,11 +1,12 @@
-import { deriveNbmeSession } from '../nbme/model'
+import { deriveNbmeSession, isNbmeSessionArchived } from '../nbme/model'
 import type { NbmeQuestionMeta, NbmeQuestionRef, NbmeState } from '../nbme/types'
 import { inicioDelDia, materialNuevo, type EntradaDia } from './dia'
+import { fechaEstudio } from './calendario-estudio'
 export interface MaterialNuevo { conceptIds: string[]; preguntas: NbmeQuestionRef[]; titulo: string; nbmeSessionId: string | null }
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 export function tituloDeHoy(tipo: 'Cajas' | 'Nuevo', ahora: number): string {
-  const f = new Date(inicioDelDia(ahora))
-  return `${tipo} de hoy · ${f.getDate()} ${MESES[f.getMonth()]}`
+  const f = fechaEstudio(ahora)
+  return `${tipo} de hoy · ${f.dia} ${MESES[f.mes - 1]}`
 }
 export function prepararNuevoDeHoy(entrada: EntradaDia, listas: Map<string, NbmeQuestionMeta>, state: NbmeState): MaterialNuevo {
   const material = materialNuevo(entrada)
@@ -14,6 +15,7 @@ export function prepararNuevoDeHoy(entrada: EntradaDia, listas: Map<string, Nbme
   const titulo = tituloDeHoy('Nuevo', entrada.ahora)
   let nbmeSessionId: string | null = null
   if (preguntas.length) for (const s of Object.values(state.sessions)) {
+    if (isNbmeSessionArchived(state, s.id)) continue
     if (s.title !== titulo || s.startedAt < inicioDelDia(entrada.ahora)) continue
     const vista = deriveNbmeSession(state, s.id)
     if (vista?.phase !== 'question' || vista.current?.round !== 0) continue

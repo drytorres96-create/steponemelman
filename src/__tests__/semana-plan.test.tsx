@@ -46,7 +46,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
   // Lunes 14 de septiembre de 2026: el primer día de la semana del plan.
-  vi.setSystemTime(new Date(2026, 8, 14, 5, 30))
+  vi.setSystemTime(Date.parse('2026-09-14T05:30:00-04:00'))
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -84,7 +84,7 @@ describe('el plan de la semana dentro de Hoy', () => {
   })
 
   it('mantiene la semana actual el domingo y muestra sólo su domingo opcional', async () => {
-    vi.setSystemTime(new Date(2026, 8, 20, 10))
+    vi.setSystemTime(Date.parse('2026-09-20T10:00:00-04:00'))
     mock.plan.mockResolvedValue({ ...PLAN, checkpoints: [...PLAN.checkpoints,
       cp({ id: 77, idx: 7, dia: 0, kind: 'qbank', label: 'Práctica opcional' })] })
     await pintar()
@@ -98,14 +98,14 @@ describe('el plan de la semana dentro de Hoy', () => {
   })
 
   it('sin un checkpoint de domingo mantiene la semana sin inventar un día', async () => {
-    vi.setSystemTime(new Date(2026, 8, 20, 10))
+    vi.setSystemTime(Date.parse('2026-09-20T10:00:00-04:00'))
     await pintar()
     expect(mock.plan).toHaveBeenCalledWith('x'.repeat(30), '2026-09-14')
     expect(dias().some(b => b.textContent?.includes('domingo'))).toBe(false)
   })
 
   it('cambia de semana a las 3:00, también con el calendario abierto', async () => {
-    vi.setSystemTime(new Date(2026, 8, 21, 2, 59))
+    vi.setSystemTime(Date.parse('2026-09-21T02:59:00-04:00'))
     await pintar()
     expect(mock.plan).toHaveBeenLastCalledWith('x'.repeat(30), '2026-09-14')
     mock.plan.mockResolvedValue({ ...PLAN, inicio: '2026-09-21', fin: '2026-09-26' })
@@ -115,7 +115,7 @@ describe('el plan de la semana dentro de Hoy', () => {
   })
 
   it('al llegar la nueva semana abre su lunes, aunque la anterior tuviera un jueves pendiente', async () => {
-    vi.setSystemTime(new Date(2026, 8, 21, 2, 59))
+    vi.setSystemTime(Date.parse('2026-09-21T02:59:00-04:00'))
     mock.plan.mockResolvedValue({ ...PLAN, checkpoints: [cp({ dia: 4, label: 'Pendiente antiguo' }),
       cp({ id: 2, dia: 0, idx: 2, done: true, label: 'Domingo opcional terminado' })] })
     await pintar()

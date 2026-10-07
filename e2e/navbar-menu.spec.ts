@@ -81,6 +81,8 @@ test.describe('Ratón y teclado', () => {
 
   test('la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo', async ({ page }) => {
     const errores = await abrir(page, 'no-preference')
+    // Keep the 90 ms / 180 ms boundary independent of browser and CI wall time.
+    await page.clock.pauseAt(new Date(LUNES.getTime() + 60_000))
     const principal = page.getByRole('button', { name: 'Hoy', exact: true })
     await principal.focus()
     const progreso = await page.evaluate(() => JSON.stringify(window.__leerProgresoSintetico()))

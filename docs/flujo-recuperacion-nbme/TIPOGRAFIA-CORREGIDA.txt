@@ -1,0 +1,17 @@
+[WebServer] (node:59529) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:59543) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 4 tests using 1 worker
+
+(node:59562) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:59562) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas (4.0s)
+  ✓  2 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas (2.8s)
+  ✓  3 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas (3.7s)
+  ✓  4 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas (3.7s)
+
+  4 passed (18.0s)

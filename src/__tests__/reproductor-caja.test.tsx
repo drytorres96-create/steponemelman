@@ -12,7 +12,7 @@ import type { Intento } from '../srs/tipos'
  * control sin resumen intermedio. Cada paso trae su propia sesión, así que su
  * identificador no choca con el de otro paso.
  */
-const mock = vi.hoisted(() => ({ app: vi.fn(), intentos: [] as Intento[], reanudables: [] as unknown[] }))
+const mock = vi.hoisted(() => ({ app: vi.fn(), vista: vi.fn(), intentos: [] as Intento[], reanudables: [] as unknown[] }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../components/AyudaIA', () => ({ AyudaIA: () => <div>ayuda</div> }))
 vi.mock('../lib/calificacion-ia', () => ({ calificarConIA: async () => ({ estado: 'sin_ia', motivo: 'Sin IA en pruebas.' }) }))
@@ -44,6 +44,7 @@ beforeEach(() => {
   } }
   mock.app.mockImplementation(() => ({
     estado,
+    registrarVistaConcepto: mock.vista,
     registrarIntento: (_id: string, intento: Intento) => { mock.intentos.push(intento) },
     cerrarSesion: vi.fn(),
     iniciarSesion: () => 'no-debe-usarse',

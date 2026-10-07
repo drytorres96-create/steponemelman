@@ -7,6 +7,9 @@ export function emptyNbmeState(bankVersion = '1.0.0'): NbmeState {
   return { version: 1, bankVersion, discarded: {}, sessions: {}, attempts: {}, activeSessionId: null, activeChangedAt: 0,
     filters: { ...DEFAULT_NBME_FILTERS }, filtersChangedAt: 0 }
 }
+export function isNbmeSessionArchived(state: NbmeState, sid: string): boolean {
+  return Object.hasOwn(state.archivedSessions ?? {}, sid)
+}
 /** Cuántas lápidas se conservan: las más recientes bastan para no resucitar nada vivo. */
 export const MAX_LAPIDAS = 200
 function podarLapidas(discarded: NbmeDiscarded): NbmeDiscarded {
@@ -67,6 +70,15 @@ export function parseNbmeState(value: unknown): NbmeState | null {
       out.discarded[sid] = cuando
     }
   }
+  if (value.archivedSessions !== undefined) {
+    if (!object(value.archivedSessions) || Object.keys(value.archivedSessions).length > 20000) return null
+    const archived: Record<string, number> = {}
+    for (const [sid, when] of Object.entries(value.archivedSessions)) {
+      if (!id(sid) || !num(when)) return null
+      archived[sid] = when
+    }
+    out.archivedSessions = archived
+  }
   for (const [sid, raw] of Object.entries(value.sessions)) {
     if (out.discarded[sid]) continue   // una lápida gana sobre la sesión que la acompañe
 
@@ -76,6 +88,7 @@ export function parseNbmeState(value: unknown): NbmeState | null {
     out.sessions[sid] = session
   }
   if (out.activeSessionId !== null && !out.sessions[out.activeSessionId]) return null
+  if (out.activeSessionId && isNbmeSessionArchived(out, out.activeSessionId)) out.activeSessionId = null
   for (const [aid, raw] of Object.entries(value.attempts)) {
     if (!id(aid) || !object(raw) || raw.id !== aid || !id(raw.sessionId) || !int(raw.position) || raw.position > 100000
       || aid !== key(raw.sessionId, raw.position) || !id(raw.questionId) || !id(raw.revision) || !id(raw.optionId)
@@ -109,6 +122,9 @@ export function mergeNbmeStates(a: NbmeState, b: NbmeState): NbmeState {
     out.discarded[sid] = Math.max(a.discarded[sid] ?? 0, b.discarded[sid] ?? 0)
   }
   out.discarded = podarLapidas(out.discarded)
+  const archiveIds = new Set([...Object.keys(a.archivedSessions ?? {}), ...Object.keys(b.archivedSessions ?? {})])
+  if (archiveIds.size) out.archivedSessions = Object.fromEntries([...archiveIds].sort().map(sid =>
+    [sid, Math.max(a.archivedSessions?.[sid] ?? 0, b.archivedSessions?.[sid] ?? 0)]))
   for (const sid of [...new Set([...Object.keys(a.sessions), ...Object.keys(b.sessions)])].sort()) {
     if (out.discarded[sid]) continue
     const x = a.sessions[sid], y = b.sessions[sid]
@@ -131,7 +147,7 @@ export function mergeNbmeStates(a: NbmeState, b: NbmeState): NbmeState {
   out.activeChangedAt = Math.max(a.activeChangedAt, b.activeChangedAt)
   const activo = a.activeChangedAt === b.activeChangedAt && (a.activeSessionId === null || b.activeSessionId === null)
     ? null : choose(a.activeSessionId, b.activeSessionId, a.activeChangedAt, b.activeChangedAt)
-  out.activeSessionId = activo && out.discarded[activo] ? null : activo
+  out.activeSessionId = activo && (out.discarded[activo] || isNbmeSessionArchived(out, activo)) ? null : activo
   out.filters = choose(a.filters, b.filters, a.filtersChangedAt, b.filtersChangedAt)
   out.filtersChangedAt = Math.max(a.filtersChangedAt, b.filtersChangedAt)
   return out
@@ -175,7 +191,7 @@ export function referenciasPendientesNbme(state: NbmeState, sessionId: string): 
   return [...refs.values()]
 }
 function requireSession(state: NbmeState, sid: string) {
-  const s = state.sessions[sid]; if (!s) throw new Error('Sesión de preguntas no disponible.'); return s
+  const s = state.sessions[sid]; if (!s || isNbmeSessionArchived(state, sid)) throw new Error('Sesión de preguntas no disponible.'); return s
 }
 export function startNbmeSession(state: NbmeState, input: { id: string; title: string; refs: NbmeQuestionRef[]; budgetMinutes?: 10 | 20 | 30 | null }, now = Date.now()): NbmeState {
   if (!id(input.id) || state.sessions[input.id] || !text(input.title, 300) || !num(now) || !budget(input.budgetMinutes ?? null)
@@ -244,6 +260,15 @@ export function discardNbmeSession(state: NbmeState, sid: string, now = Date.now
     discarded: podarLapidas({ ...state.discarded, [sid]: now }),
     activeSessionId: activo ? null : state.activeSessionId,
     activeChangedAt: activo ? now : state.activeChangedAt }
+}
+/** Retira el bloque de las sesiones visibles sin cambiar ninguna respuesta ni su progreso. */
+export function archiveNbmeSession(state: NbmeState, sid: string, now = Date.now()): NbmeState {
+  if (!state.sessions[sid] || isNbmeSessionArchived(state, sid)) return state
+  if (!num(now)) throw new Error('Fecha no válida.')
+  const active = state.activeSessionId === sid
+  return { ...state, archivedSessions: { ...state.archivedSessions, [sid]: now },
+    activeSessionId: active ? null : state.activeSessionId,
+    activeChangedAt: active ? Math.max(now, state.activeChangedAt) : state.activeChangedAt }
 }
 
 /** Cuántos intentos se perderían al descartar: la interfaz lo dice antes de preguntar. */

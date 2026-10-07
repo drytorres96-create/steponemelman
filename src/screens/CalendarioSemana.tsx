@@ -4,17 +4,17 @@ import { cargarPlanSemana, marcarCheckpoint, PlanEscrituraError } from '../plan/
 import { tituloDeCheckpoint } from '../plan/enlace'
 import { Enfoque } from '../plan/Enfoque'
 import { DIAS_SEMANA, esTarea, MINUTOS_POR_KIND, type PlanCheckpoint, type PlanSemana } from '../plan/tipos'
-import { fechaISO } from '../lib/tiempo'
-import { inicioDelDia, limitesSemana } from '../lib/dia'
+import { desplazarFechaEstudio, fechaEstudio, fechaISOEstudio, instanteEstudio, ZONA_ESTUDIO } from '../lib/calendario-estudio'
+import { limitesSemana } from '../lib/dia'
 
 const DIAS = [...DIAS_SEMANA, 'domingo']
 
-/** `2026-09-14` como fecha local: parsearla como ISO la desplazaría un día según la zona. */
+/** Mediodía de Nueva York: una fecha del plan conserva su etiqueta en cualquier dispositivo. */
 function fechaLocal(iso: string, mas = 0): Date {
-  const [a, m, d] = iso.split('-').map(Number)
-  return new Date(a, m - 1, d + mas)
+  const [anio, mes, dia] = iso.split('-').map(Number)
+  return new Date(instanteEstudio(desplazarFechaEstudio({ anio, mes, dia }, mas), 12))
 }
-const diaYMes = (f: Date) => f.toLocaleDateString('es', { day: 'numeric', month: 'short' }).replace('.', '')
+const diaYMes = (f: Date) => f.toLocaleDateString('es', { timeZone: ZONA_ESTUDIO, day: 'numeric', month: 'short' }).replace('.', '')
 
 /** `S2 · 14–19 sep · Reproductivo…` se parte en titular y contexto. */
 function partirTitulo(titulo: string): { titular: string; resto: string } {
@@ -64,7 +64,7 @@ export function CalendarioSemana() {
   const { session } = useAuth()
   const token = session?.access_token ?? ''
   const [ahora, setAhora] = useState(() => Date.now())
-  const diaDeEstudio = fechaISO(new Date(inicioDelDia(ahora)))
+  const diaDeEstudio = fechaISOEstudio(fechaEstudio(ahora))
   const inicioSemana = limitesSemana(ahora).inicio
   useEffect(() => {
     const t = setInterval(() => setAhora(Date.now()), 60_000)

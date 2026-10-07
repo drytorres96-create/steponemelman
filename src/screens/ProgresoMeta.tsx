@@ -2,46 +2,54 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
 import {
-  DIAS_META, DIAS_PARA_PROYECTAR, fechaDelDia, primerasRespuestasNbme, resumenMeta, type SerieMeta,
+  DIAS_META, DIAS_PARA_PROYECTAR, distanciasMeta, fechaDelDia, primerasRespuestasNbme, resumenMeta, type SerieMeta,
 } from '../lib/meta'
+import { instanteEstudio, ZONA_ESTUDIO } from '../lib/calendario-estudio'
 import type { Concepto } from '../schema/concept'
 import { resumenProgresoAprendizaje } from '../lib/progreso-aprendizaje'
 import type { AccionesRecuperacion } from './RecuperarMeta'
 
 const RecuperarMeta = lazy(() => import('./RecuperarMeta').then(m => ({ default: m.RecuperarMeta })))
 
-const diaYMes = (f: Date) => f.toLocaleDateString('es', { day: 'numeric', month: 'short' }).replace('.', '')
+const diaYMes = (f: Date) => f.toLocaleDateString('es', { day: 'numeric', month: 'short', timeZone: ZONA_ESTUDIO }).replace('.', '')
 const desdeISO = (iso: string) => {
   const [a, m, d] = iso.split('-').map(Number)
-  return new Date(a, m - 1, d)
+  return new Date(instanteEstudio({ anio: a, mes: m, dia: d }, 12))
 }
 
 const RUMBO: Record<SerieMeta['rumbo'], (distancia: number) => string> = {
   delante: d => `Vas ${d} por delante.`,
-  linea: () => 'Vas en la línea.',
+  linea: () => 'Vas dentro del margen de planificación.',
   debajo: d => `Vas ${d} por debajo.`,
 }
 
 /** Una meta: lo hecho, la marca de la línea encima y, cuando hay ritmo, adónde lleva. */
 function Serie({ titulo, serie, fin }: { titulo: string; serie: SerieMeta; fin: string }) {
-  const pct = serie.meta ? Math.min(100, serie.hechos / serie.meta * 100) : 0
+  const porcentaje = serie.meta ? serie.hechos / serie.meta * 100 : 0
+  const pct = Math.min(100, Math.max(0, porcentaje))
   const marca = serie.meta ? Math.min(100, serie.linea / serie.meta * 100) : 0
+  const distancia = distanciasMeta(serie)
   return <div className="meta-serie">
     <div className="meta-serie-cabecera">
       <strong>{titulo}</strong>
-      <span>{serie.hechos} / {serie.meta} · {Math.round(pct)} %</span>
+      <span>{serie.hechos} / {serie.meta} · {Math.round(porcentaje)} %</span>
     </div>
     <div className="meta-pista">
       <div className="barra-prog" role="progressbar" aria-label={titulo}
-        aria-valuemin={0} aria-valuemax={serie.meta} aria-valuenow={serie.hechos}
-        aria-valuetext={`${serie.hechos} de ${serie.meta}; la línea va por ${serie.linea}`}>
+        aria-valuemin={0} aria-valuemax={serie.meta} aria-valuenow={Math.min(serie.meta, Math.max(0, serie.hechos))}
+        aria-valuetext={`${serie.hechos} de ${serie.meta}; la línea va por ${serie.linea}${serie.hechos > serie.meta ? '; meta superada' : ''}`}>
         <span style={{ width: `${pct}%` }} />
       </div>
       <span className="meta-marca" style={{ left: `${marca}%` }} aria-hidden="true" />
     </div>
     <p className={`mini meta-rumbo ${serie.rumbo}`}>La línea va por {serie.linea}. {RUMBO[serie.rumbo](serie.distancia)}</p>
+    <p className="mini meta-distancia">{distancia.igualarLinea > 0
+      ? <>Para alcanzar la línea: {distancia.igualarLinea}. Para superarla: {distancia.superarLinea}.</>
+      : distancia.superarLinea > 0 ? <>Estás exactamente en la línea. Para superarla: {distancia.superarLinea}.</>
+        : <>Ya superaste la línea.</>} {distancia.completarMeta > 0
+          ? <>Para completar la meta: {distancia.completarMeta}.</> : <>Meta completada{serie.hechos > serie.meta ? ` · ${serie.hechos - serie.meta} por encima` : ''}.</>}</p>
     {serie.proyeccion !== null && <p className="mini meta-proyeccion">
-      Si sigues como la última semana: ~{serie.proyeccion} el {fin}{serie.proyeccion >= serie.meta ? ', por encima de la meta' : ''}.
+      Si sigues como la última semana: ~{serie.proyeccion} el {fin}{serie.proyeccion > serie.meta ? ', por encima de la meta' : serie.proyeccion === serie.meta ? ', justo en la meta' : ''}.
     </p>}
   </div>
 }
@@ -67,7 +75,7 @@ export function ProgresoMeta({ conceptos, conceptIds, ...acciones }: AccionesRec
   // Sin catálogo todavía no se sabe cuántas hay: la meta no se recorta a cero mientras carga.
   const catalogo = !!nbme.catalog
   const r = resumenMeta({
-    ahora, dominadosEn: aprendizaje.dominadosEn, conceptosPublicados: aprendizaje.total,
+    ahora, dominadosEn: aprendizaje.dominadosEn, primerasAcreditaciones: aprendizaje.primerasAcreditaciones, conceptosPublicados: aprendizaje.total,
     primerasRespuestas: preguntas.marcas, preguntasPublicadas: catalogo ? preguntas.publicadas : Number.POSITIVE_INFINITY,
   })
 
@@ -76,7 +84,7 @@ export function ProgresoMeta({ conceptos, conceptIds, ...acciones }: AccionesRec
   const consolidar = `${r.semanasConsolidacion} ${r.semanasConsolidacion === 1 ? 'semana' : 'semanas'}`
   const cuando = r.dia < 1 ? `Empieza el ${inicio} y termina el ${fin}.`
     : r.dia > DIAS_META ? `Terminó el ${fin}.`
-    : `Día ${r.dia} de ${DIAS_META}, del ${inicio} al ${fin}. Después quedan ${consolidar} para consolidar antes del examen.`
+    : `Día ${r.dia} de ${DIAS_META}, del ${inicio} al ${fin}. Después quedan unas ${consolidar} para consolidar antes del examen.`
   const proyeccionPendiente = r.dia <= DIAS_PARA_PROYECTAR
 
   return <section className="tarjeta pila" aria-labelledby="meta-titulo">
@@ -112,9 +120,23 @@ export function ProgresoMeta({ conceptos, conceptIds, ...acciones }: AccionesRec
       </table>
     </div>
 
-    <p className="mini">La línea sigue los techos de Hoy —nada el viernes, el doble el fin de semana— y, en conceptos,
-      deja una semana para consolidar como supuesto de planificación. Ya cuenta con días malos: avanza más despacio de lo
-      que dan los techos, así que nunca hace falta hacer más de lo que Hoy te da. Cuenta desde el {inicio}; el dominio demostrado usa
-      tus criterios de dominio. Un mantenimiento pendiente no borra esa evidencia. Una pregunta cuenta la primera vez que la respondes.</p>
+    <details className="hoy-desplegable"><summary>Cómo avanzan las líneas y el dominio</summary><div className="hoy-desplegable-cuerpo pila">
+      <p className="mini">La marca indica lo previsto al empezar el día de estudio, que cambia a las 03:00 de Nueva York.
+        Sigue los techos de Hoy: viernes libre y doble el fin de semana. En conceptos deja una semana como margen de planificación;
+        el dominio depende de la evidencia, no de esperar una semana.</p>
+      <p className="mini">Cada concepto conserva un solo historial, entres por Hoy, la meta o una pregunta NBME.
+        Verlo aumenta la cobertura; responderlo registra práctica. Para dominarlo necesitas {estado.criterios.recuperaciones} aciertos independientes
+        en {estado.criterios.sesiones} sesiones y al menos {estado.criterios.separacionHoras} horas de separación
+        {estado.criterios.exigirRecuperacionActiva && ', con recuerdo sin alternativas o aplicación'}.
+        Las respuestas con pistas, fuente o explicación previa no acreditan independencia.
+        {estado.criterios.ventanaConfusionDias > 0 && <> Una confusión de conceptos bloquea la acreditación durante {estado.criterios.ventanaConfusionDias} días.</>}</p>
+      <p className="mini">Cuenta el dominio válido acreditado por primera vez desde el {inicio}. Repetir un concepto no lo suma de nuevo.
+        Un repaso vencido cambia el mantenimiento y conserva la evidencia; una confusión reciente puede reducir el dominio vigente.
+        Al vencer su bloqueo temporal, la evidencia suficiente vuelve a ser válida, sin añadir respuestas ni inventar una primera acreditación.
+        Cambiar los criterios o el material disponible también puede cambiar la cifra. Una pregunta NBME cuenta una vez, al responderla por primera vez,
+        aunque sea incorrecta. Corregirla o borrar su sesión conserva ese progreso.</p>
+      <p className="mini">La proyección usa la última semana completa y aparece después de dos semanas; es una estimación de ritmo.
+        La distancia exacta se muestra incluso dentro del margen de planificación. Ponerte al día respeta los techos de Hoy y los intervalos de repaso.</p>
+    </div></details>
   </section>
 }

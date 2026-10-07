@@ -1,0 +1,17 @@
+{
+  "build": "final synthetic harness, absolute outDir, emptyOutDir",
+  "htmlAssets": {
+    "/assets/index-Bzz858u_.js": "aeec76683bcc3670a07064cf1f4f8003e2d9e6c05351118c9b60c5ef1a3dcfa4",
+    "/assets/index-BXaAABPU.css": "8f6fc9bb5e795c7312de20f08495b0f70f11d00553d938a2762d92b581c469b1"
+  },
+  "stylesheets": {
+    "index-BXaAABPU.css": "8f6fc9bb5e795c7312de20f08495b0f70f11d00553d938a2762d92b581c469b1",
+    "NbmePlayer-DjDqH64E.css": "53924c48013ffd8cd4a5d3fa7bc980f3a90970935421ed9d593fad0f2a456039",
+    "nbme-DgTJILPg.css": "97af0d1b0cc08cc23bcffa2d26ccc06a5ae4d5d675d11dba6f76e8b4c48a5218",
+    "Vinetas-CDjnbw4M.css": "34da96d58752213d6a7a16436ae1270650d599bd77711ed194fcda6137480a81"
+  },
+  "contrastToken": true,
+  "recoveryMinimum16": [
+    "NbmePlayer-DjDqH64E.css"
+  ]
+}

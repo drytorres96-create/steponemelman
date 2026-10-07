@@ -1,5 +1,5 @@
 /** Versión persistida con cada intento para poder revisar su calificación. */
-export const EVALUADOR_VERSION = '2.3.0'
+export const EVALUADOR_VERSION = '2.4.0'
 
 /** Normaliza la presentación sin borrar letras griegas, signos ni cifras clínicas. */
 export function normalizar(s: string): string {

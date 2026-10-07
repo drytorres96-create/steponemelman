@@ -1,0 +1,236 @@
+
+> steponemelman@1.30.0 e2e
+> playwright test
+
+[WebServer] (node:52773) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:52790) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 93 tests using 1 worker
+
+(node:52831) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52831) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/estudio.spec.ts:61:1 › cajas: Intro comprueba, enseña la corrección y sólo el segundo Intro pasa a la siguiente (6.3s)
+  ✓   2 [chromium] › e2e/estudio.spec.ts:81:1 › cajas: si el corrector no sabe juzgar, «La sabía» cuenta y pasa con un toque (3.7s)
+  ✓   3 [chromium] › e2e/estudio.spec.ts:108:1 › cajas: tras un fallo hay una sola acción principal y el resto queda plegado (2.8s)
+  ✓   4 [chromium] › e2e/estudio.spec.ts:124:1 › cajas: la pregunta NBME se contesta con el teclado y la piel no cambia en toda la sesión (3.3s)
+  ✓   5 [chromium] › e2e/estudio.spec.ts:148:1 › lo nuevo: los tramos de tres conceptos se encadenan sin «Sesión terminada» (4.1s)
+  ✓   6 [chromium] › e2e/estudio.spec.ts:168:1 › lo nuevo: los fallos respetan el techo y llegan al cierre en una sola vuelta (5.4s)
+  ✓   7 [chromium] › e2e/estudio.spec.ts:196:1 › lo nuevo: tras un feedback largo el siguiente enunciado queda visible bajo la cabecera (5.4s)
+  ✓   8 [chromium] › e2e/estudio.spec.ts:245:1 › NBME: la figura se amplía sin revelar la respuesta ni la procedencia antes de comprobar (3.4s)
+  ✓   9 [chromium] › e2e/estudio.spec.ts:280:1 › NBME: laboratorios y columnas conservan sus celdas sin desbordar la pantalla (3.3s)
+  ✓  10 [chromium] › e2e/estudio.spec.ts:309:1 › cajas: tras 20 seguidas la pausa es opcional y permite guardar sin un intento nuevo (7.7s)
+  ✓  11 [chromium] › e2e/estudio.spec.ts:336:1 › viñetas del piloto: la letra elige, Intro comprueba sin saltar la explicación y otro Intro sigue (2.9s)
+  ✓  12 [chromium] › e2e/figuras-csp.spec.ts:3:1 › las figuras descargadas se decodifican con la política de seguridad de producción (903ms)
+  ✓  13 [chromium] › e2e/ia-gratuita.spec.ts:18:3 › IA gratuita a 390px › el chat usa la pregunta respondida, conserva la cita y permite continuar (3.6s)
+  ✓  14 [chromium] › e2e/ia-gratuita.spec.ts:95:3 › IA gratuita a 390px › un fallo genera una corrección individual y el razonamiento sólo se analiza al enviarlo (3.6s)
+  ✓  15 [chromium] › e2e/ia-gratuita.spec.ts:154:3 › IA gratuita a 390px › un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar (7.3s)
+  ✓  16 [chromium] › e2e/ia-gratuita.spec.ts:18:3 › IA gratuita a 1280px › el chat usa la pregunta respondida, conserva la cita y permite continuar (5.2s)
+  ✓  17 [chromium] › e2e/ia-gratuita.spec.ts:95:3 › IA gratuita a 1280px › un fallo genera una corrección individual y el razonamiento sólo se analiza al enviarlo (6.4s)
+  ✓  18 [chromium] › e2e/ia-gratuita.spec.ts:154:3 › IA gratuita a 1280px › un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar (10.0s)
+  ✓  19 [chromium] › e2e/movil-auditoria.spec.ts:87:3 › auditoría móvil · 390px › figura grande sintética: carga, dimensiones, captura y foco del modal (4.3s)
+  ✓  20 [chromium] › e2e/movil-auditoria.spec.ts:139:3 › auditoría móvil · 390px › laboratorios y caption son legibles en ambas pieles (5.8s)
+  ✓  21 [chromium] › e2e/movil-auditoria.spec.ts:151:3 › auditoría móvil · 390px › zoom aumenta la imagen y permite desplazamiento sin perder el foco (6.1s)
+  ✓  22 [chromium] › e2e/movil-auditoria.spec.ts:87:3 › auditoría móvil · 1280px › figura grande sintética: carga, dimensiones, captura y foco del modal (4.7s)
+  ✓  23 [chromium] › e2e/movil-auditoria.spec.ts:139:3 › auditoría móvil · 1280px › laboratorios y caption son legibles en ambas pieles (4.2s)
+  ✓  24 [chromium] › e2e/movil-auditoria.spec.ts:151:3 › auditoría móvil · 1280px › zoom aumenta la imagen y permite desplazamiento sin perder el foco (7.7s)
+  ✓  25 [chromium] › e2e/movil-auditoria.spec.ts:224:3 › auditoría táctil de figuras › el campo de respuesta mantiene un borde visible en ambas pieles y el conmutador mide 44px (5.4s)
+  ✓  26 [chromium] › e2e/movil-auditoria.spec.ts:239:3 › auditoría táctil de figuras › pellizcar amplía y arrastrar desplaza la figura con eventos táctiles del navegador (9.2s)
+  ✓  27 [chromium] › e2e/movil-auditoria.spec.ts:332:3 › auditoría táctil de figuras › las tablas tienen región enfocada con indicador visible (4.9s)
+  ✓  28 [chromium] › e2e/movil-auditoria.spec.ts:346:3 › auditoría táctil de figuras › la descarga espera al viewport y el salto a respuestas no permite omitir la figura necesaria (4.6s)
+  ✓  29 [chromium] › e2e/movil-auditoria.spec.ts:368:59 › auditoría táctil de figuras › error-descarga: aviso claro, bloqueo y reintento (4.6s)
+  ✓  30 [chromium] › e2e/movil-auditoria.spec.ts:368:59 › auditoría táctil de figuras › error-imagen: aviso claro, bloqueo y reintento (7.3s)
+  ✓  31 [chromium] › e2e/movil-auditoria.spec.ts:405:3 › auditoría móvil horizontal › saltos y modal mantienen el foco visible, sin desbordamiento en horizontal (5.7s)
+  ✓  32 [chromium] › e2e/navbar-menu.spec.ts:37:5 › Menú amplio a 320px › mantiene destinos, alcance táctil y navegación sin iniciar una sesión (4.5s)
+  ✓  33 [chromium] › e2e/navbar-menu.spec.ts:37:5 › Menú amplio a 390px › mantiene destinos, alcance táctil y navegación sin iniciar una sesión (3.8s)
+  ✓  34 [chromium] › e2e/navbar-menu.spec.ts:37:5 › Menú amplio a 1280px › mantiene destinos, alcance táctil y navegación sin iniciar una sesión (3.6s)
+  ✓  35 [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo (3.4s)
+  ✓  36 [chromium] › e2e/navbar-menu.spec.ts:154:3 › Ratón y teclado › un clic fija la vista previa y el siguiente cierra; Escape y el exterior también la cierran (3.1s)
+  ✓  37 [chromium] › e2e/navbar-menu.spec.ts:200:3 › Ratón y teclado › el movimiento reducido mantiene los controles visibles y elimina animaciones del panel y sus hijos (2.2s)
+  ✓  38 [chromium] › e2e/navbar-menu.spec.ts:241:5 › Menú táctil 320×740 › abre por toque y permite alcanzar todos los destinos en poco espacio (2.4s)
+  ✓  39 [chromium] › e2e/navbar-menu.spec.ts:241:5 › Menú táctil 390×844 › abre por toque y permite alcanzar todos los destinos en poco espacio (2.5s)
+  ✓  40 [chromium] › e2e/navbar-menu.spec.ts:241:5 › Menú táctil 844×390 › abre por toque y permite alcanzar todos los destinos en poco espacio (2.7s)
+  ✓  41 [chromium] › e2e/premium-aprendizaje.spec.ts:11:3 › aprendizaje y diseño premium a 390px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar (1.8s)
+  ✓  42 [chromium] › e2e/premium-aprendizaje.spec.ts:37:3 › aprendizaje y diseño premium a 390px › lo nuevo conserva el guion, muestra un final cercano y ofrece pausa al terminar el bloque (2.9s)
+  ✓  43 [chromium] › e2e/premium-aprendizaje.spec.ts:79:3 › aprendizaje y diseño premium a 390px › un concepto con dominio vencido entra en Hoy y Progreso distingue su mantenimiento (3.0s)
+  ✓  44 [chromium] › e2e/premium-aprendizaje.spec.ts:105:3 › aprendizaje y diseño premium a 390px › al completar el día hay un cierre explícito sin acción principal adicional (1.7s)
+  ✓  45 [chromium] › e2e/premium-aprendizaje.spec.ts:11:3 › aprendizaje y diseño premium a 1280px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar (2.7s)
+  ✓  46 [chromium] › e2e/premium-aprendizaje.spec.ts:37:3 › aprendizaje y diseño premium a 1280px › lo nuevo conserva el guion, muestra un final cercano y ofrece pausa al terminar el bloque (4.5s)
+  ✓  47 [chromium] › e2e/premium-aprendizaje.spec.ts:79:3 › aprendizaje y diseño premium a 1280px › un concepto con dominio vencido entra en Hoy y Progreso distingue su mantenimiento (3.3s)
+  ✓  48 [chromium] › e2e/premium-aprendizaje.spec.ts:105:3 › aprendizaje y diseño premium a 1280px › al completar el día hay un cierre explícito sin acción principal adicional (2.4s)
+  ✘  49 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas (6.1s)
+(node:56044) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56044) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  50 [chromium] › e2e/pulido-premium.spec.ts:113:5 › detalles premium a 390px en light › hover conserva límites visibles de controles y la pausa sigue siendo accesible (4.1s)
+  ✘  51 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas (5.1s)
+(node:56265) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56265) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  52 [chromium] › e2e/pulido-premium.spec.ts:113:5 › detalles premium a 390px en dark › hover conserva límites visibles de controles y la pausa sigue siendo accesible (3.6s)
+  ✓  53 [chromium] › e2e/pulido-premium.spec.ts:147:5 › biblioteca y navegación coherentes a 390px › los filtros nativos comparten paleta y el acceso a Hoy aprovecha su fila móvil (2.6s)
+  ✘  54 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas (5.5s)
+(node:56521) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56521) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  55 [chromium] › e2e/pulido-premium.spec.ts:113:5 › detalles premium a 1280px en light › hover conserva límites visibles de controles y la pausa sigue siendo accesible (4.4s)
+  ✘  56 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas (7.6s)
+(node:56768) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56768) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  57 [chromium] › e2e/pulido-premium.spec.ts:113:5 › detalles premium a 1280px en dark › hover conserva límites visibles de controles y la pausa sigue siendo accesible (6.9s)
+  ✓  58 [chromium] › e2e/pulido-premium.spec.ts:147:5 › biblioteca y navegación coherentes a 1280px › los filtros nativos comparten paleta y el acceso a Hoy aprovecha su fila móvil (3.2s)
+  ✓  59 [chromium] › e2e/recuperacion-meta.spec.ts:10:3 › recuperación de la meta a 390px › se abre a petición, distingue dominio y trabajo y retoma la misma cola de Hoy (3.1s)
+  ✓  60 [chromium] › e2e/recuperacion-meta.spec.ts:43:3 › recuperación de la meta a 390px › el viernes la distancia es informativa y no abre recuperación (2.5s)
+  ✓  61 [chromium] › e2e/recuperacion-meta.spec.ts:62:3 › recuperación de la meta a 390px › retoma la cola exacta de conceptos en su paso guardado (3.8s)
+  ✓  62 [chromium] › e2e/recuperacion-meta.spec.ts:101:3 › recuperación de la meta a 390px › retoma una sesión NBME pausada en su explicación, conservando el intento (7.7s)
+  ✓  63 [chromium] › e2e/recuperacion-meta.spec.ts:137:3 › recuperación de la meta a 390px › un resumen conceptual terminado no oculta la sesión NBME pendiente (5.4s)
+  ✓  64 [chromium] › e2e/recuperacion-meta.spec.ts:162:44 › recuperación de la meta a 390px › un fallo al retomar concepto se ve junto al botón y permite reintentar (3.6s)
+  ✓  65 [chromium] › e2e/recuperacion-meta.spec.ts:162:44 › recuperación de la meta a 390px › un fallo al retomar nbme se ve junto al botón y permite reintentar (4.6s)
+  ✓  66 [chromium] › e2e/recuperacion-meta.spec.ts:185:3 › recuperación de la meta a 390px › también retoma desde Cómo va todo en Hoy (3.3s)
+  ✓  67 [chromium] › e2e/recuperacion-meta.spec.ts:10:3 › recuperación de la meta a 1280px › se abre a petición, distingue dominio y trabajo y retoma la misma cola de Hoy (3.7s)
+  ✓  68 [chromium] › e2e/recuperacion-meta.spec.ts:43:3 › recuperación de la meta a 1280px › el viernes la distancia es informativa y no abre recuperación (3.1s)
+  ✓  69 [chromium] › e2e/recuperacion-meta.spec.ts:62:3 › recuperación de la meta a 1280px › retoma la cola exacta de conceptos en su paso guardado (3.4s)
+  ✓  70 [chromium] › e2e/recuperacion-meta.spec.ts:101:3 › recuperación de la meta a 1280px › retoma una sesión NBME pausada en su explicación, conservando el intento (3.5s)
+  ✓  71 [chromium] › e2e/recuperacion-meta.spec.ts:137:3 › recuperación de la meta a 1280px › un resumen conceptual terminado no oculta la sesión NBME pendiente (3.4s)
+  ✓  72 [chromium] › e2e/recuperacion-meta.spec.ts:162:44 › recuperación de la meta a 1280px › un fallo al retomar concepto se ve junto al botón y permite reintentar (4.8s)
+  ✓  73 [chromium] › e2e/recuperacion-meta.spec.ts:162:44 › recuperación de la meta a 1280px › un fallo al retomar nbme se ve junto al botón y permite reintentar (5.3s)
+  ✓  74 [chromium] › e2e/recuperacion-meta.spec.ts:185:3 › recuperación de la meta a 1280px › también retoma desde Cómo va todo en Hoy (4.0s)
+  ✓  75 [chromium] › e2e/recuperacion-nbme.spec.ts:170:3 › recuperación desde NBME a 390px › ofrece más fundamentos, registra el concepto practicado y regresa a la misma pregunta (6.4s)
+  ✓  76 [chromium] › e2e/recuperacion-nbme.spec.ts:260:3 › recuperación desde NBME a 390px › IA manual conserva ejercicios al recargar y avanza una sola vez dentro del bloque original (13.3s)
+  ✓  77 [chromium] › e2e/recuperacion-nbme.spec.ts:417:3 › recuperación desde NBME a 390px › una cuota agotada deja volver sin cambiar el intento ni crear una sesión (5.7s)
+  ✓  78 [chromium] › e2e/recuperacion-nbme.spec.ts:443:3 › recuperación desde NBME a 390px › la biblioteca conserva el primer resultado al revisar falladas y borrar sólo la sesión visible (9.5s)
+  ✓  79 [chromium] › e2e/recuperacion-nbme.spec.ts:170:3 › recuperación desde NBME a 1280px › ofrece más fundamentos, registra el concepto practicado y regresa a la misma pregunta (15.9s)
+  ✓  80 [chromium] › e2e/recuperacion-nbme.spec.ts:260:3 › recuperación desde NBME a 1280px › IA manual conserva ejercicios al recargar y avanza una sola vez dentro del bloque original (8.1s)
+  ✓  81 [chromium] › e2e/recuperacion-nbme.spec.ts:417:3 › recuperación desde NBME a 1280px › una cuota agotada deja volver sin cambiar el intento ni crear una sesión (5.6s)
+  ✓  82 [chromium] › e2e/recuperacion-nbme.spec.ts:443:3 › recuperación desde NBME a 1280px › la biblioteca conserva el primer resultado al revisar falladas y borrar sólo la sesión visible (15.9s)
+  ✓  83 [chromium] › e2e/recuperacion-revisiones.spec.ts:64:3 › revisión histórica con proveedor NBME real a 390px › retoma feedback y termina el mismo bloque conservando letras, revisiones y primer resultado (12.4s)
+  ✓  84 [chromium] › e2e/recuperacion-revisiones.spec.ts:64:3 › revisión histórica con proveedor NBME real a 1280px › retoma feedback y termina el mismo bloque conservando letras, revisiones y primer resultado (9.3s)
+  ✓  85 [chromium] › e2e/recuperacion-revisiones.spec.ts:154:1 › un asset histórico ausente conserva el bloque y permite reintentar sin crear otro (4.8s)
+  ✓  86 [chromium] › e2e/rendimiento.spec.ts:3:1 › un fallo al descargar una pantalla conserva la navegación y permite volver a Hoy (2.9s)
+  ✓  87 [chromium] › e2e/rendimiento.spec.ts:22:1 › navegar no acumula fondos animados invisibles y estudiar retira el paisaje (4.0s)
+  ✓  88 [chromium] › e2e/rendimiento.spec.ts:46:1 › IndexedDB reutiliza una conexión para lecturas y escrituras concurrentes (1.7s)
+  ✓  89 [chromium] › e2e/rendimiento.spec.ts:83:1 › una actualización desde otra pestaña no queda bloqueada por la conexión compartida (1.7s)
+  ✓  90 [chromium] › e2e/synapse.spec.ts:12:5 › Synapse en Melman a 320px › el menú conserva destinos, teclado y controles sin desbordamientos (5.0s)
+  ✓  91 [chromium] › e2e/synapse.spec.ts:12:5 › Synapse en Melman a 390px › el menú conserva destinos, teclado y controles sin desbordamientos (4.4s)
+  ✓  92 [chromium] › e2e/synapse.spec.ts:12:5 › Synapse en Melman a 1280px › el menú conserva destinos, teclado y controles sin desbordamientos (5.7s)
+  ✓  93 [chromium] › e2e/synapse.spec.ts:73:1 › el movimiento es breve, responde a la preferencia y no depende de las imágenes (2.0s)
+
+
+  1) [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 16
+    Received:    13.6
+
+      78 |       const razonamiento = page.getByLabel('¿Qué dato te llevó a elegir esa opción?')
+      79 |       await razonamiento.focus()
+    > 80 |       expect(await razonamiento.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+         |                                                                                            ^
+      81 |       await expect(razonamiento).toBeFocused()
+      82 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      83 |     })
+        at /workspace/work/nbme-recuperacion/e2e/pulido-premium.spec.ts:80:92
+
+    Error Context: test-results/pulido-premium-detalles-pr-b78ba-nservan-señales-inequívocas-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/pulido-premium-detalles-pr-b78ba-nservan-señales-inequívocas-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/pulido-premium-detalles-pr-b78ba-nservan-señales-inequívocas-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 16
+    Received:    13.6
+
+      78 |       const razonamiento = page.getByLabel('¿Qué dato te llevó a elegir esa opción?')
+      79 |       await razonamiento.focus()
+    > 80 |       expect(await razonamiento.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+         |                                                                                            ^
+      81 |       await expect(razonamiento).toBeFocused()
+      82 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      83 |     })
+        at /workspace/work/nbme-recuperacion/e2e/pulido-premium.spec.ts:80:92
+
+    Error Context: test-results/pulido-premium-detalles-pr-756c4-nservan-señales-inequívocas-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/pulido-premium-detalles-pr-756c4-nservan-señales-inequívocas-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/pulido-premium-detalles-pr-756c4-nservan-señales-inequívocas-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 16
+    Received:    13.6
+
+      78 |       const razonamiento = page.getByLabel('¿Qué dato te llevó a elegir esa opción?')
+      79 |       await razonamiento.focus()
+    > 80 |       expect(await razonamiento.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+         |                                                                                            ^
+      81 |       await expect(razonamiento).toBeFocused()
+      82 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      83 |     })
+        at /workspace/work/nbme-recuperacion/e2e/pulido-premium.spec.ts:80:92
+
+    Error Context: test-results/pulido-premium-detalles-pr-2b150-nservan-señales-inequívocas-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/pulido-premium-detalles-pr-2b150-nservan-señales-inequívocas-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/pulido-premium-detalles-pr-2b150-nservan-señales-inequívocas-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 16
+    Received:    13.6
+
+      78 |       const razonamiento = page.getByLabel('¿Qué dato te llevó a elegir esa opción?')
+      79 |       await razonamiento.focus()
+    > 80 |       expect(await razonamiento.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+         |                                                                                            ^
+      81 |       await expect(razonamiento).toBeFocused()
+      82 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      83 |     })
+        at /workspace/work/nbme-recuperacion/e2e/pulido-premium.spec.ts:80:92
+
+    Error Context: test-results/pulido-premium-detalles-pr-d6861-nservan-señales-inequívocas-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/pulido-premium-detalles-pr-d6861-nservan-señales-inequívocas-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/pulido-premium-detalles-pr-d6861-nservan-señales-inequívocas-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4 failed
+    [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas
+    [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas
+    [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas
+    [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas
+  89 passed (8.1m)

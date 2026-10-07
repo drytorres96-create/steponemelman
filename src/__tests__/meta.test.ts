@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { TECHOS, tipoDeDia } from '../lib/dia'
 import {
   DIAS_META, META_CONCEPTOS, META_PREGUNTAS, diaDeLaMeta, fechaDelDia, inicioDelDiaMeta, lineaConceptos,
-  lineaPreguntas, primerasRespuestasNbme, resumenMeta, rumboDe, type EntradaMeta,
+  lineaPreguntas, primerasRespuestasNbme, resumenMeta, rumboDe, distanciasMeta, type EntradaMeta,
 } from '../lib/meta'
 import type { NbmeAttempt, NbmeCatalog, NbmeQuestionMeta } from '../nbme/types'
 
@@ -29,20 +29,19 @@ function siguiendo(linea: (n: number) => number, dias: number, desde = 1, factor
   return marcas
 }
 const techoDelDia = (k: number) => {
-  const f = fechaDelDia(k)
-  return TECHOS[tipoDeDia(new Date(f.getFullYear(), f.getMonth(), f.getDate(), 12).getTime())]
+  return TECHOS[tipoDeDia(fechaDelDia(k).getTime())]
 }
 
 describe('la ventana', () => {
   it('va del viernes 25-sep al lunes 23-nov, con el corte de las 3:00', () => {
-    expect(diaDeLaMeta(new Date(2026, 8, 25, 2, 59).getTime())).toBe(0)
-    expect(diaDeLaMeta(new Date(2026, 8, 25, 3).getTime())).toBe(1)
-    expect(diaDeLaMeta(new Date(2026, 8, 26, 10).getTime())).toBe(2)
-    expect(diaDeLaMeta(new Date(2026, 10, 23, 12).getTime())).toBe(60)
-    expect(diaDeLaMeta(new Date(2026, 10, 24, 2, 59).getTime())).toBe(60)
-    expect(diaDeLaMeta(new Date(2026, 10, 24, 3).getTime())).toBe(61)
-    expect(fechaDelDia(1).getDay()).toBe(5)
-    expect(fechaDelDia(DIAS_META).toDateString()).toBe(new Date(2026, 10, 23).toDateString())
+    expect(diaDeLaMeta(Date.parse('2026-09-25T02:59:00-04:00'))).toBe(0)
+    expect(diaDeLaMeta(Date.parse('2026-09-25T03:00:00-04:00'))).toBe(1)
+    expect(diaDeLaMeta(Date.parse('2026-09-26T10:00:00-04:00'))).toBe(2)
+    expect(diaDeLaMeta(Date.parse('2026-11-23T12:00:00-05:00'))).toBe(60)
+    expect(diaDeLaMeta(Date.parse('2026-11-24T02:59:00-05:00'))).toBe(60)
+    expect(diaDeLaMeta(Date.parse('2026-11-24T03:00:00-05:00'))).toBe(61)
+    expect(fechaDelDia(1).getUTCDay()).toBe(5)
+    expect(fechaDelDia(DIAS_META).toISOString()).toBe('2026-11-23T17:00:00.000Z')
   })
 
   it('deja cuatro semanas enteras para consolidar antes del examen', () => {
@@ -73,6 +72,21 @@ describe('las metas', () => {
 })
 
 describe('la línea', () => {
+  it('es monótona y finita antes, durante y después de los sesenta días', () => {
+    for (const [linea, meta] of [[lineaConceptos, META_CONCEPTOS], [lineaPreguntas, META_PREGUNTAS]] as const) {
+      let anterior = 0
+      for (let dia = -30; dia <= 100; dia++) {
+        const valor = linea(dia)
+        expect(valor).toBeGreaterThanOrEqual(anterior)
+        expect(valor).toBeGreaterThanOrEqual(0)
+        expect(valor).toBeLessThanOrEqual(meta)
+        if (dia <= 0) expect(valor).toBe(0)
+        if (dia >= 60) expect(valor).toBe(meta)
+        anterior = valor
+      }
+    }
+  })
+
   it('sigue los techos de Hoy: nada el viernes, el doble el fin de semana, y llega a la meta el último día', () => {
     expect(lineaPreguntas(0)).toBe(0)
     expect(lineaPreguntas(1)).toBe(0) // el viernes 25 no suma
@@ -102,6 +116,15 @@ describe('la línea', () => {
 })
 
 describe('el rumbo', () => {
+  it('separa igualdad, superar por una unidad y completar la meta del margen de planificación', () => {
+    expect(distanciasMeta({ hechos: 17, linea: 50, meta: 510 })).toEqual({ igualarLinea: 33, superarLinea: 34, completarMeta: 493 })
+    expect(distanciasMeta({ hechos: 23, linea: 52, meta: 255 })).toEqual({ igualarLinea: 29, superarLinea: 30, completarMeta: 232 })
+    expect(distanciasMeta({ hechos: 50, linea: 50, meta: 510 })).toEqual({ igualarLinea: 0, superarLinea: 1, completarMeta: 460 })
+    expect(distanciasMeta({ hechos: 51, linea: 50, meta: 510 })).toEqual({ igualarLinea: 0, superarLinea: 0, completarMeta: 459 })
+    expect(rumboDe(51, 50).rumbo).toBe('linea')
+    expect(distanciasMeta({ hechos: 515, linea: 510, meta: 510 })).toEqual({ igualarLinea: 0, superarLinea: 0, completarMeta: 0 })
+  })
+
   it('por delante, en la línea o por debajo, con un margen que no convierte un día flojo en ir detrás', () => {
     expect(rumboDe(10, 0)).toEqual({ rumbo: 'delante', distancia: 10 })
     expect(rumboDe(2, 0)).toEqual({ rumbo: 'linea', distancia: 0 })
@@ -115,6 +138,22 @@ describe('el rumbo', () => {
 })
 
 describe('lo que cuenta', () => {
+  it('una fecha desconocida o futura no se convierte en actividad ni en dominio anterior', () => {
+    const r = resumenMeta(entrada({ ahora: mediodia(13), conceptosPublicados: 3,
+      dominadosEn: [0, Number.NaN, Number.POSITIVE_INFINITY, mediodia(14), mediodia(13) + 0.5] }))
+    expect(r.conceptos.hechos).toBe(0)
+    expect(r.conceptos.meta).toBe(3)
+  })
+
+  it('un primer hito anterior sigue consumiendo disponibilidad aunque hoy haya perdido dominio', () => {
+    const r = resumenMeta(entrada({ ahora: mediodia(61), conceptosPublicados: 3,
+      dominadosEn: [mediodia(12)], primerasAcreditaciones: [mediodia(0), mediodia(12)] }))
+    expect(r.conceptos.hechos).toBe(1)
+    expect(r.conceptos.meta).toBe(2)
+    expect(r.conceptos.linea).toBe(2)
+    expect(r.filas.at(-1)?.conceptos).toBe(2)
+  })
+
   it('sólo lo de la ventana: lo dominado antes del 25-sep no suma, ni lo que llegue después del 23-nov', () => {
     const antes = inicioDelDiaMeta(1) - 1
     const r = resumenMeta(entrada({
@@ -183,7 +222,7 @@ describe('la proyección', () => {
 
 describe('la tabla', () => {
   it('una fila por semana hasta el 23-nov, con la línea acumulada y la semana de hoy marcada', () => {
-    const r = resumenMeta(entrada({ ahora: new Date(2026, 9, 20, 10).getTime() }))
+    const r = resumenMeta(entrada({ ahora: Date.parse('2026-10-20T10:00:00-04:00') }))
     expect(r.filas).toHaveLength(10)
     expect(r.filas[0]).toMatchObject({ semana: 1, hasta: '2026-09-27', conceptos: 0 })
     expect(r.filas.at(-1)).toMatchObject({ semana: 10, hasta: '2026-11-23', conceptos: 510, preguntas: 255 })
