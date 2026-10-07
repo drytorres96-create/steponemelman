@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import worker, { StudyCoach, candidatosDeConfusion, coseno, leerFallosDeSemana, leerHistorialChat, ordenarParecidos, validarAnalisis, validarCalificacion, validarExamen, validarRespuesta, validarRespuestaChat, vectoresDe } from './worker'
 import { FRACCION_POR_USUARIO, PRESUPUESTO_UTIL, neuronasDe, techoDeModo } from './neuronas'
 import { olvidarCachePlan } from './plan'
+import { ConceptoZ } from '../schema/concept'
+import { prepararConcepto } from '../lib/formatos'
+import { versionPregunta } from '../screens/sesion'
 const fragment = 'Fragmento sintético: alfa es el primer elemento.'
 const output = { response: JSON.stringify({ diferencia: 'Alfa y beta son distintos.', explicacion: 'Alfa ocupa el primer lugar.', recordar: 'Alfa primero.', evidencia: 'alfa es el primer elemento.' }) }
 class MemoryStorage {
@@ -684,5 +687,58 @@ describe('chat sobre el concepto', () => {
     expect((await worker.fetch(new Request('https://site/api/preguntar', { method: 'POST' }), env)).status).toBe(401)
     expect(remoto).not.toHaveBeenCalled()
     expect(env.AI.run).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('correcciones editoriales publicadas y evidencia de IA', () => {
+  const evidence = 'Alpha is the verified synthetic mechanism; beta is unrelated.'
+  function revised(fundamento = true) {
+    return ConceptoZ.parse({ ...conceptoFalso('QA-1', 'Synthetic QA'),
+      revision_editorial: { nota: 'Private editorial resolution',
+        fuentes: [{ titulo: 'Synthetic reference', url: 'https://example.org/reference' }],
+        ...(fundamento ? { fundamento: { texto: evidence, revision: '1.0.7' } } : {}) } })
+  }
+  function routeSetup(c = revised()) {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('/auth/v1/user')) return Response.json({ id: 'usuario', email_confirmed_at: '2026-01-01' })
+      if (url.includes('app_members')) return Response.json([{ user_id: 'usuario' }])
+      return Response.json([{ payload: url.includes('index.json') ? indiceFalso : {
+        corpus_version: '3.0.0', conceptos: [c] } }])
+    }))
+    const sent: Record<string, unknown>[] = []
+    const coach = { fetch: vi.fn(async (req: Request) => { sent.push(await req.json()); return Response.json({ ok: true }) }) }
+    const env = { AI_FREE_ENABLED: 'true', AI: { run: vi.fn() }, ASSETS: { fetch: vi.fn() },
+      COACH: { idFromName: vi.fn(), get: vi.fn().mockReturnValue(coach) } }
+    const call = (path: string, body: unknown) => worker.fetch(new Request(`https://site${path}`, {
+      method: 'POST', headers: { Authorization: 'Bearer ' + 'x'.repeat(30) }, body: JSON.stringify(body) }), env)
+    return { call, sent, coach }
+  }
+  it.each(['/api/aplicar', '/api/preguntar'])('permite %s con evidencia corregida de la base y excluye el fragmento original', async path => {
+    const c = revised(), { call, sent } = routeSetup(c)
+    expect((await call(path, { conceptId: 'QA-1', pregunta: 'Why alpha?' })).status).toBe(200)
+    expect(sent[0].sourceFragment).toBe(evidence)
+    expect(sent[0].source).toEqual({ title: 'Revisión docente · QA', page: 1 })
+    expect(sent[0].reference).not.toContain(c.source.fragment)
+  })
+  it.each(['/api/explicar', '/api/calificar', '/api/ia/error'])('reconstruye %s sin aceptar evidencia ni calificación del navegador', async path => {
+    const c = revised(), { call, sent } = routeSetup(c)
+    const base = { conceptId: c.concept_id, answer: 'beta', questionId: 'qa-revised', index: 0,
+      route: 'repaso' as const, retry: false, formatVersion: 3 as const }
+    const version = versionPregunta(prepararConcepto(c, { semilla: base.questionId, indice: base.index,
+      ruta: base.route, forzarReconocimiento: base.retry, version: base.formatVersion }))
+    const presentacion = { ...base, version }
+    const body = path === '/api/ia/error' ? { tipo: 'concepto', resultado: 'incorrecta', presentacion } : presentacion
+    expect((await call(path, body)).status).toBe(200)
+    expect(sent[0].sourceFragment).toBe(evidence)
+    expect(sent[0].reference).not.toContain(c.source.fragment)
+    expect(sent[0].reference).toContain(evidence)
+  })
+  it('una revisión anterior sin fundamento permanece bloqueada y la cuarentena no accede a IA', async () => {
+    for (const c of [revised(false), { ...revised(), calidad: { estado: 'cuarentena' as const, confianza: 0.95, alertas: [] } }]) {
+      const { call, coach } = routeSetup(c)
+      expect((await call('/api/aplicar', { conceptId: 'QA-1' })).status).toBe(c.revision_editorial?.fundamento ? 404 : 422)
+      expect(coach.fetch).not.toHaveBeenCalled()
+    }
   })
 })

@@ -125,25 +125,20 @@ export function BandaDeCifras({ conceptos, conceptIds, cargarDetalleConceptos, v
       <div className="pila progress-ring-legend">{!compacta && <h2>{ventana === 'semana' ? 'Tu semana, en tres anillos' : 'Tu práctica registrada'}</h2>}
         {anillos.map((a, i) => <p key={a.label}><b>{compacta ? ['Sesiones', 'Acierto inicial', 'Acierto ≥30 d'][i] : `${i === 0 ? 'Exterior' : i === 1 ? 'Medio' : 'Interior'} · ${a.label}`}</b><br />{fraccion(a)}</p>)}
         {fallo && <p role="status">No se pudieron leer las sesiones. Los otros registros se conservan.</p>}
-        {!compacta && <p className="mini">Cada anillo conserva su denominador. Las preguntas locales son práctica; estas cifras no estiman aprobación.</p>}
       </div>
     </div>
     {ventana === 'semana' && hito.conceptos > 0 && <p className="mini" aria-label="Evidencia de esta semana">Esta semana comprobaste sin ayuda {hito.conceptos} {hito.conceptos === 1 ? 'concepto' : 'conceptos'} después de ≥24 h desde el intento anterior.</p>}
-    <details onToggle={e => { if (e.currentTarget.open) setDetalleSolicitado(true) }}><summary>Qué muestran los anillos y su evidencia</summary>
+    <details onToggle={e => { if (e.currentTarget.open) setDetalleSolicitado(true) }}><summary>Detalle de la práctica</summary>
       <p className="mini">Actividad registrada: {aprendizaje.actividad}/{aprendizaje.total} conceptos · Dominio demostrado: {aprendizaje.dominioDemostrado} · Mantenimiento al día: {aprendizaje.mantenimientoAlDia} · Mantenimiento pendiente: {aprendizaje.mantenimientoPendiente}{aprendizaje.mantenimientoPorComprobar > 0 && <> · Mantenimiento por comprobar: {aprendizaje.mantenimientoPorComprobar}</>}.</p>
-      <p className="mini">Exterior: sesiones completadas del periodo. Medio: acierto en preguntas locales respondidas por primera vez. Interior: acierto sin ayuda después de 30 días. Cada uno conserva su denominador; no se promedian ni estiman aprobación.</p>
       <p><b>Acierto tras ≥30 días:</b> {fraccion(evidencia.retencion)}</p>
       <p><b>Errores repetidos tras ≥24 h:</b> {fraccion(evidencia.repeticion)}</p>
-      <p className="mini">Correctas/intentadas tras 30 días; falladas/reexaminadas tras un fallo separado al menos 24 h. Parcial cuenta como fallo. Se excluyen ayudas, revisiones y condiciones o versiones no verificables. El intervalo parte del intento inmediatamente anterior.</p>
       <div className="scroll-x"><table className="tabla"><caption>Evidencia por tipo de respuesta</caption><thead><tr><th scope="col">Tipo</th><th scope="col">Acierto ≥30 d</th><th scope="col">Error repetido ≥24 h</th></tr></thead><tbody>{TIPOS.map(([tipo, nombre]) => <tr key={tipo}><th scope="row">{nombre}</th><td>{fraccion(evidencia.porTipo[tipo].retencion)}</td><td>{fraccion(evidencia.porTipo[tipo].repeticion)}</td></tr>)}</tbody></table></div>
-      <p className="mini">Recuerdo exige responder sin alternativas; discriminación mide elegir entre ellas; aplicación exige un caso registrado como aplicación. Los formatos antiguos se interpretan de forma conservadora.</p>
-      {ventana === 'semana' && hito.conceptos > 0 && <p className="mini">En la comprobación semanal: {hito.porTipo.recuerdo} por recuerdo · {hito.porTipo.discriminacion} por discriminación · {hito.porTipo.aplicacion} por aplicación. Hitos de dominio con fecha verificable bajo tus criterios actuales: {hito.nuevosDominios} obtenidos esta semana · {hito.mantenimientoConfirmado} anteriores comprobados esta semana. Una fecha antigua sin evidencia suficiente no se interpreta como mantenimiento confirmado.</p>}
+      {ventana === 'semana' && hito.conceptos > 0 && <p className="mini">En la comprobación semanal: {hito.porTipo.recuerdo} por recuerdo · {hito.porTipo.discriminacion} por discriminación · {hito.porTipo.aplicacion} por aplicación. Hitos de dominio: {hito.nuevosDominios} obtenidos esta semana · {hito.mantenimientoConfirmado} anteriores comprobados esta semana.</p>}
       <h3>Temas cerrados en el plan</h3>
       {!detalleSolicitado || !topicsLeidos ? <p className="mini" role="status">{detalleSolicitado ? 'Cargando los temas del plan…' : 'El detalle se carga al abrir esta sección.'}</p>
         : topics === null ? <p className="mini">No se pudo consultar el estado de los temas; no se supone que estén cerrados.</p>
         : !corpusDetalle ? <p className="mini" role="status">{conceptosFallidos || !cargarDetalleConceptos ? 'No se pudieron leer los conceptos para asociar la evidencia a los temas.' : 'Cargando el detalle de conceptos…'}</p>
         : <div className="scroll-x"><table className="tabla"><thead><tr><th scope="col">Tema</th><th scope="col">Acierto ≥30 d</th><th scope="col">Error repetido ≥24 h</th></tr></thead><tbody>{detalle.map(t => <tr key={t.nombre}><th scope="row">{t.nombre}</th><td>{fraccion(t.retencion)}</td><td>{fraccion(t.repeticion)}</td></tr>)}</tbody></table></div>}
-      <p className="mini">La correspondencia usa la disciplina o el sistema principal del concepto. Cerrado describe el plan; no demuestra dominio.</p>
     </details>
   </section>
 }

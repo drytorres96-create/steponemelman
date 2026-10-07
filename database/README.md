@@ -39,7 +39,7 @@ La base valida la estructura superior de `EstadoApp`, versión `1`, tamaño máx
 
 ## Viñetas de mecanismo (piloto)
 
-`vinetas-schema.sql` crea `ai_vignettes`: viñetas de práctica generadas por IA, sin revisión clínica, para el piloto de 1.25.0. Cada fila lleva `set_id`, `position` y un `payload` JSON (enunciado y opciones en inglés; explicación en español con claves, mecanismo, distractores y patrón) que el cliente valida entera antes de enseñarla (`src/vinetas/modelo.ts`). RLS: sólo los miembros leen; ningún rol de la aplicación escribe. El contenido se carga por administración y no se guarda en el repositorio. No alimenta `study_state` ni `nbme_state`: lo que se responde se queda en el navegador.
+El piloto de Viñetas se retiró de la aplicación en 1.31.0. `vinetas-schema.sql` y la tabla histórica `ai_vignettes` se conservan para trazabilidad; no tienen pantalla ni lectura cliente activa y sus registros no se eliminan. La ayuda «Cómo caería en el examen» de Melman es una función independiente y sigue disponible. La revisión privada del corpus se documenta en [Material para agentes](../docs/material-privado-agentes.md).
 
 ## Verificación
 

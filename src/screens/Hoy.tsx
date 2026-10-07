@@ -1,10 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Anillo, AnilloDoble, type SegmentoAnillo } from '../components/comunes'
 import { ScenePhoto } from '../components/Editorial'
 import { SynapseHeading } from '../components/SynapseHeading'
 import { useAuth } from '../auth/AuthProvider'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
+import { deriveNbmeSession, isNbmeSessionArchived } from '../nbme/model'
 import type { NbmeQuestionMeta } from '../nbme/types'
 import { cargarHistorialSesiones } from '../semana/api'
 import { separarGuion } from '../semana/guion'
@@ -12,7 +13,7 @@ import type { SesionSemanal } from '../semana/tipos'
 import { cargarPlanSemana } from '../plan/api'
 import { tituloDeCheckpoint } from '../plan/enlace'
 import { esTarea, type PlanSemana } from '../plan/tipos'
-import { cajasDelDia, type ItemCaja } from '../lib/cajas'
+import { cajasDelDia, TITULO_NBME_CAJAS, type ItemCaja } from '../lib/cajas'
 import {
   estadoDelDia, inicioDelDia, limitesSemana, referenciaDelDia, temaDeLaSemana,
   type EstadoDia, type TemaSemana,
@@ -23,7 +24,8 @@ import { fechaEstudio, fechaISOEstudio, instanteEstudioISO, ZONA_ESTUDIO } from 
 import { TablaPlanificador } from './TablaPlanificador'
 import { estimarBloque } from '../lib/ritmo'
 import { hitoSemanalAprendizaje } from '../lib/progreso-aprendizaje'
-import { prepararNuevoDeHoy, tituloDeHoy, type MaterialNuevo } from '../lib/nuevo-hoy'
+import { completarEntradaDeHoy, prepararNuevoDeHoy, tituloDeHoy, type MaterialNuevo } from '../lib/nuevo-hoy'
+import { hayConceptosPendientes } from '../lib/conceptos-pendientes'
 import type { AccionesRecuperacion } from './RecuperarMeta'
 
 const ResumenProgreso = lazy(() => import('./Progreso').then(m => ({ default: m.ResumenProgreso })))
@@ -158,6 +160,11 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
   const [fallo, setFallo] = useState(false)
   const [reintento, setReintento] = useState(0)
   const [plan, setPlan] = useState<PlanSemana | null>(null)
+  const [retomando, setRetomando] = useState(false)
+  const [errorRetomar, setErrorRetomar] = useState<string | null>(null)
+  const bloqueoRetomar = useRef(false)
+  const montado = useRef(false)
+  useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
 
   useEffect(() => {
     let vivo = true
@@ -187,12 +194,12 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
     conceptoDisponible: id => publicados.has(id), preguntaDisponible: id => listas.has(id),
     referencia: referenciaDelDia(estado.progreso, intentosPreguntas, ahora), ahora,
   })
-  const entrada = {
+  const entrada = completarEntradaDeHoy({
     progreso: estado.progreso, intentosPreguntas,
     conceptosSemana: (tema?.conceptIds ?? []).filter(id => publicados.has(id)),
     preguntasSemana: (tema?.preguntaIds ?? []).filter(id => listas.has(id)),
     cajas, ahora,
-  }
+  }, indice?.modulos ?? [], listas)
   const dia = estadoDelDia(entrada)
   const anillo = anilloDeLaSemana(tema, plan, estado.progreso, estado.criterios, ahora)
   const hito = useMemo(() => hitoSemanalAprendizaje(Object.values(estado.progreso).filter(p => publicados.has(p.concept_id)),
@@ -205,8 +212,9 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
   // El viernes va vacío a propósito: sale cerrado desde que amanece, sin botones ni cuentas,
   // y lo que venza entra en el techo del sábado. No depende de nada que tenga que cargar.
   const viernes = dia.tipo === 'vacio'
-  // Sin las sesiones de la semana no se puede dar lo nuevo por cerrado: el día queda abierto.
-  const nuevoConocido = !!sesiones || viernes
+  const fallbackDisponible = (entrada.conceptosDisponibles?.length ?? 0) + (entrada.preguntasDisponibles?.length ?? 0) > 0
+  // Un fallo de guiones no bloquea el corpus conocido; sin ningún material, no se supone un cierre.
+  const nuevoConocido = !!sesiones || viernes || (fallo && fallbackDisponible)
   const completo = nuevoConocido && dia.completo
   // Recién abierto un dispositivo, «ya está» sólo se dice cuando llegó el progreso de la cuenta:
   // un cierre calculado sobre una copia local a medias mandaría a cerrar el portátil con trabajo pendiente.
@@ -227,9 +235,9 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
   const nuevoAbierto = nuevoConocido && !dia.nuevo.cerrada
   const ahoraToca = viernes ? 'Viernes: hoy no toca nada, a propósito. Lo que venza hoy entra el sábado.'
     : completo ? fraseCierre(dia)
-    : cajasAbiertas && nuevoAbierto ? 'Primero las cajas, que ya las conoces. Después, lo nuevo de la semana.'
+    : cajasAbiertas && nuevoAbierto ? 'Primero las cajas. Después, el material nuevo.'
     : cajasAbiertas ? 'Te quedan las cajas de hoy.'
-    : nuevoAbierto ? 'Ahora, lo nuevo de la semana.'
+    : nuevoAbierto ? 'Ahora, el material nuevo.'
     : 'Lo nuevo de la semana no se pudo cargar; las cajas de hoy están hechas.'
 
   const empezarNuevo = () => {
@@ -248,6 +256,21 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
   const tiempo = estimarBloque(estado.progreso, intentosPreguntas, { conceptos: bloqueConceptos, preguntas: bloquePreguntas })
   const retomar = hechosCajas + hechosNuevo > 0
   const quedan = interior.total - interior.valor
+  const sesionPendiente = hayConceptosPendientes(estado.reanudable) || Object.values(nbme.state.sessions)
+    .some(s => !isNbmeSessionArchived(nbme.state, s.id) && s.title !== TITULO_NBME_CAJAS && deriveNbmeSession(nbme.state, s.id)?.phase !== 'complete')
+  const retomarSesion = async () => {
+    if (!onRetomar || bloqueoRetomar.current) return
+    bloqueoRetomar.current = true
+    setRetomando(true); setErrorRetomar(null)
+    try {
+      if (!await onRetomar() && montado.current) setErrorRetomar('No se pudo abrir tu sesión guardada. Vuelve a intentarlo.')
+    } catch (e) {
+      if (montado.current) setErrorRetomar(e instanceof Error ? e.message : 'No se pudo abrir tu sesión guardada. Vuelve a intentarlo.')
+    } finally {
+      bloqueoRetomar.current = false
+      if (montado.current) setRetomando(false)
+    }
+  }
 
   return <div className="pila hoy hoy-focus">
     <header className="semana-encabezado hoy-cabecera" data-depth-scene>
@@ -260,14 +283,24 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
         <p className="editorial-eyebrow">{fecha}</p>
         <h1><SynapseHeading text="Hoy" /></h1>
         <p className="hoy-tema">{rotuloTema(tema, plan)}</p>
-        <p className="mini hoy-leyenda">Dentro, trabajo realizado hoy. Fuera, {anillo.leyenda}.</p>
+        <p className="mini hoy-leyenda">{anillo.leyenda}.</p>
       </div>
     </header>
 
     <p className="hoy-ahora" role="status">{ahoraToca}</p>
+    {fallo && !viernes && fallbackDisponible && <p role="alert">No se pudieron cargar las sesiones de la semana. Puedes seguir con el material publicado.
+      {' '}<button className="btn pequeno fantasma" onClick={() => setReintento(v => v + 1)}>Volver a intentar</button></p>}
+    {sesionPendiente && onRetomar && <section className="tarjeta" aria-labelledby="sesion-guardada-hoy">
+      <h2 id="sesion-guardada-hoy">Tu sesión guardada</h2>
+      {hayConceptosPendientes(estado.reanudable) && estado.reanudable?.titulo && <p>{estado.reanudable.titulo}</p>}
+      <button className="btn" disabled={retomando} aria-busy={retomando} onClick={() => void retomarSesion()}>
+        {retomando ? 'Retomando tu sesión…' : 'Retomar mi sesión pendiente'}
+      </button>
+      {errorRetomar && <p role="alert">{errorRetomar}</p>}
+    </section>}
     {!completo && siguiente && <section className="tarjeta hoy-next-block" aria-labelledby="siguiente-bloque">
       <p className="rotulo">{retomar ? 'Retomamos aquí' : 'Tu siguiente bloque'}</p>
-      <h2 id="siguiente-bloque">{siguiente === 'cajas' ? 'Repasar y mantener lo aprendido' : 'Avanzar en el tema de la semana'}</h2>
+      <h2 id="siguiente-bloque">{siguiente === 'cajas' ? 'Repasar y mantener lo aprendido' : 'Estudiar material nuevo'}</h2>
       <p className="hoy-objective">{bloqueConceptos > 0 && plural(bloqueConceptos, 'concepto', 'conceptos')}
         {bloqueConceptos > 0 && bloquePreguntas > 0 && ' + '}{bloquePreguntas > 0 && plural(bloquePreguntas, 'pregunta', 'preguntas')} en el siguiente bloque.</p>
       {siguiente === 'cajas' && pendientesCajas.some(i => i.mantenimiento) && <p className="mini">Incluye mantenimiento de conceptos cuyo dominio ya demostraste.</p>}
@@ -275,12 +308,11 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
       <button className="btn principal" onClick={siguiente === 'cajas' ? () => onCajas(pendientesCajas, tituloCajas) : empezarNuevo}>
         {siguiente === 'cajas' ? hechosCajas ? 'Seguir con las cajas' : 'Empezar las cajas' : hechosNuevo ? 'Seguir con lo nuevo' : 'Empezar lo nuevo'}
       </button>
-      <p className="mini hoy-progress-summary">Tu objetivo de hoy: {interior.total} pasos dentro de tu techo diario. Avance: {interior.valor} hechos · quedan {quedan}. Las respuestas falladas también cuentan como trabajo realizado.</p>
+      <p className="mini hoy-progress-summary">Objetivo de hoy: {interior.total} pasos. {interior.valor} hechos · quedan {quedan}.</p>
     </section>}
     {completo && <section className="tarjeta hoy-completion" aria-labelledby="dia-terminado">
       <span className="rotulo">Plan de hoy terminado</span><h2 id="dia-terminado">Puedes cerrar por hoy.</h2>
       <p>{viernes ? 'Hoy es tu día libre.' : `Completaste ${interior.valor} pasos de tu plan.`}</p>
-      <p className="mini">Tu práctica queda guardada. Al volver, Hoy preparará los repasos que correspondan y lo siguiente de tu semana.</p>
     </section>}
     {hito.conceptos > 0 && <p className="learning-milestone" role="note">
       Esta semana confirmaste {hito.conceptos} {hito.conceptos === 1 ? 'concepto' : 'conceptos'} sin ayuda después de al menos 24 h.
@@ -300,7 +332,6 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
           <div className="hoy-bloque-texto">
             <h2 id="hoy-cajas">Cajas</h2>
             <p className="hoy-cuenta">{hechosCajas} / {dia.cajas.techo} {dia.cajas.techo === 1 ? 'caja' : 'cajas'}</p>
-            <p className="mini">Consolidación y mantenimiento dentro del techo de hoy.</p>
           </div>
         </section>}
 
@@ -317,13 +348,12 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
             <span>Nuevo · el viernes no toca</span></p>
         : dia.nuevo.cerrada
           ? <p className="hoy-bloque-hecho"><span className="hoy-marca" aria-hidden="true">✓</span>
-            <span>{techoNuevo ? `Nuevo · ${cuentaNuevo}` : 'Nuevo · la semana no trae material por ver'}</span></p>
+            <span>{techoNuevo ? `Nuevo · ${cuentaNuevo}` : 'Nuevo · no queda material nuevo publicado'}</span></p>
           : <section className="tarjeta hoy-bloque" aria-labelledby="hoy-nuevo">
             <Anillo valor={hechosNuevo} total={techoNuevo} tam={76} etiqueta="nuevo" />
             <div className="hoy-bloque-texto">
               <h2 id="hoy-nuevo">Nuevo</h2>
               <p className="hoy-cuenta">{cuentaNuevo}</p>
-              <p className="mini">Tres conceptos y una pregunta, hasta el techo de hoy.</p>
             </div>
             {siguiente !== 'nuevo' && <button className="btn fantasma" onClick={empezarNuevo}>
               {hechosNuevo ? 'Seguir con lo nuevo' : 'Empezar lo nuevo'}
@@ -335,7 +365,6 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
     {/* Con el día cerrado no hay nada que mirar por qué ni otra puerta al estudio: el cierre no enlaza a más. */}
     {!completo && <Desplegable titulo="Lo que estoy cerrando">{() => <TablaPlanificador items={cajas.items} ahora={ahora} />}</Desplegable>}
     {!completo && <Desplegable titulo="Quiero hacer algo más">{() => <>
-      <p className="sutil">Puedes abrir la biblioteca y estudiar por tu cuenta lo que necesites.</p>
       <div className="fila">
         <button className="btn fantasma" onClick={() => onBiblioteca('conceptos')}>Elegir conceptos</button>
         <button className="btn fantasma" onClick={() => onBiblioteca('preguntas')}>Elegir preguntas</button>

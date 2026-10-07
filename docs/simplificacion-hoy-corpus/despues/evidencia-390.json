@@ -1,0 +1,15 @@
+{
+  "fixture": "Existing synthetic abierto scene; no clinical content or real account",
+  "width": 390,
+  "ahora": "2026-10-05T11:30:00.000Z",
+  "destinos": [
+    "Biblioteca",
+    "Progreso",
+    "Ajustes y respaldo",
+    "Salir"
+  ],
+  "tipos": [
+    "Conceptos",
+    "Preguntas"
+  ]
+}

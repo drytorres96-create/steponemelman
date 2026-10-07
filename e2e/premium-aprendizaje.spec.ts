@@ -8,7 +8,7 @@ for (const width of [390, 1280]) test.describe(`aprendizaje y diseño premium a 
     await page.clock.install({ time: LUNES })
     await page.goto('/?escena=abierto')
     await expect(page.locator('.hoy-next-block')).toBeVisible()
-    await expect(page.locator('.hoy-next-block')).toContainText('Tu objetivo de hoy:')
+    await expect(page.locator('.hoy-next-block')).toContainText('Objetivo de hoy:')
     await expect(page.locator('.hoy-next-block')).toContainText('quedan')
     await expect(page.locator('.hoy .btn.principal:visible')).toHaveCount(1)
     // La escena de 1s no basta para estimar cuánto tardará una persona real.

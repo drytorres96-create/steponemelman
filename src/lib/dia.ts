@@ -119,6 +119,10 @@ export interface EntradaDia {
   conceptosSemana: string[]
   /** Preguntas del tema de la semana que el banco da por listas, en su orden. */
   preguntasSemana: string[]
+  /** Corpus publicado que completa la semana cuando sus guiones no llenan el techo. */
+  conceptosDisponibles?: string[]
+  /** Preguntas calificables del banco actual; los IDs semanales conservan prioridad. */
+  preguntasDisponibles?: string[]
   /** Lo que ya decidió la escalera de cajas para hoy. */
   cajas: { hechos: number; techo: number }
   ahora: number
@@ -143,16 +147,25 @@ interface CuentaNuevo {
 /**
  * «Nuevo» es un concepto sin ningún intento resuelto antes de hoy; «visto» es un
  * intento resuelto hoy, acierto o fallo, venga de donde venga. El techo es el del
- * tipo de día y baja a lo que la semana tiene disponible: la vía nunca se queda
- * abierta pidiendo algo que no existe. El viernes su techo es cero.
+ * tipo de día y baja al material publicado disponible. Los guiones semanales
+ * tienen prioridad; no son la única fuente de nuevos cuando el corpus se aporta.
+ * La vía nunca pide algo que no existe. El viernes su techo es cero.
  */
 function contarNuevo(e: EntradaDia): CuentaNuevo {
   const desde = inicioDelDia(e.ahora), hasta = finDelDia(e.ahora)
-  const deHoy = (t: number | null) => t !== null && t >= desde && t < hasta
+  const deHoy = (t: number | null) => t !== null && t >= desde && t < hasta && t <= e.ahora
+  const publicados = e.conceptosDisponibles === undefined ? null : new Set(e.conceptosDisponibles)
+  const calificables = e.preguntasDisponibles === undefined ? null : new Set(e.preguntasDisponibles)
+  const conceptosElegibles = [...new Set([
+    ...e.conceptosSemana.filter(id => !publicados || publicados.has(id)), ...(e.conceptosDisponibles ?? []),
+  ])]
+  const preguntasElegibles = [...new Set([
+    ...e.preguntasSemana.filter(id => !calificables || calificables.has(id)), ...(e.preguntasDisponibles ?? []),
+  ])]
 
   let conceptos = 0
-  for (const p of Object.values(e.progreso)) if (deHoy(primerIntentoResuelto(p))) conceptos++
-  const conceptosLibres = e.conceptosSemana.filter(id => primerIntentoResuelto(e.progreso[id]) === null)
+  for (const p of Object.values(e.progreso)) if ((!publicados || publicados.has(p.concept_id)) && deHoy(primerIntentoResuelto(p))) conceptos++
+  const conceptosLibres = conceptosElegibles.filter(id => primerIntentoResuelto(e.progreso[id]) === null)
 
   const primeraRespuesta = new Map<string, number>()
   for (const intento of e.intentosPreguntas) {
@@ -160,8 +173,8 @@ function contarNuevo(e: EntradaDia): CuentaNuevo {
     if (previa === undefined || intento.submittedAt < previa) primeraRespuesta.set(intento.questionId, intento.submittedAt)
   }
   let preguntas = 0
-  for (const t of primeraRespuesta.values()) if (deHoy(t)) preguntas++
-  const preguntasLibres = e.preguntasSemana.filter(id => !primeraRespuesta.has(id))
+  for (const [id, t] of primeraRespuesta) if ((!calificables || calificables.has(id)) && deHoy(t)) preguntas++
+  const preguntasLibres = preguntasElegibles.filter(id => !primeraRespuesta.has(id))
 
   const techos = TECHOS[tipoDeDia(e.ahora)]
   const techoConceptos = Math.min(techos.conceptos, conceptos + conceptosLibres.length)

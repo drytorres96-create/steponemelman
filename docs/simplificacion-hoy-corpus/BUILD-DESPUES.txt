@@ -1,0 +1,24 @@
+vite v6.4.3 building for production...
+transforming...
+✓ 148 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../hoy-faq-qa-despues/index.html                          0.43 kB │ gzip:   0.29 kB
+../../../hoy-faq-qa-despues/assets/Ajustes-BQ3Opmwx.css         0.43 kB │ gzip:   0.26 kB
+../../../hoy-faq-qa-despues/assets/NbmePlayer-DjDqH64E.css      2.59 kB │ gzip:   0.78 kB
+../../../hoy-faq-qa-despues/assets/nbme-DgTJILPg.css           10.49 kB │ gzip:   2.60 kB
+../../../hoy-faq-qa-despues/assets/index-BXaAABPU.css         189.05 kB │ gzip:  37.85 kB
+../../../hoy-faq-qa-despues/assets/PausaDeBloque-UEruItpt.js    0.41 kB │ gzip:   0.28 kB
+../../../hoy-faq-qa-despues/assets/meta-CA_0S40e.js             2.35 kB │ gzip:   1.23 kB
+../../../hoy-faq-qa-despues/assets/PielEstudio-DWyGZ0_e.js      3.01 kB │ gzip:   1.38 kB
+../../../hoy-faq-qa-despues/assets/RecuperarMeta-DOuWoD0O.js    7.19 kB │ gzip:   3.01 kB
+../../../hoy-faq-qa-despues/assets/SesionCajas-BtPdlcFv.js      8.38 kB │ gzip:   3.29 kB
+../../../hoy-faq-qa-despues/assets/SesionMixta-zgtCqJxc.js      9.17 kB │ gzip:   3.60 kB
+../../../hoy-faq-qa-despues/assets/NbmeLibrary-CGqs8HrL.js     14.10 kB │ gzip:   4.50 kB
+../../../hoy-faq-qa-despues/assets/Ajustes-CS9HM0re.js         18.25 kB │ gzip:   6.49 kB
+../../../hoy-faq-qa-despues/assets/Modulos-DrFynfbv.js         19.41 kB │ gzip:   6.28 kB
+../../../hoy-faq-qa-despues/assets/Progreso-vkOBe8FJ.js        22.89 kB │ gzip:   7.75 kB
+../../../hoy-faq-qa-despues/assets/NbmePlayer-tzPk1zF6.js      52.49 kB │ gzip:  17.17 kB
+../../../hoy-faq-qa-despues/assets/Reproductor-CIXlThjW.js     60.21 kB │ gzip:  18.15 kB
+../../../hoy-faq-qa-despues/assets/index-BY7YZRzc.js          367.48 kB │ gzip: 116.99 kB
+✓ built in 2.25s

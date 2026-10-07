@@ -3,6 +3,7 @@ import type { Concepto } from '../schema/concept'
 import type { EstadoDominio } from '../srs/tipos'
 import { NOMBRE_ESTADO } from '../srs/tipos'
 import { referenciaPagina } from '../lib/fuente'
+import { fundamentoEditorial } from '../lib/fuente-docente'
 
 export function Anillo({ valor, total, tam = 108, etiqueta, oro = false }:
   { valor: number; total: number; tam?: number; etiqueta: string; oro?: boolean }) {
@@ -154,8 +155,9 @@ export function Modal({ titulo, onCerrar, children, ancho }:
   )
 }
 
-/** Pantalla «Fuente»: documento, página, fragmento verbatim y relación exacta con el concepto. */
+/** Procedencia y evidencia docente. Las notas internas de auditoría no forman parte de la UI. */
 export function PanelFuente({ c }: { c: Concepto }) {
+  const fundamento = fundamentoEditorial(c)
   return (
     <div className="pila" style={{ gap: 14 }}>
       <div className="fila" style={{ gap: 8 }}>
@@ -167,12 +169,12 @@ export function PanelFuente({ c }: { c: Concepto }) {
         La página PDF cuenta la portada. El ancla de la extracción es {c.source.page}.
       </p>}
       <div>
-        <div className="rotulo" style={{ marginBottom: 6 }}>Fragmento fuente (verbatim)</div>
-        <div className="fragmento">{c.source.fragment}</div>
+        <div className="rotulo" style={{ marginBottom: 6 }}>{c.revision_editorial ? 'Fundamento del concepto' : 'Fragmento fuente (verbatim)'}</div>
+        <div className="fragmento">{c.revision_editorial ? fundamento ?? c.explicacion : c.source.fragment}</div>
       </div>
-      {c.revision_editorial && <div className="aviso"><div><b>Aclaración editorial</b><p>{c.revision_editorial.nota}</p>
+      {c.revision_editorial && c.revision_editorial.fuentes.length > 0 && <div><b>Referencias</b>
         {c.revision_editorial.fuentes.map(f => <p key={f.url}><a href={f.url} target="_blank" rel="noreferrer">{f.titulo}</a></p>)}
-      </div></div>}
+      </div>}
       {c.variante_id && <div><b>Referencias de esta variante</b>{c.variantes?.find(v => v.variant_id === c.variante_id)?.fuentes.map(f => <p key={f.url}><a href={f.url} target="_blank" rel="noreferrer">{f.titulo}</a></p>)}</div>}
       {c.fuentes_adicionales?.length ? (
         <div>
@@ -190,13 +192,6 @@ export function PanelFuente({ c }: { c: Concepto }) {
           <b style={{ color: 'var(--texto)' }}>Respuesta:</b> {c.respuesta_canonica}
         </p>
       </div>
-      {c.calidad.alertas.length > 0 && (
-        <div className="aviso"><span>⚠</span><div>
-          <b>Alertas registradas en la auditoría</b>
-          <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>{c.calidad.alertas.map((a, i) => <li key={i}>{a}</li>)}</ul>
-        </div></div>
-      )}
-      <div className="mini">Confianza de la auditoría automatizada: {(c.calidad.confianza * 100).toFixed(0)} %. Esta revisión la realizó un sistema de inteligencia artificial; no sustituye la revisión de una persona.</div>
     </div>
   )
 }

@@ -9,7 +9,9 @@ const conceptos = ids.map((id, i) => ({ ...ConceptoZ.parse({
   step: 'step1', interaccion: { recomendada: 'recuperacion_libre', permitidas: ['recuperacion_libre'] }, evaluacion: { pregunta: '¿Cuál es la respuesta de demostración?' },
   pistas: ['uno', 'dos', 'tres'], calidad: { confianza: 1, estado: 'aprobado' },
 }), concept_id: id }) as Concepto)
-export const cargarTodo = async () => conceptos
+declare global { interface Window { __cargasCorpusSintetico: number } }
+window.__cargasCorpusSintetico = 0
+export const cargarTodo = async () => { window.__cargasCorpusSintetico++; return conceptos }
 let cargas = 0
 export const cargarConceptos = async (lista: string[]) => {
   if (new URLSearchParams(location.search).get('retomar') === 'concepto-error' && ++cargas === 1) throw new Error('No se pudo cargar la sesión sintética. Vuelve a intentarlo.')

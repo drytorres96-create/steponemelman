@@ -24,12 +24,10 @@ export function ResumenProgreso(acciones: AccionesRecuperacion) {
     <section className="premium-progress-grid" aria-label="Estado de tu aprendizaje">
       <article className="premium-progress-card"><h2>Conceptos vistos</h2><strong>{resumen.vistos} / {resumen.total}</strong>
         <progress max={resumen.total || 1} value={resumen.vistos} aria-label="Progreso de conceptos vistos" />
-        <p className="mini">{resumen.actividad} con práctica registrada. Abrir un concepto cuenta como visto; responderlo registra práctica.</p></article>
-      <article className="premium-progress-card"><h2>Dominio demostrado</h2><strong>{resumen.dominioDemostrado}</strong>
-        <p className="mini">Cumplen tus criterios de evidencia. Un repaso vencido conserva esa evidencia.</p></article>
+        <p className="mini">{resumen.actividad} con práctica registrada.</p></article>
+      <article className="premium-progress-card"><h2>Dominio demostrado</h2><strong>{resumen.dominioDemostrado}</strong></article>
       <article className="premium-progress-card"><h2>Mantenimiento al día</h2><strong>{resumen.mantenimientoAlDia} / {resumen.dominioDemostrado}</strong>
-        <p className="mini">{resumen.mantenimientoPendiente} pendientes de repaso.{resumen.mantenimientoPorComprobar > 0 && ` ${resumen.mantenimientoPorComprobar} por comprobar.`}
-          {!resumen.dominioDemostrado && ' Se contará al demostrar dominio.'}</p></article>
+        <p className="mini">{resumen.mantenimientoPendiente} pendientes de repaso.{resumen.mantenimientoPorComprobar > 0 && ` ${resumen.mantenimientoPorComprobar} por comprobar.`}</p></article>
     </section>
     <BandaDeCifras conceptIds={conceptIds} cargarDetalleConceptos={cargarDetalleConceptos} ventana="semana" />
     <ProgresoMeta conceptIds={conceptIds} {...acciones} />

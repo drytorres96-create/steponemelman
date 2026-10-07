@@ -1,9 +1,8 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ConceptoZ, IndiceZ } from '../schema/concept'
+import { IndiceZ } from '../schema/concept'
 import { ESTADO_INICIAL, type EstadoApp } from '../store/model'
-import { csvAuditoria, celdaCSV, jsonNotas } from '../lib/exportar-auditoria'
 
 const mock = vi.hoisted(() => ({ app: vi.fn(), cargar: vi.fn(), leer: vi.fn(), escribir: vi.fn(), descargar: vi.fn(),
   semanas: vi.fn(), plan: vi.fn() }))
@@ -16,13 +15,6 @@ vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ session: { access_tok
 vi.mock('../semana/api', () => ({ cargarHistorialSesiones: mock.semanas }))
 vi.mock('../plan/api', () => ({ cargarPlanSemana: mock.plan }))
 import { Ajustes, LIMITE_EXTRAS_MS } from '../screens/Ajustes'
-import { Auditoria } from '../screens/Auditoria'
-
-const c = ConceptoZ.parse({ concept_id: 'QA-uno', source: { doc: 'QA', doc_title: 'Documento sintético', page: 1, item_id: 'I', fragment: 'Ejemplo sintético.' },
-  objetivo: 'Reconocer alfa', afirmacion: 'Alfa es primero.', respuesta_canonica: 'alfa', explicacion: 'Explicación sintética.',
-  clasificacion: { disciplina_primaria: 'Fisiología', disciplinas_secundarias: ['Farmacología'], sistema_primario: 'Cardiovascular', sistemas_secundarios: ['Endocrino'], tema: 'Secuencia', tipo_conocimiento: 'Definición', dificultad: 1 },
-  step: 'step1', interaccion: { recomendada: 'recuperacion_libre' }, evaluacion: { pregunta: '¿Cuál es primero?' }, pistas: ['uno', 'dos', 'tres'], calidad: { estado: 'aprobado', confianza: 1 } })
-const cs = [c, ...['dos', 'tres', 'cuatro'].map(x => ConceptoZ.parse({ ...c, concept_id: `QA-${x}` }))]
 const indice = IndiceZ.parse({ schema_version: '1.0.0', corpus_version: '1.0.5', n_conceptos: 0, modulos: [], documentos: ['QA'], glosario: [], cuarentena: 0 })
 let host: HTMLDivElement, root: Root, estado: EstadoApp
 const guardar = vi.fn()
@@ -34,7 +26,7 @@ beforeEach(() => {
   guardar.mockImplementation(c => { estado = { ...estado, criterios: c } })
   mock.app.mockImplementation(() => ({ estado, actualizarCriterios: guardar,
     exportar: (extra?: Record<string, unknown>) => JSON.stringify({ ...estado, ...extra }), indice }))
-  mock.cargar.mockResolvedValue(cs); mock.leer.mockResolvedValue({}); mock.escribir.mockResolvedValue(undefined)
+  mock.cargar.mockResolvedValue([]); mock.leer.mockResolvedValue({}); mock.escribir.mockResolvedValue(undefined)
   mock.semanas.mockResolvedValue([{ id: 'semana-sintetica' }]); mock.plan.mockResolvedValue({ eventoId: 'S-sintetica' })
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks() })
@@ -106,38 +98,4 @@ describe('simplificación con datos conservados', () => {
     expect(guardar).not.toHaveBeenCalled()
   })
 
-  it('conserva una nota al cerrar con Escape y exporta también las que están fuera del filtro', async () => {
-    mock.leer.mockResolvedValue({ 'QA-fuera': { nota: 'Nota anterior fuera del filtro' } })
-    await act(async () => root.render(<Auditoria />))
-    await click('Revisar')
-    await escribir('textarea[aria-label="Nota de revisión"]', 'Nota nueva antes de Escape')
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-    await escribir('input[aria-label="Buscar conceptos"]', 'QA-uno')
-    await click('Exportar notas')
-    const contenido = JSON.parse(mock.descargar.mock.calls.at(-1)![1])
-    expect(contenido.correcciones).toEqual({ 'QA-fuera': { nota: 'Nota anterior fuera del filtro' }, 'QA-uno': { nota: 'Nota nueva antes de Escape' } })
-    expect(mock.escribir).toHaveBeenLastCalledWith('correcciones-auditoria', contenido.correcciones, { estricto: true })
-  })
-
-  it('no permite editar antes de leer las notas y avisa si falla la escritura', async () => {
-    let terminar!: (value: unknown) => void
-    mock.leer.mockImplementation(() => new Promise(resolve => { terminar = resolve }))
-    await act(async () => root.render(<Auditoria />))
-    await click('Revisar')
-    expect(host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Nota de revisión"]')?.disabled).toBe(true)
-    await act(async () => terminar({}))
-    mock.escribir.mockRejectedValue(new Error('cuota'))
-    await escribir('textarea[aria-label="Nota de revisión"]', 'Se conserva para exportar')
-    expect(host.textContent).toContain('No se pudo guardar la nota')
-  })
-
-  it('CSV mantiene las propuestas separadas y neutraliza fórmulas sin alterar el JSON', () => {
-    const notas = { 'QA-uno': { tema: 'Tema propuesto', nota: '=HYPERLINK("ejemplo")\nsegunda línea' }, 'QA-fuera': { nota: 'Otra' } }
-    const csv = csvAuditoria([c], notas)
-    expect(csv).toContain('"tema_propuesto"'); expect(csv).toContain('"Tema propuesto"')
-    expect(csv).toContain('"\'=HYPERLINK(""ejemplo"")\nsegunda línea"')
-    for (const texto of [' +SUM(1)', '\ttexto', '-1', '@dato', '\n=1']) expect(celdaCSV(texto)).toBe(`"'${texto}"`)
-    expect(JSON.parse(jsonNotas(notas)).correcciones).toEqual(notas)
-    expect(c.clasificacion.tema).toBe('Secuencia')
-  })
 })

@@ -9,6 +9,10 @@ import { useAuth } from '../auth/AuthProvider'
 import { cargarHistorialSesiones } from '../semana/api'
 import { cargarPlanSemana } from '../plan/api'
 import { nombreRespaldo } from '../lib/respaldo'
+import { PreguntasFrecuentes } from './PreguntasFrecuentes'
+import { Cobertura } from './Cobertura'
+import { cargarTodo } from '../data/corpus'
+import type { Concepto, Indice } from '../schema/concept'
 
 const CAMPOS = [
   { clave: 'recuperaciones', titulo: 'Respuestas independientes correctas mínimas', min: 1, max: 10 },
@@ -23,12 +27,38 @@ function conLimite<T>(promesa: Promise<T>): Promise<T | null> {
 }
 const textos = (c: typeof CRITERIOS_POR_DEFECTO) => Object.fromEntries(CAMPOS.map(f => [f.clave, String(c[f.clave])])) as Record<typeof CAMPOS[number]['clave'], string>
 
+function IndiceMaterial({ indice }: { indice: Indice | null }) {
+  const [conceptos, setConceptos] = useState<Concepto[] | null>(null)
+  const [fallo, setFallo] = useState(false)
+  const [reintento, setReintento] = useState(0)
+  useEffect(() => {
+    if (!indice) return
+    let vivo = true
+    setConceptos(null); setFallo(false)
+    cargarTodo(indice.modulos).then(c => { if (vivo) setConceptos(c) }).catch(() => { if (vivo) setFallo(true) })
+    return () => { vivo = false }
+  }, [indice, reintento])
+  if (!indice) return <p role="status">Cargando el índice del material…</p>
+  if (fallo) return <div className="pila"><p role="status">No se pudo cargar el índice del material.</p><button className="btn" onClick={() => setReintento(n => n + 1)}>Volver a cargar el índice</button></div>
+  if (!conceptos) return <p role="status">Cargando el contenido disponible…</p>
+  const publicados = new Set(conceptos.map(c => c.concept_id))
+  return <div className="pila ajustes-indice">
+    <div className="scroll-x" tabIndex={0} role="region" aria-label="Módulos publicados"><table className="tabla"><caption>Módulos publicados</caption>
+      <thead><tr><th scope="col">Módulo</th><th scope="col">Conceptos</th></tr></thead>
+      <tbody>{indice.modulos.map(m => <tr key={m.module_id}><th scope="row">{m.nombre}</th>
+        <td>{new Set(m.sesiones.flatMap(s => s.conceptos).filter(id => publicados.has(id))).size.toLocaleString('es')}</td></tr>)}</tbody>
+    </table></div>
+    <Cobertura conceptos={conceptos} indice={indice} />
+  </div>
+}
+
 export function Ajustes() {
   const { estado, actualizarCriterios, exportar, importar, reiniciar, indice } = useApp()
   const nbme = useNbme()
   const { session } = useAuth()
   const [preparando, setPreparando] = useState(false)
   const [msg, setMsg] = useState('')
+  const [indiceSolicitado, setIndiceSolicitado] = useState(false)
   const archivo = useRef<HTMLInputElement>(null)
   const { entregar, dialogo } = useDescarga()
   const c = estado.criterios
@@ -64,15 +94,13 @@ export function Ajustes() {
   return (
     <div className="pila" style={{ maxWidth: 760 }}>
       {dialogo}
-      <ScreenHeading landscape="stone" eyebrow="Tu espacio personal" title="Ajustes" description="Respaldo, preferencias y material de consulta." />
+      <ScreenHeading landscape="stone" eyebrow="Tu espacio personal" title="Ajustes" description="Preferencias, respaldo y preguntas frecuentes." />
 
-      <details className="tarjeta"><summary>Criterios de dominio (avanzado)</summary>
+      <details className="tarjeta ajustes-seccion"><summary>Criterios de dominio (avanzado)</summary>
         <form className="pila" style={{ marginTop: 16 }} noValidate onSubmit={e => { e.preventDefault(); aplicar() }}>
-          <p className="mini">Edita los valores y aplícalos juntos. Hasta entonces se conservan tus criterios actuales.</p>
           <div className="rejilla r2">{CAMPOS.map(f => <div key={f.clave}><label htmlFor={`criterio-${f.clave}`}>{f.titulo}</label>
             <input id={`criterio-${f.clave}`} type="number" min={f.min} max={f.max} step={1} value={borrador[f.clave]}
               onChange={e => { setBorrador(b => ({ ...b, [f.clave]: e.target.value })); setMensajeCriterios('') }} /></div>)}</div>
-          <p className="sutil">Cambiar los criterios recalcula el dominio vigente. Tus intentos y los hitos de dominio anteriores se conservan.</p>
           {conflicto && <p role="alert">Los criterios cambiaron en otra ventana. Pulsa «Recargar valores» para revisar la configuración actual.</p>}
           <div className="fila"><button className="btn principal" type="submit" disabled={!sucio || conflicto}>Aplicar criterios</button>
             <button className="btn" type="button" onClick={cancelar}>{conflicto ? 'Recargar valores' : 'Cancelar cambios'}</button>
@@ -82,9 +110,7 @@ export function Ajustes() {
       </details>
 
       <div className="tarjeta pila">
-        <h2>Tu progreso</h2>
-        <p className="sutil">Tu progreso se sincroniza con tu cuenta. Inicia sesión con el mismo correo en otro dispositivo para continuar. También puedes importar el progreso de la versión anterior o guardar una copia.</p>
-        <p className="mini">La copia incluye los conceptos, las preguntas NBME, las sesiones de la semana y el plan de esta semana. Importar recupera los conceptos; lo demás vive en tu cuenta.</p>
+        <h2>Respaldo del progreso</h2>
         <div className="fila">
           <button className="btn" disabled={preparando} onClick={() => void descargar()}>{preparando ? 'Preparando la copia…' : 'Exportar progreso'}</button>
           <button className="btn fantasma" onClick={() => archivo.current?.click()}>Importar progreso</button>
@@ -106,8 +132,11 @@ export function Ajustes() {
         </button>
       </div>
 
-      <details className="tarjeta"><summary>Glosario del material</summary>
-        <p className="sutil">Siglas expandidas la primera vez que aparecen, extraídas del propio corpus.</p>
+      <details className="tarjeta ajustes-seccion" onToggle={e => { if (e.currentTarget.open) setIndiceSolicitado(true) }}><summary>Índice del material</summary>
+        {indiceSolicitado && <IndiceMaterial indice={indice} />}
+      </details>
+
+      <details className="tarjeta ajustes-seccion"><summary>Glosario del material</summary>
         <div className="scroll-x" tabIndex={0} role="region" aria-label="Glosario del material" style={{ maxHeight: 320 }}>
           <table className="tabla">
             <thead><tr><th>Sigla</th><th>Término</th><th>Disciplina</th></tr></thead>
@@ -117,6 +146,7 @@ export function Ajustes() {
           </table>
         </div>
       </details>
+      <PreguntasFrecuentes criterios={c} />
       <p className="mini">Step 1 · Melman · Versión {APP_VERSION}</p>
     </div>
   )

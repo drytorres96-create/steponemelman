@@ -345,7 +345,7 @@ describe('portada Hoy', () => {
     expect(anillo().classList.contains('cerrado')).toBe(true)
     expect(host.textContent).toContain('Hoy ya está: no tocaba nada nuevo ni ninguna caja.')
     expect(host.textContent).toContain('Cajas · hoy no toca ninguna')
-    expect(host.textContent).toContain('Nuevo · la semana no trae material por ver')
+    expect(host.textContent).toContain('Nuevo · no queda material nuevo publicado')
   })
 
   it('el anillo exterior cae a su reserva sin lanzar cuando no hay semana en curso', async () => {
@@ -493,5 +493,32 @@ describe('portada Hoy', () => {
     expect(anillo().classList.contains('cerrado')).toBe(false)
     expect(host.textContent).not.toContain('Hoy ya está')
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('No se pudieron cargar las sesiones de la semana')
+  })
+
+  it('sin guion semanal, 1/1 hechos muestran un objetivo de 10/5 y abren los 9/4 restantes del corpus', async () => {
+    datos({ conceptos: ids('C', 12), preguntas: ids('Q', 7),
+      progresos: { C1: progreso('C1', [fallo(HOY(9))]) }, respuestas: [respuesta('Q1', HOY(9), false)] })
+    const onNuevo = vi.fn()
+    await pintar({ onNuevo })
+    expect(host.textContent).toContain('1 / 10 conceptos · 1 / 5 preguntas')
+    expect(host.textContent).toContain('Objetivo de hoy: 15 pasos. 2 hechos · quedan 13.')
+    expect(host.textContent).not.toContain('Puedes cerrar por hoy.')
+    await act(async () => { boton('Seguir con lo nuevo').click() })
+    expect(onNuevo).toHaveBeenCalledWith({ conceptIds: ids('C', 10).slice(1),
+      preguntas: ids('Q', 5).slice(1).map(id => ({ id, revision: 'r1' })),
+      titulo: 'Nuevo de hoy · 24 sep', nbmeSessionId: null })
+  })
+
+  it('un fallo al cargar guiones deja estudiar el corpus conocido y conserva el aviso de reintento', async () => {
+    datos({ conceptos: ['C1', 'C2'], preguntas: ['Q1'] })
+    mock.historial.mockRejectedValue(new Error('sin red'))
+    const onNuevo = vi.fn()
+    await pintar({ onNuevo })
+    expect(host.textContent).toContain('0 / 2 conceptos · 0 / 1 pregunta')
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Puedes seguir con el material publicado')
+    expect(boton('Volver a intentar')).toBeDefined()
+    await act(async () => { boton('Empezar lo nuevo').click() })
+    expect(onNuevo.mock.calls[0][0].conceptIds).toEqual(['C1', 'C2'])
+    expect(onNuevo.mock.calls[0][0].preguntas).toEqual([{ id: 'Q1', revision: 'r1' }])
   })
 })

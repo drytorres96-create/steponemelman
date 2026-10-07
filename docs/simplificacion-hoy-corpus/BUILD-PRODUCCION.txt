@@ -1,0 +1,35 @@
+
+> steponemelman@1.31.0 build
+> tsc -b && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 193 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                          1.23 kB │ gzip:   0.61 kB
+dist/assets/Ajustes-BQ3Opmwx.css         0.43 kB │ gzip:   0.26 kB
+dist/assets/NbmePlayer-DjDqH64E.css      2.59 kB │ gzip:   0.78 kB
+dist/assets/nbme-BOLMhFUY.css           10.46 kB │ gzip:   2.59 kB
+dist/assets/App-nYHucDYa.css            13.29 kB │ gzip:   2.79 kB
+dist/assets/index-BHyxqepI.css         178.21 kB │ gzip:  36.26 kB
+dist/assets/PausaDeBloque-BLcZAfFk.js    0.41 kB │ gzip:   0.28 kB
+dist/assets/meta-DbRGvTcr.js             2.36 kB │ gzip:   1.24 kB
+dist/assets/PielEstudio-DGFw4Urj.js      3.05 kB │ gzip:   1.40 kB
+dist/assets/RecuperarMeta-CA-ytm89.js    6.83 kB │ gzip:   2.88 kB
+dist/assets/SesionCajas-Bshxm-Bs.js      8.17 kB │ gzip:   3.21 kB
+dist/assets/SesionMixta-B8I5BgaG.js      9.00 kB │ gzip:   3.56 kB
+dist/assets/NbmeLibrary-Cz52-Lna.js     14.04 kB │ gzip:   4.48 kB
+dist/assets/Ajustes-BlBOYnEn.js         18.18 kB │ gzip:   6.47 kB
+dist/assets/Modulos-D8yWg2ax.js         19.12 kB │ gzip:   6.16 kB
+dist/assets/Progreso-CI0Im0vH.js        22.87 kB │ gzip:   7.76 kB
+dist/assets/NbmePlayer-DIPNHl6q.js      50.83 kB │ gzip:  16.63 kB
+dist/assets/Reproductor-fGBGjs-1.js     58.46 kB │ gzip:  17.55 kB
+dist/assets/App-DFhcBEcF.js             70.09 kB │ gzip:  24.53 kB
+dist/assets/index-BQ-SsESM.js          546.99 kB │ gzip: 157.90 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.66s

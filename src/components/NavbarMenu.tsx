@@ -10,11 +10,9 @@ type Props = {
   onSignOut: () => void | Promise<void>
 }
 const DESCRIPTIONS: Record<string, string> = {
-  modulos: 'Conceptos, preguntas y viñetas.',
+  modulos: 'Conceptos y preguntas.',
   progreso: 'Una mirada a lo que has aprendido.',
   ajustes: 'Preferencias y datos guardados.',
-  auditoria: 'Estado y revisión del contenido.',
-  inicio: 'Tu planificación de siempre.',
 }
 const PHOTOS: Record<string, string> = {
   modulos: '/images/cinematic/ribbons-mobile.webp',

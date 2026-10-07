@@ -6,8 +6,7 @@ import { NavbarMenu } from './NavbarMenu'
 
 const items = [
   { id: 'modulos', txt: 'Biblioteca' }, { id: 'progreso', txt: 'Progreso' },
-  { id: 'ajustes', txt: 'Ajustes y respaldo' }, { id: 'auditoria', txt: 'Calidad del material' },
-  { id: 'inicio', txt: 'Plan diario clásico' },
+  { id: 'ajustes', txt: 'Ajustes y respaldo' },
 ] as const
 let host: HTMLDivElement, root: Root, outside: HTMLButtonElement
 let fine: boolean, visibility: DocumentVisibilityState

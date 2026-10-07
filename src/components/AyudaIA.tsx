@@ -5,6 +5,7 @@ import type { PresentacionIA } from '../lib/contexto-ia'
 import { versionPregunta } from '../screens/sesion'
 import type { CoachAnswer } from '../server/worker'
 import { referenciaPagina } from '../lib/fuente'
+import { referenciaDocente } from '../lib/fuente-docente'
 
 export function AyudaIA({ concepto, respuesta, preguntaId, indice, ruta, reintento, versionFormato = 2 }: {
   concepto: Concepto; respuesta: string; preguntaId: string; indice: number; ruta: string; reintento: boolean
@@ -37,7 +38,10 @@ export function AyudaIA({ concepto, respuesta, preguntaId, indice, ruta, reinten
       <h3>Una explicación más</h3>
       <p><b>Diferencia clave:</b> {answer.diferencia}</p><p>{answer.explicacion}</p><p><b>Para recordar:</b> {answer.recordar}</p>
       <details><summary>Fragmento utilizado</summary><blockquote>{answer.evidencia}</blockquote>
-        <p className="mini">{concepto.source.doc_title} · {referenciaPagina(concepto.source)}</p></details>
+        <p className="mini">{concepto.revision_editorial ? referenciaDocente(concepto).title
+          : `${concepto.source.doc_title} · ${referenciaPagina(concepto.source)}`}</p>
+        {concepto.revision_editorial?.fuentes.map(f => <p className="mini" key={f.url}>
+          <a href={f.url} target="_blank" rel="noreferrer">{f.titulo}</a></p>)}</details>
       <p className="mini">Ayuda generada por IA; puede equivocarse. Tu calificación y tu dominio no cambian por leerla.</p>
     </div>}
     {!answer && <p className="mini">Opcional · usa el concepto y tu respuesta · sale del presupuesto gratuito del día, que se renueva a las 00:00 UTC.</p>}

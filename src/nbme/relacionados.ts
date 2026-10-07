@@ -1,4 +1,5 @@
 import type { Concepto } from '../schema/concept'
+import { fragmentoDocente } from '../lib/fuente-docente'
 import type { NbmeCatalog, NbmeConceptLink, NbmeQuestion } from './types'
 
 export interface ConceptoRelacionadoNbme {
@@ -138,7 +139,7 @@ export function recomendarConceptosNbme({ pregunta, catalogo, conceptos, limite 
   for (const p of anclas) if (/^(?:alpha|beta)[1-3]$/.test(p)) especificos.add(p)
 
   const documentos = [...existentes.values()].map(c => ({ c, principal: terminos(textoPrincipal(c)),
-    contenido: terminos([textoPrincipal(c), c.explicacion, c.source.fragment].join(' ')),
+    contenido: terminos([textoPrincipal(c), c.explicacion, fragmentoDocente(c)].join(' ')),
     tema: terminos([c.clasificacion.tema, c.clasificacion.subtema].join(' ')) }))
   const frecuencia = new Map<string, number>()
   for (const d of documentos) for (const p of d.contenido) frecuencia.set(p, (frecuencia.get(p) ?? 0) + 1)

@@ -147,7 +147,7 @@ function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId }: Props &
       continuacion={{ valor: guardada?.continuacion ?? null, guardar: guardarContinuacion }} unaVuelta apoyoPrevio
       etiquetaSalida="Volver a la pregunta original" onSalir={() => void volver('original')} onTramoCompleto={terminarRepaso} />
       : modo === 'terminado' ? <div className="tarjeta pila">
-        <h2 ref={titulo} tabIndex={-1}>Repaso terminado</h2><p>Los conceptos presentados cuentan como vistos. Tus respuestas se guardaron en el progreso de Melman.</p>
+        <h2 ref={titulo} tabIndex={-1}>Repaso terminado</h2>
         <div className="recuperacion-acciones"><button className="btn principal" disabled={volviendo} onClick={() => void volver('original')}>Volver a la pregunta original</button>
           <button className="btn" disabled={volviendo} onClick={() => void volver('siguiente')}>Ir a la siguiente pregunta</button></div>
       </div> : <>

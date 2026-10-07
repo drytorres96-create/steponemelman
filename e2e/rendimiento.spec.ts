@@ -16,7 +16,7 @@ test('navegar no acumula fondos animados invisibles y estudiar retira el paisaje
   await page.clock.install({ time: new Date('2026-09-28T07:30:00-04:00') })
   await page.goto('/?escena=abierto')
   await expect(page.locator('.anillo-doble')).toBeVisible()
-  for (const view of ['modulos', 'auditoria', 'ajustes', 'inicio', 'hoy']) {
+  for (const view of ['modulos', 'progreso', 'ajustes', 'hoy']) {
     await page.evaluate(view => { location.hash = view }, view)
     const fondo = page.locator('.cinematic-backdrop')
     await expect.poll(() => fondo.locator('.cine-escena').count()).toBeLessThanOrEqual(2)

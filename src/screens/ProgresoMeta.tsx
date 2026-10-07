@@ -98,7 +98,7 @@ export function ProgresoMeta({ conceptos, conceptIds, ...acciones }: AccionesRec
     <p className="mini">Dominio demostrado total: {aprendizaje.dominioDemostrado} conceptos. Mantenimiento: {aprendizaje.mantenimientoAlDia} al día · {aprendizaje.mantenimientoPendiente} pendientes de repaso{aprendizaje.mantenimientoPorComprobar > 0 && <> · {aprendizaje.mantenimientoPorComprobar} por comprobar</>}.</p>
     {catalogo ? <Serie titulo="Preguntas NBME respondidas" serie={r.preguntas} fin={fin} />
       : <p className="mini" role="status">{nbme.error ? 'Las preguntas NBME no están disponibles ahora mismo.' : 'Cargando las preguntas NBME…'}</p>}
-    {proyeccionPendiente && <p className="mini">La proyección sale el {diaYMes(fechaDelDia(DIAS_PARA_PROYECTAR + 1))}: antes no hay ritmo que proyectar.</p>}
+    {proyeccionPendiente && <p className="mini">La proyección sale el {diaYMes(fechaDelDia(DIAS_PARA_PROYECTAR + 1))}.</p>}
 
     <details className="hoy-desplegable" onToggle={e => setRecuperacionAbierta(e.currentTarget.open)}>
       <summary>Ponerme al día con la meta</summary>
@@ -120,23 +120,5 @@ export function ProgresoMeta({ conceptos, conceptIds, ...acciones }: AccionesRec
       </table>
     </div>
 
-    <details className="hoy-desplegable"><summary>Cómo avanzan las líneas y el dominio</summary><div className="hoy-desplegable-cuerpo pila">
-      <p className="mini">La marca indica lo previsto al empezar el día de estudio, que cambia a las 03:00 de Nueva York.
-        Sigue los techos de Hoy: viernes libre y doble el fin de semana. En conceptos deja una semana como margen de planificación;
-        el dominio depende de la evidencia, no de esperar una semana.</p>
-      <p className="mini">Cada concepto conserva un solo historial, entres por Hoy, la meta o una pregunta NBME.
-        Verlo aumenta la cobertura; responderlo registra práctica. Para dominarlo necesitas {estado.criterios.recuperaciones} aciertos independientes
-        en {estado.criterios.sesiones} sesiones y al menos {estado.criterios.separacionHoras} horas de separación
-        {estado.criterios.exigirRecuperacionActiva && ', con recuerdo sin alternativas o aplicación'}.
-        Las respuestas con pistas, fuente o explicación previa no acreditan independencia.
-        {estado.criterios.ventanaConfusionDias > 0 && <> Una confusión de conceptos bloquea la acreditación durante {estado.criterios.ventanaConfusionDias} días.</>}</p>
-      <p className="mini">Cuenta el dominio válido acreditado por primera vez desde el {inicio}. Repetir un concepto no lo suma de nuevo.
-        Un repaso vencido cambia el mantenimiento y conserva la evidencia; una confusión reciente puede reducir el dominio vigente.
-        Al vencer su bloqueo temporal, la evidencia suficiente vuelve a ser válida, sin añadir respuestas ni inventar una primera acreditación.
-        Cambiar los criterios o el material disponible también puede cambiar la cifra. Una pregunta NBME cuenta una vez, al responderla por primera vez,
-        aunque sea incorrecta. Corregirla o borrar su sesión conserva ese progreso.</p>
-      <p className="mini">La proyección usa la última semana completa y aparece después de dos semanas; es una estimación de ritmo.
-        La distancia exacta se muestra incluso dentro del margen de planificación. Ponerte al día respeta los techos de Hoy y los intervalos de repaso.</p>
-    </div></details>
   </section>
 }

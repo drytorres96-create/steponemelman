@@ -1,0 +1,28 @@
+vite v6.4.3 building for production...
+transforming...
+✓ 153 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../hoy-faq-qa-antes/index.html                          0.43 kB │ gzip:   0.29 kB
+../../../hoy-faq-qa-antes/assets/Vinetas-CDjnbw4M.css         0.98 kB │ gzip:   0.45 kB
+../../../hoy-faq-qa-antes/assets/NbmePlayer-DjDqH64E.css      2.59 kB │ gzip:   0.78 kB
+../../../hoy-faq-qa-antes/assets/nbme-DgTJILPg.css           10.49 kB │ gzip:   2.60 kB
+../../../hoy-faq-qa-antes/assets/index-BXaAABPU.css         189.05 kB │ gzip:  37.85 kB
+../../../hoy-faq-qa-antes/assets/PausaDeBloque-oP3-YOLi.js    0.41 kB │ gzip:   0.28 kB
+../../../hoy-faq-qa-antes/assets/Cronometro-BgMdjZDs.js       1.25 kB │ gzip:   0.63 kB
+../../../hoy-faq-qa-antes/assets/SelectorCarga-BqyB-qS2.js    1.75 kB │ gzip:   0.78 kB
+../../../hoy-faq-qa-antes/assets/PielEstudio-DblsE0Rd.js      1.81 kB │ gzip:   0.91 kB
+../../../hoy-faq-qa-antes/assets/Ajustes-CF69YKOG.js          5.90 kB │ gzip:   2.53 kB
+../../../hoy-faq-qa-antes/assets/Inicio-7Bv0p6gU.js           6.19 kB │ gzip:   2.39 kB
+../../../hoy-faq-qa-antes/assets/RecuperarMeta-YwFogs9X.js    7.54 kB │ gzip:   3.16 kB
+../../../hoy-faq-qa-antes/assets/SesionCajas-DFZIWM2I.js      8.42 kB │ gzip:   3.32 kB
+../../../hoy-faq-qa-antes/assets/SesionMixta-Ve15BNnJ.js      9.21 kB │ gzip:   3.62 kB
+../../../hoy-faq-qa-antes/assets/Auditoria-Dn0Z2Ext.js        9.82 kB │ gzip:   3.47 kB
+../../../hoy-faq-qa-antes/assets/Vinetas-DKSnMRtD.js         12.57 kB │ gzip:   4.53 kB
+../../../hoy-faq-qa-antes/assets/NbmeLibrary-1xs83Ggy.js     14.11 kB │ gzip:   4.50 kB
+../../../hoy-faq-qa-antes/assets/Modulos-CzNpPErT.js         17.78 kB │ gzip:   5.82 kB
+../../../hoy-faq-qa-antes/assets/Progreso-Dcyqat_B.js        29.11 kB │ gzip:  10.00 kB
+../../../hoy-faq-qa-antes/assets/NbmePlayer-NFGHd1w4.js      52.79 kB │ gzip:  17.28 kB
+../../../hoy-faq-qa-antes/assets/Reproductor-1Qy0mef1.js     60.26 kB │ gzip:  18.14 kB
+../../../hoy-faq-qa-antes/assets/index-Bzz858u_.js          369.27 kB │ gzip: 117.39 kB
+✓ built in 2.69s

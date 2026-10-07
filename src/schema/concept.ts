@@ -41,7 +41,10 @@ export const ConceptoZ = z.object({
   concept_id: z.string().min(3),
   variantes: z.array(VarianteZ).optional(),
   variante_id: z.string().optional(),
-  revision_editorial: z.object({ nota: z.string(), fuentes: z.array(z.object({ titulo: z.string(), url: z.string().url() })) }).optional(),
+  revision_editorial: z.object({
+    nota: z.string(), fuentes: z.array(z.object({ titulo: z.string(), url: z.string().url() })),
+    fundamento: z.object({ texto: z.string().min(15).max(1600), revision: z.string().regex(/^\d+\.\d+\.\d+$/) }).optional(),
+  }).optional(),
   source: z.object({
     doc: z.string(), doc_title: z.string(), page: z.number().int().positive(),
     pdf_page: z.number().int().positive().optional(),
