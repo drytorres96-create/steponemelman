@@ -114,7 +114,7 @@ export function NavbarMenu({ active, items, onNavigate, onSignOut }: Props) {
     if (closing.current !== null) window.clearTimeout(closing.current)
     closing.current = window.setTimeout(() => { closing.current = null; close() }, 180)
   }
-  const choose = (id: string) => { close(); onNavigate(id) }
+  const choose = (id: string) => { close(true); onNavigate(id) }
   const featured = items.filter(item => item.id in PHOTOS)
   const utilities = items.filter(item => !(item.id in PHOTOS))
 
@@ -165,7 +165,7 @@ export function NavbarMenu({ active, items, onNavigate, onSignOut }: Props) {
         </button>)}
       </div>
       <div className="navbar-menu-footer"><span>Step One · Melman</span>
-        <button type="button" className="navbar-menu-exit" aria-label="Salir" onClick={() => { close(); void onSignOut() }}>Salir</button>
+        <button type="button" className="navbar-menu-exit" aria-label="Salir" onClick={() => { close(true); void onSignOut() }}>Salir</button>
       </div>
     </div>
   </details>
