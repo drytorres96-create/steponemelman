@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Anillo, AnilloDoble, type SegmentoAnillo } from '../components/comunes'
 import { ScenePhoto } from '../components/Editorial'
+import { SynapseHeading } from '../components/SynapseHeading'
 import { useAuth } from '../auth/AuthProvider'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
@@ -252,7 +253,7 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar }: {
       </div>
       <div className="semana-heading-copy">
         <p className="editorial-eyebrow">{fecha}</p>
-        <h1>Hoy</h1>
+        <h1><SynapseHeading text="Hoy" /></h1>
         <p className="hoy-tema">{rotuloTema(tema, plan)}</p>
         <p className="mini hoy-leyenda">Dentro, trabajo realizado hoy. Fuera, {anillo.leyenda}.</p>
       </div>

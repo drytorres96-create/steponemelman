@@ -10,5 +10,6 @@ import '@app/studio.css'
 import '@app/hoy.css'
 import '@app/piel-estudio.css'
 import '@app/premium.css'
+import '@app/synapse.css'
 
 createRoot(document.getElementById('root')!).render(<Resguardo alFallar={error => <FalloGeneral error={error} />}><NbmeProvider><App /></NbmeProvider></Resguardo>)

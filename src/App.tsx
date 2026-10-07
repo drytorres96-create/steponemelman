@@ -255,7 +255,7 @@ export default function App() {
   if (!indice) return <div className="vacio" style={{ paddingTop: 120 }}><p>{errorCarga ?? 'No se pudo cargar el material de estudio.'}</p><button className="btn" onClick={() => location.reload()}>Volver a intentar</button></div>
 
   return (
-    <div className={`app editorial-app${enConcentracion ? ' study-focus session-focus' : ''}`} data-app-version={APP_VERSION} data-view={vista}>
+    <div className={`app editorial-app${enConcentracion ? ' study-focus session-focus' : ' synapse-workspace'}`} data-app-version={APP_VERSION} data-view={vista}>
       {!enConcentracion && <CinematicBackdrop scene={SCENES[vista].fondo} />}
       <a className="saltar-contenido" href="#contenido" onClick={e => { e.preventDefault(); contenido.current?.focus() }}>Saltar al contenido</a>
       <header className="barra">
@@ -272,7 +272,12 @@ export default function App() {
             {!enConcentracion && <MedidorIA />}
             {sincronizacionVisible && <button className="btn pequeno fantasma" title="Comprobar y sincronizar el progreso"
               onClick={() => { void sincronizarTodo() }} aria-live="polite">{sincronizacionVisible}</button>}
-            {!enConcentracion && <details className="menu-cuenta study-secondary-nav"><summary>Biblioteca, progreso y cuenta</summary><div className="menu-cuenta-opciones">{SECUNDARIAS.map(n => <button className="btn pequeno fantasma" key={n.id} onClick={e => { ir(n.id); e.currentTarget.closest('details')?.removeAttribute('open') }}>{n.txt}</button>)}<button className="btn pequeno fantasma" onClick={async () => {
+            {!enConcentracion && <details className="menu-cuenta study-secondary-nav" onKeyDown={event => {
+              if (event.key !== 'Escape') return
+              event.preventDefault()
+              event.currentTarget.open = false
+              event.currentTarget.querySelector('summary')?.focus()
+            }}><summary><span className="synapse-menu-icon" aria-hidden="true"><span /><span /><span /></span><span>Biblioteca, progreso y cuenta</span></summary><div className="menu-cuenta-opciones">{SECUNDARIAS.map(n => <button className="btn pequeno fantasma" key={n.id} onClick={e => { ir(n.id); e.currentTarget.closest('details')?.removeAttribute('open') }}>{n.txt}</button>)}<button className="btn pequeno fantasma" onClick={async () => {
               const guardado = await sincronizarTodo()
               if (!guardado && !confirm('Puede haber cambios pendientes. Se conservarán en este navegador para esta cuenta. ¿Cerrar sesión?')) return
               try { await signOut() } catch { setError('No se pudo cerrar la sesión. Vuelve a intentarlo.') }

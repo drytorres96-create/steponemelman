@@ -1,0 +1,142 @@
+/* Diseño web · SynapseX adaptado al espacio de estudio de Melman.
+   Sólo el entorno: las sesiones mantienen su piel, orden y controles. */
+.editorial-app.synapse-workspace {
+  --synapse-glass: linear-gradient(145deg, rgba(38, 53, 49, .94), rgba(12, 21, 21, .97));
+  --synapse-edge: rgba(219, 238, 228, .2);
+}
+
+/* La cámara responde al desplazamiento; el contenido nunca se desvanece. */
+.synapse-workspace .cinematic-backdrop { --cine-foto: .48; }
+.synapse-workspace .cine-escena {
+  transform: translateY(var(--synapse-scroll-y, 0px)) scale(var(--synapse-scroll-scale, 1));
+  transform-origin: center top;
+}
+.synapse-workspace .cine-escena img { animation-name: none; transform: scale(1.05); }
+.synapse-workspace :is(.cine-haz, .cine-niebla, .cine-halo) { animation: none; }
+.synapse-workspace .cinematic-backdrop::after {
+  content: ''; position: absolute; inset: 0; width: auto; height: auto;
+  background: radial-gradient(circle, rgba(224, 242, 232, .15) .7px, transparent 1px) 0 0 / 24px 24px;
+  opacity: .3; pointer-events: none;
+}
+.synapse-workspace .cine-bottom-blur {
+  position: absolute; inset: auto 0 0; height: 150px; pointer-events: none;
+  background: linear-gradient(transparent, var(--bg));
+  -webkit-mask-image: linear-gradient(transparent, #000 55%);
+  mask-image: linear-gradient(transparent, #000 55%);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+}
+
+/* Cápsulas de cristal independientes con los mismos destinos y etiquetas. */
+.editorial-app.synapse-workspace > .barra { padding-top: max(14px, env(safe-area-inset-top, 0px)); }
+.editorial-app.synapse-workspace .barra-in {
+  padding: 0; min-height: 52px; border-color: transparent; border-radius: 0;
+  background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.synapse-workspace .editorial-brand {
+  min-height: 52px; padding: 8px 15px; border: 1px solid var(--synapse-edge);
+  border-radius: 15px; background: rgba(29, 43, 40, .94);
+}
+.synapse-workspace .brand-mark { width: 29px; height: 29px; border: 0; background: none; box-shadow: none; }
+.synapse-workspace .brand-wordmark { font-size: 17px; }
+.editorial-app.synapse-workspace .nav button { border-radius: 999px; padding-inline: 22px; min-height: 48px; }
+.editorial-app.synapse-workspace .nav button[aria-current='page'] {
+  background: var(--acento); color: var(--action-text); box-shadow: inset 0 1px 0 #ffffff59;
+}
+.synapse-workspace .menu-cuenta > summary {
+  display: flex; align-items: center; gap: 11px; min-height: 48px; padding: 10px 16px;
+  border: 1px solid var(--synapse-edge); border-radius: 15px;
+  background: rgba(29, 43, 40, .94); color: var(--texto); list-style: none;
+  transition: background-color .18s, border-color .18s;
+}
+.synapse-workspace .menu-cuenta > summary::-webkit-details-marker { display: none; }
+.synapse-workspace .menu-cuenta > summary::after { content: none; }
+.synapse-workspace .menu-cuenta[open] > summary,
+.synapse-workspace .menu-cuenta > summary:hover { background: #263c34; border-color: var(--linea-interactiva); }
+.synapse-menu-icon { position: relative; width: 17px; height: 14px; flex: none; }
+.synapse-menu-icon span {
+  position: absolute; left: 0; width: 17px; height: 1.5px; border-radius: 2px; background: currentColor;
+  transition: transform .22s ease, opacity .16s;
+}
+.synapse-menu-icon span:nth-child(1) { top: 1px; }
+.synapse-menu-icon span:nth-child(2) { top: 6px; }
+.synapse-menu-icon span:nth-child(3) { top: 11px; }
+.menu-cuenta[open] .synapse-menu-icon span:nth-child(1) { transform: translateY(5px) rotate(45deg); }
+.menu-cuenta[open] .synapse-menu-icon span:nth-child(2) { opacity: 0; }
+.menu-cuenta[open] .synapse-menu-icon span:nth-child(3) { transform: translateY(-5px) rotate(-45deg); }
+.editorial-app.synapse-workspace .menu-cuenta-opciones {
+  padding: 8px; margin-top: 8px; border-radius: 18px; border: 1px solid var(--synapse-edge);
+  background: #14221e; box-shadow: 0 16px 40px #0006;
+}
+.synapse-workspace .menu-cuenta-opciones .btn { justify-content: flex-start; }
+
+/* Tipografía técnica en títulos y cifras; la lectura conserva su tipografía. */
+.synapse-workspace :is(.editorial-eyebrow, .rotulo) { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; }
+.editorial-app.synapse-workspace :is(.screen-heading, .editorial-hero, .hoy-cabecera) {
+  border: 1px solid var(--synapse-edge); border-radius: 26px;
+  background: linear-gradient(125deg, rgba(12, 23, 21, .96), rgba(15, 25, 25, .84));
+  box-shadow: inset 0 1px 0 #ffffff0d, 0 18px 40px -28px #0009;
+}
+.editorial-app.synapse-workspace :is(.screen-heading, .editorial-hero, .hoy-cabecera) h1 {
+  font-family: var(--mono); font-weight: 400; letter-spacing: -.055em;
+}
+.synapse-workspace .hoy-focus .panel-escena { opacity: .16; }
+.synapse-workspace .hoy-anillo { filter: drop-shadow(0 0 18px #cae5d811); }
+.editorial-app.synapse-workspace .hoy-next-block {
+  border: 1px solid var(--linea-interactiva); border-radius: 24px;
+  background: var(--synapse-glass); box-shadow: inset 0 1px 0 #ffffff12, 0 16px 40px -30px #000b;
+}
+.synapse-workspace .hoy-objective { background: rgba(8, 17, 16, .8); }
+.editorial-app.synapse-workspace .btn.principal {
+  border-radius: 999px; background: var(--acento); color: var(--action-text);
+  box-shadow: inset 0 1px 0 #ffffff75, 0 4px 14px #0002;
+}
+.editorial-app.synapse-workspace .btn.principal:hover:not(:disabled) { background: #e2f1e8; border-color: #e2f1e8; }
+.editorial-app.synapse-workspace :is(.hoy-bloque, .premium-progress-card) {
+  border: 1px solid var(--synapse-edge); border-radius: 24px; background: var(--synapse-glass);
+  box-shadow: inset 0 0 0 5px #d9eee507, inset 0 1px 0 #ffffff12;
+}
+.synapse-workspace .premium-progress-card { display: flex; flex-direction: column; padding: 26px; }
+.synapse-workspace .premium-progress-card h2 { font-family: var(--mono); font-size: 12px; line-height: 1.65; letter-spacing: .04em; text-transform: uppercase; }
+.synapse-workspace .premium-progress-card > strong { font-family: var(--mono); font-size: clamp(32px, 3.5vw, 46px); font-weight: 400; letter-spacing: -.06em; margin: 16px 0 20px; }
+.synapse-workspace .premium-progress-card > .mini { margin: auto 0 0; padding-top: 16px; border-top: 1px solid var(--linea); }
+.synapse-workspace .hoy-cuenta { font-family: var(--mono); font-size: 15px; line-height: 1.65; }
+.synapse-workspace .hoy-desplegable { background: rgba(19, 32, 28, .97); border-color: var(--synapse-edge); border-radius: 17px; }
+.synapse-workspace .hoy-desplegable[open] { background: #101e19; }
+
+/* Una entrada breve; los controles siguen visibles durante la carga. */
+@media (prefers-reduced-motion: no-preference) {
+  .synapse-workspace :is(.hoy-cabecera, .screen-heading, .editorial-hero) { animation: synapse-arrive .5s ease-out; }
+  .synapse-workspace .premium-progress-card { animation: synapse-arrive .55s ease-out; }
+  .synapse-workspace .premium-progress-card:nth-child(2) { animation-duration: .65s; }
+  .synapse-workspace .premium-progress-card:nth-child(3) { animation-duration: .75s; }
+}
+@keyframes synapse-arrive { from { opacity: .82; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
+
+@supports (backdrop-filter: blur(12px)) {
+  .synapse-workspace :is(.editorial-brand, .menu-cuenta > summary) { background: rgba(35, 50, 43, .72); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+}
+@media (max-width: 650px) {
+  .editorial-app.synapse-workspace > .barra { padding-inline: max(12px, env(safe-area-inset-left, 0px)) max(12px, env(safe-area-inset-right, 0px)); }
+  .editorial-app.synapse-workspace .barra-in { gap: 10px 8px; }
+  .synapse-workspace .editorial-brand { padding: 7px 9px; gap: 6px; }
+  .synapse-workspace .brand-wordmark { font-size: 15px; }
+  .synapse-workspace .brand-wordmark > span { font-size: 9px; }
+  .synapse-workspace .menu-cuenta > summary { padding: 10px; gap: 8px; font-size: 12px; }
+  .editorial-app.synapse-workspace .nav { border: 0; padding-top: 0; }
+  .editorial-app.synapse-workspace .nav button { justify-content: center; }
+  .editorial-app.synapse-workspace :is(.hoy-focus .hoy-cabecera, .hoy-next-block, .hoy-bloque, .screen-heading) { border-radius: 20px; }
+  .synapse-workspace .premium-progress-card { padding: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .synapse-workspace .cine-escena { transform: none; }
+  .synapse-workspace *, .synapse-workspace *::before, .synapse-workspace *::after { animation: none !important; transition: none !important; }
+}
+@media (max-width: 380px) {
+  .editorial-app.synapse-workspace .barra-in { grid-template-columns: 124px minmax(0, 1fr); }
+  .synapse-workspace .barra-fin, .synapse-workspace .menu-cuenta { width: 100%; }
+  .synapse-workspace .menu-cuenta > summary { white-space: normal; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .synapse-workspace :is(.editorial-brand, .menu-cuenta > summary, .hoy-cabecera, .screen-heading, .editorial-hero, .hoy-next-block, .hoy-bloque, .premium-progress-card) { background: #14261f; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .synapse-workspace .cine-bottom-blur { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
