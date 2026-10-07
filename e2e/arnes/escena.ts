@@ -3,6 +3,7 @@ import { CRITERIOS_POR_DEFECTO } from '@app/srs/mastery'
 import { fechaISO, lunesDe } from '@app/lib/tiempo'
 import { inicioDelDia } from '@app/lib/dia'
 import type { Intento } from '@app/srs/tipos'
+import { IDS_APLICACION } from './aplicacion-fixture'
 
 /**
  * Escenas sintéticas para las pruebas de navegador: `?escena=abierto` (un día a medias),
@@ -10,6 +11,7 @@ import type { Intento } from '@app/srs/tipos'
  * Ningún dato es clínico: ids inventados y textos de demostración.
  */
 const escena = new URLSearchParams(location.search).get('escena') ?? 'abierto'
+export const conAplicacion = escena === 'aplicacion'
 const ahora = Date.now()
 const D0 = inicioDelDia(ahora)
 const hoy = (min: number) => D0 + 60 * 60_000 + min * 60_000
@@ -27,7 +29,7 @@ const ids = (p: string, k: number) => Array.from({ length: k }, (_, i) => `${p}$
 const semana = ids('C', 14)
 const vistosHoy = escena === 'cerrado' ? 10 : escena === 'vacio' ? 0 : 3
 export const progreso: Record<string, ReturnType<typeof reconstruirProgreso>> = {}
-if (escena !== 'vacio' && escena !== 'huerfanos') {
+if (escena !== 'vacio' && escena !== 'huerfanos' && !conAplicacion) {
   semana.slice(0, vistosHoy).forEach((id, i) => { progreso[id] = reconstruirProgreso(id, [intento(hoy(i))], CRITERIOS_POR_DEFECTO) })
   // Cuatro conceptos de otros días en la escalera y uno ya cerrado.
   progreso.X1 = reconstruirProgreso('X1', [fallo(haceDias(3))], CRITERIOS_POR_DEFECTO)
@@ -65,17 +67,25 @@ if (escena === 'huerfanos') {
   // Only the second ID is published. The first remains in the saved history.
   for (const id of ['QA-OBSOLETO', 'QA-VALIDO']) progreso[id] = reconstruirProgreso(id, [fallo(haceDias(3))], CRITERIOS_POR_DEFECTO)
 }
-export const conceptos = escena === 'huerfanos' ? ['QA-VALIDO'] : [...semana, 'X1', 'X2', 'X3', ...conceptosMeta, ...conceptosMuchas]
+if (conAplicacion) {
+  // One base MCQ and one failed case: resolved history, but no independent active success.
+  progreso['QA-APLICACION'] = reconstruirProgreso('QA-APLICACION', [
+    intento(haceDias(7), { interaccion: 'opcion_multiple', tipo_evidencia: 'discriminacion', recuperacion_activa: false }),
+    intento(haceDias(3), { interaccion: 'caso_clinico', tipo_evidencia: 'aplicacion', recuperacion_activa: false,
+      variante_id: 'QA-APLICACION-caso-1', resultado: 'incorrecta', tipo_error: 'interpretacion_incorrecta', calificacion: 1 }),
+  ], CRITERIOS_POR_DEFECTO)
+}
+export const conceptos = conAplicacion ? IDS_APLICACION : escena === 'huerfanos' ? ['QA-VALIDO'] : [...semana, 'X1', 'X2', 'X3', ...conceptosMeta, ...conceptosMuchas]
 const preguntas = ids('Q', 5)
 export const respuestasBase = escena === 'cerrado'
   ? preguntas.map((q, i) => ({ id: `n${i}:0`, sessionId: `n${i}`, position: 0, questionId: q, revision: 'r1', optionId: 'A', correct: i !== 1, submittedAt: hoy(40 + i), reviewedAt: hoy(40 + i), durationMs: 1000 }))
-  : escena === 'vacio' || escena === 'huerfanos' ? [] : [{ id: 'm1:0', sessionId: 'm1', position: 0, questionId: 'Q9', revision: 'r1', optionId: 'B', correct: false, submittedAt: haceDias(1), reviewedAt: haceDias(1), durationMs: 1000 }]
+  : escena === 'vacio' || escena === 'huerfanos' || conAplicacion ? [] : [{ id: 'm1:0', sessionId: 'm1', position: 0, questionId: 'Q9', revision: 'r1', optionId: 'B', correct: false, submittedAt: haceDias(1), reviewedAt: haceDias(1), durationMs: 1000 }]
 export const catalogoBase = [...preguntas, 'Q9'].map(id => ({ id, revision: 'r1', form: '27', section: 1, item: 1, page: 1, systems: [], disciplines: [], topic: 'T', objective: null, status: 'ready', reasons: [], figureRequired: false, conceptLinks: [] }))
 const lunes = fechaISO(lunesDe(D0))
 const sesion = (id: string, dia: number, cs: string[], qs: string[]) => ({ id, semana: 'S4', semanaInicio: lunes, dia, orden: 1, titulo: id, subtitulo: null,
   guion: [...cs.map(c => ({ kind: 'concepto', id: c })), ...qs.map(q => ({ kind: 'pregunta', id: q, revision: 'r1' }))],
   presupuestoMin: 30, estado: 'pendiente', cursor: 0, nbmeSessionId: null, completadaEn: null })
-export const sesiones = escena === 'vacio' ? [] : [
+export const sesiones = conAplicacion ? [sesion('Gate protocol', 1, IDS_APLICACION, ['Q1'])] : escena === 'vacio' ? [] : [
   sesion('Renal 1/3', 1, semana.slice(0, 5), preguntas.slice(0, 2)),
   sesion('Renal 2/3', 2, semana.slice(5, 10), preguntas.slice(2, 4)),
   sesion('Renal 3/3', 3, semana.slice(10), preguntas.slice(4)),

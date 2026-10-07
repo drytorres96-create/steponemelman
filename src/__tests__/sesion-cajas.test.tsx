@@ -3,10 +3,11 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ESTADO_INICIAL } from '../store/model'
-import type { Concepto } from '../schema/concept'
+import { ConceptoZ, type Concepto } from '../schema/concept'
 import type { ItemCaja } from '../lib/cajas'
 import type { Intento } from '../srs/tipos'
 import { identificarPregunta } from '../screens/sesion'
+import { conceptoConAplicacion, intentoSintetico, progresoConIntentos } from './aplicacion-fixture'
 
 /**
  * El recorrido de las cajas no reescribe ningún reproductor: monta uno u otro por
@@ -23,6 +24,7 @@ const mock = vi.hoisted(() => {
     intento: { correct: true } as { correct: boolean },
     error: null as string | null,
     reproductor: vi.fn(),
+    colas: vi.fn(),
     jugador: vi.fn(),
     startSession: vi.fn(),
     resumeSession: vi.fn(),
@@ -58,6 +60,7 @@ vi.mock('../screens/Reproductor', () => ({ Reproductor: (props: {
   modoCaja: { reintento: boolean; avisoFallo: string }
 }) => {
   mock.reproductor({ id: props.cola.conceptos[0].concept_id, sessionId: props.cola.sessionId, ...props.modoCaja })
+  mock.colas(props.cola.conceptos)
   return <div><p>Reproductor de conceptos {props.cola.conceptos[0].concept_id}</p><button onClick={props.onTramoCompleto}>Terminar paso</button></div>
 } }))
 vi.mock('../nbme/NbmePlayer', () => ({ NbmePlayer: (props: { onPasoCompleto: () => void; avisoFallo?: string }) => {
@@ -69,7 +72,12 @@ import { SesionCajas } from '../screens/SesionCajas'
 import { ATRIBUTO_PIEL } from '../lib/piel-estudio'
 
 const item = (tipo: ItemCaja['tipo'], id: string): ItemCaja => ({ tipo, id, caja: 2, vence: 0, hecho: false })
-const concepto = (id: string) => ({ concept_id: id } as Concepto)
+const concepto = (id: string) => ({ ...ConceptoZ.parse({ concept_id: 'QA-TEMPLATE', objetivo: 'Identify a synthetic element',
+  source: { doc: 'QA', doc_title: 'Synthetic rules', page: 1, item_id: id, fragment: 'Alfa is the first synthetic element.' },
+  afirmacion: 'Alfa is the first synthetic element.', respuesta_canonica: 'Alfa', explicacion: 'Alfa is the first synthetic element.',
+  interaccion: { recomendada: 'recuperacion_libre' }, evaluacion: { pregunta: 'Name the first synthetic element.' },
+  pistas: ['One', 'Two', 'Three'], step: 'step1', calidad: { confianza: .9, estado: 'aprobado' },
+  clasificacion: { disciplina_primaria: 'Fisiología', sistema_primario: 'Renal', tema: 'Synthetic', tipo_conocimiento: 'Mecanismo', dificultad: 1 } }), concept_id: id })
 
 let host: HTMLDivElement
 let root: Root
@@ -140,6 +148,37 @@ async function terminarConcepto(resultado: 'correcta' | 'incorrecta') {
 }
 
 describe('recorrido de las cajas', () => {
+  it('fija la aplicación al crear las cajas y conserva esa pregunta en su corrección', async () => {
+    const c = conceptoConAplicacion('QA-GATE')
+    const p = progresoConIntentos(c.concept_id, [intentoSintetico({ variante_id: c.variantes![0].variant_id })])
+    mock.app.valor = { ...ESTADO_INICIAL, progreso: { [c.concept_id]: p } }
+    mock.cargarConceptos.mockResolvedValue(new Map([[c.concept_id, c]]))
+    await act(async () => root.render(<SesionCajas items={[item('concepto', c.concept_id)]} titulo="Cajas" onSalir={vi.fn()} />))
+    await esperar()
+    expect(mock.colas.mock.calls.at(-1)![0][0].variante_id).toBe(c.variantes![1].variant_id)
+    expect(mock.app.valor.reanudable).toMatchObject({ conceptIds: [c.concept_id], variantes: [c.variantes![1].variant_id] })
+    expect(mock.app.valor.progreso).toEqual({ [c.concept_id]: p })
+    await terminarConcepto('incorrecta')
+    expect(mock.reproductor.mock.calls.at(-1)![0].reintento).toBe(true)
+    expect(mock.colas.mock.calls.at(-1)![0][0].variante_id).toBe(c.variantes![1].variant_id)
+    expect(mock.app.valor.reanudable).toMatchObject({ variantes: [c.variantes![1].variant_id] })
+  })
+
+  it('una continuación de caja conserva explícitamente la base elegida antes', async () => {
+    const uuid = '00000000-0000-4000-8000-000000000001'
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(uuid)
+    const c = conceptoConAplicacion('QA-GATE')
+    const r = { versionFormato: 3, modulo: 'hoy:cajas:0', sesion: 'repaso', indice: 0, ts: 1,
+      sessionId: `${uuid}:0`, conceptIds: [c.concept_id], variantes: [null], cantidadInicial: 1 }
+    const progreso = { [c.concept_id]: progresoConIntentos(c.concept_id) }
+    mock.app.valor = { ...ESTADO_INICIAL, progreso, reanudable: r }
+    mock.cargarConceptos.mockResolvedValue(new Map([[c.concept_id, c]]))
+    await act(async () => root.render(<SesionCajas items={[item('concepto', c.concept_id)]} titulo="Cajas" onSalir={vi.fn()} />))
+    await esperar()
+    expect(mock.colas.mock.calls.at(-1)![0][0]).toBe(c)
+    expect(mock.app.valor.reanudable).toBe(r)
+    expect(mock.app.valor.progreso).toBe(progreso)
+  })
   it('omitir un concepto no disponible no llena la barra ni acredita una caja repasada', async () => {
     mock.cargarConceptos.mockResolvedValue(new Map([['B', concepto('B')]]))
     const progresoGuardado = { A: { concept_id: 'A', intentos: [{ resultado: 'incorrecta', ts: 1 }] } }

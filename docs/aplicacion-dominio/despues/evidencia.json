@@ -1,0 +1,62 @@
+{
+  "escena": "aplicacion",
+  "contenido": "Reglas inventadas de fichas y compuertas. Sin material clínico.",
+  "hora": "2026-10-05T11:30:00Z",
+  "url": "http://127.0.0.1:5319",
+  "bundle": "/assets/index-Bu-Dv-wC.js",
+  "capturas": [
+    {
+      "archivo": "caso-390.png",
+      "width": 390,
+      "pregunta": "A simulated operator has a blue token and an amber counter below its threshold. Which gate action follows from the demonstration rule?"
+    },
+    {
+      "archivo": "correccion-390.png",
+      "width": 390,
+      "pregunta": "A simulated operator has a blue token and an amber counter below its threshold. Which gate action follows from the demonstration rule?"
+    },
+    {
+      "archivo": "retoma-390.png",
+      "width": 390,
+      "pregunta": "A simulated operator has a blue token and an amber counter below its threshold. Which gate action follows from the demonstration rule?"
+    },
+    {
+      "archivo": "mcq-390.png",
+      "width": 390,
+      "pregunta": "In the demonstration protocol, which complete rule governs the blue token?"
+    },
+    {
+      "archivo": "caso-1280.png",
+      "width": 1280,
+      "pregunta": "A simulated operator has a blue token and an amber counter below its threshold. Which gate action follows from the demonstration rule?"
+    },
+    {
+      "archivo": "correccion-1280.png",
+      "width": 1280,
+      "pregunta": "A simulated operator has a blue token and an amber counter below its threshold. Which gate action follows from the demonstration rule?"
+    },
+    {
+      "archivo": "retoma-1280.png",
+      "width": 1280,
+      "pregunta": "A simulated operator has a blue token and an amber counter below its threshold. Which gate action follows from the demonstration rule?"
+    },
+    {
+      "archivo": "mcq-1280.png",
+      "width": 1280,
+      "pregunta": "In the demonstration protocol, which complete rule governs the blue token?"
+    }
+  ],
+  "fecha_validacion": "2026-10-07",
+  "fecha_simulada": "2026-10-05T11:30:00Z",
+  "version_fuente": "1.31.1, código congelado antes del commit final",
+  "sha256_imagenes": {
+    "caso-390.png": "c7415a5fbd02b69ab315fa3912936baa52452630b8fac829a3e31039e812b4e2",
+    "correccion-390.png": "7f0931f3f8f707312b2036ebd00c5fcd21db81e702c090f1156dab61638864b1",
+    "retoma-390.png": "ca8281e7118aeb6a17bfae488f79147a571ac3c0c63cbf164e518674bd3eb165",
+    "mcq-390.png": "d005cfda3889139a2a31d83313711667c472db178ec9450e06c45c1d7ed8994b",
+    "caso-1280.png": "bf4eb3d782e3e34339d8567b17cc449dae614fc721c7ea59e0aed5b94f0523b7",
+    "correccion-1280.png": "b68404881d38810705a90f7c9a54b86ab6ba959ca34a4974e5cee5b575a41c72",
+    "retoma-1280.png": "849463c55495731bb4d7fb67e047d3d650fe2b09b9d53afc37e3575ce9a45308",
+    "mcq-1280.png": "7e127cac180fe6653c8ac89074937dfea0786bb3d9940e20ad8291671d3c9844"
+  }
+}

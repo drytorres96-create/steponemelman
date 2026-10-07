@@ -3,8 +3,9 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ESTADO_INICIAL } from '../store/model'
-import type { Concepto } from '../schema/concept'
+import { ConceptoZ, type Concepto } from '../schema/concept'
 import type { SesionSemanal } from '../semana/tipos'
+import { conceptoConAplicacion, intentoSintetico, progresoConIntentos } from './aplicacion-fixture'
 
 /**
  * El orquestador no reescribe ningún reproductor: monta uno u otro según el paso
@@ -22,6 +23,7 @@ const mock = vi.hoisted(() => {
       estado.oyentes.forEach(o => o())
     },
     reproductor: vi.fn(),
+    colas: vi.fn(),
     jugadorPreguntas: vi.fn(),
     guardarAvance: vi.fn(),
     cargarConceptos: vi.fn(),
@@ -65,6 +67,7 @@ vi.mock('../data/corpus', () => ({ cargarConceptos: mock.cargarConceptos }))
 vi.mock('../semana/api', () => ({ guardarAvance: mock.guardarAvance }))
 vi.mock('../screens/Reproductor', () => ({ Reproductor: (props: { cola: { conceptos: Concepto[] }; indiceInicial: number; onTramoCompleto?: () => void }) => {
   mock.reproductor({ ids: props.cola.conceptos.map(c => c.concept_id), indiceInicial: props.indiceInicial })
+  mock.colas(props.cola.conceptos)
   return <div><p>Reproductor de conceptos</p><button onClick={props.onTramoCompleto}>Terminar tramo</button></div>
 } }))
 vi.mock('../nbme/NbmePlayer', () => ({ NbmePlayer: (props: { modoPaso?: boolean; onPasoCompleto?: () => void; avisoFallo?: string }) => {
@@ -75,7 +78,12 @@ vi.mock('../nbme/NbmePlayer', () => ({ NbmePlayer: (props: { modoPaso?: boolean;
 import { SesionMixta } from '../semana/SesionMixta'
 import { ATRIBUTO_PIEL } from '../lib/piel-estudio'
 
-const concepto = (id: string) => ({ concept_id: id } as Concepto)
+const concepto = (id: string) => ({ ...ConceptoZ.parse({ concept_id: 'QA-TEMPLATE', objetivo: 'Identify a synthetic element',
+  source: { doc: 'QA', doc_title: 'Synthetic rules', page: 1, item_id: id, fragment: 'Alfa is the first synthetic element.' },
+  afirmacion: 'Alfa is the first synthetic element.', respuesta_canonica: 'Alfa', explicacion: 'Alfa is the first synthetic element.',
+  interaccion: { recomendada: 'recuperacion_libre' }, evaluacion: { pregunta: 'Name the first synthetic element.' },
+  pistas: ['One', 'Two', 'Three'], step: 'step1', calidad: { confianza: .9, estado: 'aprobado' },
+  clasificacion: { disciplina_primaria: 'Fisiología', sistema_primario: 'Renal', tema: 'Synthetic', tipo_conocimiento: 'Mecanismo', dificultad: 1 } }), concept_id: id })
 const sesion: SesionSemanal = {
   id: 'semana-1', semana: 'S2', semanaInicio: '2026-09-14', dia: 3, orden: 1,
   titulo: 'Farmacología endocrina 1/4', subtitulo: 'Tiroides y suprarrenal',
@@ -113,6 +121,39 @@ const boton = (texto: string) => [...host.querySelectorAll('button')].find(b => 
 const avances = () => mock.guardarAvance.mock.calls.map(c => c[1] as Record<string, unknown>)
 
 describe('orquestador de la sesión mixta', () => {
+  it('elige y guarda una aplicación sólo al crear el tramo, sin cambiarla al responder', async () => {
+    const c = conceptoConAplicacion('QA-GATE')
+    const p = progresoConIntentos(c.concept_id, [intentoSintetico({ variante_id: c.variantes![0].variant_id })])
+    mock.estado.valor = { ...ESTADO_INICIAL, progreso: { [c.concept_id]: p } }
+    mock.cargarConceptos.mockResolvedValue(new Map([[c.concept_id, c]]))
+    const nueva = { ...sesion, guion: [{ kind: 'concepto' as const, id: c.concept_id }], nbmeSessionId: null }
+    await act(async () => root.render(<SesionMixta sesion={nueva} onSalir={vi.fn()} />))
+    expect(mock.colas.mock.calls.at(-1)![0][0]).toMatchObject({ concept_id: c.concept_id,
+      variante_id: c.variantes![1].variant_id, interaccion: { recomendada: 'caso_clinico' } })
+    expect(mock.estado.valor.reanudable).toMatchObject({ sessionId: sesion.id, indice: 0,
+      conceptIds: [c.concept_id], variantes: [c.variantes![1].variant_id] })
+    expect(mock.estado.valor.progreso).toEqual({ [c.concept_id]: p })
+    await act(async () => mock.editar(e => ({ ...e, progreso: { [c.concept_id]: progresoConIntentos(c.concept_id,
+      [...p.intentos, intentoSintetico({ variante_id: c.variantes![1].variant_id })]) } })))
+    expect(mock.colas.mock.calls.at(-1)![0][0].variante_id).toBe(c.variantes![1].variant_id)
+  })
+
+  it('restaura la base y posición guardadas aunque ahora sea elegible para una aplicación', async () => {
+    const c = conceptoConAplicacion('QA-GATE')
+    const breve = concepto('QA-SHORT')
+    const r = { versionFormato: 3, modulo: `semana:${sesion.id}`, sesion: 'repaso', indice: 1,
+      ts: 1, sessionId: sesion.id, conceptIds: [c.concept_id, breve.concept_id], variantes: [null, null], cantidadInicial: 2 }
+    const progreso = { [c.concept_id]: progresoConIntentos(c.concept_id) }
+    mock.estado.valor = { ...ESTADO_INICIAL, progreso, reanudable: r }
+    mock.cargarConceptos.mockResolvedValue(new Map([[c.concept_id, c], [breve.concept_id, breve]]))
+    await act(async () => root.render(<SesionMixta sesion={{ ...sesion, cursor: 1, nbmeSessionId: null,
+      guion: [c, breve].map(x => ({ kind: 'concepto', id: x.concept_id })) }} onSalir={vi.fn()} />))
+    expect(mock.colas.mock.calls.at(-1)![0][0]).toBe(c)
+    expect(mock.reproductor.mock.calls.at(-1)![0]).toEqual({ ids: [c.concept_id, breve.concept_id], indiceInicial: 1 })
+    expect(mock.estado.valor.reanudable).toBe(r)
+    expect(mock.estado.valor.progreso).toBe(progreso)
+  })
+
   it('recorre el guion montando un reproductor u otro y cierra la sesión al final', async () => {
     const salir = vi.fn()
     await act(async () => { root.render(<SesionMixta sesion={sesion} onSalir={salir} />) })

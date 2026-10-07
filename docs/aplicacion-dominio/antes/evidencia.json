@@ -1,0 +1,36 @@
+{
+  "fuente": "84d875998bcf29a3a01946ac4237152725d545fd",
+  "escena": "aplicacion",
+  "contenido": "Reglas inventadas de fichas y compuertas. Sin material clínico.",
+  "bundle": "/assets/index-BmjK-3WA.js",
+  "capturas": [
+    {
+      "archivo": "cajas-base-390.png",
+      "width": 390,
+      "pregunta": "In the demonstration protocol, which complete rule governs the blue token?"
+    },
+    {
+      "archivo": "retoma-base-390.png",
+      "width": 390,
+      "pregunta": "In the demonstration protocol, which complete rule governs the blue token?"
+    },
+    {
+      "archivo": "cajas-base-1280.png",
+      "width": 1280,
+      "pregunta": "In the demonstration protocol, which complete rule governs the blue token?"
+    },
+    {
+      "archivo": "retoma-base-1280.png",
+      "width": 1280,
+      "pregunta": "In the demonstration protocol, which complete rule governs the blue token?"
+    }
+  ],
+  "fecha_validacion": "2026-10-07",
+  "fecha_simulada": "2026-10-05T11:30:00Z",
+  "sha256_imagenes": {
+    "cajas-base-390.png": "409a64608dd29d29946ec96c0e3a57673a1773a1c50279a0adec6252ac34c97d",
+    "retoma-base-390.png": "d005cfda3889139a2a31d83313711667c472db178ec9450e06c45c1d7ed8994b",
+    "cajas-base-1280.png": "64d6b34dacd1887fab6f3eb30702d92a1c7d51c64048d2791098805534fe657c",
+    "retoma-base-1280.png": "7e127cac180fe6653c8ac89074937dfea0786bb3d9940e20ad8291671d3c9844"
+  }
+}

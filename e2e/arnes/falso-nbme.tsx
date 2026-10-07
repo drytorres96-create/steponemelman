@@ -1,7 +1,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { NbmeProvider as ProveedorReal, useNbme as useNbmeReal } from '@app/nbme/NbmeProvider'
 import { activateNbmeSession, deriveNbmeSession, emptyNbmeState, reviewNbmeAnswer, startNbmeSession, submitNbmeAnswer, updateNbmeSession } from '@app/nbme/model'
-import { catalogo, respuestas } from './escena'
+import { catalogo, conAplicacion, respuestas } from './escena'
 // Doble del proveedor NBME que usa el modelo real: abre, responde y revisa sesiones de verdad.
 // Las preguntas son texto sintético sin contenido clínico.
 const parametros = new URLSearchParams(location.search)
@@ -31,7 +31,8 @@ const loadFigure = async (_assetId: string, signal?: AbortSignal) => {
 }
 const introduccion = parametros.has('enunciado-largo') ? Array.from({ length: 24 }, (_, i) => `Synthetic paragraph ${i + 1}: this demonstration text places the figure below the first viewport without introducing medical facts.`).join('\n\n') + '\n\n' : ''
 const pregunta = (id: string) => ({ id, revision: 'r1', form: '27', section: 1, item: 1, page: 1, systems: [], disciplines: [], topic: 'T',
-  objective: 'Synthetic objective: the answer follows from the demo mechanism described in the stem.', status: 'ready', reasons: [], figureRequired: conFigura, conceptLinks: [],
+  objective: 'Synthetic objective: the answer follows from the demo mechanism described in the stem.', status: 'ready', reasons: [], figureRequired: conFigura,
+  conceptLinks: conAplicacion ? [{ conceptId: 'QA-APLICACION', relation: 'tested', review: 'reviewed', confidence: 1 }] : [],
   stem: introduccion + (conTabla ? 'Synthetic laboratory studies show:\nSample X: 12 units\nSample Y 30%\nGroup | Low | High\nFirst | 20 | 40\nSecond | 30 | 50\nWhich result?\nOption columns: First measure | Second measure' : 'A 45-year-old synthetic patient presents with a demonstration finding after a long synthetic history. Laboratory studies are pending. Which of the following is the most likely explanation?'),
   options: 'ABCDE'.split('').map(l => ({ id: l, text: conTabla ? `${l} first | ${l} second` : `Synthetic option ${l}` })), answer: 'C', explanation: 'Synthetic explanation.', figures: conFigura ? [{ assetId: 'synthetic-figure', alt: 'Synthetic figure' }] : [],
   provenance: { sourceFile: 'demo', sourceRecordId: id, notes: [] } })

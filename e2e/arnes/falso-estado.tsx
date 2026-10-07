@@ -2,11 +2,15 @@ import { useSyncExternalStore } from 'react'
 import { ESTADO_INICIAL, reconstruirProgreso, registrarVistaConceptoEstado } from '@app/store/model'
 import { nuevoProgreso } from '@app/srs/fsrs'
 import { CRITERIOS_POR_DEFECTO } from '@app/srs/mastery'
-import { conceptos, progreso } from './escena'
+import { conceptos, conAplicacion, progreso } from './escena'
 
 // Doble del proveedor de progreso: el mismo contrato que useApp, en memoria y sin Supabase.
 const reanudar = new URLSearchParams(location.search).get('retomar')
-const guardada = reanudar?.startsWith('concepto') ? {
+const guardada = conAplicacion && reanudar === 'base-guardada' ? {
+  versionFormato: 3, modulo: 'M', sesion: 'repaso', indice: 1, ts: Date.now(), sessionId: 'qa-base-guardada',
+  conceptIds: ['QA-CORTO', 'QA-APLICACION'], variantes: [null, null], cantidadInicial: 2,
+  titulo: 'Base sintética guardada', subtitulo: 'La presentación base ya estaba decidida.',
+} : reanudar?.startsWith('concepto') ? {
   versionFormato: 3, modulo: 'M', sesion: 'repaso', indice: 1, ts: Date.now(), sessionId: 'conceptos-guardados',
   conceptIds: ['C8', 'C4', 'C8'], variantes: [null, null, null], cantidadInicial: 2,
   titulo: 'Sesión sintética guardada', subtitulo: 'Cola exacta, incluidos reintentos.',
@@ -21,6 +25,7 @@ declare global { interface Window { __leerProgresoSintetico: () => any } }
 window.__leerProgresoSintetico = () => estado
 const oyentes = new Set<() => void>()
 const avisar = () => { valor = { ...valor, estado }; oyentes.forEach(f => f()) }
+let sesionesAplicacion = 0
 let valor: any = {
   listo: true, errorCarga: null, estado,
   indice: { schema_version: '1', corpus_version: '1.0.5', n_conceptos: conceptos.length, modulos: [{ module_id: 'M', nombre: 'M', proposito: '', prerrequisitos: [], disciplinas: [], sistemas: [], temas: [], n_conceptos: conceptos.length, minutos_estimados: 0, cobertura_documental: [], orden: 1, sesiones: [{ session_id: 'S', titulo: 'S', objetivo: '', conceptos }] }], documentos: [], glosario: [], cuarentena: 0 },
@@ -37,7 +42,7 @@ let valor: any = {
   },
   progresoDe: (id: string) => estado.progreso[id] ?? nuevoProgreso(id),
   guardarReanudable: (r: any) => { estado = { ...estado, reanudable: r }; avisar() },
-  iniciarSesion: () => 'sesion', cerrarSesion: () => {}, actualizarCriterios: () => {},
+  iniciarSesion: () => conAplicacion ? `qa-aplicacion-sesion-${++sesionesAplicacion}` : 'sesion', cerrarSesion: () => {}, actualizarCriterios: () => {},
   avisoLocal: null, descartarAvisoLocal: () => {},
   exportar: (extra?: Record<string, unknown>) => JSON.stringify({ ...extra, ...estado }), importar: () => ({ ok: true, mensaje: '' }), reiniciar: async () => {},
 }
