@@ -117,6 +117,9 @@ export function PreguntasFrecuentes({ criterios }: { criterios: CriteriosDominio
           La práctica de IA se guarda para esa cuenta y dispositivo y utiliza el presupuesto de IA disponible. Comprueba sus explicaciones con el material.</p>
         <p>Los ejercicios de IA no acreditan dominio Melman. Los conceptos Melman que se presentan cuentan como vistos, y sus respuestas reales aportan al historial compartido.
           Al terminar puedes volver a la pregunta original o seguir con la siguiente del mismo bloque.</p>
+        <p>Generar los ejercicios puede tardar hasta un minuto. El indicador de IA muestra el presupuesto contabilizado por esta aplicación;
+          otras aplicaciones de la misma cuenta Cloudflare pueden consumir parte del saldo gratuito. La recuperación tiene prioridad sobre las explicaciones adicionales,
+          y se conserva una reserva para corregir respuestas.</p>
       </Pregunta>
       <Pregunta titulo="¿Qué pasa con mis sesiones y su progreso?">
         <p>Retomar continúa la sesión pendiente. La práctica relacionada con un error NBME regresa al mismo bloque al terminar.

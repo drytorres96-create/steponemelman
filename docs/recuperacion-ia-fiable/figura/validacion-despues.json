@@ -1,0 +1,28 @@
+[
+  {
+    "width": 390,
+    "stage": "despues",
+    "syntheticOnly": true,
+    "noticeCount": 0,
+    "imageDimensions": {
+      "width": 1200,
+      "height": 800
+    },
+    "modalAndFocusPreserved": true,
+    "horizontalOverflow": false,
+    "pageErrors": []
+  },
+  {
+    "width": 1280,
+    "stage": "despues",
+    "syntheticOnly": true,
+    "noticeCount": 0,
+    "imageDimensions": {
+      "width": 1200,
+      "height": 800
+    },
+    "modalAndFocusPreserved": true,
+    "horizontalOverflow": false,
+    "pageErrors": []
+  }
+]

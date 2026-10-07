@@ -1,5 +1,6 @@
 import config from '../../project.config.json'
 import { registrar } from './registro'
+import { clasificarErrorCloudflare } from './error-cloudflare'
 import { ConceptoZ, IndiceZ, type Concepto, type Indice } from '../schema/concept'
 import { prepararConcepto } from '../lib/formatos'
 import { fragmentoDocente, fundamentoEditorial, materialAptoParaIA, referenciaDocente } from '../lib/fuente-docente'
@@ -9,7 +10,7 @@ import { PeticionErrorIAZ, PresentacionIAZ } from '../lib/contexto-ia'
 import type { NbmeQuestion } from '../nbme/types'
 import { INSTRUCCION_ERROR, MAX_TOKENS_ERROR, materialErrorConcepto, materialErrorNbme, validarCorreccionError, type CorreccionError } from './correccion-error'
 import { INSTRUCCION_RECUPERACION, MAX_TOKENS_RECUPERACION, PeticionRecuperacionNbmeZ,
-  validarRecuperacionNbme, type FuenteRecuperacion, type RecuperacionNbme } from './recuperacion-nbme'
+  validarPlanRecuperacionNbme, type FuenteRecuperacion, type RecuperacionNbme } from './recuperacion-nbme'
 import { NOMBRE_ERROR, type TipoError } from '../srs/tipos'
 import { handleNbme } from './nbme'
 import { handlePlan, type PlanEnv } from './plan'
@@ -25,6 +26,7 @@ const MODELO_EMBEDDING = '@cf/baai/bge-m3'
 export const UMBRAL_PARECIDO = 0.55
 const MAX_CANDIDATOS = 24
 const DAY = 86400000
+export const TIEMPO_RECUPERACION_MS = 60_000
 /** Conceptos que entran en una lectura de la semana, y módulos que se pueden abrir para armarla. */
 const MAX_CONCEPTOS_ANALISIS = 18
 const MAX_MODULOS_ANALISIS = 6
@@ -39,7 +41,7 @@ interface Storage {
 interface Gasto { v: 2; day: string; neuronas: number; llamadas: number; users: Record<string, { neuronas: number; llamadas: number }> }
 interface Env extends PlanEnv {
   AI_FREE_ENABLED?: string
-  AI: { run(model: string, input: unknown): Promise<unknown> }
+  AI: { run(model: string, input: unknown, options?: { signal?: AbortSignal }): Promise<unknown> }
   COACH: { idFromName(name: string): unknown; get(id: unknown): { fetch(request: Request): Promise<Response> } }
   ASSETS: { fetch(request: Request): Promise<Response> }
 }
@@ -64,6 +66,10 @@ export const MOTIVOS = {
   concepto_largo: 'Este concepto es demasiado extenso para la ayuda de IA. Su explicación sigue disponible.',
   no_verificable: 'La ayuda no pudo respaldar su respuesta en la fuente, así que se descartó.',
   interno: 'Algo falló en el servidor al preparar la ayuda. La explicación del concepto sigue disponible.',
+  tiempo: 'Cloudflare tardó demasiado en preparar los ejercicios. Puedes volver a intentarlo o continuar tu pregunta.',
+  proveedor: 'Cloudflare no pudo generar los ejercicios ahora. Puedes volver a intentarlo o continuar tu pregunta.',
+  capacidad: 'Cloudflare está ocupado ahora. Puedes volver a intentarlo o continuar tu pregunta.',
+  cuota_proveedor: 'Cloudflare indicó que su cuota diaria de IA se agotó. Se renueva a las 00:00 UTC; puedes continuar tu pregunta.',
 } as const
 export type Motivo = keyof typeof MOTIVOS
 const unavailable = (codigo: Motivo = 'ia') => json({ error: MOTIVOS[codigo], codigo }, 503)
@@ -356,7 +362,7 @@ export class StudyCoach {
     const mio = g.users[user] ?? { neuronas: 0, llamadas: 0 }
     const presupuestoUsuario = Math.floor(PRESUPUESTO_UTIL * FRACCION_POR_USUARIO)
     const restantesUsuario = mio.llamadas >= LIMITE_LLAMADAS_USUARIO ? 0 : Math.max(0, presupuestoUsuario - mio.neuronas)
-    const modos: ModoIA[] = ['calificar', 'confusion', 'analizar', 'chat', 'explicar', 'examen']
+    const modos: ModoIA[] = ['calificar', 'confusion', 'analizar', 'chat', 'explicar', 'examen', 'recuperar']
     return { presupuesto: PRESUPUESTO_UTIL, gastadas: g.neuronas, restantes: Math.max(0, PRESUPUESTO_UTIL - g.neuronas),
       llamadas: mio.llamadas, activa: this.env.AI_FREE_ENABLED === 'true', presupuestoUsuario, restantesUsuario,
       porModo: Object.fromEntries(modos.map(m => [m, Math.max(0, Math.min(restantesUsuario, techoDeModo(m) - g.neuronas))])) as Record<ModoIA, number>,
@@ -398,7 +404,7 @@ export class StudyCoach {
     }
   }
 
-  /** Optional, finite practice shares the existing explanation budget and account cache. */
+  /** Finite recovery uses its priority share of the same free account budget and cache. */
   private async recuperarNbme(input: CoachInput): Promise<Response> {
     const cacheKey = `cache:${input.key}`
     const saved = await this.state.storage.get<{ at: number; recuperacion: RecuperacionNbme }>(cacheKey)
@@ -409,24 +415,39 @@ export class StudyCoach {
       { role: 'user', content: JSON.stringify({ material: JSON.parse(input.reference),
         razonamiento_del_estudiante: input.reasoning ?? '' }) }]
     const estimado = costeEstimado(JSON.stringify(messages), MAX_TOKENS_RECUPERACION)
-    const diaReservado = await this.admitir(input.user, 'explicar', estimado)
+    const diaReservado = await this.admitir(input.user, 'recuperar', estimado)
     if (!diaReservado) return json({ available: false,
       error: 'La recuperación agotó su parte gratuita de hoy. Puedes repasar los conceptos y continuar la pregunta; la cuota se renueva a las 00:00 UTC.' }, 429)
     let timer: ReturnType<typeof setTimeout> | undefined, raw: unknown
+    let agotado = false
+    let fase: 'generacion' | 'validacion' | 'guardado' = 'generacion'
+    const inicio = Date.now()
+    const control = new AbortController()
     try {
       raw = await Promise.race([this.env.AI.run(MODEL, { stream: false, temperature: 0.1,
-        max_tokens: MAX_TOKENS_RECUPERACION, response_format: { type: 'json_object' }, messages }),
-      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), 20_000) })])
-      const recuperacion = validarRecuperacionNbme(raw, input.sourceFragment,
+        max_tokens: MAX_TOKENS_RECUPERACION, response_format: { type: 'json_object' }, messages }, { signal: control.signal }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => {
+        agotado = true; control.abort(); reject(new Error('timeout'))
+      }, TIEMPO_RECUPERACION_MS) })])
+      if (timer) { clearTimeout(timer); timer = undefined }
+      fase = 'validacion'
+      const recuperacion = validarPlanRecuperacionNbme(raw, input.sourceFragment,
         (JSON.parse(input.reference) as { alternativas_originales: string[] }).alternativas_originales,
         input.recoverySources)
       if (!recuperacion) return recuperacionUnavailable('no_verificable')
+      fase = 'guardado'
       await this.state.storage.put(cacheKey, { at: Date.now(), recuperacion })
       await this.podarCache()
       return json({ ...recuperacion, source: input.source, cached: false })
     } catch (causa) {
-      registrar('coach/recuperacion-nbme', causa)
-      return recuperacionUnavailable('interno')
+      const proveedor = clasificarErrorCloudflare(causa)
+      const codigo = agotado ? 'tiempo' : fase === 'generacion' ? proveedor.codigo : 'interno'
+      // Provider errors can echo prompt text. Log only the phase and duration,
+      // never the question, student reasoning or an upstream response body.
+      registrar('coach/recuperacion-nbme', codigo, { fase, duracionMs: Date.now() - inicio,
+        ...(fase === 'generacion' && proveedor.codigoProveedor !== undefined ? { codigoProveedor: proveedor.codigoProveedor } : {}) })
+      if (codigo === 'cuota_proveedor') return json({ available: false, error: MOTIVOS[codigo], codigo }, 429)
+      return recuperacionUnavailable(codigo)
     } finally {
       if (timer) clearTimeout(timer)
       await this.liquidar(input.user, diaReservado, estimado, costeReal(raw, estimado))
@@ -1184,7 +1205,7 @@ async function handleRecuperacionNbme(request: Request, url: URL, env: Env): Pro
     const trusted: CoachInput = { user: quien.userId, mode: 'recuperacion-nbme', ...material, reference,
       sourceFragment, recoverySources: fuentes, reasoning,
       key: await digest(JSON.stringify([quien.userId, input.questionId, input.revision, input.optionId,
-        reference, reasoning, MODEL, 'recuperacion-nbme-v1'])),
+        reference, reasoning, MODEL, 'recuperacion-nbme-v2'])),
       question: '', answer: '', canonical: '' }
     return alCoach(env, 'recuperacion-nbme', trusted)
   } catch (causa) {

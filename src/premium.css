@@ -137,8 +137,6 @@
 .session-focus .nbme-source-text { line-height: 1.65; }
 .session-focus .nbme-feedback .nbme-respuesta { margin: 0; padding: 12px 14px; background: var(--violeta-tenue); border-radius: var(--radio-s); }
 .session-focus .nbme-status { line-height: 1.5; }
-.session-focus .nbme-figure-notice { padding: 8px 12px; font-size: 14px; }
-.session-focus .nbme-figure-links { column-gap: 16px; }
 
 @media (max-width: 760px) {
   .premium-progress-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }

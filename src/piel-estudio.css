@@ -160,7 +160,6 @@
 :root[data-piel-estudio] .nbme-lab-tabla td { color: var(--piel-texto); }
 :root[data-piel-estudio] .nbme-lab-tabla th { color: var(--piel-texto-2); }
 :root[data-piel-estudio] .nbme-lab-encabezado { background: transparent; color: var(--piel-texto-2); }
-:root[data-piel-estudio] .nbme-figure-links a { color: var(--piel-acento-fuerte); }
 :root[data-piel-estudio] .rotulo,
 :root[data-piel-estudio] .editorial-eyebrow { color: var(--piel-acento); }
 

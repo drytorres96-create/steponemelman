@@ -12,7 +12,7 @@ export async function generarRecuperacionNbme(peticion: PeticionRecuperacionNbme
   // La identidad del intento se usa para guardar; el servidor sólo recibe contexto verificable de la pregunta.
   const { qid, revision, optionId, razonamiento } = peticion
   const r = await solicitarIA<ContenidoRecuperacion>('/api/ia/recuperacion-nbme',
-    { questionId: qid, revision, optionId, ...(razonamiento?.trim() ? { razonamiento: razonamiento.trim() } : {}) }, 25_000, signal)
+    { questionId: qid, revision, optionId, ...(razonamiento?.trim() ? { razonamiento: razonamiento.trim() } : {}) }, 90_000, signal)
   if (r.estado === 'ok' && !esContenidoRecuperacion(r.data)) {
     return { estado: 'sin_ia' as const, motivo: 'Los ejercicios llegaron incompletos. Puedes repasar el material y continuar.' }
   }

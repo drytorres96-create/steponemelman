@@ -1,0 +1,40 @@
+{
+  "fase": "despues",
+  "width": 1280,
+  "browser": "151.0.7922.173",
+  "build": "/workspace/work/recuperacion-ia-qa-despues",
+  "head": "fuente final congelada",
+  "javascript": [
+    "/assets/index-XY0GNv0U.js"
+  ],
+  "respuesta503Sintetica": {
+    "error": "Cloudflare tardó demasiado en preparar los ejercicios. Puedes volver a intentarlo o continuar tu pregunta.",
+    "codigo": "tiempo"
+  },
+  "saldoPorcentaje": 80,
+  "segundosSimulados": 26,
+  "generaciones": [
+    {
+      "method": "POST",
+      "body": {
+        "questionId": "Q3",
+        "revision": "synthetic-r1",
+        "optionId": "B"
+      },
+      "authorization": "Bearer QA-token-sintetico-sin-acceso-real"
+    },
+    {
+      "method": "POST",
+      "body": {
+        "questionId": "Q3",
+        "revision": "synthetic-r1",
+        "optionId": "B"
+      },
+      "authorization": "Bearer QA-token-sintetico-sin-acceso-real"
+    }
+  ],
+  "intentoOriginalConservado": true,
+  "sinRecuperacionGuardadaDuranteEspera": true,
+  "compiladoSinHMR": true,
+  "sinErroresDePagina": true
+}

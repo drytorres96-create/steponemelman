@@ -188,6 +188,8 @@ test('NBME: la figura se amplía sin revelar la respuesta ni la procedencia ante
   await llegarAPreguntaNbme(page)
   await expect(preguntaNbme(page).getByText(/NBME 27 · sección/)).toHaveCount(0)
   await expect(page.locator('.nbme-option-state')).toHaveCount(0)
+  await expect(page.getByText('Esta pregunta incluye una figura.', { exact: false })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /^Ir a (la figura|las respuestas)$/ })).toHaveCount(0)
   const image = page.locator('.nbme-image-button img')
   await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true)
   const source = await image.getAttribute('src')

@@ -164,7 +164,7 @@ describe('cliente IA manual', () => {
     const control = new AbortController()
     expect(await generarRecuperacionNbme({ ...origen, razonamiento: '  I picked the second token.  ' }, control.signal)).toEqual({ estado: 'ok', data: contenido })
     expect(mock.pedir).toHaveBeenCalledWith('/api/ia/recuperacion-nbme',
-      { questionId: 'QA-P0001', revision: 'qa-r1', optionId: 'B', razonamiento: 'I picked the second token.' }, 25_000, control.signal)
+      { questionId: 'QA-P0001', revision: 'qa-r1', optionId: 'B', razonamiento: 'I picked the second token.' }, 90_000, control.signal)
   })
   it('deniega respuestas o entradas malformadas y conserva el fallback de cuota', async () => {
     mock.pedir.mockResolvedValue({ estado: 'ok', data: { ejercicios: [] } })

@@ -26,8 +26,7 @@ async function abrirPregunta(page: Page, parametros = 'figura=larga&tabla=1') {
 }
 
 async function mostrarFigura(page: Page) {
-  const enlace = page.getByRole('link', { name: 'Ir a la figura', exact: true })
-  if (await enlace.count()) await enlace.click()
+  await page.locator('#nbme-figures').scrollIntoViewIfNeeded()
   const imagen = page.locator('.nbme-image-button img')
   await expect.poll(() => imagen.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth === 1200)).toBe(true)
   return imagen
@@ -198,13 +197,12 @@ test.describe('auditoría táctil de figuras', () => {
     }
   })
 
-  test('la descarga espera al viewport y el salto a respuestas no permite omitir la figura necesaria', async ({ page }) => {
+  test('la descarga espera al viewport y comprobar sigue bloqueado hasta cargar la figura necesaria', async ({ page }) => {
     await abrirPregunta(page, 'figura=larga&enunciado-largo=1')
     expect(await page.evaluate(() => (window as Window & { __nbmeFigureRequests: number }).__nbmeFigureRequests)).toBe(0)
     await page.keyboard.press('c')
     await expect(page.getByRole('button', { name: 'Comprobar respuesta', exact: true })).toBeDisabled()
-    await page.getByRole('link', { name: 'Ir a las respuestas', exact: true }).click()
-    await expect(page.locator('#nbme-answers')).toBeFocused()
+    await expect(page.getByRole('link', { name: /^Ir a (la figura|las respuestas)$/ })).toHaveCount(0)
     await mostrarFigura(page)
     expect(await page.evaluate(() => (window as Window & { __nbmeFigureRequests: number }).__nbmeFigureRequests)).toBe(1)
     await expect(page.getByRole('button', { name: 'Comprobar respuesta', exact: true })).toBeEnabled()
@@ -212,7 +210,7 @@ test.describe('auditoría táctil de figuras', () => {
 
   for (const error of ['error-descarga', 'error-imagen']) test(`${error}: aviso claro, bloqueo y reintento`, async ({ page }) => {
     await abrirPregunta(page, `figura=${error}`)
-    await page.getByRole('link', { name: 'Ir a la figura', exact: true }).click()
+    await page.locator('#nbme-figures').scrollIntoViewIfNeeded()
     await expect(page.getByRole('alert').filter({ hasText: 'No se pudo cargar la figura' })).toBeVisible()
     await page.keyboard.press('c')
     await expect(page.getByRole('button', { name: 'Comprobar respuesta', exact: true })).toBeDisabled()
@@ -225,9 +223,10 @@ test.describe('auditoría táctil de figuras', () => {
 test.describe('auditoría móvil horizontal', () => {
   test.use({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, reducedMotion: 'reduce' })
 
-  test('saltos y modal mantienen el foco visible, sin desbordamiento en horizontal', async ({ page }) => {
+  test('respuestas y modal mantienen el foco visible, sin desbordamiento en horizontal', async ({ page }) => {
     await abrirPregunta(page, 'figura=larga&tabla=1&enunciado-largo=1')
-    await page.getByRole('link', { name: 'Ir a las respuestas', exact: true }).click()
+    await page.locator('#nbme-answers').scrollIntoViewIfNeeded()
+    await page.locator('#nbme-answers').focus()
     await expect(page.locator('#nbme-answers')).toBeFocused()
     const answer = await page.locator('#nbme-answers').boundingBox()
     const header = await page.locator('.barra').boundingBox()

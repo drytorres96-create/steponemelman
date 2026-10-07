@@ -1,0 +1,12 @@
+
+> steponemelman@1.31.2 test
+> vitest run --pool=forks --maxWorkers=1
+
+
+ RUN  v4.1.11 /workspace/work/hoy-faq-corpus
+
+
+ Test Files  99 passed | 1 skipped (100)
+      Tests  1076 passed | 2 skipped (1078)
+   Start at  23:43:41
+   Duration  82.05s (transform 3.50s, setup 0ms, import 10.82s, tests 13.08s, environment 40.44s)

@@ -2,7 +2,9 @@
 
 Plataforma de estudio para USMLE Step 1 con sesiones, repaso espaciado y progreso asociado a una cuenta. El sitio existente está en [steponemelman.yoeltorres.workers.dev](https://steponemelman.yoeltorres.workers.dev/). Este repositorio contiene la aplicación React/Vite y el contrato de base de datos; Supabase conserva el material privado y el progreso.
 
-La versión **1.31.1** centra la navegación en **Hoy**, **Biblioteca**, **Progreso** y **Ajustes y respaldo**. Las líneas de la meta de 60 días y los círculos siguen visibles. Las explicaciones de dominio, metas, repasos y sesiones están en **Ajustes → Preguntas frecuentes**; el índice del material también está en Ajustes. Viñetas (piloto), Plan diario clásico y Auditoría se retiraron de la interfaz. Consulta [Material privado para agentes](docs/material-privado-agentes.md).
+La versión **1.31.2** corrige el corte prematuro de la recuperación con IA: admite una generación de hasta un minuto, construye los ejercicios desde un plan compacto y conserva la comprobación literal de cada fuente. Recuperación dispone de una mayor parte del mismo presupuesto gratuito. El aviso redundante sobre figuras se retiró; la imagen y su ampliación siguen disponibles. Consulta [Cambios y validación](docs/cambios-1.31.2.md).
+
+La navegación se centra en **Hoy**, **Biblioteca**, **Progreso** y **Ajustes y respaldo**. Las líneas de la meta de 60 días y los círculos siguen visibles. Las explicaciones de dominio, metas, repasos y sesiones están en **Ajustes → Preguntas frecuentes**; el índice del material también está en Ajustes. Viñetas (piloto), Plan diario clásico y Auditoría se retiraron de la interfaz. Consulta [Material privado para agentes](docs/material-privado-agentes.md).
 
 ## Estudiar y continuar en otro dispositivo
 

@@ -4,8 +4,11 @@
 - Mejorar lo existente; no reconstruir. Melman consolida; AMBOSS y simulacros miden.
 - React 18, Vite 6, TypeScript; Workers Static Assets y API en `src/server/worker.ts`.
 - Worker incluye NBME, explicación y proxy del plan; revisar rutas reales.
-- `AI`, `COACH` (StudyCoach) y `AI_FREE_ENABLED`: no subir cuotas ni relajar
-  la validación de evidencia literal de la fuente.
+- `AI`, `COACH` (StudyCoach) y `AI_FREE_ENABLED`: conservar la validación literal
+  de la fuente y el presupuesto gratuito. El usuario autorizó el 7-oct-2026 ampliar
+  la capacidad de recuperación y valorar modelos mejores dentro de ese presupuesto.
+  Recuperación puede usar el 85 % de los 8500 útiles; explicación mantiene el 70 %.
+  Conservar el contador v=2, reserva del 15 %, tope individual y ausencia de pago.
 - Supabase vigente: `rcwvwxchpukjbtqsrxfi`, compartido con step1-lessons.
 - Material privado: `corpus_assets`, `nbme_assets`; nunca copiarlo al repo/public.
 - Progreso: `study_state`, `nbme_state` con CHECK, revision y generation;
