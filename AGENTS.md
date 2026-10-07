@@ -22,8 +22,13 @@
 
 - Los límites de sólo lectura siguientes pertenecían a la auditoría inicial. La petición
   explícita del 7-oct-2026 autoriza simplificar la UI, corregir la selección de Hoy y
-  reparar/integrar los 191 conceptos en cuarentena. No autoriza modificar NBME,
-  `step1-lessons` ni el historial de progreso. No pedir de nuevo autorización ya dada.
+  reparar/integrar los 191 conceptos en cuarentena. La petición posterior del mismo
+  usuario autoriza corregir la generación de recuperación NBME con Workers AI y
+  eliminar el aviso «Esta pregunta incluye una figura» y los enlaces «Ir a la figura»
+  / «Ir a las respuestas». Conservar la imagen, su ampliación y los controles de carga.
+  Esa autorización afecta al flujo y presentación del jugador; no autoriza cambiar
+  preguntas, letras, revisiones ni contenido del banco NBME, `step1-lessons` o el
+  historial de progreso. No pedir de nuevo autorización ya dada ni restaurar el aviso.
 
 - No escribir en ninguna base, ni mediante scripts, datos, RPC o migraciones.
 - No crear migraciones. Los cambios de esquema van como propuestas en auditoría.
