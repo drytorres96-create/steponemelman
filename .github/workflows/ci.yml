@@ -18,8 +18,26 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - id: browser
+        run: npx playwright install --with-deps chromium
       - run: npm run e2e
+      - name: Checkout visual baseline (synthetic fixtures only)
+        if: always() && steps.browser.outcome == 'success'
+        uses: actions/checkout@v4
+        with:
+          ref: ef9e3c21514b11a9fd4791cce618e03acdae244b
+          path: work/navbar-before
+          persist-credentials: false
+      - name: Compare navigation before and after
+        if: always() && steps.browser.outcome == 'success'
+        run: node qa/navbar-review.mjs
+      - name: Navigation visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: navbar-before-after
+          path: work/navbar-review/
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'pull_request' && github.head_ref == 'audit/octubre-aprendizaje-movil'
         with:
