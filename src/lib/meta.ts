@@ -1,7 +1,7 @@
 import type { NbmeCatalog, NbmeState } from '../nbme/types'
 import { EXAMEN_MS } from '../srs/fsrs'
-import { INICIO_DIA_HORA, TECHOS, inicioDelDia, tipoDeDia } from './dia'
-import { fechaISO } from './tiempo'
+import { INICIO_DIA_HORA, TECHOS } from './dia'
+import { desplazarFechaEstudio, diaSemanaEstudio, fechaEstudio, fechaISOEstudio, instanteEstudio, numeroDiaEstudio, partesEstudio } from './calendario-estudio'
 
 /**
  * La meta de 60 días: del viernes 25-sep-2026 al lunes 23-nov-2026. Las cuatro
@@ -14,8 +14,8 @@ import { fechaISO } from './tiempo'
  * Nada de esto se guarda: como el estado del día, sale del historial y de la fecha.
  */
 
-/** Primer día de la ventana, en fecha local. */
-const INICIO = { anio: 2026, mes: 8, dia: 25 }
+/** Primer día de la ventana en el calendario de Nueva York. */
+const INICIO = { anio: 2026, mes: 9, dia: 25 }
 export const DIAS_META = 60
 /**
  * Conceptos dominados en la ventana. Es la meta calibrada con el estado real del
@@ -28,53 +28,47 @@ export const META_CONCEPTOS = 510
  * del de conceptos —5 y 10 frente a 10 y 20—, así que su meta es la mitad: 255.
  */
 export const META_PREGUNTAS = 255
-/** Un concepto tarda una semana en quedar dominado: exposición y tres cajas a 1, 2 y 3 días. */
+/** Supuesto de planificación; la acreditación real exige los criterios guardados, no siete días fijos. */
 export const RETRASO_DOMINIO = 7
 /** La proyección espera dos semanas: la primera la infla lo que ya venía en camino. */
 export const DIAS_PARA_PROYECTAR = 14
 
-const DIA_MS = 86_400_000
-
-/** Fecha local del día `n` de la ventana; el 1 es el 25-sep. */
+/** Mediodía de Nueva York del día `n`; las etiquetas deben formatearse en ZONA_ESTUDIO. */
 export function fechaDelDia(n: number): Date {
-  return new Date(INICIO.anio, INICIO.mes, INICIO.dia + n - 1)
+  return new Date(instanteEstudio(desplazarFechaEstudio(INICIO, n - 1), 12))
 }
 
 /** Instante en que empieza el día `n` de la ventana, con el corte de las 3:00. */
 export function inicioDelDiaMeta(n: number): number {
-  const f = fechaDelDia(n)
-  return new Date(f.getFullYear(), f.getMonth(), f.getDate(), INICIO_DIA_HORA).getTime()
+  return instanteEstudio(desplazarFechaEstudio(INICIO, n - 1), INICIO_DIA_HORA)
 }
-
-const diasEntre = (a: Date, b: Date) =>
-  Math.round((Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) - Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) / DIA_MS)
 
 /** Qué día de la ventana es `ahora`: 1 el 25-sep, 60 el 23-nov; 0 o menos antes y más de 60 después. */
 export function diaDeLaMeta(ahora: number): number {
-  return diasEntre(fechaDelDia(1), new Date(inicioDelDia(ahora))) + 1
+  return numeroDiaEstudio(fechaEstudio(ahora, INICIO_DIA_HORA)) - numeroDiaEstudio(INICIO) + 1
 }
 
 /** Suma de los techos de los `n` primeros días de la ventana: nada el viernes, el doble el fin de semana. */
 function techosAcumulados(n: number, campo: 'conceptos' | 'preguntas'): number {
   let suma = 0
   for (let k = 1; k <= Math.min(n, DIAS_META); k++) {
-    const f = fechaDelDia(k)
-    suma += TECHOS[tipoDeDia(new Date(f.getFullYear(), f.getMonth(), f.getDate(), 12).getTime())][campo]
+    const dia = diaSemanaEstudio(desplazarFechaEstudio(INICIO, k - 1))
+    suma += TECHOS[dia === 5 ? 'vacio' : dia === 0 || dia === 6 ? 'finde' : 'semana'][campo]
   }
   return suma
 }
 
 /**
  * Dónde va la línea tras `cerrados` días de la ventana. Avanza con los techos de Hoy
- * y llega a la meta el último día. En conceptos va una semana por detrás, lo que tarda
- * uno en quedar dominado; una pregunta cuenta el mismo día en que se responde.
+ * y llega a la meta el último día. En conceptos deja una semana como supuesto de
+ * planificación; el dominio real depende de los criterios. Una pregunta cuenta al responderla.
  */
 export function lineaConceptos(cerrados: number): number {
-  return META_CONCEPTOS * techosAcumulados(cerrados - RETRASO_DOMINIO, 'conceptos')
+  return META_CONCEPTOS * techosAcumulados(Math.max(0, Math.min(cerrados, DIAS_META)) - RETRASO_DOMINIO, 'conceptos')
     / techosAcumulados(DIAS_META - RETRASO_DOMINIO, 'conceptos')
 }
 export function lineaPreguntas(cerrados: number): number {
-  return META_PREGUNTAS * techosAcumulados(cerrados, 'preguntas') / techosAcumulados(DIAS_META, 'preguntas')
+  return META_PREGUNTAS * techosAcumulados(Math.max(0, Math.min(cerrados, DIAS_META)), 'preguntas') / techosAcumulados(DIAS_META, 'preguntas')
 }
 
 export type Rumbo = 'delante' | 'linea' | 'debajo'
@@ -105,9 +99,19 @@ export interface SerieMeta {
   proyeccion: number | null
 }
 
-function serie(marcas: number[], publicados: number, metaBase: number, linea: (n: number) => number, cerrados: number, ahora: number): SerieMeta & { lineaDe: (n: number) => number } {
+/** Cantidades exactas respecto a la marca visible, separadas del rumbo con margen. */
+export function distanciasMeta(serie: Pick<SerieMeta, 'hechos' | 'linea' | 'meta'>) {
+  const marca = Math.round(serie.linea)
+  return { igualarLinea: Math.max(0, marca - serie.hechos), superarLinea: Math.max(0, marca + 1 - serie.hechos),
+    completarMeta: Math.max(0, serie.meta - serie.hechos) }
+}
+
+function serie(marcasCrudas: number[], publicados: number, metaBase: number, linea: (n: number) => number, cerrados: number, ahora: number,
+  primerasAcreditaciones: number[] = marcasCrudas): SerieMeta & { lineaDe: (n: number) => number } {
   const inicio = inicioDelDiaMeta(1)
-  const previas = marcas.filter(m => m < inicio).length
+  const conocida = (m: number) => Number.isFinite(m) && m > 0 && m <= ahora
+  const marcas = marcasCrudas.filter(conocida)
+  const previas = primerasAcreditaciones.filter(m => conocida(m) && m < inicio).length
   /** Hecho en la ventana antes del instante `fin`. */
   const hasta = (fin: number) => marcas.filter(m => m >= inicio && m < fin).length
   /** Hecho en la ventana tras `n` días cerrados. */
@@ -154,6 +158,8 @@ export interface EntradaMeta {
   ahora: number
   /** Cuándo quedó dominado por primera vez cada concepto publicado que hoy cumple los criterios. */
   dominadosEn: number[]
+  /** Primeros hitos históricos validados de todos los IDs publicados, aunque hoy hayan perdido dominio. */
+  primerasAcreditaciones?: number[]
   conceptosPublicados: number
   /** Primera respuesta de cada pregunta publicada que se ha respondido alguna vez. */
   primerasRespuestas: number[]
@@ -163,24 +169,25 @@ export interface EntradaMeta {
 export function resumenMeta(e: EntradaMeta): ResumenMeta {
   const dia = diaDeLaMeta(e.ahora)
   const cerrados = Math.min(Math.max(dia - 1, 0), DIAS_META)
-  const { lineaDe: lineaC, ...conceptos } = serie(e.dominadosEn, e.conceptosPublicados, META_CONCEPTOS, lineaConceptos, cerrados, e.ahora)
+  const { lineaDe: lineaC, ...conceptos } = serie(e.dominadosEn, e.conceptosPublicados, META_CONCEPTOS, lineaConceptos, cerrados, e.ahora, e.primerasAcreditaciones)
   const { lineaDe: lineaP, ...preguntas } = serie(e.primerasRespuestas, e.preguntasPublicadas, META_PREGUNTAS, lineaPreguntas, cerrados, e.ahora)
 
   // Una fila por semana de lunes a domingo; la última acaba el 23-nov, que es lunes.
   const filas: FilaMeta[] = []
   let desde = 1
   for (let k = 1; k <= DIAS_META; k++) {
-    if (fechaDelDia(k).getDay() !== 0 && k !== DIAS_META) continue
+    const fecha = desplazarFechaEstudio(INICIO, k - 1)
+    if (diaSemanaEstudio(fecha) !== 0 && k !== DIAS_META) continue
     filas.push({
-      semana: filas.length + 1, hasta: fechaISO(fechaDelDia(k)),
+      semana: filas.length + 1, hasta: fechaISOEstudio(fecha),
       conceptos: Math.round(lineaC(k)), preguntas: Math.round(lineaP(k)),
       actual: dia >= desde && dia <= k,
     })
     desde = k + 1
   }
 
-  const fin = fechaDelDia(DIAS_META)
-  const semanasConsolidacion = Math.max(0, Math.floor(diasEntre(fin, new Date(EXAMEN_MS)) / 7))
+  const fin = desplazarFechaEstudio(INICIO, DIAS_META - 1)
+  const semanasConsolidacion = Math.max(0, Math.floor((numeroDiaEstudio(partesEstudio(EXAMEN_MS)) - numeroDiaEstudio(fin)) / 7))
   return { dia, conceptos, preguntas, filas, semanasConsolidacion }
 }
 

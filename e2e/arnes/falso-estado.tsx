@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { ESTADO_INICIAL, reconstruirProgreso } from '@app/store/model'
+import { ESTADO_INICIAL, reconstruirProgreso, registrarVistaConceptoEstado } from '@app/store/model'
 import { nuevoProgreso } from '@app/srs/fsrs'
 import { CRITERIOS_POR_DEFECTO } from '@app/srs/mastery'
 import { conceptos, progreso } from './escena'
@@ -30,6 +30,10 @@ let valor: any = {
     const previo = estado.progreso[id]
     const p = reconstruirProgreso(id, [...(previo?.intentos ?? []), intento], CRITERIOS_POR_DEFECTO, previo?.dominado_en ?? null)
     estado = { ...estado, progreso: { ...estado.progreso, [id]: p } }; avisar(); return p
+  },
+  registrarVistaConcepto: (id: string, preguntaId: string) => {
+    const nuevo = registrarVistaConceptoEstado(estado, id, preguntaId)
+    if (nuevo !== estado) { estado = nuevo; avisar() }
   },
   progresoDe: (id: string) => estado.progreso[id] ?? nuevoProgreso(id),
   guardarReanudable: (r: any) => { estado = { ...estado, reanudable: r }; avisar() },

@@ -10,6 +10,8 @@ import type { NbmeAttempt, NbmeQuestionMeta } from '../nbme/types'
 import type { PlanCheckpoint, PlanSemana } from '../plan/tipos'
 import type { SesionSemanal } from '../semana/tipos'
 import type { Concepto } from '../schema/concept'
+import { cajaDeConcepto } from '../lib/cajas'
+import { resumenProgresoAprendizaje } from '../lib/progreso-aprendizaje'
 
 /**
  * La portada pone el techo. Lo que se comprueba es lo que decide si Yoel cierra el
@@ -155,7 +157,7 @@ const conceptoX1 = {
 
 describe('portada Hoy', () => {
   it('recarga el plan al cambiar el día de estudio aunque siga siendo la misma semana', async () => {
-    vi.setSystemTime(new Date(2026, 8, 22, 2, 59))
+    vi.setSystemTime(new Date('2026-09-22T02:59:00-04:00'))
     await pintar()
     expect(mock.plan).toHaveBeenLastCalledWith('x'.repeat(30), '2026-09-21')
     const lecturas = mock.plan.mock.calls.length
@@ -178,7 +180,7 @@ describe('portada Hoy', () => {
   })
 
   it('la lectura del plan cambia de semana a las 3:00 del lunes', async () => {
-    vi.setSystemTime(new Date(2026, 8, 28, 2, 59))
+    vi.setSystemTime(new Date('2026-09-28T02:59:00-04:00'))
     await pintar()
     expect(mock.plan).toHaveBeenLastCalledWith('x'.repeat(30), '2026-09-21')
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
@@ -282,7 +284,7 @@ describe('portada Hoy', () => {
   })
 
   it('el viernes sale cerrado desde que amanece: sin botones y sin cuentas, aunque haya material y cajas', async () => {
-    vi.setSystemTime(new Date(2026, 8, 25, 3, 5))
+    vi.setSystemTime(new Date('2026-09-25T03:05:00-04:00'))
     const semana = ids('C', 12)
     datos({
       progresos: { X1: progreso('X1', [fallo(new Date(2026, 8, 22, 9).getTime())]) },
@@ -388,6 +390,39 @@ describe('portada Hoy', () => {
     expect(etiquetados).toHaveLength(1)
     expect(anillo().getAttribute('aria-label')).toBe('Hoy, pasos hechos: 3 de 12. Tema de la semana, dominio demostrado: 0 de 12.')
     expect(anillo().querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('un concepto compartido entre sesiones ocupa un solo lugar en la cifra y el arco semanal', async () => {
+    const aciertos = [8, 5, 2].map(dias => intento(HOY(9) - dias * 86_400_000))
+    datos({ progresos: { C1: progreso('C1', aciertos) }, conceptos: ['C1', 'C2', 'C3'] })
+    mock.historial.mockResolvedValue([
+      sesion('lunes', '2026-09-21', 1, ['C1', 'C2']),
+      sesion('martes', '2026-09-21', 2, ['C1', 'C3']),
+      sesion('miercoles', '2026-09-21', 3, ['C1']),
+    ])
+    await pintar()
+    expect(anillo().getAttribute('aria-label')).toContain('Tema de la semana, dominio demostrado: 1 de 3.')
+    const arcos = [...anillo().querySelectorAll('g')].map(g => {
+      const [pista, avance] = g.querySelectorAll('circle')
+      return { pista: Number.parseFloat(pista.getAttribute('stroke-dasharray')!),
+        avance: Number.parseFloat(avance.getAttribute('stroke-dasharray')!) }
+    })
+    expect(arcos).toHaveLength(2)
+    expect(arcos.reduce((n, a) => n + a.avance, 0) / arcos.reduce((n, a) => n + a.pista, 0)).toBeCloseTo(1 / 3, 10)
+    expect(host.textContent).toContain('el tema de la semana, 1 de 3 con dominio demostrado')
+  })
+
+  it('el anillo conserva el dominio demostrado que también cuenta Progreso cuando un fallo pide recuperación', async () => {
+    const aciertos = [12, 10, 8, 6, 4].map(dias => intento(HOY(9) - dias * 86_400_000))
+    const p = progreso('C1', [...aciertos, fallo(HOY(8))])
+    expect(cajaDeConcepto(p, CRITERIOS_POR_DEFECTO, HOY(10))).toBe(1)
+    expect(resumenProgresoAprendizaje(['C1'], { C1: p }, CRITERIOS_POR_DEFECTO, HOY(10)).dominioDemostrado).toBe(1)
+    datos({ progresos: { C1: p }, conceptos: ['C1'] })
+    mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, ['C1'])])
+    await pintar()
+    expect(anillo().getAttribute('aria-label')).toContain('Tema de la semana, dominio demostrado: 1 de 1.')
+    expect(host.textContent).toContain('el tema de la semana, 1 de 1 con dominio demostrado')
+    expect(host.textContent).toContain('Cajas')
   })
 
   it('cajas primero y lo nuevo después, cada uno a un clic de su primer paso', async () => {

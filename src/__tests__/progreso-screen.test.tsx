@@ -3,7 +3,8 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Concepto, Indice } from '../schema/concept'
-import { ESTADO_INICIAL } from '../store/model'
+import { ESTADO_INICIAL, reconstruirProgreso } from '../store/model'
+import type { Intento } from '../srs/tipos'
 
 const mock = vi.hoisted(() => ({ app: vi.fn(), cargarTodo: vi.fn(), cifras: vi.fn(), meta: vi.fn(), adherencia: vi.fn(), calendario: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
@@ -28,7 +29,7 @@ beforeEach(() => {
   mock.adherencia.mockImplementation(() => <p data-testid="adherencia">Adherencia sintética</p>)
   mock.calendario.mockImplementation(() => <p data-testid="calendario">Calendario sintético</p>)
 })
-afterEach(async () => { await act(async () => root.unmount()); host.remove() })
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers() })
 const render = async () => { await act(async () => root.render(<ResumenProgreso />)) }
 async function toggle(open: boolean) {
   await act(async () => {
@@ -37,12 +38,37 @@ async function toggle(open: boolean) {
 }
 
 describe('entrada a progreso sin descargar material ni montar el plan cerrado', () => {
+  it('actualiza el mantenimiento al vencer con la pantalla abierta y conserva dominio e historial', async () => {
+    vi.useFakeTimers()
+    const ahora = Date.parse('2026-10-07T12:00:00-04:00')
+    vi.setSystemTime(ahora)
+    const intentos: Intento[] = [5, 3, 0].map((d, n) => ({ attempt_id: `sintetico-${n}`, session_id: `sesion-${n}`, ts: ahora - d * 86_400_000,
+      calificacion: 3, resultado: 'correcta', interaccion: 'recuperacion_libre', recuperacion_activa: true, tipo_evidencia: 'recuerdo',
+      pistas_usadas: 0, fuente_consultada: false, explicacion_previa: false, ms: 1000, tipo_error: 'ninguno', confianza_declarada: null }))
+    const p = { ...reconstruirProgreso('A', intentos, ESTADO_INICIAL.criterios), proxima: ahora + 30_000 }
+    const estado = { ...ESTADO_INICIAL, progreso: { A: p } }
+    const anterior = structuredClone(estado)
+    mock.app.mockImplementation(() => ({ indice, estado }))
+    await render()
+    const tarjeta = (nombre: string) => [...host.querySelectorAll('article')].find(a => a.querySelector('h2')?.textContent === nombre)!
+    expect(tarjeta('Mantenimiento al día').textContent).toContain('1 / 1')
+    await act(async () => vi.advanceTimersByTimeAsync(60_000))
+    expect(tarjeta('Mantenimiento al día').textContent).toContain('0 / 1')
+    expect(tarjeta('Mantenimiento al día').textContent).toContain('1 pendientes de repaso')
+    expect(tarjeta('Dominio demostrado').querySelector('strong')?.textContent).toBe('1')
+    expect(estado).toEqual(anterior)
+  })
+
   it('pasa IDs únicos del índice a los indicadores y carga contenido sólo a petición del detalle', async () => {
     await render()
     expect(mock.cargarTodo).not.toHaveBeenCalled()
     expect(mock.adherencia).not.toHaveBeenCalled()
     expect(mock.calendario).not.toHaveBeenCalled()
-    expect([...host.querySelectorAll('.premium-progress-card h2')].map(h => h.textContent)).toEqual(['Trabajo realizado', 'Dominio demostrado', 'Mantenimiento al día'])
+    expect([...host.querySelectorAll('.premium-progress-card h2')].map(h => h.textContent)).toEqual(['Conceptos vistos', 'Dominio demostrado', 'Mantenimiento al día'])
+    const vistos = host.querySelector<HTMLProgressElement>('progress[aria-label="Progreso de conceptos vistos"]')!
+    expect(vistos.value).toBe(0)
+    expect(vistos.max).toBe(4)
+    expect(host.textContent).toContain('0 con práctica registrada.')
     const cifras = mock.cifras.mock.calls[0][0] as PropsIndicadores
     const meta = mock.meta.mock.calls[0][0] as PropsIndicadores
     expect(cifras.conceptIds).toEqual(['A', 'B', 'C', 'D'])

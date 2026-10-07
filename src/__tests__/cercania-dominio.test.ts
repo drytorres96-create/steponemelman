@@ -5,7 +5,7 @@ import { reconstruirProgreso } from '../store/model'
 import type { Intento } from '../srs/tipos'
 
 const HORA = 3_600_000
-const T0 = new Date(2026, 8, 13, 20, 30).getTime()
+const T0 = Date.parse('2026-09-13T20:30:00-04:00')
 
 const acierto = (ts: number, sesion: string, extra: Partial<Intento> = {}): Intento => ({
   attempt_id: `a-${ts}-${sesion}`, session_id: sesion, ts, calificacion: 3, resultado: 'correcta',
@@ -21,6 +21,13 @@ const cercania = (intentos: Intento[], ahora: number) =>
   cercaniaDominio(progreso(intentos), CRITERIOS_POR_DEFECTO, ahora)
 
 describe('cercanía al dominio', () => {
+  it('la retención estimada baja no inventa una segunda puerta cuando sólo toca esperar separación', () => {
+    const p = { ...progreso([acierto(T0, 's1'), acierto(T0 + 24 * HORA, 's2')]), estabilidad: 0.1 }
+    const c = cercaniaDominio(p, CRITERIOS_POR_DEFECTO, T0 + 44 * HORA)
+    expect(c).toMatchObject({ cumple: false, bastaUnAcierto: false,
+      esperandoSeparacion: true, disponibleDesde: T0 + 48 * HORA })
+    expect(c.faltan).toEqual(['3 respuestas correctas independientes', 'separadas ≥ 48 h'])
+  })
   it('tres aciertos en menos de un día no se cierran con otro acierto: falta esperar', () => {
     // El caso real: dos aciertos anoche y uno esta mañana, el umbral pide 96 h de separación.
     const intentos = [acierto(T0, 's1'), acierto(T0 + 2 * HORA, 's2'), acierto(T0 + 15.6 * HORA, 's3')]

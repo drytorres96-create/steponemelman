@@ -1,0 +1,164 @@
+/* Respuestas: selección y resultado tienen fondos, bordes y etiquetas distintos.
+   Cargar después de las pieles; los estados correctos no dependen de un brillo. */
+:root {
+  --respuesta-seleccion-borde: #9dd9ff;
+  --respuesta-seleccion-fondo: #173b58;
+  --respuesta-seleccion-texto: #f4f8fc;
+  --respuesta-acierto-borde: #92f2c7;
+  --respuesta-acierto-fondo: #12362c;
+  --respuesta-acierto-texto: #f3faf6;
+  --respuesta-acierto-etiqueta: #b6f6d4;
+  --respuesta-acierto-etiqueta-texto: #123426;
+  --respuesta-fallo-borde: #ffaba7;
+  --respuesta-fallo-fondo: #442527;
+  --respuesta-fallo-texto: #fff4f2;
+  --respuesta-fallo-etiqueta: #ffceca;
+  --respuesta-fallo-etiqueta-texto: #502024;
+}
+
+:root[data-piel-estudio='claro'] {
+  --respuesta-seleccion-borde: #235f97;
+  --respuesta-seleccion-fondo: #e6f1fc;
+  --respuesta-seleccion-texto: #142c44;
+  --respuesta-acierto-borde: #1b7049;
+  --respuesta-acierto-fondo: #e6f4ec;
+  --respuesta-acierto-texto: #173427;
+  --respuesta-acierto-etiqueta: #1b7049;
+  --respuesta-acierto-etiqueta-texto: #ffffff;
+  --respuesta-fallo-borde: #a63235;
+  --respuesta-fallo-fondo: #fff0ed;
+  --respuesta-fallo-texto: #491f23;
+  --respuesta-fallo-etiqueta: #a63235;
+  --respuesta-fallo-etiqueta-texto: #ffffff;
+}
+
+:root :is(.nbme-option, .opcion, .recuperacion-opcion, .ficha, .flecha-ops button),
+:root[data-piel-estudio] .editorial-app :is(.nbme-option, .opcion, .recuperacion-opcion, .ficha, .flecha-ops button) {
+  min-height: 44px;
+  border-width: 2px;
+}
+
+:root :is(.nbme-option.selected, .opcion.elegida, .recuperacion-opcion.elegida, .ficha.sel, .flecha-ops button.sel):not(.correct, .incorrect, .acierto, .fallo, .ok, .mal),
+:root[data-piel-estudio] .editorial-app :is(.nbme-option.selected, .opcion.elegida, .recuperacion-opcion.elegida, .ficha.sel, .flecha-ops button.sel):not(.correct, .incorrect, .acierto, .fallo, .ok, .mal) {
+  border-color: var(--respuesta-seleccion-borde);
+  background: var(--respuesta-seleccion-fondo);
+  color: var(--respuesta-seleccion-texto);
+  box-shadow: inset 5px 0 0 var(--respuesta-seleccion-borde);
+}
+
+:root :is(.nbme-option.correct, .opcion.acierto, .opcion.correcta-oculta, .recuperacion-opcion.correct, .nbme-failed-options li.correct, .ficha.ok, .flecha-ops button.ok),
+:root[data-piel-estudio] .editorial-app :is(.nbme-option.correct, .opcion.acierto, .opcion.correcta-oculta, .recuperacion-opcion.correct, .nbme-failed-options li.correct, .ficha.ok, .flecha-ops button.ok) {
+  border-width: 2px;
+  border-color: var(--respuesta-acierto-borde);
+  background: var(--respuesta-acierto-fondo);
+  color: var(--respuesta-acierto-texto);
+  box-shadow: inset 5px 0 0 var(--respuesta-acierto-borde);
+}
+
+:root :is(.nbme-option.incorrect, .opcion.fallo, .recuperacion-opcion.incorrect, .nbme-failed-options li.wrong, .ficha.mal, .flecha-ops button.mal),
+:root[data-piel-estudio] .editorial-app :is(.nbme-option.incorrect, .opcion.fallo, .recuperacion-opcion.incorrect, .nbme-failed-options li.wrong, .ficha.mal, .flecha-ops button.mal) {
+  border-width: 2px;
+  border-color: var(--respuesta-fallo-borde);
+  background: var(--respuesta-fallo-fondo);
+  color: var(--respuesta-fallo-texto);
+  box-shadow: inset 5px 0 0 var(--respuesta-fallo-borde);
+}
+
+:root :is(.nbme-option, .recuperacion-opcion) input {
+  accent-color: var(--respuesta-seleccion-borde);
+}
+:root :is(.nbme-option.correct, .recuperacion-opcion.correct) input {
+  accent-color: var(--respuesta-acierto-borde);
+}
+:root :is(.nbme-option.incorrect, .recuperacion-opcion.incorrect) input {
+  accent-color: var(--respuesta-fallo-borde);
+}
+
+:root .nbme-option.correct .nbme-option-state,
+:root :is(.opcion.acierto, .opcion.correcta-oculta) :is(.mini, .respuesta-estado),
+:root .recuperacion-opcion.correct .recuperacion-opcion-state {
+  display: table;
+  max-width: 100%;
+  margin-top: 7px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  background: var(--respuesta-acierto-etiqueta);
+  color: var(--respuesta-acierto-etiqueta-texto);
+  font-size: .86rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+:root .nbme-option.incorrect .nbme-option-state,
+:root .opcion.fallo :is(.opcion-state, .respuesta-estado),
+:root .recuperacion-opcion.incorrect .recuperacion-opcion-state {
+  display: table;
+  max-width: 100%;
+  margin-top: 7px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  background: var(--respuesta-fallo-etiqueta);
+  color: var(--respuesta-fallo-etiqueta-texto);
+  font-size: .86rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+:root :is(.nbme-feedback.correct, .recuperacion-feedback.correct),
+:root[data-piel-estudio] .editorial-app :is(.nbme-feedback.correct, .recuperacion-feedback.correct) {
+  border-left: 5px solid var(--respuesta-acierto-borde);
+}
+:root :is(.nbme-feedback.incorrect, .recuperacion-feedback.incorrect),
+:root[data-piel-estudio] .editorial-app :is(.nbme-feedback.incorrect, .recuperacion-feedback.incorrect) {
+  border-left: 5px solid var(--respuesta-fallo-borde);
+}
+
+:root .retro.ok,
+:root[data-piel-estudio] .editorial-app .retro.ok {
+  border: 2px solid var(--respuesta-acierto-borde);
+  border-left-width: 5px;
+  background: var(--respuesta-acierto-fondo);
+  color: var(--respuesta-acierto-texto);
+}
+:root .retro.no,
+:root[data-piel-estudio] .editorial-app .retro.no {
+  border: 2px solid var(--respuesta-fallo-borde);
+  border-left-width: 5px;
+  background: var(--respuesta-fallo-fondo);
+  color: var(--respuesta-fallo-texto);
+}
+
+:root .opcion:focus-visible,
+:root .ficha:focus-visible,
+:root .flecha-ops button:focus-visible,
+:root :is(.nbme-option, .recuperacion-opcion):has(input:focus-visible),
+:root[data-piel-estudio] .editorial-app .opcion:focus-visible,
+:root[data-piel-estudio] .editorial-app .ficha:focus-visible,
+:root[data-piel-estudio] .editorial-app .flecha-ops button:focus-visible,
+:root[data-piel-estudio] .editorial-app :is(.nbme-option, .recuperacion-opcion):has(input:focus-visible) {
+  outline: 3px solid var(--respuesta-seleccion-borde);
+  outline-offset: 4px;
+}
+
+/* Un resultado permanece visible; no hay pulso, movimiento ni destello nuevo. */
+@media (prefers-reduced-motion: reduce) {
+  :root :is(.nbme-option, .opcion, .recuperacion-opcion, .ficha, .flecha-ops button, .retro) {
+    animation: none;
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  :root :is(.nbme-option, .opcion, .recuperacion-opcion, .ficha, .flecha-ops button),
+  :root[data-piel-estudio] .editorial-app :is(.nbme-option, .opcion, .recuperacion-opcion, .ficha, .flecha-ops button) {
+    box-shadow: none;
+  }
+  :root :is(.nbme-option.correct, .opcion.acierto, .opcion.correcta-oculta, .recuperacion-opcion.correct, .ficha.ok, .flecha-ops button.ok, .nbme-failed-options li.correct),
+  :root[data-piel-estudio] .editorial-app :is(.nbme-option.correct, .opcion.acierto, .opcion.correcta-oculta, .recuperacion-opcion.correct, .ficha.ok, .flecha-ops button.ok, .nbme-failed-options li.correct) {
+    border: 3px double Highlight;
+  }
+  :root :is(.nbme-option.incorrect, .opcion.fallo, .recuperacion-opcion.incorrect, .ficha.mal, .flecha-ops button.mal, .nbme-failed-options li.wrong),
+  :root[data-piel-estudio] .editorial-app :is(.nbme-option.incorrect, .opcion.fallo, .recuperacion-opcion.incorrect, .ficha.mal, .flecha-ops button.mal, .nbme-failed-options li.wrong) {
+    border: 2px dashed CanvasText;
+  }
+}

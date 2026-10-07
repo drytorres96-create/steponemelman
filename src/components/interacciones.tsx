@@ -68,7 +68,8 @@ function Opciones({ c, bloqueado, resultado, onResponder, semilla, ocultarFeedba
               <span className="letra">{LETRAS[i]}</span>
               <span style={{ flex: 1 }}>
                 {o.texto}
-                {bloqueado && !ocultarFeedback && o.correcta && <div className="mini" style={{ marginTop: 4, color: 'var(--verde)' }}>Respuesta correcta</div>}
+                {bloqueado && !ocultarFeedback && o.correcta && <div className="mini respuesta-estado" style={{ marginTop: 4 }}><span aria-hidden="true">✓</span> Respuesta correcta</div>}
+              {bloqueado && !ocultarFeedback && !o.correcta && seleccionada === i && <div className="mini respuesta-estado" style={{ marginTop: 4 }}><span aria-hidden="true">×</span> Tu respuesta incorrecta</div>}
               </span>
             </button>
           )

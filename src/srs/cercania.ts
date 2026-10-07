@@ -39,18 +39,18 @@ function aciertoSimulado(ahora: number): Intento {
 
 export function cercaniaDominio(p: ProgresoConcepto, c: CriteriosDominio, ahora = Date.now()): Cercania {
   const actual = evaluarDominio(p, c, ahora)
-  const faltan = actual.detalle.filter(d => !d.cumplido).map(d => d.criterio)
+  const faltan = actual.detalle.filter(d => d.clave !== 'retencion' && !d.cumplido).map(d => d.criterio)
   if (actual.cumple) {
     return { cumple: true, bastaUnAcierto: false, esperandoSeparacion: false, disponibleDesde: null, faltan: [] }
   }
 
   const conUno = evaluarDominio({ ...p, intentos: [...p.intentos, aciertoSimulado(ahora)] }, c, ahora)
-  const pendientes = conUno.detalle.filter(d => !d.cumplido)
+  const pendientes = conUno.detalle.filter(d => d.clave !== 'retencion' && !d.cumplido)
   const soloSeparacion = pendientes.length === 1 && pendientes[0].clave === 'separacion'
 
   // El reloj de la separación corre desde el primer acierto que sigue vigente: un
   // acierto nuevo se añade al final y no mueve ese punto de partida.
-  const primero = aciertosVigentes(p)[0]
+  const primero = aciertosVigentes(p, ahora)[0]
   const disponibleDesde = soloSeparacion && primero
     ? primero.ts + c.separacionHoras * 3_600_000
     : null

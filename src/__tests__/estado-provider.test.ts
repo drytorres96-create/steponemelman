@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ESTADO_INICIAL, type EstadoApp } from '../store/model'
 import type { CloudSnapshot, SyncReply } from '../store/sync'
 
-const mocks = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn(), load: vi.fn(), rpc: vi.fn(), select: vi.fn() }))
+const mocks = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn(), load: vi.fn(), rpc: vi.fn(), select: vi.fn(), indice: vi.fn() }))
 vi.mock('../store/db', () => ({ leer: mocks.read, escribir: mocks.write, borrar: mocks.remove }))
-vi.mock('../data/corpus', () => ({ cargarIndice: async () => null, cargarMigraciones: async () => ({}) }))
+vi.mock('../data/corpus', () => ({ cargarIndice: mocks.indice, cargarMigraciones: async () => ({}) }))
 vi.mock('../lib/supabase', () => ({ supabase: {
   from: () => ({ select: (columnas: string) => { mocks.select(columnas); return { eq: () => ({ maybeSingle: mocks.load }) } } }),
   rpc: mocks.rpc,
@@ -16,6 +16,7 @@ vi.mock('../lib/supabase', () => ({ supabase: {
 import { ProveedorEstado, useApp, AVISO_COPIA_APARTADA } from '../store/estado'
 import { nuevoProgreso, programar } from '../srs/fsrs'
 import { leerEstadoDesconocido } from '../store/model'
+import { evaluarDominio } from '../srs/mastery'
 
 let root: Root
 let host: HTMLDivElement
@@ -48,6 +49,7 @@ beforeEach(() => {
   mocks.read.mockResolvedValue(null)
   mocks.write.mockResolvedValue(undefined)
   mocks.remove.mockResolvedValue(undefined)
+  mocks.indice.mockResolvedValue(null)
   mocks.load.mockImplementation(async () => ({ data: clone(row), error: failure ? new Error('offline') : null }))
   mocks.rpc.mockImplementation(async (_name: string, params: { p_state: EstadoApp; p_generation: string | null }) => {
     if (failure) return { data: null, error: new Error('offline') }
@@ -64,6 +66,56 @@ afterEach(async () => {
 })
 
 describe('proveedor de progreso', () => {
+  it('cada ruta registra en un historial compartido del concepto y acredita los criterios guardados', async () => {
+    mocks.indice.mockResolvedValue({ modulos: [{ sesiones: [{ conceptos: ['COMPARTIDO'] }] }] })
+    await render()
+    const inicio = Date.parse('2026-10-01T09:00:00-04:00')
+    const rutas = ['hoy', 'nbme:relacionados', 'ponerse-al-dia']
+    for (let n = 0; n < rutas.length; n++) {
+      let sessionId = ''
+      await act(async () => { sessionId = api.iniciarSesion('melman', rutas[n]) })
+      const t = { ...intento(`compartido:${n}`, inicio + n * 2 * 86_400_000), session_id: sessionId,
+        pregunta_id: `${sessionId}:0:COMPARTIDO`, pregunta_version: 'melman-v1',
+        fuente_consultada: false, explicacion_previa: false }
+      await act(async () => { api.registrarIntento('COMPARTIDO', t) })
+    }
+    const p = api.progresoDe('COMPARTIDO')
+    expect(Object.keys(api.estado.progreso)).toEqual(['COMPARTIDO'])
+    expect(p.intentos).toHaveLength(3)
+    expect(new Set(p.intentos.map(t => t.session_id)).size).toBe(3)
+    expect(evaluarDominio(p, api.estado.criterios, inicio + 4 * 86_400_000).cumple).toBe(true)
+    const antes = api.estado.progreso
+    await act(async () => { api.registrarVistaConcepto('COMPARTIDO', 'presentacion:sin-respuesta') })
+    expect(api.estado.progreso).toBe(antes)
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
+    expect(row?.state.progreso.COMPARTIDO.intentos).toHaveLength(3)
+    expect(row?.state.criterios).toEqual(api.estado.criterios)
+  })
+
+  it('guarda y sincroniza conceptos publicados vistos sin responder ni crear otra sesión', async () => {
+    mocks.indice.mockResolvedValue({ modulos: [{ sesiones: [{ conceptos: ['A', 'B'] }] }] })
+    await render()
+    await act(async () => { api.registrarVistaConcepto('A', 'paso:A') })
+    const vista = api.estado.conceptosVistos?.A
+    expect(vista).toMatchObject({ preguntaId: 'paso:A' })
+    expect(api.estado.progreso).toEqual({})
+    expect(api.estado.sesiones).toEqual([])
+    expect(api.estado.msEstudio).toBe(0)
+    const respaldo = JSON.parse(localStorage.getItem('step1-respaldo:cuenta:user-a')!)
+    expect(respaldo.state.conceptosVistos.A).toEqual(vista)
+    const escrituras = mocks.write.mock.calls.length
+    await act(async () => {
+      api.registrarVistaConcepto('A', 'paso:A')
+      api.registrarVistaConcepto('inventado', 'paso:inventado')
+    })
+    expect(mocks.write.mock.calls.length).toBe(escrituras)
+    expect(api.estado.conceptosVistos).not.toHaveProperty('inventado')
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
+    expect(row?.state.conceptosVistos?.A).toEqual(vista)
+    expect(row?.state.progreso).toEqual({})
+    expect(leerEstadoDesconocido(JSON.parse(api.exportar()))?.conceptosVistos?.A).toEqual(vista)
+  })
+
   it('respalda el envío inmediatamente y una autoevaluación posterior actualiza el mismo intento', async () => {
     await render()
     let sessionId = ''

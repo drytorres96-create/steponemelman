@@ -1,0 +1,28 @@
+vite v6.4.3 building for production...
+transforming...
+✓ 153 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../nbme-qa-dist/index.html                          0.43 kB │ gzip:   0.29 kB
+../../../nbme-qa-dist/assets/Vinetas-CDjnbw4M.css         0.98 kB │ gzip:   0.45 kB
+../../../nbme-qa-dist/assets/NbmePlayer-DjDqH64E.css      2.59 kB │ gzip:   0.78 kB
+../../../nbme-qa-dist/assets/nbme-DgTJILPg.css           10.49 kB │ gzip:   2.60 kB
+../../../nbme-qa-dist/assets/index-BXaAABPU.css         189.05 kB │ gzip:  37.85 kB
+../../../nbme-qa-dist/assets/PausaDeBloque-oP3-YOLi.js    0.41 kB │ gzip:   0.28 kB
+../../../nbme-qa-dist/assets/Cronometro-BgMdjZDs.js       1.25 kB │ gzip:   0.63 kB
+../../../nbme-qa-dist/assets/SelectorCarga-BqyB-qS2.js    1.75 kB │ gzip:   0.78 kB
+../../../nbme-qa-dist/assets/PielEstudio-DblsE0Rd.js      1.81 kB │ gzip:   0.91 kB
+../../../nbme-qa-dist/assets/Ajustes-CF69YKOG.js          5.90 kB │ gzip:   2.53 kB
+../../../nbme-qa-dist/assets/Inicio-7Bv0p6gU.js           6.19 kB │ gzip:   2.39 kB
+../../../nbme-qa-dist/assets/RecuperarMeta-YwFogs9X.js    7.54 kB │ gzip:   3.16 kB
+../../../nbme-qa-dist/assets/SesionCajas-DFZIWM2I.js      8.42 kB │ gzip:   3.32 kB
+../../../nbme-qa-dist/assets/SesionMixta-Ve15BNnJ.js      9.21 kB │ gzip:   3.62 kB
+../../../nbme-qa-dist/assets/Auditoria-Dn0Z2Ext.js        9.82 kB │ gzip:   3.47 kB
+../../../nbme-qa-dist/assets/Vinetas-DKSnMRtD.js         12.57 kB │ gzip:   4.53 kB
+../../../nbme-qa-dist/assets/NbmeLibrary-1xs83Ggy.js     14.11 kB │ gzip:   4.50 kB
+../../../nbme-qa-dist/assets/Modulos-CzNpPErT.js         17.78 kB │ gzip:   5.82 kB
+../../../nbme-qa-dist/assets/Progreso-Dcyqat_B.js        29.11 kB │ gzip:  10.00 kB
+../../../nbme-qa-dist/assets/NbmePlayer-NFGHd1w4.js      52.79 kB │ gzip:  17.28 kB
+../../../nbme-qa-dist/assets/Reproductor-1Qy0mef1.js     60.26 kB │ gzip:  18.14 kB
+../../../nbme-qa-dist/assets/index-Bzz858u_.js          369.27 kB │ gzip: 117.39 kB
+✓ built in 4.85s

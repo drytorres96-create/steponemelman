@@ -16,6 +16,28 @@
 .nbme-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .nbme-actions .btn { min-height: 44px; white-space: normal; }
 .nbme-resume { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; border-color: #8b7cf655; }
+.nbme-session-card { min-width: 0; padding: 16px 0; border-bottom: 1px solid var(--linea-suave); }
+.nbme-session-card:last-child { border-bottom: 0; }
+.nbme-session-title { display: flex; align-items: baseline; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+.nbme-session-title h3 { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+.nbme-session-state { display: inline-block; color: var(--texto-2); font-size: .82rem; border: 1px solid var(--linea); padding: 3px 9px; border-radius: 20px; }
+.nbme-session-state.complete { color: var(--verde); border-color: var(--verde); }
+.nbme-session-distribution { height: 10px; display: flex; overflow: hidden; border-radius: 7px; background: var(--linea); margin-top: 10px; }
+.nbme-session-distribution > span { height: 100%; }
+.nbme-session-distribution .correct { background: var(--verde); }
+.nbme-session-distribution .wrong { background: var(--rojo, #f07878); }
+.nbme-session-distribution .unanswered { background: #6f7b78; }
+.nbme-session-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.nbme-session-legend .correct { color: var(--verde); }
+.nbme-session-legend .wrong { color: var(--rojo, #f07878); }
+.nbme-session-legend .unanswered { color: var(--texto-2); }
+.nbme-session-delete { padding: 10px 0 0; }
+.nbme-failed-options { list-style: none; padding: 0; display: grid; gap: 8px; }
+.nbme-failed-options li { padding: 12px; border: 1px solid var(--linea); border-radius: var(--radio-s); white-space: pre-wrap; overflow-wrap: anywhere; }
+.nbme-failed-options li.correct { border-color: var(--verde); }
+.nbme-failed-options li.wrong { border-color: var(--rojo, #f07878); }
+.nbme-failed-figure { display: block; max-width: 100%; max-height: 420px; object-fit: contain; }
+.nbme-failed-review .nbme-source-text { white-space: pre-wrap; }
 .nbme-counts { display: flex; gap: 8px 22px; flex-wrap: wrap; }
 .nbme-counts > div { min-width: 120px; }
 .nbme-counts dt { color: var(--texto-2); font-size: .9rem; }

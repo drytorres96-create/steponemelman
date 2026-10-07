@@ -14,7 +14,7 @@ vi.mock('../nbme/NbmeProvider', () => ({ useNbme: mocks.nbme }))
 vi.mock('../semana/api', () => ({ cargarHistorialSesiones: mocks.semana }))
 import { RecuperarMeta } from '../screens/RecuperarMeta'
 
-const lunes = new Date(2026, 9, 5, 10).getTime()
+const lunes = Date.parse('2026-10-05T10:00:00-04:00')
 const intento: Intento = { attempt_id: 'sintetico:0', session_id: 'sintetica', ts: lunes - 2 * 86_400_000, calificacion: 1, resultado: 'incorrecta', interaccion: 'recuperacion_libre', recuperacion_activa: true, tipo_evidencia: 'recuerdo', pistas_usadas: 0, fuente_consultada: false, explicacion_previa: false, ms: 5000, tipo_error: 'desconocimiento', confianza_declarada: null }
 const sesion = { id: 'semana', semana: 'S4', semanaInicio: '2026-10-05', dia: 1, orden: 1, titulo: 'Synthetic', subtitulo: null,
   guion: [{ kind: 'concepto', id: 'C2' }, { kind: 'concepto', id: 'C3' }, { kind: 'pregunta', id: 'Q1', revision: 'r2' }, { kind: 'pregunta', id: 'Q2', revision: 'r1' }], presupuestoMin: 30, estado: 'pendiente', cursor: 0, nbmeSessionId: null, completadaEn: null } as SesionSemanal
@@ -128,22 +128,22 @@ describe('la recuperación valida el progreso y el día al empezar', () => {
   })
 
   it('revalida el día también al retomar una sesión pendiente', async () => {
-    vi.setSystemTime(new Date(2026, 9, 8, 23))
+    vi.setSystemTime(Date.parse('2026-10-08T23:00:00-04:00'))
     banco.state = startNbmeSession(banco.state, { id: 'pausada', title: 'Sesión pendiente', refs: [{ id: 'Q1', revision: 'r2' }] }, lunes)
     await render()
     const retomar = boton('Retomar mi sesión pendiente')!
-    vi.setSystemTime(new Date(2026, 9, 9, 4))
+    vi.setSystemTime(Date.parse('2026-10-09T04:00:00-04:00'))
     await act(async () => retomar.click())
     expect(onRetomar).not.toHaveBeenCalled()
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('El viernes queda libre')
   })
 
   it('revalida el viernes al tocar un botón dibujado el jueves y actualiza la línea sin reabrir la pantalla', async () => {
-    vi.setSystemTime(new Date(2026, 9, 8, 23))
+    vi.setSystemTime(Date.parse('2026-10-08T23:00:00-04:00'))
     await render()
     const empezar = boton('Empezar recuperación de Hoy')!
     expect(empezar).toBeDefined()
-    vi.setSystemTime(new Date(2026, 9, 9, 4))
+    vi.setSystemTime(Date.parse('2026-10-09T04:00:00-04:00'))
     await act(async () => empezar.click())
     expect(onCajas).not.toHaveBeenCalled(); expect(onNuevo).not.toHaveBeenCalled()
     await act(async () => vi.advanceTimersByTime(60_000))
@@ -156,7 +156,7 @@ describe('la recuperación valida el progreso y el día al empezar', () => {
     await render()
     expect(boton('Empezar recuperación de Hoy')).toBeDefined()
     mocks.semana.mockImplementation(() => new Promise(() => {}))
-    vi.setSystemTime(new Date(2026, 9, 12, 10))
+    vi.setSystemTime(Date.parse('2026-10-12T10:00:00-04:00'))
     await act(async () => vi.advanceTimersByTime(60_000))
     expect(mocks.semana).toHaveBeenCalledTimes(2)
     expect(boton('Empezar recuperación de Hoy')).toBeUndefined()

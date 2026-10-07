@@ -88,11 +88,40 @@ function dosSemanas() {
 }
 
 describe('visión a futuro', () => {
+  it('reproduce el día 13 y muestra exactamente cuánto falta para alcanzar, superar y completar cada meta', async () => {
+    for (let i = 0; i < 14; i++) progreso[`C${i}`] = dominado(`C${i}`, f(9, 20))
+    for (let i = 14; i < 31; i++) progreso[`C${i}`] = dominado(`C${i}`, f(10, 1))
+    const respuestas = [
+      ...Array.from({ length: 40 }, (_, i) => respuesta(`Q${i}`, f(9, 20))),
+      ...Array.from({ length: 23 }, (_, i) => respuesta(`Q${i + 40}`, f(10, 1))),
+      respuesta('Q40', f(10, 6)),
+    ]
+    nbme.state.attempts = Object.fromEntries(respuestas.map(r => [r.id, r]))
+    await pintar(f(10, 7, 16))
+    expect(texto()).toContain('Día 13 de 60')
+    expect(barra('Conceptos con dominio demostrado en esta meta')?.getAttribute('aria-valuetext')).toBe('17 de 510; la línea va por 50')
+    expect(barra('Preguntas NBME respondidas')?.getAttribute('aria-valuetext')).toBe('23 de 255; la línea va por 52')
+    expect(texto()).toContain('Para alcanzar la línea: 33. Para superarla: 34. Para completar la meta: 493.')
+    expect(texto()).toContain('Para alcanzar la línea: 29. Para superarla: 30. Para completar la meta: 232.')
+  })
+
+  it('sobrepasar la meta conserva el excedente real y un valor accesible dentro del rango de la barra', async () => {
+    for (let i = 0; i < 515; i++) progreso[`C${i}`] = dominado(`C${i}`, f(10, 1))
+    await pintar(f(10, 7, 16))
+    const b = barra('Conceptos con dominio demostrado en esta meta')!
+    expect(texto()).toContain('515 / 510 · 101 %')
+    expect(texto()).toContain('Meta completada · 5 por encima.')
+    expect(b.getAttribute('aria-valuenow')).toBe('510')
+    expect(b.getAttribute('aria-valuetext')).toContain('515 de 510')
+    expect(b.getAttribute('aria-valuetext')).toContain('meta superada')
+    expect((b.firstElementChild as HTMLElement).style.width).toBe('100%')
+  })
+
   it('es la meta de 60 días: dos metas, el día en que va y lo hecho desde el 25-sep', async () => {
     dosSemanas()
     await pintar(f(10, 10, 10))
     expect(host.querySelector('#meta-titulo')?.textContent).toBe('Meta de 60 días: 510 conceptos y 255 preguntas')
-    expect(texto()).toContain('Día 16 de 60, del 25 sept al 23 nov. Después quedan 4 semanas para consolidar antes del examen.')
+    expect(texto()).toContain('Día 16 de 60, del 25 sept al 23 nov. Después quedan unas 4 semanas para consolidar antes del examen.')
     expect(barra('Conceptos con dominio demostrado en esta meta')?.getAttribute('aria-valuetext')).toBe('80 de 510; la línea va por 67')
     expect(texto()).toContain('Dominio demostrado total: 81 conceptos.')
     expect(barra('Preguntas NBME respondidas')?.getAttribute('aria-valuetext')).toBe('38 de 255; la línea va por 59')

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DIA, EXAMEN_MS, estaVencido, nuevoProgreso, prioridad, programar, proximaRevision, techoHorizonte } from '../srs/fsrs'
 import type { Intento } from '../srs/tipos'
+import { DIAS_META, inicioDelDiaMeta } from '../lib/meta'
 
 const limite = EXAMEN_MS - DIA
 const ahora = Date.parse('2026-10-05T08:00:00-04:00')
@@ -9,6 +10,16 @@ const ids = Array.from({ length: 1400 }, (_, n) => `QA-horizonte-${n}`)
 const diaNY = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' })
 
 describe('reparto del horizonte final', () => {
+  it('la ventana de meta termina antes de los repasos finales y deja intactas sus fechas finitas', () => {
+    const cierreMeta = inicioDelDiaMeta(DIAS_META + 1)
+    expect(cierreMeta).toBe(Date.parse('2026-11-24T03:00:00-05:00'))
+    for (const id of ids) {
+      const fecha = techoHorizonte(despues, ahora, EXAMEN_MS, id)
+      expect(fecha).toBeGreaterThan(cierreMeta)
+      expect(fecha).toBeLessThanOrEqual(Date.parse('2026-12-20T08:00:00-05:00'))
+    }
+  })
+
   it('mantiene compatible el tope de las llamadas anteriores sin ID', () => {
     expect(techoHorizonte(despues, ahora)).toBe(limite)
     expect(techoHorizonte(despues, ahora, EXAMEN_MS, undefined)).toBe(limite)

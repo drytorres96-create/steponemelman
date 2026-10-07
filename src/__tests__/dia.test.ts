@@ -13,11 +13,11 @@ import { reconstruirProgreso } from '../store/model'
  * El día como techo: se cuenta desde el historial, no desde un marcador guardado.
  * Jueves 24 de septiembre de 2026, a media mañana: un día entre semana.
  */
-const AHORA = new Date(2026, 8, 24, 10, 0).getTime()
-const HOY = (h: number, m = 0) => new Date(2026, 8, 24, h, m).getTime()
-const AYER = (h: number) => new Date(2026, 8, 23, h).getTime()
+const AHORA = Date.parse('2026-09-24T10:00:00-04:00')
+const HOY = (h: number, m = 0) => Date.parse(`2026-09-24T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00-04:00`)
+const AYER = (h: number) => Date.parse(`2026-09-23T${String(h).padStart(2, '0')}:00:00-04:00`)
 /** Viernes 25, sábado 26 y domingo 27 de la misma semana. */
-const DIA = (d: number, h: number, m = 0) => new Date(2026, 8, d, h, m).getTime()
+const DIA = (d: number, h: number, m = 0) => Date.parse(`2026-09-${String(d).padStart(2, '0')}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00-04:00`)
 
 const intento = (ts: number, extra: Partial<Intento> = {}): Intento => ({
   attempt_id: `a-${ts}-${Math.random()}`, session_id: 's-hoy', ts, calificacion: 3, resultado: 'correcta',
@@ -196,7 +196,7 @@ describe('el corte de las 3:00', () => {
     expect(inicioDelDia(HOY(10))).toBe(HOY(3))
     expect(inicioDelDia(HOY(2, 59))).toBe(AYER(3))
     expect(inicioDelDia(HOY(3))).toBe(HOY(3))
-    expect(finDelDia(HOY(10))).toBe(new Date(2026, 8, 25, 3).getTime())
+    expect(finDelDia(HOY(10))).toBe(DIA(25, 3))
   })
 })
 
@@ -214,8 +214,8 @@ describe('lo que fija el día y el tema de la semana', () => {
   it('la semana va de lunes a domingo según el día de estudio', () => {
     expect(limitesSemana(AHORA)).toEqual({ inicio: '2026-09-21', fin: '2026-09-27' })
     // El lunes a las 2 AM todavía es el domingo anterior.
-    expect(limitesSemana(new Date(2026, 8, 28, 2).getTime())).toEqual({ inicio: '2026-09-21', fin: '2026-09-27' })
-    expect(limitesSemana(new Date(2026, 8, 28, 4).getTime())).toEqual({ inicio: '2026-09-28', fin: '2026-10-04' })
+    expect(limitesSemana(DIA(28, 2))).toEqual({ inicio: '2026-09-21', fin: '2026-09-27' })
+    expect(limitesSemana(DIA(28, 4))).toEqual({ inicio: '2026-09-28', fin: '2026-10-04' })
   })
 
   it('el tema de la semana reúne los guiones de sus sesiones sin duplicados y en orden', () => {

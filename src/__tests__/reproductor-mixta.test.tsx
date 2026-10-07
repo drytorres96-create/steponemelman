@@ -19,7 +19,8 @@ const mock = vi.hoisted(() => ({
   guardados: [] as EstadoApp['reanudable'][],
   registrados: [] as Intento[],
   cargarConceptos: vi.fn(), calificarConIA: vi.fn(), nextQuestion: vi.fn(),
-  resumeSession: vi.fn(), guardarAvance: vi.fn(),
+  vista: vi.fn(),
+  resumeSession: vi.fn(), startSession: vi.fn(), guardarAvance: vi.fn(),
 }))
 vi.mock('../store/estado', async () => {
   const { useSyncExternalStore } = await import('react')
@@ -29,6 +30,7 @@ vi.mock('../store/estado', async () => {
   const leer = () => mock.estado!
   const acciones = {
     indice,
+    registrarVistaConcepto: mock.vista,
     progresoDe: (id: string) => mock.estado!.progreso[id] ?? nuevoProgreso(id),
     registrarIntento: (id: string, t: Intento) => {
       mock.registrados.push(t)
@@ -55,7 +57,7 @@ vi.mock('../components/ExamenIA', () => ({ ExamenIA: () => null }))
 vi.mock('../components/ChatConcepto', () => ({ ChatConcepto: () => null }))
 vi.mock('../nbme/NbmePlayer', () => ({ NbmePlayer: () => <p>Pregunta NBME siguiente</p> }))
 vi.mock('../nbme/NbmeProvider', () => ({ useNbme: () => ({ state: mock.nbmeState!, loading: false, busy: false,
-  resumeSession: mock.resumeSession, nextQuestion: mock.nextQuestion }) }))
+  resumeSession: mock.resumeSession, startSession: mock.startSession, nextQuestion: mock.nextQuestion }) }))
 
 import { SesionMixta } from '../semana/SesionMixta'
 import { Reproductor } from '../screens/Reproductor'
@@ -113,6 +115,31 @@ async function responder(texto: string) {
 const pintar = () => act(async () => root.render(<SesionMixta sesion={sesion} onSalir={vi.fn()} efimera />))
 
 describe('neurocognición: tramo mixto finito', () => {
+  it('abrir el historial semanal de un bloque borrado conserva el progreso y no crea otro bloque con sus referencias antiguas', async () => {
+    mock.nbmeState = { ...mock.nbmeState!, archivedSessions: { 'nbme-S': Date.now() } }
+    const antes = structuredClone(mock.nbmeState)
+    await pintar()
+    expect(host.textContent).toContain('El bloque NBME de esta sesión se borró de la biblioteca')
+    expect(mock.startSession).not.toHaveBeenCalled()
+    expect(mock.resumeSession).not.toHaveBeenCalled()
+    expect(mock.nbmeState).toEqual(antes)
+    expect(mock.guardados).toHaveLength(0)
+    expect(mock.registrados).toHaveLength(0)
+  })
+
+  it('borrar el bloque en otra ventana mientras cargan los conceptos tampoco lo recrea', async () => {
+    let liberar!: (mapa: Map<string, typeof conceptos[number]>) => void
+    mock.cargarConceptos.mockReturnValue(new Promise<Map<string, typeof conceptos[number]>>(resolve => { liberar = resolve }))
+    await pintar()
+    mock.nbmeState = { ...mock.nbmeState!, archivedSessions: { 'nbme-S': Date.now() } }
+    await pintar()
+    await act(async () => liberar(new Map(conceptos.map(c => [c.concept_id, c]))))
+    expect(host.textContent).toContain('El bloque NBME de esta sesión se borró de la biblioteca')
+    expect(mock.startSession).not.toHaveBeenCalled()
+    expect(mock.resumeSession).not.toHaveBeenCalled()
+    expect(mock.guardados).toHaveLength(0)
+  })
+
   const conOpciones = () => ConceptoZ.parse({ ...conceptos[0],
     interaccion: { recomendada: 'opcion_multiple', permitidas: ['opcion_multiple', 'recuperacion_libre'] },
     evaluacion: { ...conceptos[0].evaluacion, opciones: [
@@ -140,7 +167,7 @@ describe('neurocognición: tramo mixto finito', () => {
     await responder('alfa')
     expect(mock.registrados).toHaveLength(1)
     expect(mock.registrados[0]).toMatchObject({ interaccion: 'recuperacion_libre', recuperacion_activa: true,
-      tipo_evidencia: 'recuerdo', resultado: 'correcta', fuente_consultada: false, explicacion_previa: false, evaluador_version: '2.3.0' })
+      tipo_evidencia: 'recuerdo', resultado: 'correcta', fuente_consultada: false, explicacion_previa: false, evaluador_version: '2.4.0' })
     expect(evaluarDominio(mock.estado!.progreso[c.concept_id], mock.estado!.criterios).cumple).toBe(true)
     const preguntaVersion = mock.registrados[0].pregunta_version
     const guardado = leerEstadoDesconocido(JSON.parse(JSON.stringify(mock.estado)))!

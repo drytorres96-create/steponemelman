@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { nuevoProgreso, programar } from '../srs/fsrs'
-import { evidenciaIndependiente, CRITERIOS_HEREDADOS, CRITERIOS_96H } from '../srs/mastery'
+import { evidenciaIndependiente, evaluarDominio, CRITERIOS_HEREDADOS, CRITERIOS_96H } from '../srs/mastery'
 import type { Intento } from '../srs/tipos'
 import {
-  CORPUS_VERSION, ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, reconstruirProgreso, combinarEstados,
+  CORPUS_VERSION, ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, reconstruirProgreso, combinarEstados, registrarVistaConceptoEstado,
   type EstadoApp,
 } from '../store/model'
 
@@ -159,5 +159,82 @@ describe('migración de criterios al leer el estado guardado', () => {
     const leido = leerEstadoDesconocido({ ...ESTADO_INICIAL, criterios: propios })
     expect(leido?.criterios.separacionHoras).toBe(48)
     expect(leido?.criterios.recuperaciones).toBe(4)
+  })
+})
+
+describe('conceptos vistos sin respuestas ficticias', () => {
+  it('une práctica de distintas rutas bajo el mismo concepto y los mismos criterios de dominio', () => {
+    const inicio = Date.parse('2026-10-01T09:00:00-04:00')
+    const respuesta = (ruta: string, dias: number): Intento => ({ ...intento(`intento:${ruta}`, inicio + dias * 86_400_000),
+      session_id: `sesion:${ruta}`, pregunta_id: `sesion:${ruta}:0:COMPARTIDO`, pregunta_version: 'melman-v1',
+      fuente_consultada: false, explicacion_previa: false, tipo_evidencia: 'recuerdo' })
+    const respuestas = [respuesta('hoy', 0), respuesta('nbme:relacionados', 2), respuesta('ponerse-al-dia', 4)]
+    const porRuta = respuestas.map((t, n): EstadoApp => ({ ...ESTADO_INICIAL,
+      progreso: { COMPARTIDO: reconstruirProgreso('COMPARTIDO', [t], ESTADO_INICIAL.criterios) },
+      sesiones: [{ id: t.session_id!, inicio: t.ts, fin: t.ts + 1000, modulo: 'melman',
+        ruta: ['hoy', 'nbme:relacionados', 'ponerse-al-dia'][n], vistos: 1, correctos: 1, ms: 1200 }] }))
+    const dosRutas = combinarEstados(porRuta[0], porRuta[1])
+    const visto = registrarVistaConceptoEstado(dosRutas, 'COMPARTIDO', 'presentacion:sin-respuesta', inicio + 4 * 86_400_000)
+    expect(evaluarDominio(visto.progreso.COMPARTIDO, visto.criterios, respuestas[2].ts).cumple).toBe(false)
+    expect(visto.progreso.COMPARTIDO.intentos).toHaveLength(2)
+    const unido = combinarEstados(visto, porRuta[2])
+    expect(Object.keys(unido.progreso)).toEqual(['COMPARTIDO'])
+    expect(unido.criterios).toEqual(ESTADO_INICIAL.criterios)
+    expect(unido.progreso.COMPARTIDO).toEqual(reconstruirProgreso('COMPARTIDO', respuestas, unido.criterios))
+    expect(evaluarDominio(unido.progreso.COMPARTIDO, unido.criterios, respuestas[2].ts).cumple).toBe(true)
+    expect(unido.progreso.COMPARTIDO.aciertos).toBe(3)
+    expect(leerEstadoDesconocido(JSON.parse(JSON.stringify(unido)))?.progreso.COMPARTIDO.intentos).toHaveLength(3)
+  })
+
+  it('lee estados anteriores y guarda la presentación nueva sin crear progreso ni agenda', () => {
+    const legado = JSON.parse(JSON.stringify(estadoCon({ A: reconstruirProgreso('A', [intento('a', 1000)], ESTADO_INICIAL.criterios) })))
+    const anterior = leerEstadoDesconocido(legado)!
+    expect(anterior.conceptosVistos).toBeUndefined()
+    const nuevo = registrarVistaConceptoEstado(anterior, 'B', 'paso:B', 2000)
+    const leido = leerEstadoDesconocido(JSON.parse(JSON.stringify(nuevo)))!
+    expect(leido.conceptosVistos).toEqual({ B: { primera: 2000, ultima: 2000, preguntaId: 'paso:B' } })
+    expect(leido.progreso).toEqual(anterior.progreso)
+    expect(leido.sesiones).toEqual(anterior.sesiones)
+    expect(leido.msEstudio).toBe(anterior.msEstudio)
+    expect(leido.progreso.B).toBeUndefined()
+    expect(registrarVistaConceptoEstado(nuevo, 'B', 'paso:B', 3000)).toBe(nuevo)
+  })
+
+  it('fusiona presentaciones en ambos órdenes sin perder la primera ni sumar intentos', () => {
+    const a = registrarVistaConceptoEstado(ESTADO_INICIAL, 'A', 'paso:1', 2000)
+    const b = registrarVistaConceptoEstado(registrarVistaConceptoEstado(ESTADO_INICIAL, 'A', 'paso:2', 1000), 'B', 'paso:3', 3000)
+    const combinado = combinarEstados(a, b)
+    expect(combinado).toEqual(combinarEstados(b, a))
+    expect(combinarEstados(combinado, a)).toEqual(combinado)
+    expect(combinado.conceptosVistos).toEqual({
+      A: { primera: 1000, ultima: 2000, preguntaId: 'paso:1' },
+      B: { primera: 3000, ultima: 3000, preguntaId: 'paso:3' },
+    })
+    expect(combinado.progreso).toEqual({})
+    expect(combinado.sesiones).toEqual([])
+    expect(leerEstadoDesconocido(combinado)).toEqual(combinado)
+    const empate = combinarEstados(a, registrarVistaConceptoEstado(ESTADO_INICIAL, 'A', 'paso:Z', 2000))
+    expect(empate.conceptosVistos?.A.preguntaId).toBe('paso:Z')
+  })
+
+  it('migra y une IDs vistos sin añadirlos al historial de práctica', () => {
+    const visto = registrarVistaConceptoEstado(registrarVistaConceptoEstado(ESTADO_INICIAL, 'OLD', 'old', 1000), 'NEW', 'new', 2000)
+    const migrado = migrarConceptIds(visto, { OLD: 'NEW' })
+    expect(migrado.conceptosVistos).toEqual({ NEW: { primera: 1000, ultima: 2000, preguntaId: 'new' } })
+    expect(migrarConceptIds(migrado, { OLD: 'NEW' })).toEqual(migrado)
+    expect(migrado.progreso).toEqual({})
+  })
+
+  it('rechaza campos vistos corruptos y claves peligrosas sin importar un estado parcial', () => {
+    const valida = { primera: 1000, ultima: 2000, preguntaId: 'paso:1' }
+    for (const vista of [null, 'vista', { ...valida, primera: -1 }, { ...valida, ultima: 999 },
+      { ...valida, preguntaId: '' }, { ...valida, preguntaId: '__proto__' }]) {
+      expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, conceptosVistos: { A: vista } })).toBeNull()
+    }
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, conceptosVistos: [] })).toBeNull()
+    expect(leerEstadoDesconocido({ ...ESTADO_INICIAL, conceptosVistos: JSON.parse('{"__proto__":{"primera":1,"ultima":1,"preguntaId":"q"}}') })).toBeNull()
+    for (const [id, preguntaId, ts] of [['__proto__', 'q', 1], ['A', '', 1], ['A', 'q', Number.NaN]] as const) {
+      expect(registrarVistaConceptoEstado(ESTADO_INICIAL, id, preguntaId, ts)).toBe(ESTADO_INICIAL)
+    }
   })
 })

@@ -1,0 +1,319 @@
+
+> steponemelman@1.30.0 e2e
+> playwright test
+
+[WebServer] (node:43249) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:43263) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 93 tests using 1 worker
+
+(node:43281) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:43281) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/estudio.spec.ts:61:1 › cajas: Intro comprueba, enseña la corrección y sólo el segundo Intro pasa a la siguiente (3.1s)
+  ✓   2 [chromium] › e2e/estudio.spec.ts:81:1 › cajas: si el corrector no sabe juzgar, «La sabía» cuenta y pasa con un toque (35.8s)
+  ✓   3 [chromium] › e2e/estudio.spec.ts:108:1 › cajas: tras un fallo hay una sola acción principal y el resto queda plegado (3.9s)
+  ✓   4 [chromium] › e2e/estudio.spec.ts:124:1 › cajas: la pregunta NBME se contesta con el teclado y la piel no cambia en toda la sesión (5.5s)
+  ✓   5 [chromium] › e2e/estudio.spec.ts:148:1 › lo nuevo: los tramos de tres conceptos se encadenan sin «Sesión terminada» (3.9s)
+  ✓   6 [chromium] › e2e/estudio.spec.ts:168:1 › lo nuevo: los fallos respetan el techo y llegan al cierre en una sola vuelta (5.1s)
+  ✓   7 [chromium] › e2e/estudio.spec.ts:196:1 › lo nuevo: tras un feedback largo el siguiente enunciado queda visible bajo la cabecera (5.6s)
+  ✓   8 [chromium] › e2e/estudio.spec.ts:245:1 › NBME: la figura se amplía sin revelar la respuesta ni la procedencia antes de comprobar (4.1s)
+  ✓   9 [chromium] › e2e/estudio.spec.ts:280:1 › NBME: laboratorios y columnas conservan sus celdas sin desbordar la pantalla (3.5s)
+  ✓  10 [chromium] › e2e/estudio.spec.ts:309:1 › cajas: tras 20 seguidas la pausa es opcional y permite guardar sin un intento nuevo (5.5s)
+  ✓  11 [chromium] › e2e/estudio.spec.ts:336:1 › viñetas del piloto: la letra elige, Intro comprueba sin saltar la explicación y otro Intro sigue (2.2s)
+  ✓  12 [chromium] › e2e/figuras-csp.spec.ts:3:1 › las figuras descargadas se decodifican con la política de seguridad de producción (436ms)
+  ✓  13 [chromium] › e2e/ia-gratuita.spec.ts:18:3 › IA gratuita a 390px › el chat usa la pregunta respondida, conserva la cita y permite continuar (3.1s)
+  ✓  14 [chromium] › e2e/ia-gratuita.spec.ts:95:3 › IA gratuita a 390px › un fallo genera una corrección individual y el razonamiento sólo se analiza al enviarlo (2.5s)
+  ✘  15 [chromium] › e2e/ia-gratuita.spec.ts:154:3 › IA gratuita a 390px › un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar (14.2s)
+(node:44605) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44605) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  16 [chromium] › e2e/ia-gratuita.spec.ts:18:3 › IA gratuita a 1280px › el chat usa la pregunta respondida, conserva la cita y permite continuar (4.0s)
+  ✓  17 [chromium] › e2e/ia-gratuita.spec.ts:95:3 › IA gratuita a 1280px › un fallo genera una corrección individual y el razonamiento sólo se analiza al enviarlo (4.2s)
+  ✘  18 [chromium] › e2e/ia-gratuita.spec.ts:154:3 › IA gratuita a 1280px › un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar (14.7s)
+(node:44890) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44890) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  19 [chromium] › e2e/movil-auditoria.spec.ts:87:3 › auditoría móvil · 390px › figura grande sintética: carga, dimensiones, captura y foco del modal (5.0s)
+  ✓  20 [chromium] › e2e/movil-auditoria.spec.ts:139:3 › auditoría móvil · 390px › laboratorios y caption son legibles en ambas pieles (3.7s)
+  ✓  21 [chromium] › e2e/movil-auditoria.spec.ts:151:3 › auditoría móvil · 390px › zoom aumenta la imagen y permite desplazamiento sin perder el foco (5.9s)
+  ✓  22 [chromium] › e2e/movil-auditoria.spec.ts:87:3 › auditoría móvil · 1280px › figura grande sintética: carga, dimensiones, captura y foco del modal (4.5s)
+  ✓  23 [chromium] › e2e/movil-auditoria.spec.ts:139:3 › auditoría móvil · 1280px › laboratorios y caption son legibles en ambas pieles (4.1s)
+  ✓  24 [chromium] › e2e/movil-auditoria.spec.ts:151:3 › auditoría móvil · 1280px › zoom aumenta la imagen y permite desplazamiento sin perder el foco (4.6s)
+  ✓  25 [chromium] › e2e/movil-auditoria.spec.ts:224:3 › auditoría táctil de figuras › el campo de respuesta mantiene un borde visible en ambas pieles y el conmutador mide 44px (2.0s)
+  ✓  26 [chromium] › e2e/movil-auditoria.spec.ts:239:3 › auditoría táctil de figuras › pellizcar amplía y arrastrar desplaza la figura con eventos táctiles del navegador (4.9s)
+  ✓  27 [chromium] › e2e/movil-auditoria.spec.ts:332:3 › auditoría táctil de figuras › las tablas tienen región enfocada con indicador visible (3.3s)
+  ✓  28 [chromium] › e2e/movil-auditoria.spec.ts:346:3 › auditoría táctil de figuras › la descarga espera al viewport y el salto a respuestas no permite omitir la figura necesaria (3.4s)
+  ✓  29 [chromium] › e2e/movil-auditoria.spec.ts:368:59 › auditoría táctil de figuras › error-descarga: aviso claro, bloqueo y reintento (3.3s)
+  ✓  30 [chromium] › e2e/movil-auditoria.spec.ts:368:59 › auditoría táctil de figuras › error-imagen: aviso claro, bloqueo y reintento (3.5s)
+  ✓  31 [chromium] › e2e/movil-auditoria.spec.ts:405:3 › auditoría móvil horizontal › saltos y modal mantienen el foco visible, sin desbordamiento en horizontal (3.9s)
+  ✓  32 [chromium] › e2e/navbar-menu.spec.ts:37:5 › Menú amplio a 320px › mantiene destinos, alcance táctil y navegación sin iniciar una sesión (3.1s)
+  ✓  33 [chromium] › e2e/navbar-menu.spec.ts:37:5 › Menú amplio a 390px › mantiene destinos, alcance táctil y navegación sin iniciar una sesión (2.8s)
+  ✓  34 [chromium] › e2e/navbar-menu.spec.ts:37:5 › Menú amplio a 1280px › mantiene destinos, alcance táctil y navegación sin iniciar una sesión (3.3s)
+  ✘  35 [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo (13.1s)
+(node:45911) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:45911) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  36 [chromium] › e2e/navbar-menu.spec.ts:152:3 › Ratón y teclado › un clic fija la vista previa y el siguiente cierra; Escape y el exterior también la cierran (3.3s)
+  ✓  37 [chromium] › e2e/navbar-menu.spec.ts:198:3 › Ratón y teclado › el movimiento reducido mantiene los controles visibles y elimina animaciones del panel y sus hijos (2.3s)
+  ✓  38 [chromium] › e2e/navbar-menu.spec.ts:239:5 › Menú táctil 320×740 › abre por toque y permite alcanzar todos los destinos en poco espacio (2.7s)
+  ✓  39 [chromium] › e2e/navbar-menu.spec.ts:239:5 › Menú táctil 390×844 › abre por toque y permite alcanzar todos los destinos en poco espacio (2.4s)
+  ✓  40 [chromium] › e2e/navbar-menu.spec.ts:239:5 › Menú táctil 844×390 › abre por toque y permite alcanzar todos los destinos en poco espacio (2.5s)
+  ✓  41 [chromium] › e2e/premium-aprendizaje.spec.ts:11:3 › aprendizaje y diseño premium a 390px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar (1.9s)
+  ✓  42 [chromium] › e2e/premium-aprendizaje.spec.ts:37:3 › aprendizaje y diseño premium a 390px › lo nuevo conserva el guion, muestra un final cercano y ofrece pausa al terminar el bloque (2.3s)
+  ✓  43 [chromium] › e2e/premium-aprendizaje.spec.ts:79:3 › aprendizaje y diseño premium a 390px › un concepto con dominio vencido entra en Hoy y Progreso distingue su mantenimiento (2.4s)
+  ✓  44 [chromium] › e2e/premium-aprendizaje.spec.ts:105:3 › aprendizaje y diseño premium a 390px › al completar el día hay un cierre explícito sin acción principal adicional (1.5s)
+  ✓  45 [chromium] › e2e/premium-aprendizaje.spec.ts:11:3 › aprendizaje y diseño premium a 1280px › Hoy explica la meta, conserva una sola acción principal y retira fotografías al estudiar (2.2s)
+  ✓  46 [chromium] › e2e/premium-aprendizaje.spec.ts:37:3 › aprendizaje y diseño premium a 1280px › lo nuevo conserva el guion, muestra un final cercano y ofrece pausa al terminar el bloque (2.9s)
+  ✓  47 [chromium] › e2e/premium-aprendizaje.spec.ts:79:3 › aprendizaje y diseño premium a 1280px › un concepto con dominio vencido entra en Hoy y Progreso distingue su mantenimiento (2.7s)
+  ✓  48 [chromium] › e2e/premium-aprendizaje.spec.ts:105:3 › aprendizaje y diseño premium a 1280px › al completar el día hay un cierre explícito sin acción principal adicional (1.6s)
+  ✘  49 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas (1.0m)
+(node:46774) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:46774) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  50 [chromium] › e2e/pulido-premium.spec.ts:113:5 › detalles premium a 390px en light › hover conserva límites visibles de controles y la pausa sigue siendo accesible (2.6s)
+  ✘  51 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas (1.0m)
+(node:47267) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:47267) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  52 [chromium] › e2e/pulido-premium.spec.ts:113:5 › detalles premium a 390px en dark › hover conserva límites visibles de controles y la pausa sigue siendo accesible (2.6s)
+  ✓  53 [chromium] › e2e/pulido-premium.spec.ts:147:5 › biblioteca y navegación coherentes a 390px › los filtros nativos comparten paleta y el acceso a Hoy aprovecha su fila móvil (1.6s)
+  ✘  54 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas (1.0m)
+(node:47628) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:47628) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  55 [chromium] › e2e/pulido-premium.spec.ts:113:5 › detalles premium a 1280px en light › hover conserva límites visibles de controles y la pausa sigue siendo accesible (4.3s)
+  ✘  56 [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas (10.9s)
+
+
+  1) [chromium] › e2e/ia-gratuita.spec.ts:154:3 › IA gratuita a 390px › un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: locator('.correccion-error-ia')
+    Expected string: "se agotó"
+    Received: <element(s) not found>
+    Timeout: 10000ms
+
+    Call log:
+      - Expect "toContainText" with timeout 10000ms
+      - waiting for locator('.correccion-error-ia')
+
+
+      83 |     await page.locator('.nbme-question').waitFor()
+      84 |     await page.keyboard.press('a'); await page.keyboard.press('Enter')
+    > 85 |     await expect(page.locator('.correccion-error-ia')).toContainText('se agotó')
+         |                                                        ^
+      86 |     expect(consultas).toHaveLength(1)
+      87 |     expect(consultas[0]).toMatchObject({ tipo: 'nbme', optionId: 'A', revision: 'r1' })
+      88 |     await expect(page.getByRole('button', { name: 'Continuar', exact: true })).toBeEnabled()
+        at /workspace/work/nbme-recuperacion/e2e/ia-gratuita.spec.ts:85:56
+
+    Error Context: test-results/ia-gratuita-IA-gratuita-a--d626c-a-agotada-permite-continuar-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ia-gratuita-IA-gratuita-a--d626c-a-agotada-permite-continuar-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ia-gratuita-IA-gratuita-a--d626c-a-agotada-permite-continuar-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e/ia-gratuita.spec.ts:154:3 › IA gratuita a 1280px › un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: locator('.correccion-error-ia')
+    Expected string: "se agotó"
+    Received: <element(s) not found>
+    Timeout: 10000ms
+
+    Call log:
+      - Expect "toContainText" with timeout 10000ms
+      - waiting for locator('.correccion-error-ia')
+
+
+      83 |     await page.locator('.nbme-question').waitFor()
+      84 |     await page.keyboard.press('a'); await page.keyboard.press('Enter')
+    > 85 |     await expect(page.locator('.correccion-error-ia')).toContainText('se agotó')
+         |                                                        ^
+      86 |     expect(consultas).toHaveLength(1)
+      87 |     expect(consultas[0]).toMatchObject({ tipo: 'nbme', optionId: 'A', revision: 'r1' })
+      88 |     await expect(page.getByRole('button', { name: 'Continuar', exact: true })).toBeEnabled()
+        at /workspace/work/nbme-recuperacion/e2e/ia-gratuita.spec.ts:85:56
+
+    Error Context: test-results/ia-gratuita-IA-gratuita-a--a1b1f-a-agotada-permite-continuar-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/ia-gratuita-IA-gratuita-a--a1b1f-a-agotada-permite-continuar-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/ia-gratuita-IA-gratuita-a--a1b1f-a-agotada-permite-continuar-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: locator('.navbar-menu')
+    Expected string: ""
+    Received string: serializes to the same string
+    Timeout: 10000ms
+
+    Call log:
+      - Expect "toHaveAttribute" with timeout 10000ms
+      - waiting for locator('.navbar-menu')
+        14 × locator resolved to <details class="menu-cuenta study-secondary-nav navbar-menu">…</details>
+           - unexpected value "null"
+
+
+      100 |     await page.mouse.move(5, 880)
+      101 |     await page.clock.runFor(90)
+    > 102 |     await expect(menu(page)).toHaveAttribute('open', '')
+          |                              ^
+      103 |     await page.clock.runFor(200)
+      104 |     await expect(menu(page)).not.toHaveAttribute('open')
+      105 |     expect(await page.evaluate(() => JSON.stringify(window.__leerProgresoSintetico()))).toBe(progreso)
+        at /workspace/work/nbme-recuperacion/e2e/navbar-menu.spec.ts:102:30
+
+    Error Context: test-results/navbar-menu-Ratón-y-teclad-a3fec-de-salida-permiten-cruzarlo-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/navbar-menu-Ratón-y-teclad-a3fec-de-salida-permiten-cruzarlo-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/navbar-menu-Ratón-y-teclad-a3fec-de-salida-permiten-cruzarlo-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas
+
+    Test timeout of 60000ms exceeded.
+
+    Error: locator.focus: Test timeout of 60000ms exceeded.
+    Call log:
+      - waiting for getByLabel('¿Qué dato te llevó a esa respuesta?')
+
+
+      77 |       await page.getByText('Así lo razoné · opcional', { exact: true }).click()
+      78 |       const razonamiento = page.getByLabel('¿Qué dato te llevó a esa respuesta?')
+    > 79 |       await razonamiento.focus()
+         |                          ^
+      80 |       expect(await razonamiento.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+      81 |       await expect(razonamiento).toBeFocused()
+      82 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+        at /workspace/work/nbme-recuperacion/e2e/pulido-premium.spec.ts:79:26
+
+    Error Context: test-results/pulido-premium-detalles-pr-b78ba-nservan-señales-inequívocas-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/pulido-premium-detalles-pr-b78ba-nservan-señales-inequívocas-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/pulido-premium-detalles-pr-b78ba-nservan-señales-inequívocas-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas
+
+    Test timeout of 60000ms exceeded.
+
+    Error: locator.focus: Test timeout of 60000ms exceeded.
+    Call log:
+      - waiting for getByLabel('¿Qué dato te llevó a esa respuesta?')
+
+
+      77 |       await page.getByText('Así lo razoné · opcional', { exact: true }).click()
+      78 |       const razonamiento = page.getByLabel('¿Qué dato te llevó a esa respuesta?')
+    > 79 |       await razonamiento.focus()
+         |                          ^
+      80 |       expect(await razonamiento.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+      81 |       await expect(razonamiento).toBeFocused()
+      82 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+        at /workspace/work/nbme-recuperacion/e2e/pulido-premium.spec.ts:79:26
+
+    Error Context: test-results/pulido-premium-detalles-pr-756c4-nservan-señales-inequívocas-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/pulido-premium-detalles-pr-756c4-nservan-señales-inequívocas-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/pulido-premium-detalles-pr-756c4-nservan-señales-inequívocas-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas
+
+    Test timeout of 60000ms exceeded.
+
+    Error: locator.focus: Test timeout of 60000ms exceeded.
+    Call log:
+      - waiting for getByLabel('¿Qué dato te llevó a esa respuesta?')
+
+
+      77 |       await page.getByText('Así lo razoné · opcional', { exact: true }).click()
+      78 |       const razonamiento = page.getByLabel('¿Qué dato te llevó a esa respuesta?')
+    > 79 |       await razonamiento.focus()
+         |                          ^
+      80 |       expect(await razonamiento.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+      81 |       await expect(razonamiento).toBeFocused()
+      82 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+        at /workspace/work/nbme-recuperacion/e2e/pulido-premium.spec.ts:79:26
+
+    Error Context: test-results/pulido-premium-detalles-pr-2b150-nservan-señales-inequívocas-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/pulido-premium-detalles-pr-2b150-nservan-señales-inequívocas-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/pulido-premium-detalles-pr-2b150-nservan-señales-inequívocas-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas
+
+    Test was interrupted.
+
+    Error: locator.focus: Test ended.
+    Call log:
+      - waiting for getByLabel('¿Qué dato te llevó a esa respuesta?')
+
+
+      77 |       await page.getByText('Así lo razoné · opcional', { exact: true }).click()
+      78 |       const razonamiento = page.getByLabel('¿Qué dato te llevó a esa respuesta?')
+    > 79 |       await razonamiento.focus()
+         |                          ^
+      80 |       expect(await razonamiento.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+      81 |       await expect(razonamiento).toBeFocused()
+      82 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+        at /workspace/work/nbme-recuperacion/e2e/pulido-premium.spec.ts:79:26
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/pulido-premium-detalles-pr-d6861-nservan-señales-inequívocas-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/pulido-premium-detalles-pr-d6861-nservan-señales-inequívocas-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6 failed
+    [chromium] › e2e/ia-gratuita.spec.ts:154:3 › IA gratuita a 390px › un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar
+    [chromium] › e2e/ia-gratuita.spec.ts:154:3 › IA gratuita a 1280px › un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar
+    [chromium] › e2e/navbar-menu.spec.ts:118:3 › Ratón y teclado › la intención al pasar abre sin robar foco; el puente y la pausa de salida permiten cruzarlo
+    [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas
+    [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 390px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas
+    [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en light › la elección, el resultado y el foco de teclado conservan señales inequívocas
+  1 interrupted
+    [chromium] › e2e/pulido-premium.spec.ts:60:5 › detalles premium a 1280px en dark › la elección, el resultado y el foco de teclado conservan señales inequívocas
+  37 did not run
+  49 passed (7.5m)

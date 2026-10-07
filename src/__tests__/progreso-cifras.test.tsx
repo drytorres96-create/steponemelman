@@ -8,15 +8,15 @@ import type { Intento, ProgresoConcepto } from '../srs/tipos'
 import type { Concepto } from '../schema/concept'
 import type { SesionSemanal } from '../semana/tipos'
 
-const mock = vi.hoisted(() => ({ app: vi.fn(), historial: vi.fn(), topics: vi.fn(), detalle: vi.fn() }))
+const mock = vi.hoisted(() => ({ app: vi.fn(), banco: vi.fn(), historial: vi.fn(), topics: vi.fn(), detalle: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ session: { access_token: 'token-sintetico' } }) }))
-vi.mock('../nbme/NbmeProvider', () => ({ useNbme: () => ({ state: { attempts: {} }, catalog: null }) }))
+vi.mock('../nbme/NbmeProvider', () => ({ useNbme: mock.banco }))
 vi.mock('../semana/api', () => ({ cargarHistorialSesiones: mock.historial }))
 vi.mock('../plan/api', () => ({ cargarTopics: mock.topics }))
-import { BandaDeCifras } from '../screens/ProgresoCifras'
+import { BandaDeCifras, fechaDeSesion } from '../screens/ProgresoCifras'
 
-const HOY = new Date(2026, 9, 8, 9).getTime()
+const HOY = Date.parse('2026-10-08T09:00:00-04:00')
 const i = (dias: number, extra: Partial<Intento> = {}): Intento => ({
   ts: HOY + dias * DIA, calificacion: 3, resultado: 'correcta', interaccion: 'recuperacion_libre',
   recuperacion_activa: true, tipo_evidencia: 'recuerdo', pistas_usadas: 0, fuente_consultada: false,
@@ -41,6 +41,7 @@ beforeEach(() => {
   progreso = { R: p('R'), D: p('D', { interaccion: 'direccion', resultado: 'parcial' }),
     A: p('A', { interaccion: 'caso_clinico', tipo_evidencia: 'aplicacion' }), H: p('H', { pistas_usadas: 1 }), fuera: p('fuera') }
   mock.app.mockImplementation(() => ({ estado: { ...ESTADO_INICIAL, progreso } }))
+  mock.banco.mockReturnValue({ state: { attempts: {} }, catalog: null })
   mock.historial.mockResolvedValue([sesion(1, 'completada'), sesion(3, 'pendiente')])
   mock.topics.mockResolvedValue([{ id: 1, name: 'Bioquímica', status: 2 }, { id: 2, name: 'Endocrino', status: 1 }])
   mock.detalle.mockResolvedValue(conceptos)
@@ -58,6 +59,30 @@ const texto = () => host.textContent ?? ''
 const fila = (label: string) => [...host.querySelectorAll('tr')].find(tr => tr.querySelector('th')?.textContent === label)?.textContent
 
 describe('cifras observadas y detalle solicitado', () => {
+  it('el domingo opcional pertenece al final de su semana y conserva su fecha NY durante DST', () => {
+    const domingo = { ...sesion(0, 'completada'), semanaInicio: '2026-10-26' }
+    expect(fechaDeSesion(domingo).getTime()).toBe(Date.parse('2026-11-01T03:00:00-05:00'))
+    expect(fechaDeSesion({ ...domingo, dia: 1 }).getTime()).toBe(Date.parse('2026-10-26T03:00:00-04:00'))
+  })
+
+  it('los anillos cambian de semana en el corte NY tras DST y excluyen primeras respuestas futuras', async () => {
+    const antes = Date.parse('2026-11-02T02:59:00-05:00'), corte = Date.parse('2026-11-02T03:00:00-05:00')
+    const previo = { ...sesion(0, 'completada'), semanaInicio: '2026-10-26' }, nuevo = { ...sesion(1, 'pendiente'), semanaInicio: '2026-11-02' }
+    mock.historial.mockResolvedValue([previo, nuevo])
+    const intento = (questionId: string, submittedAt: number) => ({ id: questionId, questionId, submittedAt, correct: true })
+    mock.banco.mockReturnValue({ state: { attempts: { previa: intento('Qprevia', antes), actual: intento('Qactual', corte), futura: intento('Qfutura', corte + DIA) } },
+      catalog: { questions: ['Qprevia', 'Qactual', 'Qfutura'].map(id => ({ id, status: 'ready', form: '27' })) } })
+    const leyenda = (label: string) => [...host.querySelectorAll('.progress-ring-legend p')].find(p => p.querySelector('b')?.textContent?.includes(label))?.textContent
+    vi.setSystemTime(antes)
+    await render()
+    expect(leyenda('Sesiones de esta semana')).toContain('100 % · 1/1 · n=1')
+    expect(leyenda('Acierto inicial')).toContain('100 % · 1/1 · n=1')
+    vi.setSystemTime(corte)
+    await render()
+    expect(leyenda('Sesiones de esta semana')).toContain('0 % · 0/1 · n=1')
+    expect(leyenda('Acierto inicial')).toContain('100 % · 1/1 · n=1')
+  })
+
   it('los indicadores generales usan IDs únicos sin cargar contenido ni temas', async () => {
     await render()
     expect(mock.historial).toHaveBeenCalledOnce()

@@ -62,8 +62,10 @@ export function techoHorizonte(propuesta: number, ahora: number, examen = EXAMEN
 }
 
 export function retencion(dias: number, estabilidad: number): number {
-  if (estabilidad <= 0) return 0
-  return Math.pow(1 + F * (dias / estabilidad), C)
+  if (!Number.isFinite(estabilidad) || estabilidad <= 0 || Number.isNaN(dias)) return 0
+  // Un reloj adelantado en otro dispositivo no representa tiempo de olvido negativo.
+  // Con entradas válidas se conserva exactamente la curva del modelo.
+  return Math.pow(1 + F * (Math.max(0, dias) / estabilidad), C)
 }
 
 /** Intervalo (días) para alcanzar la retención objetivo. */
@@ -105,7 +107,7 @@ export function factorPorError(intento: Intento): number {
     case 'error_ortografico': return 0.85          // sabía el concepto: apenas se penaliza
     case 'correcta_con_pistas': return 0.6
     case 'correcta_baja_confianza': return 0.75
-    case 'confusion_conceptos': return 0.5         // la confusión necesita volver antes
+    case 'confusion_conceptos': return intento.confianza_declarada === 3 ? 0.4 : 0.5
     case 'incorrecta_exceso_confianza': return 0.4
     default: return 1
   }
@@ -130,7 +132,7 @@ export function programar(p: ProgresoConcepto, intento: Intento, ahora = Date.no
   // La respuesta comprobada gobierna el planificador. La calificación sólo matiza
   // la dificultad dentro del rango compatible con ese resultado.
   const g = calificacionEfectiva(intento)
-  const diasDesde = p.ultimo ? (ahora - p.ultimo) / DIA : 0
+  const diasDesde = p.ultimo !== null ? Math.max(0, (ahora - p.ultimo) / DIA) : 0
   const r = p.estabilidad > 0 ? retencion(diasDesde, p.estabilidad) : 0.9
 
   const dificultad = p.estabilidad === 0 ? dificultadInicial(g) : siguienteDificultad(p.dificultad, g)

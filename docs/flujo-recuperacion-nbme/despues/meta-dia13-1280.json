@@ -1,0 +1,20 @@
+{
+  "fixture": "escena=meta, synthetic concept IDs and attempts",
+  "ahora": "2026-10-07T20:33:24.000Z",
+  "width": 1280,
+  "texto": "VISIÓN A FUTURO\nMeta de 60 días: 510 conceptos y 255 preguntas\n\nDía 13 de 60, del 25 sept al 23 nov. Después quedan unas 4 semanas para consolidar antes del examen.\n\nConceptos con dominio demostrado en esta meta\n86 / 510 · 17 %\n\nLa línea va por 50. Vas 36 por delante.\n\nYa superaste la línea. Para completar la meta: 424.\n\nDominio demostrado total: 86 conceptos. Mantenimiento: 86 al día · 0 pendientes de repaso.\n\nPreguntas NBME respondidas\n46 / 255 · 18 %\n\nLa línea va por 52. Vas 6 por debajo.\n\nPara alcanzar la línea: 6. Para superarla: 7. Para completar la meta: 209.\n\nLa proyección sale el 9 oct: antes no hay ritmo que proyectar.\n\nPonerme al día con la meta\nDónde va la línea al terminar cada semana.\nHASTA\tCONCEPTOS\tPREGUNTAS\n27 SEPT\t0\t15\n4 OCT\t33\t44\n11 OCT\nESTA SEMANA\n\t100\t74\n18 OCT\t167\t103\n25 OCT\t234\t133\n1 NOV\t301\t163\n8 NOV\t368\t192\n15 NOV\t435\t222\n22 NOV\t502\t251\n23 NOV\t510\t255\nCómo avanzan las líneas y el dominio",
+  "barras": [
+    {
+      "nombre": "Conceptos con dominio demostrado en esta meta",
+      "valor": "86",
+      "max": "510",
+      "texto": "86 de 510; la línea va por 50"
+    },
+    {
+      "nombre": "Preguntas NBME respondidas",
+      "valor": "46",
+      "max": "255",
+      "texto": "46 de 255; la línea va por 52"
+    }
+  ]
+}

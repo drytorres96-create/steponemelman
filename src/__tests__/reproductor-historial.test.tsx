@@ -2,12 +2,12 @@
 import { act, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ESTADO_INICIAL, type EstadoApp } from '../store/model'
+import { ESTADO_INICIAL, registrarVistaConceptoEstado, type EstadoApp } from '../store/model'
 import { ConceptoZ, type Concepto } from '../schema/concept'
 import { nuevoProgreso } from '../srs/fsrs'
 import type { Intento } from '../srs/tipos'
 
-const mock = vi.hoisted(() => ({ app: vi.fn() }))
+const mock = vi.hoisted(() => ({ app: vi.fn(), vista: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../components/AyudaIA', () => ({ AyudaIA: () => null }))
 
@@ -44,9 +44,17 @@ function Envoltura({ c = concepto }: { c?: Concepto }) {
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   estado = { ...ESTADO_INICIAL, progreso: {}, reanudable: null }
+  mock.vista.mockReset()
+  mock.vista.mockImplementation((id: string, preguntaId: string) => {
+    const siguiente = registrarVistaConceptoEstado(estado, id, preguntaId)
+    if (siguiente === estado) return
+    estado = siguiente
+    repintar.fn(n => n + 1)
+  })
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
   mock.app.mockImplementation(() => ({
     estado,
+    registrarVistaConcepto: mock.vista,
     progresoDe: (id: string) => estado.progreso[id] ?? nuevoProgreso(id),
     registrarIntento: (id: string, t: Intento) => {
       const p = estado.progreso[id] ?? nuevoProgreso(id)
@@ -73,6 +81,30 @@ const responder = async () => {
 }
 
 describe('etiqueta de historial del concepto', () => {
+  it('presentar material visible cuenta como visto sin responder ni convertirlo en practicado', async () => {
+    await pintar()
+    expect(estado.conceptosVistos?.[concepto.concept_id]?.preguntaId).toBe(preguntaId)
+    expect(estado.progreso[concepto.concept_id]).toBeUndefined()
+    expect(etiqueta()).toBe('Concepto nuevo aquí')
+    const copia = estado.conceptosVistos
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(estado.conceptosVistos).toBe(copia)
+    expect(estado.progreso[concepto.concept_id]).toBeUndefined()
+    await responder()
+    expect(estado.progreso[concepto.concept_id].intentos).toHaveLength(1)
+  })
+
+  it('una pestaña oculta espera a presentar el concepto antes de marcarlo visto', async () => {
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    await pintar()
+    expect(estado.conceptosVistos).toBeUndefined()
+    expect(estado.progreso[concepto.concept_id]).toBeUndefined()
+    visibility.mockReturnValue('visible')
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(estado.conceptosVistos?.[concepto.concept_id]?.preguntaId).toBe(preguntaId)
+    expect(estado.progreso[concepto.concept_id]).toBeUndefined()
+  })
+
   it('un concepto nuevo conserva la etiqueta después de guardar su propia respuesta', async () => {
     await pintar()
     expect(etiqueta()).toBe('Concepto nuevo aquí')

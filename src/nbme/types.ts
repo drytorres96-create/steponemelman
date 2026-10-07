@@ -81,6 +81,8 @@ export interface NbmeState {
   version: 1
   bankVersion: string
   discarded: NbmeDiscarded
+  /** Bloques retirados de la biblioteca, con sus respuestas y progreso conservados. */
+  archivedSessions?: Record<string, number>
   sessions: Record<string, NbmeSession>
   attempts: Record<string, NbmeAttempt>
   activeSessionId: string | null
@@ -88,6 +90,7 @@ export interface NbmeState {
   filters: NbmeFilters
   filtersChangedAt: number
 }
+export interface NbmeFailedReview { question: NbmeQuestion; attempt: NbmeAttempt }
 export interface NbmeQueueItem extends NbmeQuestionRef { position: number; round: number }
 export interface NbmeSessionView {
   queue: NbmeQueueItem[]

@@ -9,21 +9,23 @@ import { Anillo } from '../components/comunes'
 import { useAuth } from '../auth/AuthProvider'
 import { cargarTopics } from '../plan/api'
 import { evidenciaDiferida, evidenciaPorTopic, porcentajeObservado, type Fraccion, type TopicEstado } from '../lib/retencion-observada'
-import { lunesDe } from '../lib/tiempo'
+import { limitesSemana } from '../lib/dia'
+import { desplazarFechaEstudio, finDiaEstudio, instanteEstudio, instanteEstudioISO } from '../lib/calendario-estudio'
+import { EXAMEN_MS } from '../srs/fsrs'
 import { hitoSemanalAprendizaje, resumenProgresoAprendizaje } from '../lib/progreso-aprendizaje'
 
 /** El examen es el lunes 21 de diciembre de 2026: todo el ritmo se mide contra esa fecha. */
-export const FECHA_EXAMEN = new Date(2026, 11, 21)
+export const FECHA_EXAMEN = new Date(EXAMEN_MS)
 const SEMANA_MS = 7 * 24 * 3_600_000
 
 export type Ventana = 'semana' | 'general'
 
 const hecha = (s: SesionSemanal) => s.estado === 'completada' || s.estado === 'auditada'
 
-/** Fecha local del día de una sesión, sin desplazamiento por zona horaria. */
+/** Corte del día planificado en Nueva York; el día opcional 0 es el domingo de esa semana. */
 export function fechaDeSesion(s: SesionSemanal): Date {
-  const [a, m, d] = s.semanaInicio.split('-').map(Number)
-  return new Date(a, m - 1, d + s.dia - 1)
+  const [anio, mes, dia] = s.semanaInicio.split('-').map(Number)
+  return new Date(instanteEstudio(desplazarFechaEstudio({ anio, mes, dia }, s.dia === 0 ? 6 : s.dia - 1)))
 }
 
 export interface Ritmo {
@@ -90,9 +92,11 @@ export function BandaDeCifras({ conceptos, conceptIds, cargarDetalleConceptos, v
       .catch(() => { if (vivo) setConceptosFallidos(true) })
     return () => { vivo = false }
   }, [detalleSolicitado, conceptos, cargarDetalleConceptos])
-  const ahora = Date.now(), desde = ventana === 'semana' ? lunesDe().getTime() : 0
-  const hasta = ventana === 'semana' ? lunesDe().getTime() + SEMANA_MS : ahora + 1
-  const formas = useMemo(() => progresoPorForma(nbme.state, nbme.catalog, desde), [nbme.state, nbme.catalog, desde])
+  const ahora = Date.now(), limites = limitesSemana(ahora)
+  const desde = ventana === 'semana' ? instanteEstudioISO(limites.inicio) : 0
+  const hasta = ventana === 'semana' ? finDiaEstudio(instanteEstudioISO(limites.fin)) : ahora + 1
+  const formas = useMemo(() => progresoPorForma({ ...nbme.state, attempts: Object.fromEntries(Object.entries(nbme.state.attempts)
+    .filter(([, intento]) => intento.submittedAt <= ahora && intento.submittedAt < hasta)) }, nbme.catalog, desde), [nbme.state, nbme.catalog, desde, hasta, ahora])
   const preguntas = formas.reduce((n, f) => ({ n: n.n + f.nuevas, favorables: n.favorables + f.primeraVez }), { n: 0, favorables: 0 })
   const ids = useMemo(() => [...new Set(conceptIds ?? (conceptos ?? []).map(c => c.concept_id))], [conceptIds, conceptos])
   const publicados = useMemo(() => new Set(ids), [ids])

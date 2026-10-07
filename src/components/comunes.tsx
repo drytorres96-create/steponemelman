@@ -34,8 +34,9 @@ const fraccion = (valor: number, total: number) => total ? Math.min(1, Math.max(
 
 /**
  * Anillo dentro de anillo. El interior es el día y se cierra en oro cuando el día
- * está completo; el exterior es el tema de la semana, partido en un tramo por
- * sesión, como los segmentos de los anillos de bioquímica.
+ * está completo; el exterior es el tema de la semana, partido en tramos cuyo
+ * tamaño corresponde a su población. Los conceptos compartidos entre sesiones
+ * deben llegar asignados una sola vez.
  *
  * La pista es una línea fina en `--linea-interactiva` (más de 3:1 sobre el fondo)
  * y el avance un trazo grueso encima: así el borde del avance contrasta con el
@@ -49,9 +50,20 @@ export function AnilloDoble({ interior, exterior, segmentos, cerrado = false, ta
   const c = tam / 2
   const rExt = c - 7, rInt = c - 29
   const circExt = 2 * Math.PI * rExt, circInt = 2 * Math.PI * rInt
-  const tramos = segmentos.length ? segmentos : [{ valor: exterior.valor, total: exterior.total }]
-  const paso = circExt / tramos.length
-  const hueco = tramos.length > 1 ? Math.min(8, paso * 0.18) : 0
+  const conContenido = segmentos.filter(t => Number.isFinite(t.total) && t.total > 0)
+  const tramos = conContenido.length ? conContenido : [{ valor: exterior.valor, total: exterior.total }]
+  const poblacion = tramos.reduce((n, t) => n + t.total, 0)
+  // La misma proporción de hueco en cada arco conserva la fracción global:
+  // el avance visible suma los conceptos, no promedia sesiones de distinto tamaño.
+  const proporcionHueco = tramos.length > 1 ? Math.min(.18, 8 * tramos.length / circExt) : 0
+  let recorrido = 0
+  const arcos = tramos.map(t => {
+    const paso = poblacion > 0 ? circExt * t.total / poblacion : circExt
+    const hueco = paso * proporcionHueco
+    const arco = { largo: paso - hueco, desplazamiento: -(recorrido + hueco / 2), avance: fraccion(t.valor, t.total) }
+    recorrido += paso
+    return arco
+  })
   const avanceInt = cerrado ? 1 : fraccion(interior.valor, interior.total)
   const transicion = { transition: 'stroke-dasharray .6s cubic-bezier(.2,.8,.2,1)' }
   return (
@@ -64,14 +76,12 @@ export function AnilloDoble({ interior, exterior, segmentos, cerrado = false, ta
             <stop offset="100%" stopColor={cerrado ? 'var(--oro)' : 'var(--magenta)'} />
           </linearGradient>
         </defs>
-        {tramos.map((t, i) => {
-          const largo = paso - hueco
-          const desplazamiento = -(i * paso + hueco / 2)
+        {arcos.map(({ largo, desplazamiento, avance }, i) => {
           return <g key={i}>
             <circle cx={c} cy={c} r={rExt} fill="none" stroke="var(--linea-interactiva)" strokeWidth="2"
               strokeDasharray={`${largo} ${circExt - largo}`} strokeDashoffset={desplazamiento} />
             <circle cx={c} cy={c} r={rExt} fill="none" stroke="var(--violeta)" strokeWidth="9" strokeLinecap="butt"
-              strokeDasharray={`${largo * fraccion(t.valor, t.total)} ${circExt}`} strokeDashoffset={desplazamiento} style={transicion} />
+              strokeDasharray={`${largo * avance} ${circExt}`} strokeDashoffset={desplazamiento} style={transicion} />
           </g>
         })}
         <circle cx={c} cy={c} r={rInt} fill="none" stroke="var(--linea-interactiva)" strokeWidth="2" />

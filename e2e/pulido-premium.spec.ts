@@ -75,7 +75,7 @@ for (const width of [390, 1280]) {
       }
 
       await page.getByText('Así lo razoné · opcional', { exact: true }).click()
-      const razonamiento = page.getByLabel('¿Qué dato te llevó a esa respuesta?')
+      const razonamiento = page.getByLabel('¿Qué dato te llevó a elegir esa opción?')
       await razonamiento.focus()
       expect(await razonamiento.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
       await expect(razonamiento).toBeFocused()

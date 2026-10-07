@@ -8,8 +8,11 @@ import { ESTADO_INICIAL } from '../store/model'
 import { ConceptoZ, type Concepto } from '../schema/concept'
 import type { Intento } from '../srs/tipos'
 import type { ResultadoCalificacion } from '../lib/calificacion-ia'
+import { CRITERIOS_POR_DEFECTO, evidenciaIndependiente } from '../srs/mastery'
+import { evaluarDominio } from '../srs/mastery'
+import { reconstruirProgreso } from '../store/model'
 
-const mock = vi.hoisted(() => ({ app: vi.fn(), calificar: vi.fn() }))
+const mock = vi.hoisted(() => ({ app: vi.fn(), calificar: vi.fn(), vista: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../components/AyudaIA', () => ({ AyudaIA: () => <div>ayuda</div> }))
 vi.mock('../lib/calificacion-ia', () => ({ calificarConIA: mock.calificar }))
@@ -35,19 +38,22 @@ let estado: Record<string, unknown>
 let registrados: Intento[]
 const forzar = { fn: (() => {}) as (f: (n: number) => number) => void }
 
-function Envoltura({ conceptos }: { conceptos: Concepto[] }) {
+function Envoltura({ conceptos, apoyoPrevio = false }: { conceptos: Concepto[]; apoyoPrevio?: boolean }) {
   const [, set] = useState(0)
   forzar.fn = set
-  return <Reproductor cola={{ titulo: 'QA', subtitulo: '', ruta: 'aprendizaje', modulo: 'mod-qa', conceptos }} onSalir={vi.fn()} />
+  return <Reproductor cola={{ titulo: 'QA', subtitulo: '', ruta: 'aprendizaje', modulo: 'mod-qa', conceptos }} onSalir={vi.fn()} apoyoPrevio={apoyoPrevio} />
 }
 
 beforeEach(() => {
+  mock.calificar.mockReset()
+  mock.vista.mockClear()
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
   estado = { ...ESTADO_INICIAL, reanudable: null, progreso: {} }
   registrados = []
   mock.app.mockImplementation(() => ({
     estado,
+    registrarVistaConcepto: mock.vista,
     registrarIntento: (_id: string, intento: Intento) => { registrados.push(intento) },
     cerrarSesion: vi.fn(),
     iniciarSesion: () => 'sesion-qa',
@@ -63,8 +69,9 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi
 
 const boton = (texto: string) => [...host.querySelectorAll('button')].find(b => b.textContent?.trim() === texto)
 
-async function responder(texto: string) {
-  await act(async () => root.render(<Envoltura conceptos={[concepto]} />))
+async function responder(texto: string, opciones: { apoyoPrevio?: boolean; muchaConfianza?: boolean } = {}) {
+  await act(async () => root.render(<Envoltura conceptos={[concepto]} apoyoPrevio={opciones.apoyoPrevio} />))
+  if (opciones.muchaConfianza) await act(async () => boton('Mucha')!.click())
   const input = host.querySelector('input')!
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, texto)
@@ -77,6 +84,25 @@ async function responder(texto: string) {
 const ultimo = () => registrados.at(-1)!
 
 describe('la IA corrige las respuestas breves', () => {
+  it('la recuperación guiada registra práctica en el mismo concepto sin acreditar una respuesta independiente', async () => {
+    mock.calificar.mockResolvedValue({ estado: 'ok', veredicto: 'correcta', motivo: 'Es el mismo concepto.' } satisfies ResultadoCalificacion)
+    await responder('alfa', { apoyoPrevio: true })
+    expect(ultimo()).toMatchObject({ resultado: 'correcta', explicacion_previa: true, tipo_error: 'correcta_con_pistas', evaluador_version: '2.4.0' })
+    expect(evidenciaIndependiente(ultimo())).toBe(false)
+    expect(mock.vista).toHaveBeenCalledWith('QA-1', expect.any(String))
+  })
+
+  it('la confianza alta conserva la confusión conceptual y su bloqueo de dominio', async () => {
+    mock.calificar.mockResolvedValue({ estado: 'ok', veredicto: 'incorrecta', motivo: 'Nombra otro concepto.' } satisfies ResultadoCalificacion)
+    await responder('beta', { muchaConfianza: true })
+    expect(ultimo()).toMatchObject({ resultado: 'incorrecta', tipo_error: 'confusion_conceptos', confianza_declarada: 3 })
+    const fallo = ultimo(), dia = 86_400_000
+    const anteriores = [5, 3, 1].map((d, n) => ({ ...fallo, attempt_id: `previo-${n}`, session_id: `s-${n}`, ts: fallo.ts - d * dia,
+      resultado: 'correcta' as const, tipo_error: 'ninguno' as const, calificacion: 3 as const, confianza_declarada: 2 as const }))
+    const p = reconstruirProgreso('QA-1', [...anteriores, fallo], CRITERIOS_POR_DEFECTO)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, fallo.ts).cumple).toBe(false)
+    expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, fallo.ts).detalle.find(d => d.clave === 'confusion')?.cumplido).toBe(false)
+  })
   it('un sinónimo que el corrector propio no conoce cuenta como acierto y queda marcado', async () => {
     mock.calificar.mockResolvedValue({ estado: 'ok', veredicto: 'correcta', motivo: 'Es el mismo concepto.' } satisfies ResultadoCalificacion)
     await responder('el primer elemento')

@@ -1,0 +1,21 @@
+[WebServer] (node:65122) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:65135) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 8 tests using 1 worker
+
+(node:65153) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:65153) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › docs/flujo-recuperacion-nbme/capturas.spec.ts:181:3 › capturas finales del recorrido a 390px › fundamentos, práctica, IA y regreso conservan encabezados legibles (5.8s)
+  ✓  2 [chromium] › docs/flujo-recuperacion-nbme/capturas.spec.ts:259:3 › capturas finales del recorrido a 390px › biblioteca y visor muestran su título terminado (3.6s)
+  ✓  3 [chromium] › docs/flujo-recuperacion-nbme/capturas.spec.ts:181:3 › capturas finales del recorrido a 1280px › fundamentos, práctica, IA y regreso conservan encabezados legibles (8.6s)
+  ✓  4 [chromium] › docs/flujo-recuperacion-nbme/capturas.spec.ts:259:3 › capturas finales del recorrido a 1280px › biblioteca y visor muestran su título terminado (5.0s)
+  ✓  5 [chromium] › docs/flujo-recuperacion-nbme/capturas.spec.ts:289:3 › contraste de respuestas a 390px › capturas del contraste de respuestas en piel oscura (3.4s)
+  ✓  6 [chromium] › docs/flujo-recuperacion-nbme/capturas.spec.ts:289:3 › contraste de respuestas a 1280px › capturas del contraste de respuestas en piel oscura (4.7s)
+  ✓  7 [chromium] › docs/flujo-recuperacion-nbme/meta-capturas.spec.ts:15:3 › captura de meta día 13 a 390px › conserva la referencia de meta y el orden de Hoy (3.1s)
+  ✓  8 [chromium] › docs/flujo-recuperacion-nbme/meta-capturas.spec.ts:15:3 › captura de meta día 13 a 1280px › conserva la referencia de meta y el orden de Hoy (4.2s)
+
+  8 passed (42.0s)

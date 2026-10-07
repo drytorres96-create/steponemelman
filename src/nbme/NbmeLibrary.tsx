@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNbme } from './NbmeProvider'
 import { deriveNbmeSession, questionProgress } from './model'
+import { sesionesVisiblesNbme } from './sesiones-resumen'
+import { SesionNbmeResumen } from './SesionNbmeResumen'
+import { FalladasNbme } from './FalladasNbme'
 import type { NbmeQuestionMeta } from './types'
 import { ScreenHeading } from '../components/Editorial'
 import './nbme.css'
 
 export function NbmeLibrary({ onStart }: { onStart: () => void }) {
   const { catalog, state, filters, setFilters, loading, busy, error, startSession, resumeSession,
-    discardSession, attemptsInSession, reloadCatalog, catalogStale } = useNbme()
+    archiveSession, reloadCatalog, catalogStale } = useNbme()
   // El catálogo se refresca al abrir esta vista, no en el arranque de la aplicación.
   useEffect(() => { if (catalogStale) void reloadCatalog() }, [catalogStale, reloadCatalog])
-  const [confirmarDescarte, setConfirmarDescarte] = useState<string | null>(null)
+  const [falladas, setFalladas] = useState<{ id: string; titulo: string } | null>(null)
   const questions = catalog?.questions ?? []
   const systems = useMemo(() => [...new Set(questions.flatMap(q => q.systems))].sort((a, b) => a.localeCompare(b, 'es')), [catalog])
   const disciplines = useMemo(() => [...new Set(questions.flatMap(q => q.disciplines))].sort((a, b) => a.localeCompare(b, 'es')), [catalog])
@@ -25,10 +28,11 @@ export function NbmeLibrary({ onStart }: { onStart: () => void }) {
     const priority = (p: typeof pa) => p.pendingError ? 0 : !p.seen ? 1 : 2
     return priority(pa) - priority(pb) || (pa.latestSubmittedAt ?? 0) - (pb.latestSubmittedAt ?? 0) || a.id.localeCompare(b.id)
   }), [matched, state])
-  const pending = useMemo(() => Object.values(state.sessions)
+  const sessions = useMemo(() => sesionesVisiblesNbme(state), [state])
+  const pending = useMemo(() => sessions
     .map(session => ({ session, view: deriveNbmeSession(state, session.id) }))
     .filter(item => item.view && item.view.phase !== 'complete')
-    .sort((a, b) => b.session.controlChangedAt - a.session.controlChangedAt), [state])
+    .sort((a, b) => b.session.controlChangedAt - a.session.controlChangedAt), [state, sessions])
   const next = pending[0]
   const candidateCount = Math.min(filters.size, ready.length)
   const totalReady = questions.filter(q => q.status === 'ready').length
@@ -46,22 +50,11 @@ export function NbmeLibrary({ onStart }: { onStart: () => void }) {
   return <div className="nbme-library pila">
     <ScreenHeading landscape="horizon" eyebrow="Del concepto al razonamiento" title="Preguntas de aplicación" description="Practica con las formas 27, 28 y 29 y repasa los fundamentos que necesites." />
 
-    {next && <section className="tarjeta nbme-resume" aria-label="Sesión de preguntas guardada">
-      <div><h2>Retoma donde lo dejaste</h2><p className="sutil">{next.session.title}</p>
-        <p className="mini">{next.view!.firstAnswered} de {next.view!.initialCount} respondidas en la primera vuelta · {next.view!.pendingErrors} correcciones pendientes</p>
-      </div>
-      <div className="fila">
-        <button className="btn principal" disabled={busy || loading} onClick={() => void resume(next.session.id)}>Continuar sesión</button>
-        {confirmarDescarte === next.session.id
-          ? <>
-              <button className="btn pequeno" disabled={busy} onClick={() => { discardSession(next.session.id); setConfirmarDescarte(null) }}>
-                Sí, descartar {attemptsInSession(next.session.id) || 'el'} {attemptsInSession(next.session.id) === 1 ? 'respuesta' : 'respuestas'}
-              </button>
-              <button className="btn pequeno fantasma" onClick={() => setConfirmarDescarte(null)}>Mejor no</button>
-            </>
-          : <button className="btn pequeno fantasma" disabled={busy} onClick={() => setConfirmarDescarte(next.session.id)}>Descartar bloque</button>}
-      </div>
-      {confirmarDescarte === next.session.id && <p className="mini">Se borra el bloque y sus respuestas. El resto de tu progreso no se toca.</p>}
+    {next && <section className="tarjeta pila" aria-label="Sesión de preguntas guardada">
+      <h2>Retoma donde lo dejaste</h2>
+      <SesionNbmeResumen state={state} session={next.session} busy={busy || loading}
+        onContinuar={() => void resume(next.session.id)} onFalladas={() => setFalladas({ id: next.session.id, titulo: next.session.title })}
+        onBorrar={() => archiveSession(next.session.id)} />
     </section>}
 
     {error && <div className="nbme-error" role="alert"><p>{error}</p>
@@ -114,12 +107,15 @@ export function NbmeLibrary({ onStart }: { onStart: () => void }) {
       <p className="mini">Los errores volverán durante la práctica. Puedes pausar en cualquier momento y continuar después.</p>
     </section>
 
-    {pending.length > 1 && <details className="tarjeta nbme-details"><summary>Otras sesiones guardadas ({pending.length - 1})</summary>
-      <div className="pila">{pending.slice(1).map(({ session, view }) => <div className="nbme-resume" key={session.id}>
-        <div><b>{session.title}</b><p className="mini">{view!.firstAnswered}/{view!.initialCount} en primera vuelta · {view!.pendingErrors} correcciones pendientes</p></div>
-        <button className="btn" disabled={busy} onClick={() => void resume(session.id)}>Retomar</button>
-      </div>)}</div>
-    </details>}
+    {!!sessions.filter(session => session.id !== next?.session.id).length && <section className="tarjeta pila" aria-labelledby="nbme-saved-heading">
+      <h2 id="nbme-saved-heading">Mis sesiones</h2>
+      <p className="mini">La línea muestra los resultados de la primera vuelta. Los errores siguen en rojo aunque después los corrijas.</p>
+      <div className="pila">{sessions.filter(session => session.id !== next?.session.id).map(session => <SesionNbmeResumen key={session.id}
+        state={state} session={session} busy={busy || loading} onContinuar={() => void resume(session.id)}
+        onFalladas={() => setFalladas({ id: session.id, titulo: session.title })} onBorrar={() => archiveSession(session.id)} />)}</div>
+    </section>}
+
+    {falladas && <FalladasNbme sessionId={falladas.id} titulo={falladas.titulo} onCerrar={() => setFalladas(null)} />}
 
     {catalog && <details className="tarjeta nbme-details"><summary>Contenido del banco: {totalReady} disponibles · {questions.length - totalReady} pendientes de revisión</summary>
       <p className="sutil">Las preguntas con problemas de opciones, texto o figuras se conservan en el inventario y quedan fuera de la práctica hasta resolverlos.</p>

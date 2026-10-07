@@ -1,0 +1,10 @@
+.recuperacion-flujo { border-top: 1px solid var(--linea); padding-top: 20px; }
+.recuperacion-flujo.activa { border-top: 0; padding-top: 0; }
+.recuperacion-conceptos { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.recuperacion-conceptos legend { margin-bottom: 8px; }
+.recuperacion-conceptos label { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 12px; border: 1px solid var(--linea); border-radius: 12px; cursor: pointer; }
+.recuperacion-conceptos input { margin-top: 4px; flex-shrink: 0; }
+.recuperacion-conceptos span { min-width: 0; overflow-wrap: anywhere; }
+.recuperacion-conceptos small { display: block; color: var(--tinta-suave); margin-top: 4px; }
+.recuperacion-conceptos label:focus-within { outline: 2px solid var(--violeta); outline-offset: 2px; }
+.nbme-player.recuperando > :not(.recuperacion-flujo) { display: none; }

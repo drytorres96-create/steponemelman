@@ -3,7 +3,7 @@ import { cargarConceptos } from '../data/corpus'
 import { useApp } from '../store/estado'
 import { crearUUID } from '../store/model'
 import { useNbme } from '../nbme/NbmeProvider'
-import { deriveNbmeSession } from '../nbme/model'
+import { deriveNbmeSession, isNbmeSessionArchived } from '../nbme/model'
 import type { NbmeState } from '../nbme/types'
 import { NbmePlayer } from '../nbme/NbmePlayer'
 import { MAX_REINSERCIONES, reinsertarFallo, TITULO_NBME_CAJAS, type ItemCaja } from '../lib/cajas'
@@ -25,7 +25,7 @@ export { TITULO_NBME_CAJAS } from '../lib/cajas'
 /** La sesión NBME de las cajas que espera justo el reintento de esta pregunta. */
 function sesionPendiente(state: NbmeState, id: string, revision: string): string | null {
   for (const s of Object.values(state.sessions)) {
-    if (s.title !== TITULO_NBME_CAJAS || s.initial.length !== 1 || s.initial[0].id !== id || s.initial[0].revision !== revision) continue
+    if (isNbmeSessionArchived(state, s.id) || s.title !== TITULO_NBME_CAJAS || s.initial.length !== 1 || s.initial[0].id !== id || s.initial[0].revision !== revision) continue
     const vista = deriveNbmeSession(state, s.id)
     if (vista?.phase === 'question') return s.id
   }
@@ -125,7 +125,7 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
     if (!paso || paso.item.tipo !== 'pregunta' || preparado === cursor || errorPaso || nbme.loading || nbme.busy) return
     const pregunta = paso.item.id
     const abierta = sesionesPregunta[pregunta]
-    if (abierta && nbme.state.sessions[abierta]) {
+    if (abierta && nbme.state.sessions[abierta] && !isNbmeSessionArchived(nbme.state, abierta)) {
       // Si otro dispositivo ya la corrigió, no queda reintento que hacer.
       if (deriveNbmeSession(nbme.state, abierta)?.phase === 'complete') { avanzar(false); return }
       const guardada = nbme.state.sessions[abierta]
@@ -249,6 +249,6 @@ export function SesionCajas({ items, titulo, onSalir }: { items: ItemCaja[]; tit
     <div className="fila">{seguir}{volver}</div></div></div>
   if (preparado !== cursor) return preparando('Preparando la pregunta…')
   return <div className="pila">{encabezado}
-    <NbmePlayer modoPaso etiquetaSalida="Volver a Hoy" avisoFallo={avisoFallo} onSalir={onSalir} onPasoCompleto={preguntaTerminada} />
+    <NbmePlayer recuperarErrores modoPaso etiquetaSalida="Volver a Hoy" avisoFallo={avisoFallo} onSalir={onSalir} onPasoCompleto={preguntaTerminada} />
   </div>
 }
