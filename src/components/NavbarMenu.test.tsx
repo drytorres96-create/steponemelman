@@ -22,6 +22,7 @@ beforeEach(() => {
     addEventListener: vi.fn(), removeEventListener: vi.fn(),
   })))
   vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility)
+  vi.spyOn(document, 'hidden', 'get').mockImplementation(() => visibility === 'hidden')
   host = document.createElement('div'); outside = document.createElement('button')
   outside.textContent = 'Fuera'; document.body.append(host, outside); root = createRoot(host)
 })
