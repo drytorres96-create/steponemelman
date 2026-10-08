@@ -16,6 +16,7 @@ export interface ContenidoRecuperacion {
   ejercicios: EjercicioRecuperacion[]
   source?: { title: string; page: number }
   cached?: boolean
+  preparacion?: 'ia' | 'fuente_verificada'
 }
 export interface OrigenRecuperacion { qid: string; revision: string; optionId: string; attemptId?: string }
 export interface RespuestaRecuperacion { ejercicioId: string; respuesta: string; correcta: boolean }
@@ -49,7 +50,8 @@ export function esContenidoRecuperacion(v: unknown): v is ContenidoRecuperacion 
   if (!objeto(v) || !texto(v.objetivo, 350) || !Array.isArray(v.ejercicios)
     || v.ejercicios.length < 3 || v.ejercicios.length > 6
     || (v.source !== undefined && (!objeto(v.source) || !texto(v.source.title, 300) || !Number.isInteger(v.source.page) || (v.source.page as number) < 1))
-    || (v.cached !== undefined && typeof v.cached !== 'boolean')) return false
+    || (v.cached !== undefined && typeof v.cached !== 'boolean')
+    || (v.preparacion !== undefined && v.preparacion !== 'ia' && v.preparacion !== 'fuente_verificada')) return false
   const vistos = new Set<string>()
   const valido = v.ejercicios.every(e => {
     if (!objeto(e) || !identificador(e.id) || vistos.has(e.id) || !tipos.has(e.tipo as TipoEjercicioRecuperacion)
@@ -164,7 +166,7 @@ export function guardarRecuperacion(sesion: RecuperacionGuardada, almacen?: Alma
   } catch { return false }
 }
 
-/** cached y el orden de propiedades del JSON no convierten una práctica en otra. */
+/** Los metadatos de preparación/caché y el orden del JSON no convierten una práctica en otra. */
 function mismaPractica(a: ContenidoRecuperacion, b: ContenidoRecuperacion): boolean {
   const firma = (c: ContenidoRecuperacion) => JSON.stringify([c.objetivo, c.ejercicios.map(e => [
     e.id, e.tipo, e.pregunta, e.respuesta, e.alternativas ?? null, e.explicacion, e.evidencia,

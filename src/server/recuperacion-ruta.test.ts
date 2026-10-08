@@ -2,9 +2,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { NbmeQuestion } from '../nbme/types'
 import { ConceptoZ } from '../schema/concept'
-import worker, { StudyCoach, TIEMPO_RECUPERACION_MS } from './worker'
+import worker, { StudyCoach, TIEMPO_RECUPERACION_MS, MAX_TOKENS_SELECCION_RECUPERACION } from './worker'
 import { LIMITE_LLAMADAS_USUARIO, PRESUPUESTO_UTIL, costeEstimado, techoDeModo } from './neuronas'
-import { MAX_TOKENS_RECUPERACION } from './recuperacion-nbme'
+import { validarPlanRecuperacionNbme } from './recuperacion-nbme'
 
 const frases = ['Alpha is the first synthetic element.', 'Beta is the second synthetic element.', 'Gamma is the third synthetic element.']
 const objetivo = 'Distinguish the synthetic element order.'
@@ -20,8 +20,7 @@ const q: NbmeQuestion = { id: 'NBME27-P0001', revision: 'synthetic-old-r1', form
   explanation: fuente, objective: objetivo, figures: [], provenance: { sourceFile: 'Synthetic fixture', sourceRecordId: 'QA', notes: [] },
   systems: [], disciplines: [], topic: 'Synthetic order', reasons: [], figureRequired: false, conceptLinks: [] }
 const input = { questionId: q.id, revision: q.revision, optionId: 'B' }
-const planCompacto = { objetivo, ejercicios: salida.ejercicios.map(({ pregunta: _pregunta, explicacion: _explicacion, ...e }) => e) }
-const fragmentoRelacionado = 'Delta is a linked synthetic mechanism component.'
+const fragmentoRelacionado = 'Delta is the related element.'
 const relacionado = ConceptoZ.parse({ concept_id: 'QA-C1',
   source: { doc: 'QA-linked', doc_title: 'Synthetic linked source', page: 2, item_id: 'QA-C1', fragment: fragmentoRelacionado },
   objetivo: 'Distinguish synthetic components.', afirmacion: fragmentoRelacionado, respuesta_canonica: 'Delta', explicacion: fragmentoRelacionado,
@@ -42,7 +41,19 @@ class Storage {
   async list<T>({ prefix }: { prefix: string }) { return new Map([...this.values].filter(([k]) => k.startsWith(prefix))) as Map<string, T> }
   async transaction<T>(fn: (s: Storage) => Promise<T>) { return fn(this) }
 }
-function setup() {
+function seleccionDelCatalogo(args: unknown, vinculada = false) {
+  const payload = JSON.parse((args as { messages: { content: string }[] }).messages[1].content)
+  const catalogo = payload.catalogo as { id: string; tipo: string; pregunta: string; evidencia: string }[]
+  const primero = catalogo.find(e => e.evidencia === frases[0] && ['seleccion', 'discriminar'].includes(e.tipo))
+  const segundo = catalogo.find(e => e.evidencia === frases[1] && e.tipo === 'verdadero_falso')
+  const tercero = vinculada
+    ? catalogo.find(e => e.evidencia === fragmentoRelacionado && e.tipo === 'completar'
+      && e.pregunta === fragmentoRelacionado.replace('Delta', '____'))
+    : catalogo.find(e => e.evidencia === frases[2] && ['seleccion', 'discriminar'].includes(e.tipo))
+  expect([primero, segundo, tercero].every(Boolean)).toBe(true)
+  return { response: JSON.stringify({ ejercicios: [primero!.id, segundo!.id, tercero!.id] }) }
+}
+function setup(pregunta = q, fragmentoVinculado = fragmentoRelacionado) {
   const permisos = { app: true, nbme: true, ready: true, user: 'synthetic-user', mismatch: false,
     linked: false, editorial: false, corpusMismatch: false, step2: false, corpusHangs: false }
   const remoto = vi.fn(async (url: string) => {
@@ -56,17 +67,18 @@ function setup() {
       if (permisos.corpusHangs) return new Promise<Response>(() => {})
       return Response.json([{ payload: url.includes('index.json') ? indiceRelacionado : {
         corpus_version: permisos.corpusMismatch ? 'synthetic-stale' : indiceRelacionado.corpus_version,
-        conceptos: [{ ...relacionado, step: permisos.step2 ? 'step2' : 'step1',
+        conceptos: [{ ...relacionado, source: { ...relacionado.source, fragment: fragmentoVinculado },
+          step: permisos.step2 ? 'step2' : 'step1',
           ...(permisos.editorial ? { revision_editorial: { nota: 'Private correction', fuentes: [{ titulo: 'Synthetic reference', url: 'https://example.org/reference' }],
             fundamento: { texto: fragmentoRelacionado, revision: '1.0.7' } }, source: { ...relacionado.source, fragment: 'Obsolete synthetic claim must not reach AI.' } } : {}) }],
       } }])
     }
     return Response.json([{ path: `questions/${q.id}/${q.revision}.json`,
-      payload: permisos.mismatch ? { ...q, revision: 'synthetic-other' } : q }])
+      payload: permisos.mismatch ? { ...pregunta, revision: 'synthetic-other' } : pregunta }])
   })
   vi.stubGlobal('fetch', remoto)
   const storage = new Storage()
-  const env = { AI_FREE_ENABLED: 'true', AI: { run: vi.fn().mockResolvedValue({ response: JSON.stringify(salida) }) },
+  const env = { AI_FREE_ENABLED: 'true', AI: { run: vi.fn().mockImplementation(async (_modelo, args) => seleccionDelCatalogo(args)) },
     ASSETS: { fetch: vi.fn() }, COACH: { idFromName: vi.fn(), get: vi.fn() } }
   const coach = new StudyCoach({ storage }, env)
   env.COACH.get.mockReturnValue({ fetch: (request: Request) => coach.fetch(request) })
@@ -77,6 +89,88 @@ function setup() {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 
 describe('puerta de recuperación NBME', () => {
+  it('resuelve los IDs del modelo desde el catálogo y devuelve únicamente preguntas respaldadas', async () => {
+    const { call, env, storage } = setup()
+    env.AI.run.mockImplementation(async (_modelo, args) => {
+      return { ...seleccionDelCatalogo(args), usage: { prompt_tokens: 500, completion_tokens: 40 } }
+    })
+    const respuesta = await call()
+    expect(respuesta.status).toBe(200)
+    const contenido = await respuesta.json()
+    expect(contenido).toMatchObject({ preparacion: 'ia', cached: false })
+    expect(contenido.ejercicios.map((e: { evidencia: string }) => e.evidencia)).toEqual(frases)
+    expect(contenido.ejercicios.map((e: { id: string }) => e.id)).toEqual(['rec-1', 'rec-2', 'rec-3'])
+    expect(await storage.get('gasto')).toMatchObject({ llamadas: 1 })
+    expect(await (await call()).json()).toMatchObject({ preparacion: 'ia', cached: true })
+    expect(env.AI.run).toHaveBeenCalledOnce()
+  })
+  it.each([
+    { ejercicios: ['e-1', 'e-1', 'e-2'] },
+    { ejercicios: ['e-97', 'e-98', 'e-99'] },
+    { ejercicios: ['e-1', 'e-2', 'e-3'], pregunta: 'Invented unsupported private statement.' },
+    '{truncated JSON',
+  ])('una selección no válida ofrece el respaldo comprobado sin exponer la salida ni duplicar el gasto', async salidaModelo => {
+    const { call, env, storage } = setup()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      env.AI.run.mockResolvedValue({ response: typeof salidaModelo === 'string' ? salidaModelo : JSON.stringify(salidaModelo) })
+      const respuesta = await call()
+      expect(respuesta.status).toBe(200)
+      const contenido = await respuesta.json()
+      expect(contenido).toMatchObject({ preparacion: 'fuente_verificada' })
+      expect(contenido.ejercicios).toHaveLength(6)
+      expect(JSON.stringify(contenido)).not.toContain('Invented unsupported private statement')
+      expect(JSON.stringify(log.mock.calls)).toContain('seleccion_no_valida')
+      expect(JSON.stringify(log.mock.calls)).not.toContain('Invented unsupported private statement')
+      expect(env.AI.run).toHaveBeenCalledOnce()
+      expect(await storage.get('gasto')).toMatchObject({ llamadas: 1 })
+    } finally { log.mockRestore() }
+  })
+  it('no gasta cuota cuando la fuente no permite tres ejercicios con dos citas completas', async () => {
+    const { call, env, storage } = setup({ ...q, explanation: frases[0], objective: null })
+    const res = await call()
+    expect(res.status).toBe(503)
+    expect(await res.json()).toMatchObject({ available: false, codigo: 'no_verificable' })
+    expect(env.AI.run).not.toHaveBeenCalled()
+    expect(await storage.get('gasto')).toBeUndefined()
+  })
+  it('excluye toda la fuente primaria contradictoria antes de consultar IA o caché sin cambiar el banco', async () => {
+    const pregunta = { ...q, explanation: 'Alpha is a depolarizing skeletal muscle relaxant.',
+      objective: 'Alpha is a nondepolarizing neuromuscular blocker.' }
+    const antes = structuredClone(pregunta)
+    const { call, env, storage } = setup(pregunta)
+    const res = await call()
+    expect(res.status).toBe(503)
+    expect(await res.json()).toMatchObject({ available: false, codigo: 'fuente_inconsistente' })
+    expect(env.AI.run).not.toHaveBeenCalled()
+    expect(await storage.get('gasto')).toBeUndefined()
+    expect((await storage.list({ prefix: 'cache:' })).size).toBe(0)
+    expect(pregunta).toEqual(antes)
+  })
+  it('ante contradicción utiliza exclusivamente los conceptos vinculados aprobados con su propia procedencia', async () => {
+    const pregunta = { ...q, explanation: 'Alpha is a depolarizing skeletal muscle relaxant.',
+      objective: 'Alpha is a nondepolarizing neuromuscular blocker.' }
+    const fuenteVinculada = 'Delta is the related element. Epsilon is another related element.'
+    const { call, env, permisos } = setup(pregunta, fuenteVinculada)
+    permisos.linked = true
+    env.AI.run.mockResolvedValue({ response: JSON.stringify({ ejercicios: [] }) })
+    const res = await call()
+    expect(res.status).toBe(200)
+    const contenido = await res.json()
+    expect(contenido.preparacion).toBe('fuente_verificada')
+    expect(contenido.source).toEqual({ title: 'Synthetic linked source', page: 2 })
+    expect(contenido.ejercicios).toHaveLength(6)
+    for (const e of contenido.ejercicios) {
+      expect(fuenteVinculada).toContain(e.evidencia)
+      expect(e.source.conceptId).toBe('QA-C1')
+    }
+    const enviado = JSON.stringify(env.AI.run.mock.calls[0][1])
+    expect(enviado).not.toContain(pregunta.explanation)
+    expect(enviado).not.toContain(pregunta.objective)
+    expect(enviado).toContain('Delta is the related element.')
+    expect(await (await call()).json()).toMatchObject({ cached: true, preparacion: 'fuente_verificada' })
+    expect(env.AI.run).toHaveBeenCalledOnce()
+  })
   it('resuelve la revisión histórica exacta, mantiene letras y no confunde análisis con recuperación', async () => {
     const { call, env, remoto } = setup()
     const antes = structuredClone(q)
@@ -87,8 +181,8 @@ describe('puerta de recuperación NBME', () => {
     expect(q).toEqual(antes)
     expect(remoto.mock.calls.some(([url]) => decodeURIComponent(url).includes(`questions/${q.id}/${q.revision}.json`))).toBe(true)
     const sent = env.AI.run.mock.calls[0][1] as { max_tokens: number; messages: { content: string }[] }
-    expect(sent.max_tokens).toBe(MAX_TOKENS_RECUPERACION)
-    expect(sent.messages[0].content).toContain('without explicit reasoning never claim to know')
+    expect(sent.max_tokens).toBe(MAX_TOKENS_SELECCION_RECUPERACION)
+    expect(sent.messages[0].content).toContain('Without explicit reasoning never claim to know')
     expect(JSON.parse(sent.messages[1].content).material.opcion_elegida).toEqual(q.options[1])
     expect(JSON.parse(sent.messages[1].content).razonamiento_del_estudiante).toBe('I swapped the synthetic order.')
   })
@@ -141,16 +235,34 @@ describe('puerta de recuperación NBME', () => {
     expect((await call()).status).toBe(429)
     expect(env.AI.run).not.toHaveBeenCalled()
   })
-  it('descarta invenciones con cita decorativa y limita reintentos del mismo fallo', async () => {
+  it('descarta la propuesta inventada y prepara práctica respaldada sin otra inferencia', async () => {
     const { call, env, storage } = setup()
     env.AI.run.mockResolvedValue({ response: JSON.stringify({ ...salida, ejercicios: salida.ejercicios.map(e => ({ ...e, pregunta: 'Invented new assertion with a real quote.' })) }) })
     const res = await call()
-    expect(res.status).toBe(503)
-    expect(await res.json()).toMatchObject({ available: false, codigo: 'no_verificable' })
-    expect((await call()).headers.get('Retry-After')).not.toBeNull()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ preparacion: 'fuente_verificada', cached: false })
+    expect(body.ejercicios.length).toBeGreaterThanOrEqual(3)
+    expect(JSON.stringify(body)).not.toContain('Invented new assertion')
+    expect(await (await call()).json()).toMatchObject({ preparacion: 'fuente_verificada', cached: true })
     expect(env.AI.run).toHaveBeenCalledOnce()
     const cache = await storage.list({ prefix: 'cache:' })
-    expect([...cache.keys()].every(k => k.startsWith('cache:fallo:'))).toBe(true)
+    expect([...cache.keys()].some(k => !k.startsWith('cache:fallo:'))).toBe(true)
+  })
+  it('una propuesta médica antigua válida no sustituye los IDs y sirve respaldo con procedencia honesta', async () => {
+    const { call, env, storage } = setup()
+    const raw = { response: JSON.stringify(salida) }
+    expect(validarPlanRecuperacionNbme(raw, fuente + '\n' + objetivo, q.options.map(o => o.text))).not.toBeNull()
+    env.AI.run.mockResolvedValue(raw)
+    const res = await call()
+    expect(res.status).toBe(200)
+    const contenido = await res.json()
+    expect(contenido).toMatchObject({ objetivo, preparacion: 'fuente_verificada', cached: false })
+    expect(contenido.ejercicios).toHaveLength(6)
+    expect(contenido.ejercicios).not.toEqual(salida.ejercicios)
+    expect(await (await call()).json()).toMatchObject({ preparacion: 'fuente_verificada', cached: true })
+    expect(env.AI.run).toHaveBeenCalledOnce()
+    expect(await storage.get('gasto')).toMatchObject({ llamadas: 1 })
   })
   it('con IA desactivada deja disponibles el material y la pregunta sin gastar', async () => {
     const { call, env } = setup()
@@ -163,35 +275,33 @@ describe('puerta de recuperación NBME', () => {
   it('lee fragmentos de enlaces actuales autorizados y atribuye la evidencia del material relacionado', async () => {
     const { call, env, permisos, remoto } = setup()
     permisos.linked = true
-    env.AI.run.mockResolvedValue({ response: JSON.stringify({ ...salida, ejercicios: [
-      ...salida.ejercicios.slice(0, 2),
-      { tipo: 'seleccion', pregunta: '____ is a linked synthetic mechanism component.', respuesta: 'Delta',
-        alternativas: ['Alpha', 'Beta', 'Delta'], evidencia: fragmentoRelacionado, explicacion: fragmentoRelacionado },
-    ] }) })
+    env.AI.run.mockImplementation(async (_modelo, args) => seleccionDelCatalogo(args, true))
     const res = await call()
     expect(res.status).toBe(200)
-    expect((await res.json()).ejercicios[2].source).toEqual({ title: 'Synthetic linked source', page: 2, conceptId: 'QA-C1' })
+    const contenido = await res.json()
+    expect(contenido).toMatchObject({ preparacion: 'ia' })
+    expect(contenido.ejercicios).toHaveLength(3)
+    expect(contenido.ejercicios[2]).toMatchObject({ tipo: 'completar', respuesta: 'Delta', evidencia: fragmentoRelacionado,
+      source: { title: 'Synthetic linked source', page: 2, conceptId: 'QA-C1' } })
     expect(remoto.mock.calls.some(([url]) => url.includes('corpus_assets'))).toBe(true)
     const sent = env.AI.run.mock.calls[0][1] as { messages: { content: string }[] }
-    expect(JSON.parse(sent.messages[1].content).material.conceptos_vinculados).toHaveLength(1)
+    expect(JSON.stringify(JSON.parse(sent.messages[1].content).catalogo)).toContain(fragmentoRelacionado)
   })
   it('recupera con la evidencia editorial corregida y nunca cita el fragmento obsoleto', async () => {
     const { call, env, permisos } = setup()
     permisos.linked = true; permisos.editorial = true
     expect((await call()).status).toBe(200)
     const sent = env.AI.run.mock.calls[0][1] as { messages: { content: string }[] }
-    const linked = JSON.parse(sent.messages[1].content).material.conceptos_vinculados
-    expect(linked).toHaveLength(1)
+    const linked = JSON.parse(sent.messages[1].content).catalogo
     expect(JSON.stringify(linked)).toContain(fragmentoRelacionado)
     expect(JSON.stringify(linked)).not.toContain('Obsolete synthetic claim')
-    expect(linked[0].title).toContain('Revisión docente')
   })
   it.each(['corpusMismatch', 'step2'] as const)('omite el material %s y conserva la explicación NBME sin bloquear el flujo', async invalid => {
     const { call, env, permisos } = setup()
     permisos.linked = true; permisos[invalid] = true
     expect((await call()).status).toBe(200)
     const sent = env.AI.run.mock.calls[0][1] as { messages: { content: string }[] }
-    expect(JSON.parse(sent.messages[1].content).material.conceptos_vinculados).toEqual([])
+    expect(JSON.stringify(JSON.parse(sent.messages[1].content).catalogo)).not.toContain(fragmentoRelacionado)
   })
   it('limita la espera del corpus suplementario y sigue con la fuente original', async () => {
     vi.useFakeTimers()
@@ -222,8 +332,8 @@ describe('puerta de recuperación NBME', () => {
     const previo = Math.floor(PRESUPUESTO_UTIL * 0.2)
     await storage.put('gasto', { v: 2, day, neuronas: previo, llamadas: 9,
       users: { 'synthetic-user': { neuronas: previo, llamadas: 9 } } })
-    env.AI.run.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({
-      response: JSON.stringify(planCompacto), usage: { prompt_tokens: 700, completion_tokens: 500 },
+    env.AI.run.mockImplementation((_modelo, args) => new Promise(resolve => setTimeout(() => resolve({
+      ...seleccionDelCatalogo(args), usage: { prompt_tokens: 700, completion_tokens: 40 },
     }), 35_000)))
     let terminada = false
     const pending = call().then(r => { terminada = true; return r })
@@ -233,13 +343,16 @@ describe('puerta de recuperación NBME', () => {
     await vi.advanceTimersByTimeAsync(10_000)
     const res = await pending
     expect(res.status).toBe(200)
-    expect((await res.json()).ejercicios[0]).toMatchObject(salida.ejercicios[0])
+    const contenido = await res.json()
+    expect(contenido).toMatchObject({ preparacion: 'ia', cached: false })
+    expect(contenido.ejercicios).toHaveLength(3)
+    expect(contenido.ejercicios[0]).toMatchObject({ respuesta: 'Alpha', evidencia: frases[0], explicacion: frases[0] })
     expect(env.AI.run.mock.calls[0][0]).toBe('@cf/meta/llama-3.3-70b-instruct-fp8-fast')
     expect((env.AI.run.mock.calls[0][2] as { signal: AbortSignal }).signal.aborted).toBe(false)
     const gasto = await storage.get<{ v: number; neuronas: number; llamadas: number }>('gasto')
     expect(gasto).toMatchObject({ v: 2, llamadas: 10 })
     expect(gasto!.neuronas).toBeGreaterThan(previo)
-    expect(gasto!.neuronas).toBeLessThan(previo + costeEstimado('', MAX_TOKENS_RECUPERACION))
+    expect(gasto!.neuronas).toBeLessThan(previo + costeEstimado('', MAX_TOKENS_SELECCION_RECUPERACION))
   })
   it('recuperación conserva capacidad después del techo de explicación sin reiniciar el contador', async () => {
     const { call, env, storage } = setup()
@@ -274,9 +387,9 @@ describe('puerta de recuperación NBME', () => {
   it('un modelo que termina después del límite no guarda ejercicios ni inicia otra inferencia', async () => {
     vi.useFakeTimers()
     const { call, env, storage } = setup()
-    env.AI.run.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({
-      response: JSON.stringify(planCompacto),
-    }), TIEMPO_RECUPERACION_MS + 10_000)))
+    env.AI.run.mockImplementation((_modelo, args) => new Promise(resolve => setTimeout(() => resolve(
+      seleccionDelCatalogo(args),
+    ), TIEMPO_RECUPERACION_MS + 10_000)))
     const pending = call()
     await vi.waitFor(() => expect(env.AI.run).toHaveBeenCalledOnce())
     await vi.advanceTimersByTimeAsync(TIEMPO_RECUPERACION_MS + 1)
