@@ -1,4 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
+import packageJson from '../package.json' with { type: 'json' }
+
+const { version } = packageJson
 
 const AHORA = new Date('2026-10-05T11:30:00Z')
 async function abrir(page: Page, url: string) {
@@ -20,6 +23,8 @@ for (const width of [390, 1280]) test.describe(`FAQ y material disponible a ${wi
   test('FAQ se consulta con teclado, usa criterios guardados y carga el índice a petición', async ({ page }) => {
     const errores = await abrir(page, '/?escena=abierto#ajustes')
     await expect(page.getByRole('heading', { name: 'Ajustes', exact: true })).toBeVisible()
+    await expect(page.getByText(`Step 1 · Melman · Versión ${version}`, { exact: true })).toBeVisible()
+    await expect(page.locator('[data-app-version]')).toHaveAttribute('data-app-version', version)
     const faq = page.getByRole('region', { name: 'Preguntas frecuentes', exact: true })
     await expect(faq).toBeVisible()
     const antes = await page.evaluate(() => ({ estudio: window.__leerProgresoSintetico(), nbme: window.__leerNbmeSintetico() }))
