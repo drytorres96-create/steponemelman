@@ -112,6 +112,43 @@ describe('recuperar un fallo con una pregunta por turno', () => {
     expect(actividad.mock.calls.map(c => c[0])).toEqual([true, true])
   })
 
+  it('abre y retoma la práctica de fuente verificada con procedencia visible y termina regresando al NBME', async () => {
+    const procedencia = 'Preparada desde el material verificado; la IA no pudo completar la selección.'
+    const nbmePrevio = JSON.stringify({ sessions: { 'qa-session': { status: 'active' } }, attempts: { 'qa-session:0': { optionId: 'B', correct: false } } })
+    localStorage.setItem('step1-backup:nbme-state:qa-owner', nbmePrevio)
+    mock.generar.mockResolvedValue({ estado: 'ok', data: { ...contenido, preparacion: 'fuente_verificada' } })
+    await renderizar()
+    expect(host.textContent).not.toContain(procedencia)
+    await pulsar('Practicar este error con IA')
+    expect(host.textContent).toContain(procedencia)
+    await escribir('alpha'); await pulsar('Comprobar respuesta'); await pulsar('Siguiente ejercicio')
+    await elegir('Falso')
+    await act(async () => root.unmount())
+    root = createRoot(host); await renderizar()
+    expect(host.textContent).not.toContain(procedencia)
+    await pulsar('Retomar recuperación')
+    expect(host.textContent).toContain(procedencia)
+    expect(host.querySelector<HTMLInputElement>('input[value="Falso"]')!.checked).toBe(true)
+    await pulsar('Comprobar respuesta'); await pulsar('Siguiente ejercicio')
+    await elegir('beta'); await pulsar('Comprobar respuesta'); await pulsar('Siguiente ejercicio')
+    await elegir('gamma'); await pulsar('Comprobar respuesta'); await pulsar('Terminar recuperación')
+    await pulsar('Volver a la pregunta original')
+    expect(terminar).toHaveBeenCalledExactlyOnceWith('original')
+    expect(mock.generar).toHaveBeenCalledOnce()
+    expect(localStorage.getItem('step1-backup:nbme-state:qa-owner')).toBe(nbmePrevio)
+    const guardada = JSON.parse(localStorage.getItem(claveRecuperacion('qa-owner', origen)!)!)
+    expect(guardada).toMatchObject({ cursor: 4, cerrada: true, contenido: { preparacion: 'fuente_verificada' } })
+  })
+
+  it.each([undefined, 'ia'] as const)('la preparación %s carga sin atribuirla a una selección fallida', async preparacion => {
+    mock.generar.mockResolvedValue({ estado: 'ok', data: { ...contenido, ...(preparacion ? { preparacion } : {}) } })
+    await renderizar(); await pulsar('Practicar este error con IA')
+    expect(host.textContent).toContain('Ejercicio 1 de 4')
+    expect(host.textContent).not.toContain('la IA no pudo completar la selección')
+    await escribir('alpha'); await pulsar('Comprobar respuesta')
+    expect(host.textContent).toContain('El ejercicio y su respuesta se apoyan en este fragmento.')
+  })
+
   it('mantiene la cuenta y revisión separadas, y cancela la generación antigua al cambiarlas', async () => {
     let resolver: (v: unknown) => void = () => {}
     mock.generar.mockImplementation(() => new Promise(resolve => { resolver = resolve }))

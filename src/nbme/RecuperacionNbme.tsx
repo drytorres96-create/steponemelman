@@ -89,6 +89,7 @@ function PanelRecuperacion({ ownerId, origen, onTerminar, puedeSeguir = true, on
       {!sesion && <p className="mini">Usa el presupuesto gratuito de IA. La práctica se guarda en esta cuenta y dispositivo.</p>}
     </>}
     {abierta && sesion && <>
+      {sesion.contenido.preparacion === 'fuente_verificada' && <p className="mini">Preparada desde el material verificado; la IA no pudo completar la selección.</p>}
       <p className="recuperacion-objetivo" lang="en"><b lang="es">Objetivo:</b> {sesion.contenido.objetivo}</p>
       {sesion.cerrada ? <div className="pila" aria-live="polite">
         <h4 ref={titulo} tabIndex={-1}>Recuperación terminada</h4>
@@ -122,7 +123,7 @@ function PanelRecuperacion({ ownerId, origen, onTerminar, puedeSeguir = true, on
           <p lang="en">{ejercicio.explicacion}</p>
           <details><summary>Ver el fragmento utilizado</summary><blockquote lang="en">{ejercicio.evidencia}</blockquote>
             {ejercicio.source && <p className="mini">{ejercicio.source.title} · página {ejercicio.source.page}</p>}
-            <p className="mini">La interpretación de IA puede equivocarse; contrástala con el material.</p></details>
+            <p className="mini">El ejercicio y su respuesta se apoyan en este fragmento.</p></details>
           <button className="btn principal" onClick={() => actualizar(avanzarRecuperacion(sesion))}>{sesion.cursor + 1 === sesion.contenido.ejercicios.length ? 'Terminar recuperación' : 'Siguiente ejercicio'}</button>
         </div>}
         <div className="recuperacion-acciones"><button className="btn fantasma" onClick={() => salir('original')}>Pausar y volver al NBME</button></div>

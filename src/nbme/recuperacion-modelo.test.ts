@@ -84,6 +84,39 @@ describe('recuperación aislada y finita', () => {
     expect(leerRecuperacion('qa-owner', origen, local)).toEqual({ estado: 'ok', sesion: pendiente })
   })
 
+  it.each([undefined, 'ia', 'fuente_verificada'] as const)('conserva preparación %s al guardar y retomar, incluida la práctica antigua sin ese campo', preparacion => {
+    const local = almacen()
+    const material = { ...contenido, ...(preparacion ? { preparacion } : {}) }
+    expect(esContenidoRecuperacion(material)).toBe(true)
+    const contestada = responderRecuperacion(crearRecuperacion('qa-owner', origen, material, 1), 'alpha', 2)
+    const pendiente = { ...avanzarRecuperacion(contestada, 3), borrador: 'Falso' }
+    expect(guardarRecuperacion(pendiente, local)).toBe(true)
+    const lectura = leerRecuperacion('qa-owner', origen, local)
+    expect(lectura).toEqual({ estado: 'ok', sesion: pendiente })
+    if (lectura.estado === 'ok') expect(lectura.sesion.contenido.preparacion).toBe(preparacion)
+    expect(leerRecuperacion('qa-other', origen, local)).toEqual({ estado: 'vacio' })
+    expect(leerRecuperacion('qa-owner', { ...origen, attemptId: 'another-session:0' }, local)).toEqual({ estado: 'vacio' })
+  })
+
+  it.each([null, false, 'inventada', 'IA', {}])('rechaza preparación malformada %s en red y almacenamiento', preparacion => {
+    const material = { ...contenido, preparacion }
+    expect(esContenidoRecuperacion(material)).toBe(false)
+    const local = almacen()
+    const sesion = crearRecuperacion('qa-owner', origen, contenido, 1)
+    local.setItem(claveRecuperacion('qa-owner', origen)!, JSON.stringify({ ...sesion, contenido: material }))
+    expect(leerRecuperacion('qa-owner', origen, local)).toEqual({ estado: 'invalido' })
+  })
+
+  it('la procedencia no permite que una pestaña antigua retroceda el mismo lote verificado', () => {
+    const local = almacen()
+    const antigua = crearRecuperacion('qa-owner', origen, contenido, 1)
+    const verificada = { ...antigua, contenido: { ...contenido, preparacion: 'fuente_verificada' as const } }
+    const avanzada = avanzarRecuperacion(responderRecuperacion(verificada, 'alpha', 2), 3)
+    expect(guardarRecuperacion(avanzada, local)).toBe(true)
+    expect(guardarRecuperacion({ ...antigua, actualizadaEn: 99 }, local)).toBe(false)
+    expect(leerRecuperacion('qa-owner', origen, local)).toEqual({ estado: 'ok', sesion: avanzada })
+  })
+
   it('una pestaña desfasada no borra respuestas ni retrocede el cursor guardado por otra', () => {
     const local = almacen()
     const pestañaB = crearRecuperacion('qa-owner', origen, contenido, 1)

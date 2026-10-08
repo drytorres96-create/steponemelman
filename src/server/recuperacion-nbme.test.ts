@@ -95,6 +95,22 @@ describe('plan compacto de recuperación NBME', () => {
     expect(validarPlanRecuperacionNbme(raw(p), fuente)).toBeNull()
   })
 
+  it('permite una afirmación completa de 300 caracteres y rechaza la de 301 sin recortarla', () => {
+    const prefijo = 'Alpha does not activate the synthetic receptor without '
+    const frase = (n: number) => prefijo + 'x'.repeat(n - prefijo.length - 1) + '.'
+    for (const largo of [300, 301]) {
+      const evidencia = frase(largo)
+      expect(evidencia.length).toBe(largo)
+      const p = plan()
+      p.ejercicios[0] = { tipo: 'completar', evidencia, respuesta: 'Alpha' }
+      const resultado = validarPlanRecuperacionNbme(raw(p), fuente + '\n' + evidencia)
+      if (largo === 300) {
+        expect(resultado?.ejercicios[0].evidencia).toBe(evidencia)
+        expect(resultado?.ejercicios[0].pregunta).toContain('does not activate')
+      } else expect(resultado).toBeNull()
+    }
+  })
+
   it('no amplía las reglas de longitud de pregunta ni de respuesta al construir el hueco', () => {
     const evidencia = 'Thyrotropin binds.'
     const p = plan()
