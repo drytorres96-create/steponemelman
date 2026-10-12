@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
-const LUNES = new Date('2026-10-05T07:30:00-04:00')
+/** Sábado: desde la 1.32.0 sólo el fin de semana trae preguntas NBME nuevas. */
+const LUNES = new Date('2026-10-17T07:30:00-04:00')
 for (const width of [390, 1280]) test.describe(`aprendizaje y diseño premium a ${width}px`, () => {
   test.use({ viewport: { width, height: 844 }, reducedMotion: 'reduce' })
 

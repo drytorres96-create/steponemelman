@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 
-const LUNES = new Date('2026-10-05T07:30:00-04:00')
+/** Sábado: desde la 1.32.0 sólo el fin de semana trae preguntas NBME nuevas. */
+const LUNES = new Date('2026-10-17T07:30:00-04:00')
 
 async function colores(elemento: Locator) {
   return elemento.evaluate(el => {

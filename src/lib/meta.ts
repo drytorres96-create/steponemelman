@@ -4,30 +4,36 @@ import { INICIO_DIA_HORA, TECHOS } from './dia'
 import { desplazarFechaEstudio, diaSemanaEstudio, fechaEstudio, fechaISOEstudio, instanteEstudio, numeroDiaEstudio, partesEstudio } from './calendario-estudio'
 
 /**
- * La meta de 60 días: del viernes 25-sep-2026 al lunes 23-nov-2026. Las cuatro
- * semanas siguientes, hasta el examen, quedan para consolidar.
+ * La meta: del lunes 12-oct-2026 al lunes 23-nov-2026 (43 días). Las cuatro semanas
+ * siguientes, hasta el examen, quedan para consolidar.
  *
- * Es la vista a futuro de los techos de Hoy, no un reparto del corpus: repartir lo
- * que queda del material pedía 372 conceptos en una semana en la que los techos dan
- * unos 80, y una meta que el día no puede cumplir sólo sirve para sentirse detrás.
+ * Reiniciada el 12-oct-2026 a petición de Yoel. La ventana anterior (25-sep → 23-nov,
+ * 510 conceptos y 255 preguntas) asumía los techos completos todos los días y nunca
+ * fue alcanzable con los criterios de dominio: ni en la mejor semana se llegaba a la
+ * línea. Lo dominado antes del 12-oct queda como base y no cuenta para esta meta.
+ *
+ * Es la vista a futuro de los techos de Hoy, no un reparto del corpus: una meta que
+ * el día no puede cumplir sólo sirve para sentirse detrás.
  *
  * Nada de esto se guarda: como el estado del día, sale del historial y de la fecha.
  */
 
 /** Primer día de la ventana en el calendario de Nueva York. */
-const INICIO = { anio: 2026, mes: 9, dia: 25 }
-export const DIAS_META = 60
+const INICIO = { anio: 2026, mes: 10, dia: 12 }
+export const DIAS_META = 43
 /**
- * Conceptos dominados en la ventana. Es la meta calibrada con el estado real del
- * 25-sep (docs/cambios-1.21.0.md): ya descuenta los días que no se cumplen, así que
- * no pide cerrar Hoy todos los días. No se cambia a ojo.
+ * Conceptos dominados en la ventana. Misma regla que la calibración del 25-sep
+ * (docs/cambios-1.21.0.md: 510 sobre 690 de techo, ~74 %) aplicada a los techos nuevos:
+ * 245 de techo en 43 días dan 181, redondeado a 180. Ya descuenta los días que no se
+ * cumplen, así que no pide cerrar Hoy todos los días. No se cambia a ojo
+ * (docs/cambios-1.32.0.md).
  */
-export const META_CONCEPTOS = 510
+export const META_CONCEPTOS = 180
 /**
- * Preguntas NBME respondidas por primera vez en la ventana. Su techo es justo la mitad
- * del de conceptos —5 y 10 frente a 10 y 20—, así que su meta es la mitad: 255.
+ * Preguntas NBME respondidas por primera vez en la ventana. Guarda con los conceptos
+ * la misma proporción que sus techos: 60 frente a 245 → 44.
  */
-export const META_PREGUNTAS = 255
+export const META_PREGUNTAS = 44
 /** Supuesto de planificación; la acreditación real exige los criterios guardados, no siete días fijos. */
 export const RETRASO_DOMINIO = 7
 /** La proyección espera dos semanas: la primera la infla lo que ya venía en camino. */
@@ -43,12 +49,12 @@ export function inicioDelDiaMeta(n: number): number {
   return instanteEstudio(desplazarFechaEstudio(INICIO, n - 1), INICIO_DIA_HORA)
 }
 
-/** Qué día de la ventana es `ahora`: 1 el 25-sep, 60 el 23-nov; 0 o menos antes y más de 60 después. */
+/** Qué día de la ventana es `ahora`: 1 el 12-oct, 43 el 23-nov; 0 o menos antes y más de 43 después. */
 export function diaDeLaMeta(ahora: number): number {
   return numeroDiaEstudio(fechaEstudio(ahora, INICIO_DIA_HORA)) - numeroDiaEstudio(INICIO) + 1
 }
 
-/** Suma de los techos de los `n` primeros días de la ventana: nada el viernes, el doble el fin de semana. */
+/** Suma de los techos de los `n` primeros días de la ventana, con los techos de Hoy de cada tipo de día. */
 function techosAcumulados(n: number, campo: 'conceptos' | 'preguntas'): number {
   let suma = 0
   for (let k = 1; k <= Math.min(n, DIAS_META); k++) {

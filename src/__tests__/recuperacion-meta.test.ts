@@ -13,7 +13,7 @@ const meta = (hechos = 50, linea = 57): ResumenMeta => ({ dia: 11, conceptos: se
 const caja = (id: string, hecho = false): ItemCaja => ({ id, tipo: 'concepto', caja: 1, vence: AHORA - 1, hecho })
 const entrada = (extra: Partial<EntradaRecuperacion> = {}): EntradaRecuperacion => ({
   meta: meta(), datosListos: true, semanaLista: true, sesionPendiente: false,
-  dia: { tipo: 'semana', nuevo: { conceptos: 3, preguntas: 1, techoConceptos: 10, techoPreguntas: 5, cerrada: false }, cajas: { hechos: 1, techo: 4, cerrada: false }, completo: false },
+  dia: { tipo: 'finde', nuevo: { conceptos: 3, preguntas: 1, techoConceptos: 10, techoPreguntas: 5, cerrada: false }, cajas: { hechos: 1, techo: 4, cerrada: false }, completo: false },
   cajas: [caja('C0', true), caja('C1'), caja('C2'), caja('C3')],
   nuevo: { conceptIds: ['N1', 'N2'], preguntas: [{ id: 'Q1', revision: 'r-original' }], titulo: 'Nuevo de hoy · 5 oct', nbmeSessionId: null }, ...extra,
 })
@@ -89,13 +89,15 @@ describe('ponerse al día sin cambiar qué cuenta como dominio ni añadir deuda 
 })
 
 it('Hoy y recuperación seleccionan exactamente los mismos IDs y reutilizan sólo la sesión NBME con las mismas referencias', () => {
-  const e: EntradaDia = { progreso: {}, intentosPreguntas: [], conceptosSemana: ['C2', 'C1'], preguntasSemana: ['Q2', 'Q1'], cajas: { hechos: 0, techo: 0 }, ahora: AHORA }
+  // Sábado: entre semana no entran preguntas NBME nuevas y la sesión NBME no tendría nada que reutilizar.
+  const sabado = new Date(2026, 9, 17, 10).getTime()
+  const e: EntradaDia = { progreso: {}, intentosPreguntas: [], conceptosSemana: ['C2', 'C1'], preguntasSemana: ['Q2', 'Q1'], cajas: { hechos: 0, techo: 0 }, ahora: sabado }
   const q = (id: string): NbmeQuestionMeta => ({ id, revision: 'r2', form: '27', section: 1, item: 1, page: 1, systems: [], disciplines: [], topic: 'Synthetic', objective: null, status: 'ready', reasons: [], figureRequired: false, conceptLinks: [] })
   const listas = new Map(['Q1', 'Q2'].map(id => [id, q(id)]))
-  const esperado = { conceptIds: ['C2', 'C1'], preguntas: [{ id: 'Q2', revision: 'r2' }, { id: 'Q1', revision: 'r2' }], titulo: 'Nuevo de hoy · 5 oct', nbmeSessionId: null }
+  const esperado = { conceptIds: ['C2', 'C1'], preguntas: [{ id: 'Q2', revision: 'r2' }, { id: 'Q1', revision: 'r2' }], titulo: 'Nuevo de hoy · 17 oct', nbmeSessionId: null }
   const inicial = prepararNuevoDeHoy(e, listas, emptyNbmeState())
   expect(inicial).toEqual(esperado)
-  const state = startNbmeSession(emptyNbmeState(), { id: 'pendiente', title: inicial.titulo, refs: inicial.preguntas }, AHORA)
+  const state = startNbmeSession(emptyNbmeState(), { id: 'pendiente', title: inicial.titulo, refs: inicial.preguntas }, sabado)
   expect(prepararNuevoDeHoy(e, listas, state).nbmeSessionId).toBe('pendiente')
   listas.set('Q1', { ...q('Q1'), revision: 'r3' })
   expect(prepararNuevoDeHoy(e, listas, state).nbmeSessionId).toBeNull()

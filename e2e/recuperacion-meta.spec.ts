@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 for (const width of [390, 1280]) test.describe(`recuperación de la meta a ${width}px`, () => {
   test.use({ viewport: { width, height: 844 }, reducedMotion: 'reduce' })
   test('se abre a petición, distingue dominio y trabajo y retoma la misma cola de Hoy', async ({ page }) => {
-    await page.clock.install({ time: new Date('2026-10-05T11:30:00Z') })
+    await page.clock.install({ time: new Date('2026-10-26T11:30:00Z') })
     await page.goto('/?escena=atraso#progreso')
     const panel = page.locator('details').filter({ has: page.getByText('Ponerme al día con la meta', { exact: true }) })
     await expect(panel).not.toHaveAttribute('open', '')
@@ -19,7 +19,7 @@ for (const width of [390, 1280]) test.describe(`recuperación de la meta a ${wid
     await expect(page.locator('.session-step-label')).toContainText('Paso 1 de 4')
   })
   test('el viernes la distancia es informativa y no abre recuperación', async ({ page }) => {
-    await page.clock.install({ time: new Date('2026-10-09T11:30:00Z') })
+    await page.clock.install({ time: new Date('2026-10-30T11:30:00Z') })
     await page.goto('/?escena=atraso#progreso')
     await page.getByText('Ponerme al día con la meta', { exact: true }).click()
     await expect(page.locator('.recuperacion-meta')).toContainText('El viernes queda libre')
@@ -28,7 +28,7 @@ for (const width of [390, 1280]) test.describe(`recuperación de la meta a ${wid
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   })
   test('retoma la cola exacta de conceptos en su paso guardado', async ({ page }) => {
-    await page.clock.install({ time: new Date('2026-10-05T11:30:00Z') })
+    await page.clock.install({ time: new Date('2026-10-26T11:30:00Z') })
     await page.goto('/?escena=atraso&retomar=concepto#progreso')
     const progresoAntes = await page.evaluate(() => window.__leerProgresoSintetico().progreso)
     await page.getByText('Ponerme al día con la meta', { exact: true }).click()
@@ -44,7 +44,7 @@ for (const width of [390, 1280]) test.describe(`recuperación de la meta a ${wid
       paso: { pistas: 1, confianza: 2 } })
   })
   test('retoma una sesión NBME pausada en su explicación, conservando el intento', async ({ page }) => {
-    await page.clock.install({ time: new Date('2026-10-05T11:30:00Z') })
+    await page.clock.install({ time: new Date('2026-10-26T11:30:00Z') })
     await page.goto('/?escena=atraso&retomar=nbme#progreso')
     const intentosAntes = await page.evaluate(() => window.__leerNbmeSintetico().attempts)
     await page.getByText('Ponerme al día con la meta', { exact: true }).click()
@@ -63,7 +63,7 @@ for (const width of [390, 1280]) test.describe(`recuperación de la meta a ${wid
     await expect(page.locator('.nbme-player-header')).toContainText('Primera vuelta: 1/2')
   })
   test('un resumen conceptual terminado no oculta la sesión NBME pendiente', async ({ page }) => {
-    await page.clock.install({ time: new Date('2026-10-05T11:30:00Z') })
+    await page.clock.install({ time: new Date('2026-10-26T11:30:00Z') })
     await page.goto('/?escena=atraso&retomar=nbme-resumen#progreso')
     const bookmarkAntes = await page.evaluate(() => window.__leerProgresoSintetico().reanudable)
     const bancoAntes = await page.evaluate(() => window.__leerNbmeSintetico())
@@ -80,7 +80,7 @@ for (const width of [390, 1280]) test.describe(`recuperación de la meta a ${wid
     expect(await page.evaluate(() => window.__leerProgresoSintetico().reanudable)).toEqual(bookmarkAntes)
   })
   for (const tipo of ['concepto', 'nbme']) test(`un fallo al retomar ${tipo} se ve junto al botón y permite reintentar`, async ({ page }) => {
-    await page.clock.install({ time: new Date('2026-10-05T11:30:00Z') })
+    await page.clock.install({ time: new Date('2026-10-26T11:30:00Z') })
     await page.goto(`/?escena=atraso&retomar=${tipo}-error#progreso`)
     await page.getByText('Ponerme al día con la meta', { exact: true }).click()
     await page.getByRole('button', { name: 'Retomar mi sesión pendiente' }).click()
@@ -93,7 +93,7 @@ for (const width of [390, 1280]) test.describe(`recuperación de la meta a ${wid
     await expect(page.locator('.app')).toHaveAttribute('data-view', tipo === 'concepto' ? 'estudio' : 'preguntas')
   })
   test('también retoma desde Cómo va todo en Hoy', async ({ page }) => {
-    await page.clock.install({ time: new Date('2026-10-05T11:30:00Z') })
+    await page.clock.install({ time: new Date('2026-10-26T11:30:00Z') })
     await page.goto('/?escena=atraso&retomar=nbme#hoy')
     await expect(page.getByRole('region', { name: 'Tu sesión guardada', exact: true })
       .getByRole('button', { name: 'Retomar mi sesión pendiente', exact: true })).toBeVisible()

@@ -176,7 +176,7 @@ describe('continuidad y navegación accesible', () => {
     await abrirDesplegable('Cómo va todo')
     expect(host.querySelector('[aria-label="Resumen de esta semana"]')).not.toBeNull()
     expect(host.textContent).toContain('Dominio demostrado')
-    expect(host.textContent).toContain('Meta de 60 días')
+    expect(host.textContent).toContain('Meta de 43 días')
   })
 
   it('ya no quedan las secciones retiradas del progreso', async () => {

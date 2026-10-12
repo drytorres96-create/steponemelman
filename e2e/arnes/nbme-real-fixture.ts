@@ -5,7 +5,7 @@ import type { NbmeCatalog, NbmeQuestion, NbmeState } from '../../src/nbme/types'
 export const NBME_REAL_SESSION = 'preguntas-guardadas-revision'
 export const NBME_REAL_USER = 'cuenta-demo'
 export const NBME_REAL_TOKEN = 'QA-token-sintetico-sin-acceso-real'
-const inicio = new Date('2026-10-05T11:00:00Z').getTime()
+const inicio = new Date('2026-10-26T11:00:00Z').getTime()
 export function preguntaNbmeReal(id: string, revision = 'synthetic-r1'): NbmeQuestion {
   return { id, revision, form: '27', section: 1, item: id === 'Q3' ? 3 : 4, page: 1,
     systems: [], disciplines: [], topic: 'Synthetic mechanism', objective: 'Synthetic objective for the saved version.',

@@ -7,7 +7,8 @@ import type { Modulo } from '../schema/concept'
 import type { Intento } from '../srs/tipos'
 import type { NbmeAttempt, NbmeQuestionMeta, NbmeState } from '../nbme/types'
 
-const AHORA = Date.parse('2026-10-07T12:00:00-04:00')
+/** Sábado 17-oct: las dos vías de Nuevo tienen techo. Entre semana el de preguntas es cero (ver el it.each). */
+const AHORA = Date.parse('2026-10-17T12:00:00-04:00')
 const ids = (prefijo: string, n: number) => Array.from({ length: n }, (_, i) => `${prefijo}${i + 1}`)
 const entrada = (extra: Partial<EntradaDia> = {}): EntradaDia => ({
   progreso: {}, intentosPreguntas: [], conceptosSemana: [], preguntasSemana: [],
@@ -37,7 +38,7 @@ const respuesta = (id: string, ts: number): NbmeAttempt => ({
 })
 
 describe('Nuevo de Hoy con corpus publicado', () => {
-  it('con guiones vacíos y 1/1 hechos conserva 10/5 de capacidad y ofrece los 9/4 restantes', () => {
+  it('el sábado, con guiones vacíos y 1/1 hechos conserva 10/5 de capacidad y ofrece los 9/4 restantes', () => {
     const base = entrada({ progreso: { C1: progreso('C1', AHORA - 1000) }, intentosPreguntas: [respuesta('Q1', AHORA - 1000)] })
     const antes = JSON.stringify(base)
     // Reproduce el cierre prematuro: sin guion, el techo antiguo era sólo lo ya hecho.
@@ -86,10 +87,11 @@ describe('Nuevo de Hoy con corpus publicado', () => {
   })
 
   it.each([
+    ['2026-10-08T12:00:00-04:00', 5, 0],
     ['2026-10-09T12:00:00-04:00', 0, 0],
-    ['2026-10-10T12:00:00-04:00', 20, 10],
-    ['2026-10-11T12:00:00-04:00', 20, 10],
-  ])('el relleno respeta el descanso o techo de fin de semana: %s', (fecha, c, q) => {
+    ['2026-10-10T12:00:00-04:00', 10, 5],
+    ['2026-10-11T12:00:00-04:00', 10, 5],
+  ])('el relleno respeta el techo entre semana sin preguntas, el descanso o el techo de fin de semana: %s', (fecha, c, q) => {
     const completa = completarEntradaDeHoy(entrada({ ahora: Date.parse(fecha) }), [modulo('M', ids('C', 30))], catalogo(ids('Q', 15)))
     expect(materialNuevo(completa).conceptos).toHaveLength(c)
     expect(materialNuevo(completa).preguntas).toHaveLength(q)

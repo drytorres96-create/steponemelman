@@ -5,7 +5,7 @@ import type { NbmeQuestionRef } from '../src/nbme/types'
 async function abrirConProveedorReal(page: Page, errorVersion = false) {
   const solicitudes: NbmeQuestionRef[][] = []
   let versionAusente = errorVersion
-  await page.clock.install({ time: new Date('2026-10-05T11:30:00Z') })
+  await page.clock.install({ time: new Date('2026-10-26T11:30:00Z') })
   await page.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname
     if (path === '/api/nbme/catalog') return route.fulfill({ json: catalogoNbmeReal() })

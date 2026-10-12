@@ -96,8 +96,9 @@ describe('preguntas frecuentes de Ajustes', () => {
   it('conserva las reglas de meta y distingue los círculos de Hoy y Progreso', async () => {
     await act(async () => root.render(<PreguntasFrecuentes criterios={CRITERIOS_POR_DEFECTO} />))
     const meta = await abrir('¿Qué hace avanzar las líneas de la meta?')
-    expect(texto(meta)).toContain('60 días, del 25 de septiembre al 23 de noviembre')
-    expect(texto(meta)).toContain('510 conceptos y 255 preguntas NBME')
+    expect(texto(meta)).toContain('43 días, del 12 de octubre al 23 de noviembre')
+    expect(texto(meta)).toContain('180 conceptos y 44 preguntas NBME')
+    expect(texto(meta)).toContain('con viernes libre; las preguntas sólo avanzan el fin de semana')
     expect(texto(meta)).toContain('03:00 de Nueva York')
     expect(texto(meta)).toContain('7 días como margen de planificación')
     expect(texto(meta)).toContain('primera respuesta, correcta o incorrecta')

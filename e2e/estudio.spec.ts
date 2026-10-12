@@ -6,8 +6,12 @@ import { expect, test, type Page } from '@playwright/test'
  * Todo corre contra dobles en memoria con datos sintéticos (e2e/arnes).
  */
 
-/** Un lunes a primera hora: día de semana, con techo de 10 conceptos y 5 preguntas. */
-const LUNES = new Date('2026-09-28T07:30:00-04:00')
+/**
+ * Un sábado a primera hora: techo de 10 conceptos, 5 preguntas y 35 cajas. Desde la
+ * 1.32.0 entre semana no entran preguntas nuevas y el techo de cajas es 20, así que el
+ * recorrido completo con NBME y la pausa tras 20 cajas sólo se ven en fin de semana.
+ */
+const LUNES = new Date('2026-10-17T07:30:00-04:00')
 
 async function abrir(page: Page, escena = 'abierto') {
   const errores: string[] = []

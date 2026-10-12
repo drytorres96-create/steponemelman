@@ -1,7 +1,8 @@
 import type { Page, Route } from '@playwright/test'
 import { catalogoNbmeReal, NBME_REAL_SESSION, preguntaNbmeReal } from '../../e2e/arnes/nbme-real-fixture'
 
-export const AHORA = new Date('2026-10-05T11:30:00Z')
+/** Lunes 26-oct, día 15 de la meta (1.32.0). */
+export const AHORA = new Date('2026-10-26T11:30:00Z')
 export const CUOTA_80 = { presupuesto: 8500, restantes: 6800, gastadas: 1700, llamadas: 1,
   activa: true, presupuestoUsuario: 7650, restantesUsuario: 6120 }
 export const ERROR_TEMPORAL = { error: 'Cloudflare tardó demasiado en preparar los ejercicios. Puedes volver a intentarlo o continuar tu pregunta.', codigo: 'tiempo' }
