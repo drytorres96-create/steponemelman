@@ -39,6 +39,8 @@ import { vistaDesdeHash } from '../App'
 
 /** Jueves 24 de septiembre de 2026, 10:00: un día entre semana. La semana va del lunes 21 al domingo 27. */
 const HOY = (h: number, m = 0) => new Date(2026, 8, 24, h, m).getTime()
+/** Sábado 26 de la misma semana: el único tipo de día en el que entran preguntas NBME nuevas. */
+const SABADO = (h: number, m = 0) => new Date(2026, 8, 26, h, m).getTime()
 
 let serie = 0
 const intento = (ts: number, extra: Partial<Intento> = {}): Intento => ({
@@ -246,7 +248,7 @@ describe('portada Hoy', () => {
     expect(onBiblioteca).toHaveBeenLastCalledWith('conceptos')
   })
 
-  it('«Cómo va todo» reúne las cifras, la meta de 60 días, la adherencia y el plan de la semana, también con el día cerrado', async () => {
+  it('«Cómo va todo» reúne las cifras, la meta de 43 días, la adherencia y el plan de la semana, también con el día cerrado', async () => {
     mock.adherencia.mockResolvedValue([{ eventoId: 'S2', titulo: 'S2 · 14–19 sep · Reproductivo', inicio: '2026-09-14', hechas: 3, tareas: 4 }])
     mock.plan.mockResolvedValue({
       eventoId: 'S3', titulo: 'S3 · 21–26 sep · Renal y ácido-base', inicio: '2026-09-21', fin: '2026-09-26', nota: null,
@@ -260,7 +262,7 @@ describe('portada Hoy', () => {
 
     await abrir('Cómo va todo')
     expect(host.querySelector('[aria-label="Resumen de esta semana"]')).not.toBeNull()
-    expect(host.querySelector('#meta-titulo')?.textContent).toContain('Meta de 60 días')
+    expect(host.querySelector('#meta-titulo')?.textContent).toContain('Meta de 43 días')
     expect(mock.corpus).not.toHaveBeenCalled()
     expect(mock.adherencia).not.toHaveBeenCalled()
     await abrir('Mi semana y mi plan')
@@ -319,22 +321,22 @@ describe('portada Hoy', () => {
     expect(anillo().classList.contains('cerrado')).toBe(true)
   })
 
-  it('el fin de semana el techo sube a 20 conceptos, 10 preguntas y 70 cajas, sin contar lo que queda fuera', async () => {
+  it('el fin de semana el techo sube a 10 conceptos, 5 preguntas y 35 cajas, sin contar lo que queda fuera', async () => {
     vi.setSystemTime(new Date(2026, 8, 26, 10))
     const semana = ids('C', 25), preguntas = ids('Q', 12)
-    // 75 fallos del martes vencen hoy: entran 70 y los otros cinco esperan sin dejar rastro.
-    const progresos = Object.fromEntries(ids('X', 75).map((id, i) => [id, progreso(id, [fallo(new Date(2026, 8, 22, 9, i).getTime())])]))
+    // 40 fallos del martes vencen hoy: entran 35 y los otros cinco esperan sin dejar rastro.
+    const progresos = Object.fromEntries(ids('X', 40).map((id, i) => [id, progreso(id, [fallo(new Date(2026, 8, 22, 9, i).getTime())])]))
     datos({ progresos, conceptos: semana, preguntas })
     mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, semana, preguntas)])
     const onCajas = vi.fn()
     await pintar({ onCajas })
 
-    expect(host.textContent).toContain('0 / 70 cajas')
-    expect(host.textContent).toContain('0 / 20 conceptos · 0 / 10 preguntas')
-    expect(anillo().getAttribute('aria-label')).toContain('Hoy, pasos hechos: 0 de 100.')
-    expect(host.textContent).not.toMatch(/\b75\b|\b5 (cajas|pendientes)/)
+    expect(host.textContent).toContain('0 / 35 cajas')
+    expect(host.textContent).toContain('0 / 10 conceptos · 0 / 5 preguntas')
+    expect(anillo().getAttribute('aria-label')).toContain('Hoy, pasos hechos: 0 de 50.')
+    expect(host.textContent).not.toMatch(/\b40\b|\b5 (cajas|pendientes)/)
     await act(async () => { boton('Empezar las cajas').click() })
-    expect(onCajas.mock.calls[0][0]).toHaveLength(70)
+    expect(onCajas.mock.calls[0][0]).toHaveLength(35)
     expect(onCajas.mock.calls[0][1]).toBe('Cajas de hoy · 26 sep')
   })
 
@@ -388,7 +390,8 @@ describe('portada Hoy', () => {
     await pintar()
     const etiquetados = host.querySelectorAll('.anillo-doble[role="img"]')
     expect(etiquetados).toHaveLength(1)
-    expect(anillo().getAttribute('aria-label')).toBe('Hoy, pasos hechos: 3 de 12. Tema de la semana, dominio demostrado: 0 de 12.')
+    // 5 conceptos nuevos de techo entre semana, sin preguntas, más las 2 cajas que vencen: 7 pasos.
+    expect(anillo().getAttribute('aria-label')).toBe('Hoy, pasos hechos: 3 de 7. Tema de la semana, dominio demostrado: 0 de 12.')
     expect(anillo().querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
   })
 
@@ -425,7 +428,7 @@ describe('portada Hoy', () => {
     expect(host.textContent).toContain('Cajas')
   })
 
-  it('cajas primero y lo nuevo después, cada uno a un clic de su primer paso', async () => {
+  it('cajas primero y lo nuevo después, cada uno a un clic de su primer paso; entre semana lo nuevo no trae preguntas', async () => {
     const semana = ids('C', 12)
     datos({
       progresos: {
@@ -445,7 +448,9 @@ describe('portada Hoy', () => {
     expect(cajas.classList.contains('principal')).toBe(true)
     expect(nuevo.textContent).toBe('Seguir con lo nuevo')
     expect(host.textContent).toContain('0 / 2 cajas')
-    expect(host.textContent).toContain('3 / 10 conceptos · 0 / 2 preguntas')
+    // El guion trae Q1 y Q2, pero entre semana el techo de preguntas es cero: ni se cuentan ni se ofrecen.
+    expect(host.querySelector('#hoy-nuevo')?.parentElement?.querySelector('.hoy-cuenta')?.textContent).toBe('3 / 5 conceptos')
+    expect(host.textContent).not.toMatch(/\/ \d+ preguntas?/)
     // Ninguna cuenta de deuda fuera de los desplegables.
     expect(host.textContent).not.toMatch(/venc|pendiente|atrasad|deuda/i)
 
@@ -455,14 +460,14 @@ describe('portada Hoy', () => {
 
     await act(async () => { nuevo.click() })
     expect(onNuevo).toHaveBeenCalledWith({
-      conceptIds: ['C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10'],
-      preguntas: [{ id: 'Q1', revision: 'r1' }, { id: 'Q2', revision: 'r1' }],
+      conceptIds: ['C4', 'C5'],
+      preguntas: [],
       titulo: 'Nuevo de hoy · 24 sep', nbmeSessionId: null,
     })
   })
 
   it('una vía cerrada se colapsa a una línea y pierde su botón', async () => {
-    const semana = ids('C', 10)
+    const semana = ids('C', 5)
     datos({
       progresos: {
         ...Object.fromEntries(semana.map((id, i) => [id, progreso(id, [intento(HOY(8, i))])])),
@@ -473,7 +478,7 @@ describe('portada Hoy', () => {
     mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, semana)])
     await pintar()
     expect(botones().map(b => b.textContent)).toEqual(['Empezar las cajas'])
-    expect(host.textContent).toContain('✓Nuevo · 10 / 10 conceptos')
+    expect(host.textContent).toContain('✓Nuevo · 5 / 5 conceptos')
     expect(anillo().classList.contains('cerrado')).toBe(false)
   })
 
@@ -495,9 +500,10 @@ describe('portada Hoy', () => {
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('No se pudieron cargar las sesiones de la semana')
   })
 
-  it('sin guion semanal, 1/1 hechos muestran un objetivo de 10/5 y abren los 9/4 restantes del corpus', async () => {
+  it('el sábado, sin guion semanal, 1/1 hechos muestran un objetivo de 10/5 y abren los 9/4 restantes del corpus', async () => {
+    vi.setSystemTime(new Date(SABADO(10)))
     datos({ conceptos: ids('C', 12), preguntas: ids('Q', 7),
-      progresos: { C1: progreso('C1', [fallo(HOY(9))]) }, respuestas: [respuesta('Q1', HOY(9), false)] })
+      progresos: { C1: progreso('C1', [fallo(SABADO(9))]) }, respuestas: [respuesta('Q1', SABADO(9), false)] })
     const onNuevo = vi.fn()
     await pintar({ onNuevo })
     expect(host.textContent).toContain('1 / 10 conceptos · 1 / 5 preguntas')
@@ -506,10 +512,12 @@ describe('portada Hoy', () => {
     await act(async () => { boton('Seguir con lo nuevo').click() })
     expect(onNuevo).toHaveBeenCalledWith({ conceptIds: ids('C', 10).slice(1),
       preguntas: ids('Q', 5).slice(1).map(id => ({ id, revision: 'r1' })),
-      titulo: 'Nuevo de hoy · 24 sep', nbmeSessionId: null })
+      titulo: 'Nuevo de hoy · 26 sep', nbmeSessionId: null })
   })
 
   it('un fallo al cargar guiones deja estudiar el corpus conocido y conserva el aviso de reintento', async () => {
+    // Sábado, para que el corpus conocido incluya también la pregunta.
+    vi.setSystemTime(new Date(SABADO(10)))
     datos({ conceptos: ['C1', 'C2'], preguntas: ['Q1'] })
     mock.historial.mockRejectedValue(new Error('sin red'))
     const onNuevo = vi.fn()

@@ -6,7 +6,8 @@ import type { NbmeQuestion } from '../src/nbme/types'
 
 const CARPETA = path.resolve('docs/flujo-recuperacion-nbme')
 const IDS = ['C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10']
-const AHORA = new Date('2026-10-05T11:30:00Z')
+/** Lunes 26-oct, día 15 de la meta (1.32.0): las dos líneas van por encima de la escena de atraso. */
+const AHORA = new Date('2026-10-26T11:30:00Z')
 const RECUPERACION = { objetivo: 'Distinguish the first, second and last synthetic tokens.', source: { title: 'Synthetic demonstration source', page: 1 }, cached: false,
   ejercicios: [
     { id: 'rec-1', tipo: 'completar', pregunta: 'The first synthetic token is ____.', respuesta: 'alpha', explicacion: 'Alpha comes first.', evidencia: 'The first synthetic token is alpha.' },

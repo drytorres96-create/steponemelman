@@ -59,7 +59,7 @@ export function PreguntasFrecuentes({ criterios }: { criterios: CriteriosDominio
         <p>La meta abarca {DIAS_META} días, del {fecha(1)} al {fecha(DIAS_META)}, con un objetivo de {META_CONCEPTOS} conceptos y {META_PREGUNTAS} preguntas NBME.
           Se ajusta sólo si el material disponible no alcanza para cumplirla.</p>
         <p>La marca de lo previsto avanza al empezar el día de estudio, a las {String(INICIO_DIA_HORA).padStart(2, '0')}:00 de Nueva York.
-          Sigue los techos de Hoy, con viernes libre y el doble el fin de semana. La línea de conceptos incluye {RETRASO_DOMINIO} días como margen de planificación;
+          Sigue los techos de Hoy, con viernes libre; las preguntas sólo avanzan el fin de semana. La línea de conceptos incluye {RETRASO_DOMINIO} días como margen de planificación;
           acreditar dominio depende de tus criterios, no de esperar ese margen.</p>
         <p>Tu avance de conceptos cuenta los primeros dominios con fecha verificable dentro de la ventana que siguen cumpliendo los criterios actuales.
           Repetir un concepto o recuperar uno acreditado antes de la ventana no lo suma como nuevo. Un fallo, una confusión o un cambio de criterios puede reducir la cifra;

@@ -46,8 +46,8 @@ const entrada = (extra: Partial<EntradaDia>): EntradaDia => ({
 describe('techo del día', () => {
   it('los techos están calibrados por tipo de día y el viernes va vacío', () => {
     expect(TECHOS).toEqual({
-      semana: { conceptos: 10, preguntas: 5, cajas: 40 },
-      finde: { conceptos: 20, preguntas: 10, cajas: 70 },
+      semana: { conceptos: 5, preguntas: 0, cajas: 20 },
+      finde: { conceptos: 10, preguntas: 5, cajas: 35 },
       vacio: { conceptos: 0, preguntas: 0, cajas: 0 },
     })
     expect(DIA_VACIO).toBe(5)
@@ -61,42 +61,45 @@ describe('techo del día', () => {
     expect(tipoDeDia(DIA(28, 3))).toBe('semana')
   })
 
-  it('entre semana el día se cierra exactamente a 10 conceptos nuevos y 5 preguntas', () => {
+  it('entre semana el día se cierra exactamente a 5 conceptos nuevos y no ofrece preguntas NBME', () => {
+    // La semana trae siete preguntas listas, pero entre semana su techo es cero: no se ofrece ninguna.
+    expect(materialNuevo(entrada({}))).toEqual({ conceptos: conceptos(5), preguntas: [] })
 
-    const casi = estadoDelDia(entrada({ progreso: vistosHoy(conceptos(9)), intentosPreguntas: respondidasHoy(preguntas(5)) }))
-    expect(casi.nuevo).toEqual({ conceptos: 9, preguntas: 5, techoConceptos: 10, techoPreguntas: 5, cerrada: false })
+    const casi = estadoDelDia(entrada({ progreso: vistosHoy(conceptos(4)) }))
+    expect(casi.nuevo).toEqual({ conceptos: 4, preguntas: 0, techoConceptos: 5, techoPreguntas: 0, cerrada: false })
     expect(casi.completo).toBe(false)
 
-    const faltaUnaPregunta = estadoDelDia(entrada({ progreso: vistosHoy(conceptos(10)), intentosPreguntas: respondidasHoy(preguntas(4)) }))
-    expect(faltaUnaPregunta.nuevo.cerrada).toBe(false)
+    // Responder preguntas desde la Biblioteca no sustituye al concepto que falta.
+    const faltaUnConcepto = estadoDelDia(entrada({ progreso: vistosHoy(conceptos(4)), intentosPreguntas: respondidasHoy(preguntas(5)) }))
+    expect(faltaUnConcepto.nuevo.cerrada).toBe(false)
 
-    const dia = entrada({ progreso: vistosHoy(conceptos(10)), intentosPreguntas: respondidasHoy(preguntas(5)) })
+    const dia = entrada({ progreso: vistosHoy(conceptos(5)) })
     const hecho = estadoDelDia(dia)
-    expect(hecho.nuevo).toEqual({ conceptos: 10, preguntas: 5, techoConceptos: 10, techoPreguntas: 5, cerrada: true })
+    expect(hecho.nuevo).toEqual({ conceptos: 5, preguntas: 0, techoConceptos: 5, techoPreguntas: 0, cerrada: true })
     expect(hecho.completo).toBe(true)
     // Cerrada la vía, deja de ofrecer material aunque la semana tenga más.
     expect(materialNuevo(dia)).toEqual({ conceptos: [], preguntas: [] })
   })
 
-  it('en sábado y domingo el día se cierra exactamente a 20 conceptos nuevos y 10 preguntas', () => {
+  it('en sábado y domingo el día se cierra exactamente a 10 conceptos nuevos y 5 preguntas', () => {
     for (const d of [26, 27]) {
       const ahora = DIA(d, 10)
       const vistos = (n: number) => Object.fromEntries(conceptos(n).map((id, i) => [id, progresoDe(id, [intento(DIA(d, 9, i))])]))
       const respondidas = (n: number) => preguntas(n).map((id, i) => pregunta(id, DIA(d, 9, 30 + i)))
       const semana = { conceptosSemana: conceptos(25), preguntasSemana: preguntas(12), ahora }
 
-      const casi = estadoDelDia(entrada({ ...semana, progreso: vistos(19), intentosPreguntas: respondidas(10) }))
+      const casi = estadoDelDia(entrada({ ...semana, progreso: vistos(9), intentosPreguntas: respondidas(5) }))
       expect(casi.tipo).toBe('finde')
-      expect(casi.nuevo).toEqual({ conceptos: 19, preguntas: 10, techoConceptos: 20, techoPreguntas: 10, cerrada: false })
-      expect(estadoDelDia(entrada({ ...semana, progreso: vistos(20), intentosPreguntas: respondidas(9) })).nuevo.cerrada).toBe(false)
+      expect(casi.nuevo).toEqual({ conceptos: 9, preguntas: 5, techoConceptos: 10, techoPreguntas: 5, cerrada: false })
+      expect(estadoDelDia(entrada({ ...semana, progreso: vistos(10), intentosPreguntas: respondidas(4) })).nuevo.cerrada).toBe(false)
 
-      const dia = entrada({ ...semana, progreso: vistos(20), intentosPreguntas: respondidas(10) })
+      const dia = entrada({ ...semana, progreso: vistos(10), intentosPreguntas: respondidas(5) })
       expect(estadoDelDia(dia)).toMatchObject({
-        nuevo: { conceptos: 20, preguntas: 10, techoConceptos: 20, techoPreguntas: 10, cerrada: true }, completo: true,
+        nuevo: { conceptos: 10, preguntas: 5, techoConceptos: 10, techoPreguntas: 5, cerrada: true }, completo: true,
       })
       expect(materialNuevo(dia)).toEqual({ conceptos: [], preguntas: [] })
       // Sin nada hecho, lo que ofrece es el techo entero del fin de semana, en orden.
-      expect(materialNuevo(entrada(semana))).toEqual({ conceptos: conceptos(20), preguntas: preguntas(10) })
+      expect(materialNuevo(entrada(semana))).toEqual({ conceptos: conceptos(10), preguntas: preguntas(5) })
     }
   })
 
@@ -116,15 +119,23 @@ describe('techo del día', () => {
     const extra = entrada({ ahora: DIA(25, 12), progreso: Object.fromEntries(conceptos(3).map((id, i) => [id, progresoDe(id, [intento(DIA(25, 11, i))])])) })
     expect(estadoDelDia(extra)).toMatchObject({ tipo: 'vacio', nuevo: { techoConceptos: 0, cerrada: true }, completo: true })
     // A las 2:59 del viernes todavía es jueves: un día entre semana normal.
-    expect(estadoDelDia(entrada({ ahora: DIA(25, 2, 59) }))).toMatchObject({ tipo: 'semana', nuevo: { techoConceptos: 10, cerrada: false } })
+    expect(estadoDelDia(entrada({ ahora: DIA(25, 2, 59) }))).toMatchObject({ tipo: 'semana', nuevo: { techoConceptos: TECHOS.semana.conceptos, cerrada: false } })
   })
 
   it('lo que queda de la vía nueva sale en el orden de la semana y se completa sin duplicar', () => {
-    const dia = entrada({ progreso: vistosHoy(['C1', 'C2', 'C3']), intentosPreguntas: respondidasHoy(['Q1']) })
-    expect(materialNuevo(dia)).toEqual({
+    // El sábado entran las dos vías: diez conceptos y cinco preguntas.
+    const sabado = entrada({
+      ahora: DIA(26, 10),
+      progreso: Object.fromEntries(['C1', 'C2', 'C3'].map((id, i) => [id, progresoDe(id, [intento(DIA(26, 9, i))])])),
+      intentosPreguntas: [pregunta('Q1', DIA(26, 9, 30))],
+    })
+    expect(materialNuevo(sabado)).toEqual({
       conceptos: ['C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10'],
       preguntas: ['Q2', 'Q3', 'Q4', 'Q5'],
     })
+    // Entre semana sigue el mismo orden hasta su techo, y una pregunta suelta no abre la vía de preguntas.
+    const jueves = entrada({ progreso: vistosHoy(['C1', 'C2', 'C3']), intentosPreguntas: respondidasHoy(['Q1']) })
+    expect(materialNuevo(jueves)).toEqual({ conceptos: ['C4', 'C5'], preguntas: [] })
   })
 
   it('un intento por revisar no cuenta como visto', () => {
@@ -136,28 +147,30 @@ describe('techo del día', () => {
   })
 
   it('un concepto con intentos previos no cuenta como nuevo', () => {
+    // Domingo, para que la vía de preguntas tenga techo y la comprobación de Q1 no sea vacía; «ayer» es el sábado.
     const progreso = {
-      C1: progresoDe('C1', [intento(AYER(20)), intento(HOY(9))]),
+      C1: progresoDe('C1', [intento(DIA(26, 20)), intento(DIA(27, 9))]),
       // Lo que ayer quedó por revisar no acreditó nada: hoy sí es su primera vez.
-      C2: progresoDe('C2', [intento(AYER(20), { resultado: 'revision', tipo_error: 'error_por_revisar', calificacion: 1 }), intento(HOY(9, 5))]),
+      C2: progresoDe('C2', [intento(DIA(26, 20), { resultado: 'revision', tipo_error: 'error_por_revisar', calificacion: 1 }), intento(DIA(27, 9, 5))]),
     }
-    const dia = entrada({ progreso, intentosPreguntas: [pregunta('Q1', AYER(21)), pregunta('Q1', HOY(9, 10))] })
+    const dia = entrada({ ahora: DIA(27, 10), progreso, intentosPreguntas: [pregunta('Q1', DIA(26, 21)), pregunta('Q1', DIA(27, 9, 10))] })
     const estado = estadoDelDia(dia)
     expect(estado.nuevo.conceptos).toBe(1)
     expect(estado.nuevo.preguntas).toBe(0)
     const siguiente = materialNuevo(dia)
     expect(siguiente.conceptos).not.toContain('C1')
     expect(siguiente.preguntas).not.toContain('Q1')
+    expect(siguiente.preguntas[0]).toBe('Q2')
   })
 
-  it('con solo 6 conceptos nuevos disponibles el techo baja a 6 y el día cierra', () => {
-    const semana = { conceptosSemana: conceptos(6), preguntasSemana: [] }
+  it('con solo 3 conceptos nuevos disponibles el techo baja a 3 y el día cierra', () => {
+    const semana = { conceptosSemana: conceptos(3), preguntasSemana: [] }
     const inicio = estadoDelDia(entrada(semana))
-    expect(inicio.nuevo).toMatchObject({ techoConceptos: 6, techoPreguntas: 0, cerrada: false })
-    expect(materialNuevo(entrada(semana)).conceptos).toHaveLength(6)
+    expect(inicio.nuevo).toMatchObject({ techoConceptos: 3, techoPreguntas: 0, cerrada: false })
+    expect(materialNuevo(entrada(semana)).conceptos).toHaveLength(3)
 
-    const fin = estadoDelDia(entrada({ ...semana, progreso: vistosHoy(conceptos(6)) }))
-    expect(fin.nuevo).toEqual({ conceptos: 6, preguntas: 0, techoConceptos: 6, techoPreguntas: 0, cerrada: true })
+    const fin = estadoDelDia(entrada({ ...semana, progreso: vistosHoy(conceptos(3)) }))
+    expect(fin.nuevo).toEqual({ conceptos: 3, preguntas: 0, techoConceptos: 3, techoPreguntas: 0, cerrada: true })
     expect(fin.completo).toBe(true)
   })
 

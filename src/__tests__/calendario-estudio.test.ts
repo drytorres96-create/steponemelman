@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { diaSemanaEstudio, fechaEstudio, fechaISOEstudio, instanteEstudio, ZONA_ESTUDIO } from '../lib/calendario-estudio'
 import { finDelDia, inicioDelDia, limitesSemana, tipoDeDia } from '../lib/dia'
-import { diaDeLaMeta, fechaDelDia, inicioDelDiaMeta } from '../lib/meta'
+import { DIAS_META, diaDeLaMeta, fechaDelDia, inicioDelDiaMeta } from '../lib/meta'
 import { tituloDeHoy } from '../lib/nuevo-hoy'
 
 const zonaAnterior = process.env.TZ
@@ -10,19 +10,19 @@ afterEach(() => { if (zonaAnterior === undefined) delete process.env.TZ; else pr
 describe('un solo calendario de Nueva York para Hoy y la meta', () => {
   it.each(['UTC', 'Asia/Tokyo', 'Pacific/Honolulu', 'America/New_York'])('el dispositivo en %s conserva el corte NY, las fechas y la semana', zona => {
     process.env.TZ = zona
-    const antes = Date.parse('2026-10-07T02:59:59.999-04:00'), corte = Date.parse('2026-10-07T03:00:00-04:00')
+    const antes = Date.parse('2026-10-24T02:59:59.999-04:00'), corte = Date.parse('2026-10-24T03:00:00-04:00')
     expect(diaDeLaMeta(antes)).toBe(12)
     expect(diaDeLaMeta(corte)).toBe(13)
     expect(inicioDelDia(corte)).toBe(corte)
     expect(inicioDelDiaMeta(13)).toBe(corte)
-    expect(fechaISOEstudio(fechaEstudio(antes))).toBe('2026-10-06')
-    expect(tituloDeHoy('Nuevo', corte)).toBe('Nuevo de hoy · 7 oct')
-    expect(tituloDeHoy('Cajas', antes)).toBe('Cajas de hoy · 6 oct')
+    expect(fechaISOEstudio(fechaEstudio(antes))).toBe('2026-10-23')
+    expect(tituloDeHoy('Nuevo', corte)).toBe('Nuevo de hoy · 24 oct')
+    expect(tituloDeHoy('Cajas', antes)).toBe('Cajas de hoy · 23 oct')
     expect(limitesSemana(Date.parse('2026-09-28T02:59:59-04:00'))).toEqual({ inicio: '2026-09-21', fin: '2026-09-27' })
     expect(limitesSemana(Date.parse('2026-09-28T03:00:00-04:00'))).toEqual({ inicio: '2026-09-28', fin: '2026-10-04' })
     expect(tipoDeDia(Date.parse('2026-09-26T02:59:59-04:00'))).toBe('vacio')
     expect(tipoDeDia(Date.parse('2026-09-26T03:00:00-04:00'))).toBe('finde')
-    expect(new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_ESTUDIO, dateStyle: 'short' }).format(fechaDelDia(60)))
+    expect(new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_ESTUDIO, dateStyle: 'short' }).format(fechaDelDia(DIAS_META)))
       .toBe(new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_ESTUDIO, dateStyle: 'short' }).format(Date.parse('2026-11-23T12:00:00-05:00')))
   })
 
@@ -30,13 +30,13 @@ describe('un solo calendario de Nueva York para Hoy y la meta', () => {
     const corteOctubre = Date.parse('2026-10-31T03:00:00-04:00'), corteNoviembre = Date.parse('2026-11-01T03:00:00-05:00')
     expect(finDelDia(corteOctubre)).toBe(corteNoviembre)
     expect(corteNoviembre - corteOctubre).toBe(25 * 3_600_000)
-    expect(diaDeLaMeta(corteOctubre)).toBe(37)
-    expect(diaDeLaMeta(corteNoviembre)).toBe(38)
+    expect(diaDeLaMeta(corteOctubre)).toBe(20)
+    expect(diaDeLaMeta(corteNoviembre)).toBe(21)
     for (const horaRepetida of ['2026-11-01T01:59:59-04:00', '2026-11-01T01:59:59-05:00']) {
       const ts = Date.parse(horaRepetida)
       expect(inicioDelDia(ts)).toBe(corteOctubre)
       expect(finDelDia(ts)).toBe(corteNoviembre)
-      expect(diaDeLaMeta(ts)).toBe(37)
+      expect(diaDeLaMeta(ts)).toBe(20)
     }
   })
 

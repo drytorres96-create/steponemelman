@@ -18,16 +18,17 @@ import { desplazarFechaEstudio, diaSemanaEstudio, fechaEstudio, fechaISOEstudio,
 export type TipoDia = 'semana' | 'finde' | 'vacio'
 
 /**
- * Techos por tipo de día. Están calibrados con el estado real del 25-sep-2026 y no se
- * cambian a ojo: con los criterios vigentes un concepto cuesta una exposición nueva y
- * tres de caja, así que N conceptos nuevos al día piden unos 4 N repasos al día. Es el
- * techo de cajas el que gobierna el sistema: con 12, el motor se estrangulaba solo a
- * tres o cuatro nuevos al día. Diez nuevos entre semana piden 40 de caja; veinte el
- * fin de semana piden 70, que además absorben lo que venció el viernes.
+ * Techos por tipo de día. Recalibrados el 12-oct-2026 a petición de Yoel: Melman es el
+ * arranque del día —cinco conceptos nuevos y mantener vivo lo cerrado—, no el plato
+ * principal. Con los criterios vigentes un concepto cuesta una exposición nueva y unas
+ * tres de caja, así que N nuevos al día piden unas 4 N cajas: cinco nuevos entre semana
+ * piden 20; diez el fin de semana piden 40, y 35 deja que lo que no quepa espere en
+ * silencio. Entre semana no entran preguntas NBME nuevas; el fin de semana, cinco.
+ * La calibración anterior (10/5/40 y 20/10/70, del 25-sep) pedía 55 pasos al día.
  */
 export const TECHOS: Record<TipoDia, { conceptos: number; preguntas: number; cajas: number }> = {
-  semana: { conceptos: 10, preguntas: 5, cajas: 40 },
-  finde: { conceptos: 20, preguntas: 10, cajas: 70 },
+  semana: { conceptos: 5, preguntas: 0, cajas: 20 },
+  finde: { conceptos: 10, preguntas: 5, cajas: 35 },
   vacio: { conceptos: 0, preguntas: 0, cajas: 0 },
 }
 /** Los viernes van vacíos a propósito: un plan sin holgura muere el primer día malo. */

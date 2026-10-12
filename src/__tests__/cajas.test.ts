@@ -145,25 +145,25 @@ describe('escalera de cajas', () => {
     expect(hoy.items[1].vence).toBe(F(24, 3))
   })
 
-  it('con 90 vencidos entran 40 entre semana y ninguna función devuelve la cifra 90 al exterior', () => {
+  it('con 90 vencidos entran 20 entre semana y ninguna función devuelve la cifra 90 al exterior', () => {
     const progresoNoventa = Object.fromEntries(Array.from({ length: 90 }, (_, i) => {
       const id = `C${String(i + 1).padStart(2, '0')}`
       // Cuanto mayor el número, más reciente el fallo: los primeros vencieron antes.
       return [id, progreso(id, [fallo(F(19, 8) + i * 60_000, `s${i}`)])]
     }))
     const hoy = cajasDelDia(entrada({ progreso: progresoNoventa }))
-    expect(TECHOS.semana.cajas).toBe(40)
-    expect(hoy.items).toHaveLength(40)
-    expect(hoy.techo).toBe(40)
+    expect(TECHOS.semana.cajas).toBe(20)
+    expect(hoy.items).toHaveLength(20)
+    expect(hoy.techo).toBe(20)
     expect(hoy.hechos).toBe(0)
-    expect(hoy.items.map(i => i.id)).toEqual(Array.from({ length: 40 }, (_, i) => `C${String(i + 1).padStart(2, '0')}`))
-    // Ni los 90 que vencían ni los 50 que esperan a mañana salen a ninguna parte.
+    expect(hoy.items.map(i => i.id)).toEqual(Array.from({ length: 20 }, (_, i) => `C${String(i + 1).padStart(2, '0')}`))
+    // Ni los 90 que vencían ni los 70 que esperan a mañana salen a ninguna parte.
     expect(contiene(hoy, 90)).toBe(false)
-    expect(contiene(hoy, 50)).toBe(false)
+    expect(contiene(hoy, 70)).toBe(false)
     const dia = estadoDelDia({ progreso: progresoNoventa, intentosPreguntas: [], conceptosSemana: [], preguntasSemana: [], cajas: hoy, ahora: AHORA })
-    expect(dia.cajas).toEqual({ hechos: 0, techo: 40, cerrada: false })
+    expect(dia.cajas).toEqual({ hechos: 0, techo: 20, cerrada: false })
     expect(contiene(dia, 90)).toBe(false)
-    expect(contiene(dia, 50)).toBe(false)
+    expect(contiene(dia, 70)).toBe(false)
   })
 
   it('el viernes no entra ninguna caja aunque venzan, y el día sale cerrado desde que amanece', () => {
@@ -183,28 +183,28 @@ describe('escalera de cajas', () => {
     expect(cajasDelDia(entrada({ progreso: p, intentosPreguntas: preguntaFallada })).items.map(i => i.id)).toEqual(['D', 'Q'])
   })
 
-  it('el sábado el techo de cajas es 70 y recoge primero lo que venció el viernes', () => {
+  it('el sábado el techo de cajas es 35 y recoge primero lo que venció el viernes', () => {
     const lote = (prefijo: string, n: number, dia: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => {
       const id = `${prefijo}${String(i + 1).padStart(2, '0')}`
       return [id, progreso(id, [acierto(F(dia, 10) + i * 60_000, `${prefijo}${i}`)])]
     }))
-    // 30 aciertos del miércoles vencen el viernes a las 3:00; 60 del jueves, el sábado a las 3:00.
-    const vencidasViernes = lote('V', 30, 23)
-    const vencenSabado = lote('S', 60, 24)
+    // 15 aciertos del miércoles vencen el viernes a las 3:00; 30 del jueves, el sábado a las 3:00.
+    const vencidasViernes = lote('V', 15, 23)
+    const vencenSabado = lote('S', 30, 24)
     const p = { ...vencidasViernes, ...vencenSabado }
     expect(cajasDelDia(entrada({ progreso: p, referencia: F(25, 9), ahora: F(25, 9) })).items).toEqual([])
 
     const sabado = cajasDelDia(entrada({ progreso: p, referencia: F(26, 9), ahora: F(26, 9) }))
-    expect(TECHOS.finde.cajas).toBe(70)
-    expect(sabado).toMatchObject({ hechos: 0, techo: 70, cerrada: false })
-    expect(sabado.items).toHaveLength(70)
+    expect(TECHOS.finde.cajas).toBe(35)
+    expect(sabado).toMatchObject({ hechos: 0, techo: 35, cerrada: false })
+    expect(sabado.items).toHaveLength(35)
     // Lo que venció el viernes entra entero, y primero; el resto del techo es del sábado.
-    expect(sabado.items.slice(0, 30).map(i => i.id)).toEqual(Object.keys(vencidasViernes))
-    expect(sabado.items.slice(0, 30).every(i => i.vence === F(25, 3))).toBe(true)
-    expect(sabado.items.slice(30).map(i => i.id)).toEqual(Object.keys(vencenSabado).slice(0, 40))
-    // Los 20 que no caben esperan al domingo sin dejar rastro.
-    expect(contiene(sabado, 90)).toBe(false)
-    expect(contiene(sabado, 20)).toBe(false)
+    expect(sabado.items.slice(0, 15).map(i => i.id)).toEqual(Object.keys(vencidasViernes))
+    expect(sabado.items.slice(0, 15).every(i => i.vence === F(25, 3))).toBe(true)
+    expect(sabado.items.slice(15).map(i => i.id)).toEqual(Object.keys(vencenSabado).slice(0, 20))
+    // Los 10 que no caben esperan al domingo sin dejar rastro.
+    expect(contiene(sabado, 45)).toBe(false)
+    expect(contiene(sabado, 10)).toBe(false)
   })
 
   it('un fallo reinserta 4 pasos después, tres veces como máximo', () => {
@@ -253,16 +253,16 @@ describe('las cajas de hoy', () => {
     }))
     const progresoMixto = { ...mantenimiento, A: progreso('A', [fallo(F(21, 9), 's')]) }
     const jueves = cajasDelDia(entrada({ progreso: progresoMixto }))
-    expect(jueves.items).toHaveLength(40)
+    expect(jueves.items).toHaveLength(TECHOS.semana.cajas)
     expect(jueves.items[0].id).toBe('A')
     expect(jueves.items[0].mantenimiento).toBeUndefined()
     expect(jueves.items.slice(1).every(i => i.mantenimiento === true)).toBe(true)
-    expect(jueves.items.slice(1).map(i => i.id)).toEqual(Object.keys(mantenimiento).slice(0, 39))
+    expect(jueves.items.slice(1).map(i => i.id)).toEqual(Object.keys(mantenimiento).slice(0, TECHOS.semana.cajas - 1))
     const viernes = cajasDelDia(entrada({ progreso: progresoMixto, referencia: F(25, 10), ahora: F(25, 10) }))
     expect(viernes).toEqual({ items: [], hechos: 0, techo: 0, cerrada: true })
     const sabado = cajasDelDia(entrada({ progreso: progresoMixto, referencia: F(26, 10), ahora: F(26, 10) }))
-    expect(sabado.items).toHaveLength(70)
-    expect(sabado.items.map(i => i.id)).toEqual(['A', ...Object.keys(mantenimiento).slice(0, 69)])
+    expect(sabado.items).toHaveLength(TECHOS.finde.cajas)
+    expect(sabado.items.map(i => i.id)).toEqual(['A', ...Object.keys(mantenimiento).slice(0, TECHOS.finde.cajas - 1)])
   })
 
   it('el día de mantenimiento fijado conserva su fecha y marca hechos tras un fallo o revisión', () => {

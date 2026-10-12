@@ -2,17 +2,19 @@
 
 Plataforma de estudio para USMLE Step 1 con sesiones, repaso espaciado y progreso asociado a una cuenta. El sitio existente está en [steponemelman.yoeltorres.workers.dev](https://steponemelman.yoeltorres.workers.dev/). Este repositorio contiene la aplicación React/Vite y el contrato de base de datos; Supabase conserva el material privado y el progreso.
 
-La versión **1.31.4** corrige la recuperación de errores en toda la función NBME. El servidor prepara ejercicios respaldados por el material publicado y Cloudflare elige sus identificadores; el modelo no necesita volver a copiar citas y respuestas. Si esa selección no es válida, se ofrece práctica del mismo material verificado, indicando su procedencia. Consulta [Cambios y validación](docs/cambios-1.31.4.md).
+La versión **1.32.0** reinicia la meta el 12-oct-2026 (43 días, hasta el 23-nov: 180 conceptos y 44 preguntas NBME) y convierte Hoy en un arranque diario más corto. Consulta [Cambios y validación](docs/cambios-1.32.0.md).
+
+La **1.31.4** corrigió la recuperación de errores en toda la función NBME. El servidor prepara ejercicios respaldados por el material publicado y Cloudflare elige sus identificadores; el modelo no necesita volver a copiar citas y respuestas. Si esa selección no es válida, se ofrece práctica del mismo material verificado, indicando su procedencia. Consulta [Cambios y validación](docs/cambios-1.31.4.md).
 
 La **1.31.3** corrigió el indicador de versión de Ajustes, que había quedado en 1.31.0. La interfaz toma ahora la versión del paquete compilado. Consulta [Cambios y validación](docs/cambios-1.31.3.md).
 
 La **1.31.2** corrigió el corte prematuro de la recuperación con IA: admite una generación de hasta un minuto, construye los ejercicios desde un plan compacto y conserva la comprobación literal de cada fuente. Recuperación dispone de una mayor parte del mismo presupuesto gratuito. El aviso redundante sobre figuras se retiró; la imagen y su ampliación siguen disponibles. Consulta [Cambios y validación](docs/cambios-1.31.2.md).
 
-La navegación se centra en **Hoy**, **Biblioteca**, **Progreso** y **Ajustes y respaldo**. Las líneas de la meta de 60 días y los círculos siguen visibles. Las explicaciones de dominio, metas, repasos y sesiones están en **Ajustes → Preguntas frecuentes**; el índice del material también está en Ajustes. Viñetas (piloto), Plan diario clásico y Auditoría se retiraron de la interfaz. Consulta [Material privado para agentes](docs/material-privado-agentes.md).
+La navegación se centra en **Hoy**, **Biblioteca**, **Progreso** y **Ajustes y respaldo**. Las líneas de la meta y los círculos siguen visibles. Las explicaciones de dominio, metas, repasos y sesiones están en **Ajustes → Preguntas frecuentes**; el índice del material también está en Ajustes. Viñetas (piloto), Plan diario clásico y Auditoría se retiraron de la interfaz. Consulta [Material privado para agentes](docs/material-privado-agentes.md).
 
 ## Estudiar y continuar en otro dispositivo
 
-Hoy prioriza las cajas de repaso y después el material nuevo, con un techo diario de 10 conceptos y 5 preguntas NBME entre semana, viernes libre y el doble el fin de semana. Los guiones semanales tienen prioridad; si faltan o se agotan, la selección se completa con contenido publicado aún sin responder. Los conceptos ya respondidos siguen su calendario común de consolidación y mantenimiento. Una sesión pendiente puede retomarse sin crear otra.
+Hoy prioriza las cajas de repaso y después el material nuevo, con un techo diario de 5 conceptos nuevos y hasta 20 repasos entre semana, sin preguntas NBME nuevas; el fin de semana, 10 conceptos, 5 preguntas y hasta 35 repasos; el viernes es libre. Los guiones semanales tienen prioridad; si faltan o se agotan, la selección se completa con contenido publicado aún sin responder. Los conceptos ya respondidos siguen su calendario común de consolidación y mantenimiento. Una sesión pendiente puede retomarse sin crear otra.
 
 Cada respuesta se registra al enviarla y **Siguiente pregunta** permite avanzar directamente. Ajustar la dificultad es opcional y actualiza el mismo intento. Puedes pausar y retomar; los fallos y respuestas parciales vuelven a aparecer en la misma sesión hasta acertarlos, y se distinguen de la primera vuelta. Las respuestas libres que el corrector no puede resolver quedan **por revisar**, sin contarse automáticamente como aciertos o fallos.
 

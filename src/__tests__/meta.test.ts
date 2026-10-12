@@ -7,7 +7,7 @@ import {
 import type { NbmeAttempt, NbmeCatalog, NbmeQuestionMeta } from '../nbme/types'
 
 /**
- * La meta de 60 días es la vista a futuro de los techos de Hoy. Lo que se comprueba
+ * La meta de 43 días es la vista a futuro de los techos de Hoy. Lo que se comprueba
  * es lo que decide si Yoel la mira sin agobio: la ventana y las metas son las
  * acordadas, la línea nunca va más deprisa que los techos, ir por debajo sólo se dice
  * con una distancia real, y la proyección no aparece hasta que hay ritmo de verdad.
@@ -33,14 +33,15 @@ const techoDelDia = (k: number) => {
 }
 
 describe('la ventana', () => {
-  it('va del viernes 25-sep al lunes 23-nov, con el corte de las 3:00', () => {
-    expect(diaDeLaMeta(Date.parse('2026-09-25T02:59:00-04:00'))).toBe(0)
-    expect(diaDeLaMeta(Date.parse('2026-09-25T03:00:00-04:00'))).toBe(1)
-    expect(diaDeLaMeta(Date.parse('2026-09-26T10:00:00-04:00'))).toBe(2)
-    expect(diaDeLaMeta(Date.parse('2026-11-23T12:00:00-05:00'))).toBe(60)
-    expect(diaDeLaMeta(Date.parse('2026-11-24T02:59:00-05:00'))).toBe(60)
-    expect(diaDeLaMeta(Date.parse('2026-11-24T03:00:00-05:00'))).toBe(61)
-    expect(fechaDelDia(1).getUTCDay()).toBe(5)
+  it('va del lunes 12-oct al lunes 23-nov, con el corte de las 3:00', () => {
+    expect(DIAS_META).toBe(43)
+    expect(diaDeLaMeta(Date.parse('2026-10-12T02:59:00-04:00'))).toBe(0)
+    expect(diaDeLaMeta(Date.parse('2026-10-12T03:00:00-04:00'))).toBe(1)
+    expect(diaDeLaMeta(Date.parse('2026-10-13T10:00:00-04:00'))).toBe(2)
+    expect(diaDeLaMeta(Date.parse('2026-11-23T12:00:00-05:00'))).toBe(43)
+    expect(diaDeLaMeta(Date.parse('2026-11-24T02:59:00-05:00'))).toBe(43)
+    expect(diaDeLaMeta(Date.parse('2026-11-24T03:00:00-05:00'))).toBe(44)
+    expect(fechaDelDia(1).getUTCDay()).toBe(1)
     expect(fechaDelDia(DIAS_META).toISOString()).toBe('2026-11-23T17:00:00.000Z')
   })
 
@@ -50,29 +51,33 @@ describe('la ventana', () => {
 })
 
 describe('las metas', () => {
-  it('510 conceptos, y las preguntas la mitad porque su techo es justo la mitad', () => {
+  it('180 conceptos, y las preguntas en la proporción de sus techos en la ventana: 44', () => {
     let conceptos = 0, preguntas = 0
     for (let k = 1; k <= DIAS_META; k++) { conceptos += techoDelDia(k).conceptos; preguntas += techoDelDia(k).preguntas }
-    expect(META_CONCEPTOS).toBe(510)
+    // Seis semanas de lunes a domingo más el lunes 23-nov: 6 × 40 + 5 conceptos, y sólo los fines de semana, 6 × 10 preguntas.
+    expect([conceptos, preguntas]).toEqual([245, 60])
+    expect(META_CONCEPTOS).toBe(180)
     // Si alguien cambia los techos, esta cuenta obliga a recalibrar en lugar de dejar la meta desfasada.
     expect(META_PREGUNTAS).toBe(Math.round(META_CONCEPTOS * preguntas / conceptos))
-    expect(META_PREGUNTAS).toBe(255)
+    expect(META_PREGUNTAS).toBe(44)
   })
 
   it('bajan a lo que existe cuando no queda material para cumplirlas', () => {
+    // 60 publicadas y 40 ya respondidas antes de la ventana: quedan 20, menos que las 44 de la meta.
     const r = resumenMeta(entrada({
-      ahora: mediodia(61), preguntasPublicadas: 100,
+      ahora: mediodia(DIAS_META + 1), preguntasPublicadas: 60,
       primerasRespuestas: Array.from({ length: 40 }, (_, i) => inicioDelDiaMeta(1) - (i + 1) * DIA),
     }))
-    expect(r.preguntas.meta).toBe(60)
-    expect(r.preguntas.linea).toBe(60)
-    expect(r.filas.at(-1)!.preguntas).toBe(60)
-    expect(r.conceptos.meta).toBe(510)
+    expect(r.preguntas.meta).toBe(20)
+    expect(r.preguntas.meta).toBeLessThan(META_PREGUNTAS)
+    expect(r.preguntas.linea).toBe(20)
+    expect(r.filas.at(-1)!.preguntas).toBe(20)
+    expect(r.conceptos.meta).toBe(META_CONCEPTOS)
   })
 })
 
 describe('la línea', () => {
-  it('es monótona y finita antes, durante y después de los sesenta días', () => {
+  it('es monótona y finita antes, durante y después de los días de la ventana', () => {
     for (const [linea, meta] of [[lineaConceptos, META_CONCEPTOS], [lineaPreguntas, META_PREGUNTAS]] as const) {
       let anterior = 0
       for (let dia = -30; dia <= 100; dia++) {
@@ -81,30 +86,38 @@ describe('la línea', () => {
         expect(valor).toBeGreaterThanOrEqual(0)
         expect(valor).toBeLessThanOrEqual(meta)
         if (dia <= 0) expect(valor).toBe(0)
-        if (dia >= 60) expect(valor).toBe(meta)
+        if (dia >= DIAS_META) expect(valor).toBe(meta)
         anterior = valor
       }
     }
   })
 
-  it('sigue los techos de Hoy: nada el viernes, el doble el fin de semana, y llega a la meta el último día', () => {
+  it('sigue los techos de Hoy: nada el viernes, el doble de conceptos el fin de semana, preguntas sólo en sábado y domingo, y llega a la meta el último día', () => {
     expect(lineaPreguntas(0)).toBe(0)
-    expect(lineaPreguntas(1)).toBe(0) // el viernes 25 no suma
-    const lunes = lineaPreguntas(4) - lineaPreguntas(3) // lunes 28-sep
-    const sabado = lineaPreguntas(9) - lineaPreguntas(8) // sábado 3-oct
+    // Entre semana el techo de preguntas es cero: de lunes 12 a jueves 15 no suma, ni el viernes 16.
+    expect(lineaPreguntas(5)).toBe(0)
+    const sabado = lineaPreguntas(6) - lineaPreguntas(5) // sábado 17-oct
+    const domingo = lineaPreguntas(7) - lineaPreguntas(6) // domingo 18-oct
+    expect(sabado).toBeGreaterThan(0)
+    expect(domingo).toBeCloseTo(sabado, 9)
+    expect(lineaPreguntas(12)).toBe(lineaPreguntas(7)) // de lunes 19 a viernes 23, tampoco
+    // En conceptos, con su semana de margen: lo del lunes 12 entra el 19 y lo del sábado 17, el doble, el 24.
+    const lunes = lineaConceptos(8) - lineaConceptos(7)
+    const sabadoConceptos = lineaConceptos(13) - lineaConceptos(12)
     expect(lunes).toBeGreaterThan(0)
-    expect(sabado).toBeCloseTo(2 * lunes, 9)
-    expect(lineaPreguntas(8)).toBe(lineaPreguntas(7)) // el viernes 2-oct tampoco
+    expect(sabadoConceptos).toBeCloseTo(2 * lunes, 9)
+    expect(lineaConceptos(12)).toBe(lineaConceptos(11)) // lo del viernes 16 no suma
     expect(lineaPreguntas(DIAS_META)).toBeCloseTo(META_PREGUNTAS, 9)
     expect(lineaConceptos(DIAS_META)).toBeCloseTo(META_CONCEPTOS, 9)
   })
 
-  it('en conceptos va una semana por detrás: lo visto el sábado 26 queda dominado hacia el 3-oct', () => {
-    expect(lineaConceptos(8)).toBe(0)
-    expect(lineaConceptos(9)).toBeGreaterThan(0)
-    // Siete días después, la misma forma que la de preguntas.
+  it('en conceptos va una semana por detrás: lo visto el lunes 12 queda dominado hacia el 19-oct', () => {
+    expect(lineaConceptos(7)).toBe(0)
+    expect(lineaConceptos(8)).toBeGreaterThan(0)
+    // Siete días después, la misma forma que los techos de conceptos de Hoy.
     const forma = (n: number) => lineaConceptos(n + 7) / lineaConceptos(14)
-    expect(forma(3)).toBeCloseTo((lineaPreguntas(3) - lineaPreguntas(0)) / (lineaPreguntas(7) - lineaPreguntas(0)), 9)
+    const techos = (n: number) => Array.from({ length: n }, (_, i) => techoDelDia(i + 1).conceptos).reduce((a, b) => a + b, 0)
+    expect(forma(3)).toBeCloseTo(techos(3) / techos(7), 9)
   })
 
   it('nunca va más deprisa que los techos: ya cuenta con días malos', () => {
@@ -146,7 +159,7 @@ describe('lo que cuenta', () => {
   })
 
   it('un primer hito anterior sigue consumiendo disponibilidad aunque hoy haya perdido dominio', () => {
-    const r = resumenMeta(entrada({ ahora: mediodia(61), conceptosPublicados: 3,
+    const r = resumenMeta(entrada({ ahora: mediodia(DIAS_META + 1), conceptosPublicados: 3,
       dominadosEn: [mediodia(12)], primerasAcreditaciones: [mediodia(0), mediodia(12)] }))
     expect(r.conceptos.hechos).toBe(1)
     expect(r.conceptos.meta).toBe(2)
@@ -154,15 +167,15 @@ describe('lo que cuenta', () => {
     expect(r.filas.at(-1)?.conceptos).toBe(2)
   })
 
-  it('sólo lo de la ventana: lo dominado antes del 25-sep no suma, ni lo que llegue después del 23-nov', () => {
+  it('sólo lo de la ventana: lo dominado antes del 12-oct no suma, ni lo que llegue después del 23-nov', () => {
     const antes = inicioDelDiaMeta(1) - 1
     const r = resumenMeta(entrada({
-      ahora: mediodia(61), conceptosPublicados: 600,
-      dominadosEn: [antes, antes, mediodia(1), mediodia(30), mediodia(60), inicioDelDiaMeta(61) + 1],
+      ahora: mediodia(DIAS_META + 1), conceptosPublicados: 600,
+      dominadosEn: [antes, antes, mediodia(1), mediodia(22), mediodia(DIAS_META), inicioDelDiaMeta(DIAS_META + 1) + 1],
     }))
     expect(r.conceptos.hechos).toBe(3)
     // Lo dominado antes ya no está disponible para la meta, pero con 598 sigue sobrando.
-    expect(r.conceptos.meta).toBe(510)
+    expect(r.conceptos.meta).toBe(META_CONCEPTOS)
   })
 
   it('lo que todavía no ha pasado no suma, aunque un reloj adelantado lo haya fechado', () => {
@@ -191,7 +204,7 @@ describe('la proyección', () => {
     const marcas = siguiendo(lineaPreguntas, 13)
     expect(resumenMeta(entrada({ ahora: mediodia(14), primerasRespuestas: marcas })).preguntas.proyeccion).toBeNull()
     expect(resumenMeta(entrada({ ahora: mediodia(15), primerasRespuestas: siguiendo(lineaPreguntas, 14) })).preguntas.proyeccion).not.toBeNull()
-    expect(resumenMeta(entrada({ ahora: mediodia(61), primerasRespuestas: siguiendo(lineaPreguntas, 60) })).preguntas.proyeccion).toBeNull()
+    expect(resumenMeta(entrada({ ahora: mediodia(DIAS_META + 1), primerasRespuestas: siguiendo(lineaPreguntas, DIAS_META) })).preguntas.proyeccion).toBeNull()
   })
 
   it('siguiendo la línea lleva a la meta; a medio ritmo la última semana, a medio camino de lo que falta', () => {
@@ -222,16 +235,21 @@ describe('la proyección', () => {
 
 describe('la tabla', () => {
   it('una fila por semana hasta el 23-nov, con la línea acumulada y la semana de hoy marcada', () => {
+    // Martes 20-oct: segunda semana de la ventana, la que acaba el domingo 25.
     const r = resumenMeta(entrada({ ahora: Date.parse('2026-10-20T10:00:00-04:00') }))
-    expect(r.filas).toHaveLength(10)
-    expect(r.filas[0]).toMatchObject({ semana: 1, hasta: '2026-09-27', conceptos: 0 })
-    expect(r.filas.at(-1)).toMatchObject({ semana: 10, hasta: '2026-11-23', conceptos: 510, preguntas: 255 })
+    // Seis semanas de lunes a domingo, del 12-oct al 22-nov, y el lunes 23-nov solo.
+    expect(r.filas).toHaveLength(7)
+    expect(r.filas[0]).toMatchObject({ semana: 1, hasta: '2026-10-18', conceptos: 0 })
+    expect(r.filas.at(-1)).toMatchObject({ semana: 7, hasta: '2026-11-23', conceptos: 180, preguntas: 44 })
     expect(r.filas.filter(f => f.actual).map(f => f.hasta)).toEqual(['2026-10-25'])
-    // Ninguna semana pide más de lo que dan los techos en esa semana: 80 conceptos y 40 preguntas.
+    // Ninguna semana pide más de lo que dan los techos en esa semana: 40 conceptos y 10 preguntas.
+    const semanaConceptos = 4 * TECHOS.semana.conceptos + 2 * TECHOS.finde.conceptos
+    const semanaPreguntas = 4 * TECHOS.semana.preguntas + 2 * TECHOS.finde.preguntas
+    expect([semanaConceptos, semanaPreguntas]).toEqual([40, 10])
     r.filas.forEach((f, i) => {
       const previa = r.filas[i - 1]
-      expect(f.conceptos - (previa?.conceptos ?? 0)).toBeLessThanOrEqual(80)
-      expect(f.preguntas - (previa?.preguntas ?? 0)).toBeLessThanOrEqual(40)
+      expect(f.conceptos - (previa?.conceptos ?? 0)).toBeLessThanOrEqual(semanaConceptos)
+      expect(f.preguntas - (previa?.preguntas ?? 0)).toBeLessThanOrEqual(semanaPreguntas)
     })
     expect(resumenMeta(entrada({ ahora: mediodia(0) })).filas.some(f => f.actual)).toBe(false)
   })

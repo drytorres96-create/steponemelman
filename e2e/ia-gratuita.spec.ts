@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
-const LUNES = new Date('2026-10-05T11:30:00Z')
+/** Sábado: desde la 1.32.0 sólo el fin de semana trae preguntas NBME nuevas. */
+const LUNES = new Date('2026-10-17T11:30:00Z')
 const correccion = { observado: 'Elegiste beta.', confusion: 'Puede que hayas confundido el dato solicitado.', clave: 'Se pide demostración.', evitar: 'Compara el dato solicitado con tu elección.', evidencia: 'Sin material clínico' }
 for (const width of [390, 1280]) test.describe(`IA gratuita a ${width}px`, () => {
   test.use({ viewport: { width, height: 844 }, reducedMotion: 'reduce' })

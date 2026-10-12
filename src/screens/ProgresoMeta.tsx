@@ -55,7 +55,7 @@ function Serie({ titulo, serie, fin }: { titulo: string; serie: SerieMeta; fin: 
 }
 
 /**
- * Visión a futuro: la meta de 60 días, lo que va hecho y adónde lleva el ritmo.
+ * Visión a futuro: la meta, lo que va hecho y adónde lleva el ritmo.
  *
  * La línea es el camino a la meta al paso de los techos de Hoy, y más despacio que
  * ellos: ya cuenta con días malos, así que nunca pide más de lo que Hoy da en un día.

@@ -4,7 +4,8 @@ import { join } from 'node:path'
 
 // Sólo datos sintéticos del arnés: no descarga preguntas, PDFs ni imágenes del banco.
 const output = process.env.OUTPUT
-const LUNES = new Date('2026-10-05T07:30:00-04:00')
+/** Sábado: desde la 1.32.0 sólo el fin de semana trae preguntas NBME nuevas. */
+const LUNES = new Date('2026-10-17T07:30:00-04:00')
 
 async function abrirConcepto(page: Page, parametros = '') {
   await page.addInitScript(() => localStorage.setItem('step1-piel-estudio', 'claro'))
