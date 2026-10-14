@@ -52,7 +52,8 @@ function IndiceMaterial({ indice }: { indice: Indice | null }) {
   </div>
 }
 
-export function Ajustes() {
+export function Ajustes({ english = false, extraBackup, restoreExtra }: { english?: boolean; extraBackup?: Record<string, unknown>; restoreExtra?: (backup: Record<string, unknown>) => string } = {}) {
+  const tx = (es: string, en: string) => english ? en : es
   const { estado, actualizarCriterios, exportar, importar, reiniciar, indice } = useApp()
   const nbme = useNbme()
   const { session } = useAuth()
@@ -87,37 +88,39 @@ export function Ajustes() {
     try {
       const [semanas, plan] = await Promise.all([conLimite(cargarHistorialSesiones()),
         conLimite(cargarPlanSemana(session?.access_token ?? ''))])
-      entregar(nombreRespaldo(), exportar({ nbme: nbme.state, semanas, plan }), 'application/json')
+      entregar(nombreRespaldo(), exportar({ ...extraBackup, nbme: nbme.state, semanas, plan }), 'application/json')
     } finally { setPreparando(false) }
   }
 
   return (
     <div className="pila" style={{ maxWidth: 760 }}>
       {dialogo}
-      <ScreenHeading landscape="stone" eyebrow="Tu espacio personal" title="Ajustes" description="Preferencias, respaldo y preguntas frecuentes." />
+      {!english && <ScreenHeading landscape="stone" eyebrow="Tu espacio personal" title="Ajustes" description="Preferencias, respaldo y preguntas frecuentes." />}
 
-      <details className="tarjeta ajustes-seccion"><summary>Criterios de dominio (avanzado)</summary>
+      <details className="tarjeta ajustes-seccion"><summary>{tx('Criterios de dominio (avanzado)','Mastery criteria (advanced)')}</summary>
         <form className="pila" style={{ marginTop: 16 }} noValidate onSubmit={e => { e.preventDefault(); aplicar() }}>
           <div className="rejilla r2">{CAMPOS.map(f => <div key={f.clave}><label htmlFor={`criterio-${f.clave}`}>{f.titulo}</label>
             <input id={`criterio-${f.clave}`} type="number" min={f.min} max={f.max} step={1} value={borrador[f.clave]}
               onChange={e => { setBorrador(b => ({ ...b, [f.clave]: e.target.value })); setMensajeCriterios('') }} /></div>)}</div>
           {conflicto && <p role="alert">Los criterios cambiaron en otra ventana. Pulsa «Recargar valores» para revisar la configuración actual.</p>}
-          <div className="fila"><button className="btn principal" type="submit" disabled={!sucio || conflicto}>Aplicar criterios</button>
-            <button className="btn" type="button" onClick={cancelar}>{conflicto ? 'Recargar valores' : 'Cancelar cambios'}</button>
-            <button className="btn fantasma" type="button" onClick={() => { setBorrador(textos(CRITERIOS_POR_DEFECTO)); setMensajeCriterios('Recomendados preparados. Pulsa Aplicar criterios para guardarlos.') }}>Restaurar valores recomendados</button></div>
+          <div className="fila"><button className="btn principal" type="submit" disabled={!sucio || conflicto}>{tx('Aplicar criterios','Apply criteria')}</button>
+            <button className="btn" type="button" onClick={cancelar}>{conflicto ? tx('Recargar valores','Reload values') : tx('Cancelar cambios','Cancel changes')}</button>
+            <button className="btn fantasma" type="button" onClick={() => { setBorrador(textos(CRITERIOS_POR_DEFECTO)); setMensajeCriterios('Recomendados preparados. Pulsa Aplicar criterios para guardarlos.') }}>{tx('Restaurar valores recomendados','Restore recommended values')}</button></div>
           {mensajeCriterios && <p role="status">{mensajeCriterios}</p>}
         </form>
       </details>
 
       <div className="tarjeta pila">
-        <h2>Respaldo del progreso</h2>
+        <h2>{tx('Respaldo del progreso','Progress backup')}</h2>
         <div className="fila">
-          <button className="btn" disabled={preparando} onClick={() => void descargar()}>{preparando ? 'Preparando la copia…' : 'Exportar progreso'}</button>
-          <button className="btn fantasma" onClick={() => archivo.current?.click()}>Importar progreso</button>
+          <button className="btn" disabled={preparando} onClick={() => void descargar()}>{preparando ? tx('Preparando la copia…','Preparing backup…') : tx('Exportar progreso','Export progress')}</button>
+          <button className="btn fantasma" onClick={() => archivo.current?.click()}>{tx('Importar progreso','Import progress')}</button>
           <input ref={archivo} type="file" accept="application/json" style={{ display: 'none' }}
             onChange={async e => {
               const f = e.target.files?.[0]; if (!f) return
-              const r = importar(await f.text()); setMsg(r.mensaje)
+              const text = await f.text(), r = importar(text)
+              try { setMsg(`${r.mensaje} ${r.ok && restoreExtra ? restoreExtra(JSON.parse(text)) : ''}`) }
+              catch { setMsg(`${r.mensaje} ${tx('No se pudieron importar las anotaciones.', 'Annotations could not be restored.')}`) }
             }} />
         </div>
         {msg && <div className="aviso"><span>ℹ</span><div>{msg}</div></div>}
@@ -128,15 +131,15 @@ export function Ajustes() {
             try { await reiniciar(); setMsg('Progreso reiniciado en tu cuenta.') }
             catch (e) { setMsg(e instanceof Error ? e.message : 'No se pudo reiniciar. Tu progreso se conserva.') }
           }}>
-          Reiniciar todo el progreso
+          {tx('Reiniciar todo el progreso','Reset concept progress')}
         </button>
       </div>
 
-      <details className="tarjeta ajustes-seccion" onToggle={e => { if (e.currentTarget.open) setIndiceSolicitado(true) }}><summary>Índice del material</summary>
+      <details className="tarjeta ajustes-seccion" onToggle={e => { if (e.currentTarget.open) setIndiceSolicitado(true) }}><summary>{tx('Índice del material','Material index')}</summary>
         {indiceSolicitado && <IndiceMaterial indice={indice} />}
       </details>
 
-      <details className="tarjeta ajustes-seccion"><summary>Glosario del material</summary>
+      <details className="tarjeta ajustes-seccion"><summary>{tx('Glosario del material','Glossary')}</summary>
         <div className="scroll-x" tabIndex={0} role="region" aria-label="Glosario del material" style={{ maxHeight: 320 }}>
           <table className="tabla">
             <thead><tr><th>Sigla</th><th>Término</th><th>Disciplina</th></tr></thead>
@@ -147,7 +150,7 @@ export function Ajustes() {
         </div>
       </details>
       <PreguntasFrecuentes criterios={c} />
-      <p className="mini">Step 1 · Melman · Versión {APP_VERSION}</p>
+      <p className="mini">{english ? 'My Q Bank · Version' : 'Step 1 · Melman · Versión'} {APP_VERSION}</p>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { estadoNbmeReal, NBME_REAL_TOKEN, NBME_REAL_USER } from './nbme-real-fix
 /** Synthetic in-memory remote progress. No network/database client is imported here. */
 const parametros = new URL(location.href).searchParams
 const conProveedorReal = parametros.get('proveedor') === 'nbme-real'
+const annotations = new Map<string, any>(JSON.parse(localStorage.getItem('qa-myqbank-annotations') ?? '[]'))
 let row = { user_id: NBME_REAL_USER, state: estadoNbmeReal(), revision: 1,
   generation: 'synthetic-nbme-generation', updated_at: new Date().toISOString() }
 export const supabase = {
@@ -11,12 +12,21 @@ export const supabase = {
     ? { access_token: NBME_REAL_TOKEN, user: { id: NBME_REAL_USER } }
     : parametros.get('ia') === '1' ? { access_token: NBME_REAL_TOKEN, user: { id: 'QA-user' } } : null }, error: null }) },
   from(table: string) {
+    if (table === 'myqbank_annotations') return { select: () => ({ eq: () => ({ order: () => ({ range: async (start: number, end: number) => ({ data: [...annotations.values()].slice(start,end+1), error: null }) }) }) }) }
+    if (table === 'corpus_assets' || table === 'nbme_assets') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data:null,error:null }) }) }) }
     if (!conProveedorReal || table !== 'nbme_state') throw new Error('Only synthetic nbme_state is available in this harness.')
     return { select: () => ({ eq: (_field: string, userId: string) => ({ maybeSingle: async () => ({
       data: userId === NBME_REAL_USER ? structuredClone(row) : null, error: null,
     }) }) }) }
   },
-  async rpc(name: string, args: { p_state: unknown; p_expected_revision: number; p_generation: string | null }) {
+  async rpc(name: string, args: any) {
+    if (name === 'sync_myqbank_annotation') {
+      const prior = annotations.get(args.p_id)
+      if ((prior?.revision ?? 0) !== args.p_expected_revision) return { data:{ok:false,row:prior},error:null }
+      const saved = {id:args.p_id,user_id:NBME_REAL_USER,payload:args.p_payload,revision:(prior?.revision??0)+1}
+      annotations.set(args.p_id,saved); localStorage.setItem('qa-myqbank-annotations',JSON.stringify([...annotations]))
+      return {data:{ok:true,row:saved},error:null}
+    }
     if (!conProveedorReal || name !== 'sync_nbme_state') throw new Error('Only synthetic sync_nbme_state is available in this harness.')
     const state = parseNbmeState(args.p_state)
     if (!state) return { data: null, error: new Error('Invalid synthetic state.') }

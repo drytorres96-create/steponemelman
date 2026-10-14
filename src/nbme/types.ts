@@ -51,6 +51,13 @@ export interface NbmeSession {
   budgetMinutes: 10 | 20 | 30 | null
   continueUnlimited: boolean
   drafts: Record<string, NbmeDraft>
+  /** Missing on historical sessions: legacy Tutor with its original retry queue. */
+  mode?: 'tutor' | 'test'
+  cursor?: number
+  navigationChangedAt?: number
+  skipped?: Record<string, { value: boolean; changedAt: number }>
+  flags?: Record<string, { value: boolean; changedAt: number }>
+  completedAt?: number
 }
 export interface NbmeAttempt {
   /** Stable opportunity key: sessionId:position. */
@@ -74,7 +81,7 @@ export interface NbmeFilters {
   discipline: string
   status: 'all' | 'unseen' | 'errors'
   quality: 'ready' | 'all' | 'blocked'
-  size: 5 | 10 | 20
+  size: number
   budgetMinutes: 10 | 20 | 30 | null
 }
 export interface NbmeState {

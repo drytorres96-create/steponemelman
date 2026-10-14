@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { mergeBlock, StudyBlockZ, type StudyBlock } from '../myqbank/blocks'
 import { cargarIndice, cargarMigraciones } from '../data/corpus'
 import type { Indice } from '../schema/concept'
 import { intentoCorrecto, type Intento, type ProgresoConcepto } from '../srs/tipos'
@@ -23,6 +24,7 @@ interface Ctx {
   registrarVistaConcepto: (id: string, preguntaId: string) => void
   progresoDe: (id: string) => ProgresoConcepto
   guardarReanudable: (r: Reanudable | null) => void
+  guardarBloque: (block: StudyBlock) => void
   iniciarSesion: (modulo: string, ruta: string) => string
   cerrarSesion: (id: string, datos: { vistos: number; correctos: number; ms: number; msVisibles?: number }) => void
   actualizarCriterios: (c: CriteriosDominio) => void
@@ -248,6 +250,16 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
   const api = useMemo<Ctx>(() => ({
     listo, indice, estado, errorCarga, sincronizacion, sincronizarAhora, registrarIntento, registrarVistaConcepto,
     progresoDe: id => estado.progreso[id] ?? nuevoProgreso(id),
+    guardarBloque: input => {
+      const block = StudyBlockZ.parse(input)
+      editar(p => {
+        const previous = p.myqbankBlocks?.[block.id]
+        const saved = previous ? mergeBlock(previous, block) : block
+        return { ...p, myqbankBlocks: { ...p.myqbankBlocks, [block.id]: saved },
+          sesiones: p.sesiones.some(s => s.id === block.id) ? p.sesiones.map(s => s.id === block.id && saved.completedAt !== undefined ? { ...s, fin: saved.completedAt } : s)
+            : [...p.sesiones, { id: block.id, inicio: block.createdAt, fin: saved.completedAt ?? null, modulo: 'myqbank', ruta: block.mode === 'test' ? 'examen' : 'repaso', vistos: 0, correctos: 0, ms: 0 }] }
+      })
+    },
     guardarReanudable: r => editar(p => ({ ...p, reanudable: r, fieldUpdatedAt: { criterios: p.fieldUpdatedAt?.criterios ?? 0,
       reanudable: Math.max(Date.now(), (p.fieldUpdatedAt?.reanudable ?? p.reanudable?.ts ?? 0) + 1) } })),
     iniciarSesion: (modulo, ruta) => {

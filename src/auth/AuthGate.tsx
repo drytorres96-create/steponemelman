@@ -5,8 +5,12 @@ import { authErrorMessage, useAuth } from './AuthProvider'
 import { Brand, AccessScene } from '../components/Editorial'
 import { APP_VERSION } from '../release'
 import './auth.css'
+import { myqbankEnabled } from '../myqbank/activation'
+import { MyQBankAuthFrame } from '../myqbank/AuthFrame'
+const tx = (es: string, en: string) => myqbankEnabled() ? en : es
 
 function AuthFrame({ children }: { children: ReactNode }) {
+  if (myqbankEnabled()) return <MyQBankAuthFrame>{children}</MyQBankAuthFrame>
   return <main className="auth-page" data-app-version={APP_VERSION} data-depth-scene>
     <div className="auth-brand"><Brand /></div>
     <section className="auth-card tarjeta" aria-label="Acceso a tu cuenta"><p className="editorial-eyebrow">Tu cuenta · Tu continuidad</p>{children}</section>
@@ -49,6 +53,7 @@ function AuthForm() {
     setError(null)
     setNotice(null)
     const redirect = new URL(window.location.pathname, window.location.origin)
+    if (myqbankEnabled()) redirect.searchParams.set('workspace', 'myqbank')
     try {
       if (mode === 'login') {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
@@ -76,32 +81,32 @@ function AuthForm() {
 
   return <>
     <div className="auth-heading">
-      <h2>{mode === 'login' ? 'Vuelve a tu estudio' : mode === 'signup' ? 'Crea tu cuenta' : 'Recupera tu acceso'}</h2>
+      <h2>{mode === 'login' ? tx('Vuelve a tu estudio','Welcome back') : mode === 'signup' ? tx('Crea tu cuenta','Create your account') : tx('Recupera tu acceso','Reset your password')}</h2>
       <p className="sutil">{mode === 'signup' ? 'Confirma tu correo y solicita que habiliten tu acceso al material.' : mode === 'reset' ? 'Te enviaremos un enlace a tu correo.' : 'Entra con el correo que usas en esta plataforma.'}</p>
     </div>
-    {mode !== 'reset' && <div className="auth-tabs" aria-label="Tipo de acceso">
-      <button type="button" aria-pressed={mode === 'login'} disabled={busy} onClick={() => changeMode('login')}>Entrar</button>
-      <button type="button" aria-pressed={mode === 'signup'} disabled={busy} onClick={() => changeMode('signup')}>Crear cuenta</button>
+    {mode !== 'reset' && <div className="auth-tabs" aria-label={tx('Tipo de acceso','Account access')}>
+      <button type="button" aria-pressed={mode === 'login'} disabled={busy} onClick={() => changeMode('login')}>{tx('Entrar','Sign in')}</button>
+      <button type="button" aria-pressed={mode === 'signup'} disabled={busy} onClick={() => changeMode('signup')}>{tx('Crear cuenta','Create account')}</button>
     </div>}
     <form className="auth-form" onSubmit={event => void submit(event)}>
-      <label htmlFor="auth-email">Correo electrónico
-        <input id="auth-email" name="email" type="email" autoComplete="email" autoCapitalize="none" spellCheck={false} placeholder="tu@correo.com" required value={email} disabled={busy} onChange={event => setEmail(event.target.value)} />
+      <label htmlFor="auth-email">{tx('Correo electrónico','Email')}
+        <input id="auth-email" name="email" type="email" autoComplete="email" autoCapitalize="none" spellCheck={false} placeholder={tx('tu@correo.com','you@example.com')} required value={email} disabled={busy} onChange={event => setEmail(event.target.value)} />
       </label>
-      {mode !== 'reset' && <label htmlFor="auth-password">Contraseña
+      {mode !== 'reset' && <label htmlFor="auth-password">{tx('Contraseña','Password')}
         <div className="auth-password">
           <input id="auth-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={mode === 'signup' ? 8 : 1} value={password} disabled={busy} onChange={event => setPassword(event.target.value)} aria-describedby={mode === 'signup' ? 'auth-password-help' : undefined} />
-          <button type="button" className="auth-reveal" disabled={busy} onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} aria-pressed={showPassword}>{showPassword ? 'Ocultar' : 'Mostrar'}</button>
+          <button type="button" className="auth-reveal" disabled={busy} onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? tx('Ocultar contraseña','Hide password') : tx('Mostrar contraseña','Show password')} aria-pressed={showPassword}>{showPassword ? tx('Ocultar','Hide') : tx('Mostrar','Show')}</button>
         </div>
         {mode === 'signup' && <small id="auth-password-help">Al menos 8 caracteres. Usa una contraseña propia para tu cuenta de estudio.</small>}
       </label>}
       {error && <AuthNotice error>{error}</AuthNotice>}
       {notice && <AuthNotice>{notice}</AuthNotice>}
       <button type="submit" className="btn principal auth-submit" disabled={busy}>
-        {busy ? 'Un momento…' : mode === 'login' ? 'Entrar a estudiar' : mode === 'signup' ? 'Crear mi cuenta' : 'Enviar enlace de recuperación'}
+        {busy ? tx('Un momento…','Please wait…') : mode === 'login' ? tx('Entrar a estudiar','Sign in') : mode === 'signup' ? tx('Crear mi cuenta','Create account') : tx('Enviar enlace de recuperación','Send recovery link')}
       </button>
     </form>
     <button className="auth-link" type="button" disabled={busy} onClick={() => changeMode(mode === 'reset' ? 'login' : 'reset')}>
-      {mode === 'reset' ? 'Volver a iniciar sesión' : 'Olvidé mi contraseña'}
+      {mode === 'reset' ? tx('Volver a iniciar sesión','Back to sign in') : tx('Olvidé mi contraseña','Forgot password?')}
     </button>
     <p className="mini auth-device-note">Usa la misma cuenta para recuperar tu progreso guardado desde otro dispositivo.</p>
   </>
@@ -150,19 +155,19 @@ function RecoveryForm() {
   }
 
   return <>
-    <div className="auth-heading"><h2>{saved ? 'Contraseña actualizada' : 'Elige tu nueva contraseña'}</h2>
+    <div className="auth-heading"><h2>{saved ? tx('Contraseña actualizada','Password updated') : tx('Elige tu nueva contraseña','Choose a new password')}</h2>
       <p className="sutil">{saved ? 'Ya puedes usarla la próxima vez que entres.' : 'Guárdala para acceder desde tus otros dispositivos.'}</p>
     </div>
-    {saved ? <button type="button" className="btn principal auth-submit" onClick={finishPasswordRecovery}>Continuar</button> : <form className="auth-form" onSubmit={event => void submit(event)}>
-      <label htmlFor="recovery-password">Nueva contraseña
+    {saved ? <button type="button" className="btn principal auth-submit" onClick={finishPasswordRecovery}>{tx('Continuar','Continue')}</button> : <form className="auth-form" onSubmit={event => void submit(event)}>
+      <label htmlFor="recovery-password">{tx('Nueva contraseña','New password')}
         <input id="recovery-password" type="password" autoComplete="new-password" minLength={8} required disabled={busy} value={password} onChange={event => setPassword(event.target.value)} />
       </label>
-      <label htmlFor="recovery-confirmation">Repite la contraseña
+      <label htmlFor="recovery-confirmation">{tx('Repite la contraseña','Confirm password')}
         <input id="recovery-confirmation" type="password" autoComplete="new-password" minLength={8} required disabled={busy} value={confirmation} onChange={event => setConfirmation(event.target.value)} />
       </label>
       {error && <AuthNotice error>{error}</AuthNotice>}
-      <button className="btn principal auth-submit" type="submit" disabled={busy}>{busy ? 'Guardando…' : 'Guardar contraseña'}</button>
-      <button type="button" className="auth-link" disabled={busy} onClick={() => void leaveRecovery()}>Cancelar y salir</button>
+      <button className="btn principal auth-submit" type="submit" disabled={busy}>{busy ? tx('Guardando…','Saving…') : tx('Guardar contraseña','Save password')}</button>
+      <button type="button" className="auth-link" disabled={busy} onClick={() => void leaveRecovery()}>{tx('Cancelar y salir','Cancel and sign out')}</button>
     </form>}
   </>
 }
@@ -176,7 +181,7 @@ function AccountExitButton() {
     setError(null)
     try { await signOut() } catch (requestError) { setError(authErrorMessage(requestError)) } finally { setBusy(false) }
   }
-  return <>{error && <AuthNotice error>{error}</AuthNotice>}<button type="button" className="btn fantasma" disabled={busy} onClick={() => void exit()}>{busy ? 'Saliendo…' : 'Cerrar sesión'}</button></>
+  return <>{error && <AuthNotice error>{error}</AuthNotice>}<button type="button" className="btn fantasma" disabled={busy} onClick={() => void exit()}>{busy ? tx('Saliendo…','Signing out…') : tx('Cerrar sesión','Sign out')}</button></>
 }
 
 export function AuthGate({ children }: { children: (user: User) => ReactNode }) {
@@ -230,16 +235,16 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
   }, [checkMembership, session?.access_token])
 
   if (loading) return <AuthFrame><div className="auth-loading" role="status"><span className="auth-spinner" aria-hidden="true" />Comprobando tu sesión…</div></AuthFrame>
-  if (authError) return <AuthFrame><h2>No pudimos abrir tu sesión</h2><AuthNotice error>{authError}</AuthNotice><div className="auth-actions"><button className="btn principal" type="button" onClick={() => void retryVerification()}>Volver a intentar</button><AccountExitButton /></div></AuthFrame>
+  if (authError) return <AuthFrame><h2>No pudimos abrir tu sesión</h2><AuthNotice error>{authError}</AuthNotice><div className="auth-actions"><button className="btn principal" type="button" onClick={() => void retryVerification()}>{tx('Volver a intentar','Retry')}</button><AccountExitButton /></div></AuthFrame>
   if (!user) return <AuthFrame><AuthForm /></AuthFrame>
   if (recoveringPassword) return <AuthFrame><RecoveryForm /></AuthFrame>
-  if (membershipError) return <AuthFrame><h2>No pudimos comprobar tu acceso</h2><AuthNotice error>{membershipError}</AuthNotice><div className="auth-actions"><button className="btn principal" disabled={checking} type="button" onClick={() => void checkMembership()}>{checking ? 'Comprobando…' : 'Volver a intentar'}</button><AccountExitButton /></div></AuthFrame>
+  if (membershipError) return <AuthFrame><h2>No pudimos comprobar tu acceso</h2><AuthNotice error>{membershipError}</AuthNotice><div className="auth-actions"><button className="btn principal" disabled={checking} type="button" onClick={() => void checkMembership()}>{checking ? tx('Comprobando…','Checking…') : tx('Volver a intentar','Retry')}</button><AccountExitButton /></div></AuthFrame>
   if (!membership || membership.userId !== user.id) return <AuthFrame><div className="auth-loading" role="status"><span className="auth-spinner" aria-hidden="true" />Comprobando tu acceso…</div></AuthFrame>
   if (!membership.allowed) return <AuthFrame>
     <span className="etq ambar">Acceso pendiente</span>
     <div className="auth-heading"><h2>Tu cuenta está creada; falta habilitar acceso</h2><p className="sutil">La cuenta <strong className="auth-email">{user.email}</strong> ya está verificada. El material se abrirá cuando se habilite tu acceso.</p></div>
     <p className="sutil">Si ya solicitaste la activación, pulsa el botón para comprobarla.</p>
-    <div className="auth-actions"><button type="button" className="btn principal" disabled={checking} onClick={() => void checkMembership()}>{checking ? 'Comprobando…' : 'Comprobar acceso'}</button><AccountExitButton /></div>
+    <div className="auth-actions"><button type="button" className="btn principal" disabled={checking} onClick={() => void checkMembership()}>{checking ? tx('Comprobando…','Checking…') : tx('Comprobar acceso','Check access')}</button><AccountExitButton /></div>
   </AuthFrame>
   return <>{children(user)}</>
 }

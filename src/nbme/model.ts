@@ -33,7 +33,7 @@ const choose = <T,>(a: T, b: T, ta: number, tb: number): T => ta > tb ? a : ta <
 function parseFilters(v: unknown): NbmeFilters | null {
   if (!object(v) || !['all', '27', '28', '29'].includes(String(v.form)) || !text(v.system, 100) || !text(v.discipline, 100)
     || !['all', 'unseen', 'errors'].includes(String(v.status)) || !['ready', 'all', 'blocked'].includes(String(v.quality ?? 'ready'))
-    || ![5, 10, 20].includes(v.size as number) || !budget(v.budgetMinutes)) return null
+    || !int(v.size) || v.size < 5 || v.size > 80 || !budget(v.budgetMinutes)) return null
   return { form: v.form as NbmeFilters['form'], system: v.system, discipline: v.discipline, status: v.status as NbmeFilters['status'],
     quality: (v.quality ?? 'ready') as NbmeFilters['quality'], size: v.size as NbmeFilters['size'], budgetMinutes: v.budgetMinutes }
 }
@@ -41,16 +41,35 @@ function validRef(v: unknown): v is NbmeQuestionRef { return object(v) && id(v.i
 function parseSession(v: unknown, sessionId: string): NbmeSession | null {
   if (!object(v) || v.id !== sessionId || !id(v.id) || !text(v.title, 300) || !num(v.startedAt) || !num(v.controlChangedAt)
     || typeof v.paused !== 'boolean' || !num(v.elapsedMs) || !budget(v.budgetMinutes) || typeof v.continueUnlimited !== 'boolean'
-    || !Array.isArray(v.initial) || v.initial.length < 1 || v.initial.length > 20 || !v.initial.every(validRef)
+    || !Array.isArray(v.initial) || v.initial.length < 1 || v.initial.length > 80 || !v.initial.every(validRef)
     || new Set(v.initial.map(r => r.id)).size !== v.initial.length || !object(v.drafts)) return null
   const drafts: NbmeSession['drafts'] = {}
   for (const [pos, d] of Object.entries(v.drafts)) {
     if (!/^\d{1,6}$/.test(pos) || !object(d) || !(d.optionId === null || id(d.optionId)) || !num(d.changedAt)) return null
     drafts[pos] = { optionId: d.optionId, changedAt: d.changedAt }
   }
+  if (v.mode !== undefined && v.mode !== 'tutor' && v.mode !== 'test') return null
+  if (v.cursor !== undefined && (!int(v.cursor) || v.cursor >= v.initial.length)) return null
+  if (v.navigationChangedAt !== undefined && !num(v.navigationChangedAt)) return null
+  if (v.completedAt !== undefined && (!num(v.completedAt) || v.completedAt < v.startedAt)) return null
+  const marks: Pick<NbmeSession, 'flags' | 'skipped'> = {}
+  for (const field of ['flags', 'skipped'] as const) {
+    if (v[field] === undefined) continue
+    if (!object(v[field])) return null
+    const parsed: NonNullable<NbmeSession['flags']> = {}
+    for (const [pos, mark] of Object.entries(v[field])) {
+      if (!/^\d{1,2}$/.test(pos) || Number(pos) >= v.initial.length || !object(mark) || typeof mark.value !== 'boolean' || !num(mark.changedAt)) return null
+      parsed[pos] = { value: mark.value, changedAt: mark.changedAt }
+    }
+    marks[field] = parsed
+  }
   return { id: sessionId, title: v.title, initial: v.initial.map(r => ({ id: r.id, revision: r.revision })), startedAt: v.startedAt,
     controlChangedAt: v.controlChangedAt, paused: v.paused, elapsedMs: v.elapsedMs, budgetMinutes: v.budgetMinutes,
-    continueUnlimited: v.continueUnlimited, drafts }
+    continueUnlimited: v.continueUnlimited, drafts, ...marks,
+    ...(v.mode !== undefined ? { mode: v.mode } : {}),
+    ...(v.cursor !== undefined ? { cursor: v.cursor as number } : {}),
+    ...(v.navigationChangedAt !== undefined ? { navigationChangedAt: v.navigationChangedAt as number } : {}),
+    ...(v.completedAt !== undefined ? { completedAt: v.completedAt as number } : {}) }
 }
 /** Independent state parser: no NBME fields are inserted into conceptual study_state. */
 export function parseNbmeState(value: unknown): NbmeState | null {
@@ -130,13 +149,26 @@ export function mergeNbmeStates(a: NbmeState, b: NbmeState): NbmeState {
     const x = a.sessions[sid], y = b.sessions[sid]
     if (!x || !y) { out.sessions[sid] = x ?? y; continue }
     if (stable(x.initial) !== stable(y.initial) || x.startedAt !== y.startedAt || x.budgetMinutes !== y.budgetMinutes) throw new Error('Incompatible session identity')
+    if (x.mode && y.mode && x.mode !== y.mode) throw new Error('Incompatible session mode')
     const primary = x.controlChangedAt > y.controlChangedAt ? x : x.controlChangedAt < y.controlChangedAt ? y : x.paused ? x : y
     const drafts: NbmeSession['drafts'] = {}
     for (const pos of new Set([...Object.keys(x.drafts), ...Object.keys(y.drafts)])) {
       const dx = x.drafts[pos], dy = y.drafts[pos]
       drafts[pos] = !dx || !dy ? dx ?? dy : choose(dx, dy, dx.changedAt, dy.changedAt)
     }
-    out.sessions[sid] = { ...primary, elapsedMs: Math.max(x.elapsedMs, y.elapsedMs), continueUnlimited: x.continueUnlimited || y.continueUnlimited, drafts }
+    const navigation = choose(x, y, x.navigationChangedAt ?? 0, y.navigationChangedAt ?? 0)
+    const marks: Pick<NbmeSession, 'flags' | 'skipped'> = {}
+    for (const field of ['flags', 'skipped'] as const) if (x[field] || y[field]) {
+      marks[field] = {}
+      for (const pos of new Set([...Object.keys(x[field] ?? {}), ...Object.keys(y[field] ?? {})])) {
+        const a = x[field]?.[pos], b = y[field]?.[pos]
+        marks[field]![pos] = !a || !b ? (a ?? b)! : choose(a, b, a.changedAt, b.changedAt)
+      }
+    }
+    out.sessions[sid] = { ...primary, elapsedMs: Math.max(x.elapsedMs, y.elapsedMs), continueUnlimited: x.continueUnlimited || y.continueUnlimited, drafts, ...marks,
+      ...((x.mode ?? y.mode) ? { mode: x.mode ?? y.mode, cursor: navigation.cursor ?? x.cursor ?? y.cursor ?? 0,
+        navigationChangedAt: Math.max(x.navigationChangedAt ?? 0, y.navigationChangedAt ?? 0) } : {}),
+      ...(x.completedAt !== undefined || y.completedAt !== undefined ? { completedAt: Math.max(x.completedAt ?? 0, y.completedAt ?? 0), paused: true } : {}) }
   }
   for (const aid of [...new Set([...Object.keys(a.attempts), ...Object.keys(b.attempts)])].sort()) {
     const x = a.attempts[aid], y = b.attempts[aid]
@@ -161,12 +193,12 @@ export function deriveNbmeSession(state: NbmeState, sessionId: string): NbmeSess
   let firstPending = -1, firstAnswered = 0, firstCorrect = 0, firstConflicts = 0, retryCount = 0
   for (let i = 0; i < queue.length; i++) {
     const ref = queue[i], a = state.attempts[key(sessionId, ref.position)]
-    if (a && (!a.correct || a.conflict)) queue.push({ id: ref.id, revision: ref.revision, position: ref.position + n, round: ref.round + 1 })
+    if (!session.mode && a && (!a.correct || a.conflict)) queue.push({ id: ref.id, revision: ref.revision, position: ref.position + n, round: ref.round + 1 })
     if (a && ref.round === 0) { firstAnswered++; if (a.conflict) firstConflicts++; else if (a.correct) firstCorrect++ }
     if (a && ref.round > 0) retryCount++
     if (firstPending < 0 && (!a || a.reviewedAt === null)) firstPending = i
   }
-  const index = firstPending < 0 ? queue.length : firstPending
+  const index = session.mode ? session.cursor ?? 0 : firstPending < 0 ? queue.length : firstPending
   const current = queue[index] ?? null
   const attempt = current ? state.attempts[key(sessionId, current.position)] ?? null : null
   const latest = new Map<string, NbmeAttempt>()
@@ -175,12 +207,15 @@ export function deriveNbmeSession(state: NbmeState, sessionId: string): NbmeSess
     if (!prior || a.position > prior.position) latest.set(a.questionId, a)
   }
   const pendingErrors = [...latest.values()].filter(a => !a.correct || a.conflict).length
+  const hidden = session.mode === 'test' && session.completedAt === undefined
   return { queue, index, current, attempt, phase: !current ? 'complete' : attempt ? 'feedback' : 'question',
-    initialCount: n, firstAnswered, firstCorrect, firstConflicts, retryCount, pendingErrors, unresolved: pendingErrors }
+    initialCount: n, firstAnswered, firstCorrect: hidden ? 0 : firstCorrect, firstConflicts: hidden ? 0 : firstConflicts, retryCount,
+    pendingErrors: hidden ? 0 : pendingErrors, unresolved: hidden ? 0 : pendingErrors }
 }
 /** Cargar la pregunta o explicación actual, las primeras respuestas restantes y
  * las correcciones pendientes. Un paso cerrado no bloquea la continuación. */
 export function referenciasPendientesNbme(state: NbmeState, sessionId: string): NbmeQuestionRef[] {
+  if (state.sessions[sessionId]?.mode) return state.sessions[sessionId].initial
   const view = deriveNbmeSession(state, sessionId)
   if (!view) return []
   const refs = new Map<string, NbmeQuestionRef>()
@@ -193,17 +228,19 @@ export function referenciasPendientesNbme(state: NbmeState, sessionId: string): 
 function requireSession(state: NbmeState, sid: string) {
   const s = state.sessions[sid]; if (!s || isNbmeSessionArchived(state, sid)) throw new Error('Sesión de preguntas no disponible.'); return s
 }
-export function startNbmeSession(state: NbmeState, input: { id: string; title: string; refs: NbmeQuestionRef[]; budgetMinutes?: 10 | 20 | 30 | null }, now = Date.now()): NbmeState {
+export function startNbmeSession(state: NbmeState, input: { id: string; title: string; refs: NbmeQuestionRef[]; budgetMinutes?: 10 | 20 | 30 | null; mode?: 'tutor' | 'test' }, now = Date.now()): NbmeState {
   if (!id(input.id) || state.sessions[input.id] || !text(input.title, 300) || !num(now) || !budget(input.budgetMinutes ?? null)
-    || input.refs.length < 1 || input.refs.length > 20 || !input.refs.every(validRef) || new Set(input.refs.map(r => r.id)).size !== input.refs.length) throw new Error('Selección de preguntas no válida.')
+    || input.refs.length < 1 || input.refs.length > 80 || !input.refs.every(validRef) || new Set(input.refs.map(r => r.id)).size !== input.refs.length
+    || input.mode !== undefined && !['tutor', 'test'].includes(input.mode)) throw new Error('Selección de preguntas no válida.')
   const session: NbmeSession = { id: input.id, title: input.title, initial: input.refs.map(r => ({ id: r.id, revision: r.revision })), startedAt: now,
-    paused: false, controlChangedAt: now, elapsedMs: 0, budgetMinutes: input.budgetMinutes ?? null, continueUnlimited: false, drafts: {} }
-  return { ...state, sessions: { ...state.sessions, [session.id]: session }, activeSessionId: session.id, activeChangedAt: now }
+    paused: false, controlChangedAt: now, elapsedMs: 0, budgetMinutes: input.budgetMinutes ?? null, continueUnlimited: false, drafts: {},
+    ...(input.mode ? { mode: input.mode, cursor: 0, navigationChangedAt: now, skipped: {}, flags: {} } : {}) }
+  return { ...state, sessions: { ...state.sessions, [session.id]: session }, activeSessionId: session.id, activeChangedAt: Math.max(now, state.activeChangedAt + 1) }
 }
 export function activateNbmeSession(state: NbmeState, sid: string, now = Date.now()): NbmeState {
   requireSession(state, sid)
   if (deriveNbmeSession(state, sid)?.phase === 'complete') return state
-  return { ...updateNbmeSession(state, sid, { paused: false }, now), activeSessionId: sid, activeChangedAt: now }
+  return { ...updateNbmeSession(state, sid, { paused: false }, now), activeSessionId: sid, activeChangedAt: Math.max(now, state.activeChangedAt + 1) }
 }
 export function updateNbmeSession(state: NbmeState, sid: string, patch: { paused?: boolean; elapsedMs?: number; continueUnlimited?: boolean }, now = Date.now()): NbmeState {
   const session = requireSession(state, sid)
@@ -211,16 +248,16 @@ export function updateNbmeSession(state: NbmeState, sid: string, patch: { paused
   const hasControl = patch.paused !== undefined || patch.continueUnlimited !== undefined
   return { ...state, sessions: { ...state.sessions, [sid]: { ...session, ...patch,
     elapsedMs: Math.max(session.elapsedMs, patch.elapsedMs ?? 0), continueUnlimited: session.continueUnlimited || patch.continueUnlimited === true,
-    controlChangedAt: hasControl ? Math.max(now, session.controlChangedAt) : session.controlChangedAt } } }
+    controlChangedAt: hasControl ? Math.max(now, session.controlChangedAt + 1) : session.controlChangedAt } } }
 }
 export function setNbmeDraft(state: NbmeState, sid: string, position: number, optionId: string | null, now = Date.now()): NbmeState {
   const s = requireSession(state, sid), view = deriveNbmeSession(state, sid)
   if (!int(position) || !num(now) || !(optionId === null || id(optionId))) throw new Error('Opción no válida.')
-  if (view?.phase !== 'question' || view.current?.position !== position) return state
-  return { ...state, sessions: { ...state.sessions, [sid]: { ...s, drafts: { ...s.drafts, [position]: { optionId, changedAt: now } } } } }
+  if (s.completedAt !== undefined || view?.phase !== 'question' || view.current?.position !== position) return state
+  return { ...state, sessions: { ...state.sessions, [sid]: { ...s, drafts: { ...s.drafts, [position]: { optionId, changedAt: Math.max(now, (s.drafts[position]?.changedAt ?? 0) + 1) } } } } }
 }
 export function submitNbmeAnswer(state: NbmeState, sid: string, position: number, question: NbmeQuestion, optionId: string, durationMs: number, now = Date.now()): NbmeState {
-  requireSession(state, sid)
+  if (requireSession(state, sid).completedAt !== undefined) return state
   if (state.attempts[key(sid, position)]) return state
   const view = deriveNbmeSession(state, sid)
   if (view?.phase !== 'question' || view.current?.position !== position || view.current.id !== question.id || view.current.revision !== question.revision)
@@ -239,7 +276,7 @@ export function reviewNbmeAnswer(state: NbmeState, sid: string, position: number
   if (!num(now)) throw new Error('Fecha no válida.')
   const next = { ...state, attempts: { ...state.attempts, [aid]: { ...a, reviewedAt: Math.max(now, a.submittedAt) } } }
   if (deriveNbmeSession(next, sid)?.phase === 'complete' && next.activeSessionId === sid)
-    return { ...next, activeSessionId: null, activeChangedAt: Math.max(now, next.activeChangedAt) }
+    return { ...next, activeSessionId: null, activeChangedAt: Math.max(now, next.activeChangedAt + 1) }
   return next
 }
 /**
@@ -259,7 +296,7 @@ export function discardNbmeSession(state: NbmeState, sid: string, now = Date.now
   return { ...state, sessions, attempts,
     discarded: podarLapidas({ ...state.discarded, [sid]: now }),
     activeSessionId: activo ? null : state.activeSessionId,
-    activeChangedAt: activo ? now : state.activeChangedAt }
+    activeChangedAt: activo ? Math.max(now, state.activeChangedAt + 1) : state.activeChangedAt }
 }
 /** Retira el bloque de las sesiones visibles sin cambiar ninguna respuesta ni su progreso. */
 export function archiveNbmeSession(state: NbmeState, sid: string, now = Date.now()): NbmeState {
@@ -268,7 +305,7 @@ export function archiveNbmeSession(state: NbmeState, sid: string, now = Date.now
   const active = state.activeSessionId === sid
   return { ...state, archivedSessions: { ...state.archivedSessions, [sid]: now },
     activeSessionId: active ? null : state.activeSessionId,
-    activeChangedAt: active ? Math.max(now, state.activeChangedAt) : state.activeChangedAt }
+    activeChangedAt: active ? Math.max(now, state.activeChangedAt + 1) : state.activeChangedAt }
 }
 
 /** Cuántos intentos se perderían al descartar: la interfaz lo dice antes de preguntar. */
@@ -295,15 +332,37 @@ export function questionProgress(state: NbmeState, qid: string): NbmeQuestionPro
     .sort((a, b) => a.submittedAt - b.submittedAt || a.id.localeCompare(b.id))
   const first = attempts[0], last = attempts.at(-1)
   return { questionId: qid, seen: !!first, attempts: attempts.length,
-    firstCorrect: !first || first.conflict ? null : first.correct, firstSubmittedAt: first?.submittedAt ?? null,
-    latestCorrect: !last || last.conflict ? null : last.correct, latestSubmittedAt: last?.submittedAt ?? null,
-    pendingError: !!last && (!last.correct || last.conflict === true) }
+    firstCorrect: !first || first.conflict || isHiddenNbmeAttempt(state, first) ? null : first.correct, firstSubmittedAt: first?.submittedAt ?? null,
+    latestCorrect: !last || last.conflict || isHiddenNbmeAttempt(state, last) ? null : last.correct, latestSubmittedAt: last?.submittedAt ?? null,
+    pendingError: !!last && !isHiddenNbmeAttempt(state, last) && (!last.correct || last.conflict === true) }
+}
+export function isHiddenNbmeAttempt(state: NbmeState, attempt: NbmeAttempt): boolean {
+  const session = state.sessions[attempt.sessionId]
+  return session?.mode === 'test' && session.completedAt === undefined
+}
+export function navigateNbmeSession(state: NbmeState, sid: string, position: number, now = Date.now()): NbmeState {
+  const s = requireSession(state, sid)
+  if (!s.mode || !int(position) || position >= s.initial.length || !num(now)) return state
+  return { ...state, sessions: { ...state.sessions, [sid]: { ...s, cursor: position,
+    navigationChangedAt: Math.max(now, (s.navigationChangedAt ?? 0) + 1) } } }
+}
+export function markNbmePosition(state: NbmeState, sid: string, position: number, field: 'flags' | 'skipped', value: boolean, now = Date.now()): NbmeState {
+  const s = requireSession(state, sid)
+  if (!int(position) || position >= s.initial.length || !num(now)) return state
+  return { ...state, sessions: { ...state.sessions, [sid]: { ...s, [field]: { ...s[field], [position]: {
+    value, changedAt: Math.max(now, (s[field]?.[position]?.changedAt ?? 0) + 1),
+  } } } } }
+}
+export function completeNbmeSession(state: NbmeState, sid: string, now = Date.now()): NbmeState {
+  const s = requireSession(state, sid)
+  if (s.completedAt !== undefined || !num(now)) return state
+  return { ...state, sessions: { ...state.sessions, [sid]: { ...s, completedAt: Math.max(now, s.startedAt), paused: true } } }
 }
 export function summarizeNbmeState(state: NbmeState) {
   const qs = [...new Set(Object.values(state.attempts).map(a => a.questionId))].map(id => questionProgress(state, id))
   return { seen: qs.length, totalAttempts: Object.keys(state.attempts).length,
     firstCorrect: qs.filter(p => p.firstCorrect === true).length, firstEvaluated: qs.filter(p => p.firstCorrect !== null).length,
-    firstConflicts: qs.filter(p => p.firstCorrect === null).length, pendingErrors: qs.filter(p => p.pendingError).length,
-    completedSessions: Object.keys(state.sessions).filter(id => deriveNbmeSession(state, id)?.phase === 'complete').length,
+    firstConflicts: qs.filter(p => p.firstCorrect === null && Object.values(state.attempts).filter(a => a.questionId === p.questionId).sort((a, b) => a.submittedAt - b.submittedAt || a.id.localeCompare(b.id))[0]?.conflict).length, pendingErrors: qs.filter(p => p.pendingError).length,
+    completedSessions: Object.keys(state.sessions).filter(id => state.sessions[id].completedAt !== undefined || deriveNbmeSession(state, id)?.phase === 'complete').length,
     elapsedMs: Object.values(state.sessions).reduce((sum, s) => sum + s.elapsedMs, 0) }
 }

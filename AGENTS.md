@@ -28,6 +28,13 @@
 
 ## Límites y autorización vigente
 
+- El 14-oct-2026 el usuario autorizó corregir la fase 1 e implementar las fases
+  2, 3 y 4 consecutivamente. Esa autorización incluye sesiones persistentes,
+  migración privada de anotaciones, dashboard real y estudio adaptativo con
+  piloto editorial complementario. Sustituye los límites de sólo lectura para
+  ese alcance. Mantener originales, historial, RPC y la aplicación compartida;
+  la cobertura completa y activación general de producción pertenecen a fase 5.
+
 - Los límites de sólo lectura siguientes pertenecían a la auditoría inicial. La petición
   explícita del 7-oct-2026 autoriza simplificar la UI, corregir la selección de Hoy y
   reparar/integrar los 191 conceptos en cuarentena. La petición posterior del mismo

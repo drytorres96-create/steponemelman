@@ -21,6 +21,17 @@ jobs:
       - id: browser
         run: npx playwright install --with-deps chromium
       - run: npm run e2e
+      - name: Verify integrated My Q Bank screens
+        run: node qa/myqbank-review.mjs
+      - name: Integrated My Q Bank application and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: myqbank-phases-2-4
+          path: |
+            dist/
+            docs/myqbank-phases-2-4/
+          retention-days: 14
       - name: Build isolated My Q Bank preview
         run: npm run build:myqbank
       - name: Verify My Q Bank preview

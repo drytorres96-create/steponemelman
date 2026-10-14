@@ -1,6 +1,7 @@
 import { ConceptoZ, type Concepto } from '@app/schema/concept'
 import { conceptos as ids } from './escena'
 import { conceptoAplicacionSintetico, IDS_APLICACION } from './aplicacion-fixture'
+import { myqbankConcepts } from './myqbank-fixture'
 // Se valida una plantilla con un id largo y luego se le pone el id corto de la escena: así trae todos los valores por defecto.
 const conceptos = ids.map((id, i) => IDS_APLICACION.includes(id) ? conceptoAplicacionSintetico(id) : ({ ...ConceptoZ.parse({
   concept_id: `DEMO-${i + 1}`, source: { doc: 'DEMO', doc_title: 'Fuente sintética', page: 1, item_id: String(i + 1), fragment: 'Sin material clínico' },
@@ -12,11 +13,11 @@ const conceptos = ids.map((id, i) => IDS_APLICACION.includes(id) ? conceptoAplic
 }), concept_id: id }) as Concepto)
 declare global { interface Window { __cargasCorpusSintetico: number } }
 window.__cargasCorpusSintetico = 0
-export const cargarTodo = async () => { window.__cargasCorpusSintetico++; return conceptos }
+export const cargarTodo = async () => { window.__cargasCorpusSintetico++; return new URLSearchParams(location.search).get('workspace') === 'myqbank' ? myqbankConcepts : conceptos }
 let cargas = 0
 export const cargarConceptos = async (lista: string[]) => {
   if (new URLSearchParams(location.search).get('retomar') === 'concepto-error' && ++cargas === 1) throw new Error('No se pudo cargar la sesión sintética. Vuelve a intentarlo.')
-  return new Map(conceptos.filter(c => lista.includes(c.concept_id)).map(c => [c.concept_id, c]))
+  return new Map([...conceptos, ...myqbankConcepts].filter(c => lista.includes(c.concept_id)).map(c => [c.concept_id, c]))
 }
 export const cargarModulo = async () => conceptos
 export const cargarIndice = async () => { throw new Error('no') }

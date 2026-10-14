@@ -1,2 +1,3 @@
-export function useAuth() { return { session: { access_token: 'x'.repeat(30) }, user: { id: 'cuenta-demo' }, signOut: async () => {} } }
+export function useAuth() { const authScene = new URLSearchParams(location.search).has('auth-scene'); return { session: authScene ? null : { access_token: 'x'.repeat(30) }, user: authScene ? null : { id: 'cuenta-demo' }, signOut: async () => {}, loading: false, authError: null, retryVerification: async () => {}, recoveringPassword: false, finishPasswordRecovery: () => {} } }
 export function AuthProvider({ children }: { children: unknown }) { return children }
+export function authErrorMessage(error: unknown) { return error instanceof Error ? error.message : 'Synthetic authentication unavailable.' }

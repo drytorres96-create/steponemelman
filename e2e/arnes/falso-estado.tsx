@@ -3,6 +3,8 @@ import { ESTADO_INICIAL, reconstruirProgreso, registrarVistaConceptoEstado } fro
 import { nuevoProgreso } from '@app/srs/fsrs'
 import { CRITERIOS_POR_DEFECTO } from '@app/srs/mastery'
 import { conceptos, conAplicacion, progreso } from './escena'
+import { mergeBlock } from '../../src/myqbank/blocks'
+import { myqbankConcepts } from './myqbank-fixture'
 
 // Doble del proveedor de progreso: el mismo contrato que useApp, en memoria y sin Supabase.
 const reanudar = new URLSearchParams(location.search).get('retomar')
@@ -21,10 +23,12 @@ const guardada = conAplicacion && reanudar === 'base-guardada' ? {
   titulo: 'Resumen sintético terminado', subtitulo: 'Sin pasos de concepto pendientes.',
 } : null
 let estado: any = { ...ESTADO_INICIAL, progreso, reanudable: guardada }
+const myqbank = new URLSearchParams(location.search).get('workspace') === 'myqbank'
+if (myqbank) estado = JSON.parse(localStorage.getItem('qa-myqbank-state') ?? 'null') ?? { ...ESTADO_INICIAL, progreso: guardada ? progreso : {}, reanudable: guardada }
 declare global { interface Window { __leerProgresoSintetico: () => any } }
 window.__leerProgresoSintetico = () => estado
 const oyentes = new Set<() => void>()
-const avisar = () => { valor = { ...valor, estado }; oyentes.forEach(f => f()) }
+const avisar = () => { if (myqbank) localStorage.setItem('qa-myqbank-state',JSON.stringify(estado)); valor = { ...valor, estado }; oyentes.forEach(f => f()) }
 let sesionesAplicacion = 0
 let valor: any = {
   listo: true, errorCarga: null, estado,
@@ -42,10 +46,12 @@ let valor: any = {
   },
   progresoDe: (id: string) => estado.progreso[id] ?? nuevoProgreso(id),
   guardarReanudable: (r: any) => { estado = { ...estado, reanudable: r }; avisar() },
+  guardarBloque: (block: any) => { estado = { ...estado, myqbankBlocks: { ...estado.myqbankBlocks, [block.id]: estado.myqbankBlocks?.[block.id] ? mergeBlock(estado.myqbankBlocks[block.id],block) : block } }; avisar() },
   iniciarSesion: () => conAplicacion ? `qa-aplicacion-sesion-${++sesionesAplicacion}` : 'sesion', cerrarSesion: () => {}, actualizarCriterios: () => {},
   avisoLocal: null, descartarAvisoLocal: () => {},
   exportar: (extra?: Record<string, unknown>) => JSON.stringify({ ...extra, ...estado }), importar: () => ({ ok: true, mensaje: '' }), reiniciar: async () => {},
 }
+if (myqbank) valor.indice = { ...valor.indice, n_conceptos: myqbankConcepts.length, modulos: [{ ...valor.indice.modulos[0], sesiones: [{ session_id:'QA-S', titulo:'Synthetic', objetivo:'QA', conceptos:myqbankConcepts.map(c=>c.concept_id) }] }] }
 const suscribir = (f: () => void) => { oyentes.add(f); return () => oyentes.delete(f) }
 export function useApp() { return useSyncExternalStore(suscribir, () => valor) }
 export function ProveedorEstado({ children }: { children: unknown }) { return children }
