@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/delivery_n27_01",
+  "kind": "ai",
+  "reviewedAt": "2026-10-14T23:41:11.433191+00:00",
+  "branch": "codex/myqbank-labs-polish",
+  "base": "480e9b8452041aa5e04e8ef536064c1ade876e14",
+  "decision": "approved",
+  "openFindings": [],
+  "scope": "Independent adversarial code review of Labs expansion, annotations compatibility, side-move state, icons, hover, keyboard semantics, CSS cascade/layout and regression tests. No database mutation or publication.",
+  "reviewedFiles": [
+    {
+      "path": "src/myqbank/Dashboard.tsx",
+      "sha256": "595aec9919fb5ec103496e313ddc9649859b1f3b4eb9f1aa23e715687f3923cb"
+    },
+    {
+      "path": "src/myqbank/LabReference.tsx",
+      "sha256": "54b92091c030517d691bcaeb5a7789d4381320be84b5680acda5b2541aaf5f3b"
+    },
+    {
+      "path": "src/myqbank/MyQBankApp.tsx",
+      "sha256": "e670f2c2735ee05e9befa5ca3c0d8f920048a832db620a63414597a76f1ad47a"
+    },
+    {
+      "path": "src/myqbank/Study.tsx",
+      "sha256": "60411da9374d96f0335c1ed788d137e13f0c56aef6fc894a03af27d9a4c84917"
+    },
+    {
+      "path": "src/myqbank/components.tsx",
+      "sha256": "314b32ae1fbafe1f4450ce9fe428b2d1d0567effc970ce278bdd0d5bc25ece4e"
+    },
+    {
+      "path": "src/myqbank/workspace.css",
+      "sha256": "c6b15a70c9b5e79b72054d6811d0e2f2ee4742e2757f520e40d1b325b8ec61ec"
+    },
+    {
+      "path": "src/myqbank/interactions.css",
+      "sha256": "0709f9b05227cc2b9cd2ebdfa2033808792d10c8e0e946e47341b4ee9535097b"
+    },
+    {
+      "path": "src/myqbank/lab-reference.css",
+      "sha256": "ad1e409e87a7e638fcef228f1f4f1f75a873cd2d81aa222fdf2c36ee0fc66ba9"
+    },
+    {
+      "path": "src/myqbank/lab-values.ts",
+      "sha256": "1dfeb5cdc66505deac5541a149f0c6a9edc133b959bc8deb1f9752cd831ac088"
+    },
+    {
+      "path": "src/myqbank/lab-values.test.ts",
+      "sha256": "5e24c0d36666dc3cb9087d2bc3729605d29d0348e4eb6babb4c3a1abf5ccc342"
+    },
+    {
+      "path": "e2e/myqbank-workspace.spec.ts",
+      "sha256": "2b49630c2a0951df4fd52dfd5663724cf52f19823b1ab6dd8f20ccd2e568f74b"
+    }
+  ],
+  "resolvedFindings": [
+    {
+      "id": "UI-LABS-001",
+      "priority": "P1",
+      "title": "Existing lab highlights disappeared after region keys changed",
+      "location": "src/myqbank/LabReference.tsx:7",
+      "originalFinding": "The new id:name/id:reference/id:si regions did not match previously persisted reference:Sodium:0/1/2 anchors. Exact-region filtering made all prior marks disappear without deleting them.",
+      "resolution": "Legacy names and field indices are now preserved byte-for-byte for all original ten rows; original text is rendered so quote anchors remain valid. New rows use stable explicit IDs. No saved annotation or source data is rewritten.",
+      "verification": "Reviewed legacy name/region map against origin/main original ten-row array and regression seeding all 30 historical anchors, covering name + Conventional and name + SI. The parent reports all focused tests green."
+    },
+    {
+      "id": "UI-LABS-002",
+      "priority": "P2",
+      "title": "Answering reset the active lab lookup as the panel moved sides",
+      "location": "src/myqbank/LabReference.tsx:12",
+      "originalFinding": "Independent LabReference mounts on the left and right lost local search, section, SI and scroll state after submission.",
+      "resolution": "useLabReference now lives in StudyBody, and both positions receive the same state and scroll ref; useLayoutEffect restores the inner table position on remount. Closing and reopening also preserve the lookup.",
+      "verification": "Independent Chromium runtime after selecting CBC + SI + scrollTop=120 and submitting: section=cbc, SI aria-pressed=true, scrollTop=120. Read regressions for search/mark retention and section/SI/scroll retention on move/reopen."
+    },
+    {
+      "id": "UI-LABS-003",
+      "priority": "P2",
+      "title": "Short desktop viewport reduced the lab table to zero visible height",
+      "location": "src/myqbank/lab-reference.css:1",
+      "originalFinding": "At 961x601 and 1024x601 the card was 366px high but fixed control/header/footer bands required 377px; inner table clientHeight=0 and overflow:hidden prevented recovery.",
+      "resolution": "The table now has min-height:140px, and the card scrolls internally when necessary. Desktop page dimensions remain confined to the viewport.",
+      "verification": "Independent Chromium runtime at 961x601 and 1024x601 now reports table clientHeight=138 (140px border box), card scrollHeight=515 vs clientHeight=366, no horizontal or vertical page overflow. At 1280x601 table also remains 138px. The source link can receive focus and be brought into the visible viewport. Focused E2E now includes both short desktop sizes."
+    }
+  ],
+  "additionalChecks": [
+    "Search input padding now wins the workspace cascade (computed padding-left=38px); clear control has reserved space.",
+    "Conventional/SI controls preserve 44px targets and use pressed state in a named group; fields have explicit labels; table headers/scopes and scroll region name are present.",
+    "Icons are decorative aria-hidden SVGs while button text/aria-label remain intact.",
+    "Hover transforms are gated by fine pointer; reduced-motion overrides disable animations/transitions and hover/active transforms.",
+    "Original questions, answers, sources, progress/RPC/state contracts and shared database remain outside the diff.",
+    "No new blocking code or accessibility finding after the three fixes."
+  ],
+  "validationEvidence": {
+    "independentRuntime": "Synthetic harness on localhost:5202; Chromium /usr/bin/chromium; tested desktop 1280x900/768/650/601, 1024x768/601, 961x601 and mobile 390x844; retested short sizes and side move after fixes.",
+    "parentLogsRead": [
+      "/workspace/work/myqbank-labs-polish/unit.log",
+      "/workspace/work/myqbank-labs-polish/targeted-e2e.log",
+      "/workspace/work/myqbank-labs-polish/visual.log"
+    ],
+    "parentObservedBaselineResults": "1196 unit tests passed, two expected skipped; original targeted suite 17/17 passed. Parent reports 8/8 focused tests green after the fixes. Full final CI/visual checks remain owned by parent.",
+    "medicalReview": "114/114 ranges handled independently by /root/phase5_independent_review; report labs-independent.json approved exact lab-values.ts SHA-256 1dfeb5cdc66505deac5541a149f0c6a9edc133b959bc8deb1f9752cd831ac088. This review does not claim a second clinical transcription."
+  }
+}

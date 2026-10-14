@@ -3,8 +3,9 @@ import logo from './assets/myqbank-icon.png'
 import { safePercent } from './contracts'
 import './tokens.css'
 import './components.css'
+import './interactions.css'
 
-export type IconName = 'sun' | 'moon' | 'settings' | 'arrow' | 'back' | 'flag' | 'labs' | 'rail' | 'check' | 'close' | 'play' | 'retry'
+export type IconName = 'sun' | 'moon' | 'settings' | 'arrow' | 'back' | 'flag' | 'labs' | 'rail' | 'check' | 'close' | 'play' | 'retry' | 'search' | 'external' | 'pause' | 'stop' | 'dashboard' | 'plus' | 'minus'
 const paths: Record<IconName, ReactNode> = {
   sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></>,
   moon: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/>,
@@ -16,15 +17,21 @@ const paths: Record<IconName, ReactNode> = {
   check: <path d="m5 12 4 4L19 6"/>, close: <path d="m6 6 12 12M18 6 6 18"/>,
   retry: <><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7"/></>,
   play: <path d="m8 5 11 7-11 7Z"/>,
+  search: <><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></>,
+  external: <><path d="M14 3h7v7m0-7L10 14"/><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/></>,
+  pause: <><path d="M8 5v14M16 5v14"/></>,
+  stop: <rect x="5" y="5" width="14" height="14" rx="3"/>,
+  dashboard: <><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></>,
+  plus: <path d="M5 12h14M12 5v14"/>, minus: <path d="M5 12h14"/>,
 }
 export function Icon({ name }: { name: IconName }) {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>
+  return <svg className={`mq-icon mq-icon--${name}`} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>
 }
 export function Brand() {
   return <div className="mq-brand"><img src={logo} alt="" width="40" height="38"/><span>MyQBank</span></div>
 }
 export function Button({ variant = 'ghost', className = '', children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'danger' }) {
-  return <button type="button" {...props} className={`mq-button mq-button--${variant} ${className}`}>{children}</button>
+  return <button type="button" title={props['aria-label']} {...props} className={`mq-button mq-button--${variant} ${className}`}>{children}</button>
 }
 export function Card({ className = '', children, ...props }: HTMLAttributes<HTMLElement>) {
   return <section {...props} className={`mq-card ${className}`}>{children}</section>

@@ -1,0 +1,3359 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/phase5_independent_review",
+  "kind": "ai",
+  "reviewedAt": "2026-10-14T23:35:59.075369+00:00",
+  "author": "Codex /root",
+  "decision": "approved",
+  "reviewedFile": {
+    "path": "/workspace/steponemelman/src/myqbank/lab-values.ts",
+    "sha256": "1dfeb5cdc66505deac5541a149f0c6a9edc133b959bc8deb1f9752cd831ac088",
+    "hashScope": "Exact UTF-8 file bytes, including comments and code"
+  },
+  "source": {
+    "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+    "title": "USMLE Step 1 Sample Test Questions",
+    "edition": "April 2026",
+    "editionVerifiedAt": "PDF page index 1, line 5",
+    "printedPages": [
+      7,
+      8,
+      9
+    ],
+    "pdfPageIndices": [
+      7,
+      8,
+      9
+    ],
+    "verificationMethod": "Official PDF text opened through search_service_web_run. Every row was independently transcribed before reading the dataset; exact conventional and SI comparisons then completed.",
+    "visualInspection": false,
+    "visualLimitation": "Screenshot calls returned only <<ImageDisplayed>> placeholders without image bytes. No visual inspection is claimed. Superscripts and table columns were verified from the extracted text, units, and row alignment."
+  },
+  "coverage": {
+    "expectedRows": 114,
+    "actualRows": 114,
+    "uniqueIds": 114,
+    "expectedRowsByPage": {
+      "7": 41,
+      "8": 39,
+      "9": 34
+    },
+    "actualRowsByPage": {
+      "7": 41,
+      "8": 39,
+      "9": 34
+    },
+    "sections": 15,
+    "missingRows": [],
+    "extraRows": [],
+    "numericOrUnitDiscrepancies": [],
+    "summary": {
+      "approved": 114
+    }
+  },
+  "methodNotes": [
+    "Independent numerical source matrix: official-ranges.tsv. All 114 conventional/SI pairs compared after typography-only Unicode normalization. No conversion, rounding, inequality, or cutoff normalization applied.",
+    "Names, subgroup inheritance, fasting/random states, sex, menopausal phase, cortisol times, stimulation status, arterial room-air conditions, 24-hour units, and specimen groups read individually.",
+    "The source has no SI entry for adult BMI; null is preserved rather than inventing a value. Source classifications and ranges remain the USMLE reference, not substituted local diagnostic thresholds.",
+    "AI review only; no human medical approval is represented."
+  ],
+  "items": [
+    {
+      "id": "sodium",
+      "decision": "approved",
+      "name": "Sodium (Na⁺)",
+      "context": null,
+      "sectionId": "chemistry",
+      "sectionSpecimen": "Serum",
+      "reference": "136–146 mEq/L",
+      "si": "136–146 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L157",
+        "analyte": "Sodium (Na+)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "potassium",
+      "decision": "approved",
+      "name": "Potassium (K⁺)",
+      "context": null,
+      "sectionId": "chemistry",
+      "sectionSpecimen": "Serum",
+      "reference": "3.5–5.0 mEq/L",
+      "si": "3.5–5.0 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L158",
+        "analyte": "Potassium (K+)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "chloride",
+      "decision": "approved",
+      "name": "Chloride (Cl⁻)",
+      "context": null,
+      "sectionId": "chemistry",
+      "sectionSpecimen": "Serum",
+      "reference": "95–105 mEq/L",
+      "si": "95–105 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L159",
+        "analyte": "Chloride (Cl−)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "bicarbonate",
+      "decision": "approved",
+      "name": "Bicarbonate (HCO₃⁻)",
+      "context": null,
+      "sectionId": "chemistry",
+      "sectionSpecimen": "Serum",
+      "reference": "22–28 mEq/L",
+      "si": "22–28 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L160–162",
+        "analyte": "Bicarbonate (HCO3−)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "bun",
+      "decision": "approved",
+      "name": "Urea nitrogen",
+      "context": null,
+      "sectionId": "chemistry",
+      "sectionSpecimen": "Serum",
+      "reference": "7–18 mg/dL",
+      "si": "2.5–6.4 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L163",
+        "analyte": "Urea nitrogen",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "creatinine",
+      "decision": "approved",
+      "name": "Creatinine",
+      "context": null,
+      "sectionId": "chemistry",
+      "sectionSpecimen": "Serum",
+      "reference": "0.6–1.2 mg/dL",
+      "si": "53–106 μmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L164",
+        "analyte": "Creatinine",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "glucose-fasting",
+      "decision": "approved",
+      "name": "Glucose",
+      "context": "Fasting",
+      "sectionId": "chemistry",
+      "sectionSpecimen": "Serum",
+      "reference": "70–100 mg/dL",
+      "si": "3.8–5.6 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L165",
+        "analyte": "Glucose",
+        "subgroup": "Fasting"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "glucose-random",
+      "decision": "approved",
+      "name": "Glucose",
+      "context": "Random, non-fasting",
+      "sectionId": "chemistry",
+      "sectionSpecimen": "Serum",
+      "reference": "<140 mg/dL",
+      "si": "<7.77 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L166",
+        "analyte": "Glucose",
+        "subgroup": "Random, non-fasting"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "calcium",
+      "decision": "approved",
+      "name": "Calcium",
+      "context": null,
+      "sectionId": "chemistry",
+      "sectionSpecimen": "Serum",
+      "reference": "8.4–10.2 mg/dL",
+      "si": "2.1–2.6 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L167",
+        "analyte": "Calcium",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "magnesium",
+      "decision": "approved",
+      "name": "Magnesium (Mg²⁺)",
+      "context": null,
+      "sectionId": "chemistry",
+      "sectionSpecimen": "Serum",
+      "reference": "1.5–2.0 mg/dL",
+      "si": "0.75–1.0 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L168",
+        "analyte": "Magnesium (Mg2+)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "phosphorus",
+      "decision": "approved",
+      "name": "Phosphorus (inorganic)",
+      "context": null,
+      "sectionId": "chemistry",
+      "sectionSpecimen": "Serum",
+      "reference": "3.0–4.5 mg/dL",
+      "si": "1.0–1.5 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L169",
+        "analyte": "Phosphorus (inorganic)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "alt",
+      "decision": "approved",
+      "name": "Alanine aminotransferase (ALT)",
+      "context": null,
+      "sectionId": "hepatic",
+      "sectionSpecimen": "Serum",
+      "reference": "10–40 U/L",
+      "si": "10–40 U/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L171",
+        "analyte": "Alanine aminotransferase (ALT)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "ast",
+      "decision": "approved",
+      "name": "Aspartate aminotransferase (AST)",
+      "context": null,
+      "sectionId": "hepatic",
+      "sectionSpecimen": "Serum",
+      "reference": "12–38 U/L",
+      "si": "12–38 U/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L172",
+        "analyte": "Aspartate aminotransferase (AST)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "alkaline-phosphatase",
+      "decision": "approved",
+      "name": "Alkaline phosphatase",
+      "context": null,
+      "sectionId": "hepatic",
+      "sectionSpecimen": "Serum",
+      "reference": "25–100 U/L",
+      "si": "25–100 U/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L173",
+        "analyte": "Alkaline phosphatase",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "bilirubin-total",
+      "decision": "approved",
+      "name": "Bilirubin",
+      "context": "Total",
+      "sectionId": "hepatic",
+      "sectionSpecimen": "Serum",
+      "reference": "0.1–1.0 mg/dL",
+      "si": "2–17 μmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L174",
+        "analyte": "Bilirubin",
+        "subgroup": "Total"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "bilirubin-direct",
+      "decision": "approved",
+      "name": "Bilirubin",
+      "context": "Direct",
+      "sectionId": "hepatic",
+      "sectionSpecimen": "Serum",
+      "reference": "0.0–0.3 mg/dL",
+      "si": "0–5 μmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L174",
+        "analyte": "Bilirubin",
+        "subgroup": "Direct"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "serum-protein",
+      "decision": "approved",
+      "name": "Proteins, total",
+      "context": null,
+      "sectionId": "hepatic",
+      "sectionSpecimen": "Serum",
+      "reference": "6.0–7.8 g/dL",
+      "si": "60–78 g/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L175",
+        "analyte": "Proteins, total",
+        "subgroup": "Serum"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "albumin",
+      "decision": "approved",
+      "name": "Albumin",
+      "context": null,
+      "sectionId": "hepatic",
+      "sectionSpecimen": "Serum",
+      "reference": "3.5–5.5 g/dL",
+      "si": "35–55 g/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L176",
+        "analyte": "Albumin",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "globulin",
+      "decision": "approved",
+      "name": "Globulin",
+      "context": null,
+      "sectionId": "hepatic",
+      "sectionSpecimen": "Serum",
+      "reference": "2.3–3.5 g/dL",
+      "si": "23–35 g/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L177",
+        "analyte": "Globulin",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "amylase",
+      "decision": "approved",
+      "name": "Amylase",
+      "context": null,
+      "sectionId": "other-serum",
+      "sectionSpecimen": "Serum & renal function",
+      "reference": "25–125 U/L",
+      "si": "25–125 U/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L179",
+        "analyte": "Amylase",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "lipase",
+      "decision": "approved",
+      "name": "Lipase",
+      "context": null,
+      "sectionId": "other-serum",
+      "sectionSpecimen": "Serum & renal function",
+      "reference": "13–60 U/L",
+      "si": "13–60 U/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L180",
+        "analyte": "Lipase",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "crcl-male",
+      "decision": "approved",
+      "name": "Creatinine clearance",
+      "context": "Male",
+      "sectionId": "other-serum",
+      "sectionSpecimen": "Serum & renal function",
+      "reference": "97–137 mL/min",
+      "si": "97–137 mL/min",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L181",
+        "analyte": "Creatinine clearance",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": [
+        {
+          "id": "specimen-context-crcl-male",
+          "severity": "minor",
+          "field": "section.specimen / row.context",
+          "description": "The numerical reference is faithful to USMLE, but a literal Serum specimen label must not imply that this is a serum concentration assay.",
+          "requiredContext": "clearance",
+          "decision": "resolved",
+          "evidence": {
+            "url": "https://www.medlineplus.gov/ency/article/003611.htm",
+            "locator": "Creatinine clearance test — compares creatinine levels in urine and blood",
+            "method": "web_search_result"
+          },
+          "resolution": "Visible metadata distinguishes specimen or test type without changing the official range."
+        }
+      ]
+    },
+    {
+      "id": "crcl-female",
+      "decision": "approved",
+      "name": "Creatinine clearance",
+      "context": "Female",
+      "sectionId": "other-serum",
+      "sectionSpecimen": "Serum & renal function",
+      "reference": "88–128 mL/min",
+      "si": "88–128 mL/min",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L182",
+        "analyte": "Creatinine clearance",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": [
+        {
+          "id": "specimen-context-crcl-female",
+          "severity": "minor",
+          "field": "section.specimen / row.context",
+          "description": "The numerical reference is faithful to USMLE, but a literal Serum specimen label must not imply that this is a serum concentration assay.",
+          "requiredContext": "clearance",
+          "decision": "resolved",
+          "evidence": {
+            "url": "https://www.medlineplus.gov/ency/article/003611.htm",
+            "locator": "Creatinine clearance test — compares creatinine levels in urine and blood",
+            "method": "web_search_result"
+          },
+          "resolution": "Visible metadata distinguishes specimen or test type without changing the official range."
+        }
+      ]
+    },
+    {
+      "id": "ck-male",
+      "decision": "approved",
+      "name": "Creatine kinase",
+      "context": "Male",
+      "sectionId": "other-serum",
+      "sectionSpecimen": "Serum & renal function",
+      "reference": "25–90 U/L",
+      "si": "25–90 U/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L183",
+        "analyte": "Creatine kinase",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "ck-female",
+      "decision": "approved",
+      "name": "Creatine kinase",
+      "context": "Female",
+      "sectionId": "other-serum",
+      "sectionSpecimen": "Serum & renal function",
+      "reference": "10–70 U/L",
+      "si": "10–70 U/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L184",
+        "analyte": "Creatine kinase",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "ldh",
+      "decision": "approved",
+      "name": "Lactate dehydrogenase",
+      "context": null,
+      "sectionId": "other-serum",
+      "sectionSpecimen": "Serum & renal function",
+      "reference": "45–200 U/L",
+      "si": "45–200 U/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L185",
+        "analyte": "Lactate dehydrogenase",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "serum-osmolality",
+      "decision": "approved",
+      "name": "Osmolality",
+      "context": null,
+      "sectionId": "other-serum",
+      "sectionSpecimen": "Serum & renal function",
+      "reference": "275–295 mOsmol/kg H₂O",
+      "si": "275–295 mOsmol/kg H₂O",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L186",
+        "analyte": "Osmolality",
+        "subgroup": "Serum"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "troponin",
+      "decision": "approved",
+      "name": "Troponin I",
+      "context": null,
+      "sectionId": "other-serum",
+      "sectionSpecimen": "Serum & renal function",
+      "reference": "≤0.04 ng/mL",
+      "si": "≤0.04 μg/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L187",
+        "analyte": "Troponin I",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "uric-acid",
+      "decision": "approved",
+      "name": "Uric acid",
+      "context": null,
+      "sectionId": "other-serum",
+      "sectionSpecimen": "Serum & renal function",
+      "reference": "3.0–8.2 mg/dL",
+      "si": "0.18–0.48 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L188",
+        "analyte": "Uric acid",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "cholesterol-normal",
+      "decision": "approved",
+      "name": "Cholesterol, total",
+      "context": "Normal",
+      "sectionId": "lipids",
+      "sectionSpecimen": "Serum",
+      "reference": "<200 mg/dL",
+      "si": "<5.2 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L191",
+        "analyte": "Cholesterol, total",
+        "subgroup": "Normal"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "cholesterol-high",
+      "decision": "approved",
+      "name": "Cholesterol, total",
+      "context": "High",
+      "sectionId": "lipids",
+      "sectionSpecimen": "Serum",
+      "reference": ">240 mg/dL",
+      "si": ">6.2 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L192",
+        "analyte": "Cholesterol, total",
+        "subgroup": "High"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "hdl",
+      "decision": "approved",
+      "name": "Cholesterol, HDL",
+      "context": null,
+      "sectionId": "lipids",
+      "sectionSpecimen": "Serum",
+      "reference": "40–60 mg/dL",
+      "si": "1.0–1.6 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L193",
+        "analyte": "HDL",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "ldl",
+      "decision": "approved",
+      "name": "Cholesterol, LDL",
+      "context": null,
+      "sectionId": "lipids",
+      "sectionSpecimen": "Serum",
+      "reference": "<160 mg/dL",
+      "si": "<4.2 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L194",
+        "analyte": "LDL",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "triglycerides-normal",
+      "decision": "approved",
+      "name": "Triglycerides",
+      "context": "Normal",
+      "sectionId": "lipids",
+      "sectionSpecimen": "Serum",
+      "reference": "<150 mg/dL",
+      "si": "<1.70 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L195",
+        "analyte": "Triglycerides",
+        "subgroup": "Normal"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "triglycerides-borderline",
+      "decision": "approved",
+      "name": "Triglycerides",
+      "context": "Borderline",
+      "sectionId": "lipids",
+      "sectionSpecimen": "Serum",
+      "reference": "151–199 mg/dL",
+      "si": "1.71–2.25 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L196",
+        "analyte": "Triglycerides",
+        "subgroup": "Borderline"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "ferritin-male",
+      "decision": "approved",
+      "name": "Ferritin",
+      "context": "Male",
+      "sectionId": "iron",
+      "sectionSpecimen": "Serum",
+      "reference": "20–250 ng/mL",
+      "si": "20–250 μg/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L198",
+        "analyte": "Ferritin",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "ferritin-female",
+      "decision": "approved",
+      "name": "Ferritin",
+      "context": "Female",
+      "sectionId": "iron",
+      "sectionSpecimen": "Serum",
+      "reference": "10–120 ng/mL",
+      "si": "10–120 μg/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L199",
+        "analyte": "Ferritin",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "iron-male",
+      "decision": "approved",
+      "name": "Iron",
+      "context": "Male",
+      "sectionId": "iron",
+      "sectionSpecimen": "Serum",
+      "reference": "65–175 μg/dL",
+      "si": "11.6–31.3 μmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L200",
+        "analyte": "Iron",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "iron-female",
+      "decision": "approved",
+      "name": "Iron",
+      "context": "Female",
+      "sectionId": "iron",
+      "sectionSpecimen": "Serum",
+      "reference": "50–170 μg/dL",
+      "si": "9.0–30.4 μmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L201",
+        "analyte": "Iron",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "tibc",
+      "decision": "approved",
+      "name": "Total iron-binding capacity",
+      "context": null,
+      "sectionId": "iron",
+      "sectionSpecimen": "Serum",
+      "reference": "250–400 μg/dL",
+      "si": "44.8–71.6 μmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L202",
+        "analyte": "Total iron-binding capacity",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "transferrin",
+      "decision": "approved",
+      "name": "Transferrin",
+      "context": null,
+      "sectionId": "iron",
+      "sectionSpecimen": "Serum",
+      "reference": "200–360 mg/dL",
+      "si": "2.0–3.6 g/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 7,
+        "pdfPageIndex": 7,
+        "textLocator": "L203",
+        "analyte": "Transferrin",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "fsh-male",
+      "decision": "approved",
+      "name": "Follicle-stimulating hormone",
+      "context": "Male",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "4–25 mIU/mL",
+      "si": "4–25 IU/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L207",
+        "analyte": "Follicle-stimulating hormone",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "fsh-premenopause",
+      "decision": "approved",
+      "name": "Follicle-stimulating hormone",
+      "context": "Female · premenopause",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "4–30 mIU/mL",
+      "si": "4–30 IU/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L208",
+        "analyte": "Follicle-stimulating hormone",
+        "subgroup": "Female: premenopause"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "fsh-midcycle",
+      "decision": "approved",
+      "name": "Follicle-stimulating hormone",
+      "context": "Female · midcycle peak",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "10–90 mIU/mL",
+      "si": "10–90 IU/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L209",
+        "analyte": "Follicle-stimulating hormone",
+        "subgroup": "Female: midcycle peak"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "fsh-postmenopause",
+      "decision": "approved",
+      "name": "Follicle-stimulating hormone",
+      "context": "Female · postmenopause",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "40–250 mIU/mL",
+      "si": "40–250 IU/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L210",
+        "analyte": "Follicle-stimulating hormone",
+        "subgroup": "Female: postmenopause"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "lh-male",
+      "decision": "approved",
+      "name": "Luteinizing hormone",
+      "context": "Male",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "6–23 mIU/mL",
+      "si": "6–23 IU/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L211",
+        "analyte": "Luteinizing hormone",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "lh-follicular",
+      "decision": "approved",
+      "name": "Luteinizing hormone",
+      "context": "Female · follicular phase",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "5–30 mIU/mL",
+      "si": "5–30 IU/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L212",
+        "analyte": "Luteinizing hormone",
+        "subgroup": "Female: follicular phase"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "lh-midcycle",
+      "decision": "approved",
+      "name": "Luteinizing hormone",
+      "context": "Female · midcycle",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "75–150 mIU/mL",
+      "si": "75–150 IU/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L213",
+        "analyte": "Luteinizing hormone",
+        "subgroup": "Female: midcycle"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "lh-postmenopause",
+      "decision": "approved",
+      "name": "Luteinizing hormone",
+      "context": "Female · postmenopause",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "30–200 mIU/mL",
+      "si": "30–200 IU/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L214",
+        "analyte": "Luteinizing hormone",
+        "subgroup": "Female: postmenopause"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "gh-fasting",
+      "decision": "approved",
+      "name": "Growth hormone · arginine stimulation",
+      "context": "Fasting",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "<5 ng/mL",
+      "si": "<5 μg/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L215",
+        "analyte": "Growth hormone — arginine stimulation",
+        "subgroup": "Fasting"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "gh-stimulated",
+      "decision": "approved",
+      "name": "Growth hormone · arginine stimulation",
+      "context": "Provocative stimuli",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": ">7 ng/mL",
+      "si": ">7 μg/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L216",
+        "analyte": "Growth hormone — arginine stimulation",
+        "subgroup": "Provocative stimuli"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "prolactin-male",
+      "decision": "approved",
+      "name": "Prolactin (hPRL)",
+      "context": "Male",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "<17 ng/mL",
+      "si": "<17 μg/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L217",
+        "analyte": "Prolactin (hPRL)",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "prolactin-female",
+      "decision": "approved",
+      "name": "Prolactin (hPRL)",
+      "context": "Female",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "<25 ng/mL",
+      "si": "<25 μg/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L218",
+        "analyte": "Prolactin (hPRL)",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "cortisol-0800",
+      "decision": "approved",
+      "name": "Cortisol",
+      "context": "0800 h",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "5–23 μg/dL",
+      "si": "138–635 nmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L219",
+        "analyte": "Cortisol",
+        "subgroup": "0800 h"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "cortisol-1600",
+      "decision": "approved",
+      "name": "Cortisol",
+      "context": "1600 h",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "3–15 μg/dL",
+      "si": "82–413 nmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L220",
+        "analyte": "Cortisol",
+        "subgroup": "1600 h"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "cortisol-2000",
+      "decision": "approved",
+      "name": "Cortisol",
+      "context": "2000 h",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "<50% of 0800 h",
+      "si": "Fraction of 0800 h: <0.50",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L221",
+        "analyte": "Cortisol",
+        "subgroup": "2000 h"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "tsh",
+      "decision": "approved",
+      "name": "TSH",
+      "context": null,
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "0.4–4.0 μU/mL",
+      "si": "0.4–4.0 mIU/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L222",
+        "analyte": "TSH",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "t3",
+      "decision": "approved",
+      "name": "Triiodothyronine (T3) (RIA)",
+      "context": null,
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "100–200 ng/dL",
+      "si": "1.5–3.1 nmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L223",
+        "analyte": "Triiodothyronine (T3) (RIA)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "t3-uptake",
+      "decision": "approved",
+      "name": "Triiodothyronine (T3) resin uptake",
+      "context": null,
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "25%–35%",
+      "si": "0.25–0.35",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L224",
+        "analyte": "Triiodothyronine (T3) resin uptake",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "t4",
+      "decision": "approved",
+      "name": "Thyroxine (T4)",
+      "context": null,
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "5–12 μg/dL",
+      "si": "64–155 nmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L225",
+        "analyte": "Thyroxine (T4)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "t4-free",
+      "decision": "approved",
+      "name": "Free T4",
+      "context": null,
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "0.9–1.7 ng/dL",
+      "si": "12.0–21.9 pmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L226",
+        "analyte": "Free T4",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "iodine-uptake",
+      "decision": "approved",
+      "name": "Thyroidal iodine (¹²³I) uptake",
+      "context": "24-hour thyroid uptake",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "8%–30% of administered dose/24 h",
+      "si": "0.08–0.30/24 h",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L227",
+        "analyte": "Thyroidal iodine (123I) uptake",
+        "subgroup": "24 h"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": [
+        {
+          "id": "specimen-context-iodine-uptake",
+          "severity": "minor",
+          "field": "section.specimen / row.context",
+          "description": "The numerical reference is faithful to USMLE, but a literal Serum specimen label must not imply that this is a serum concentration assay.",
+          "requiredContext": "thyroid uptake",
+          "decision": "resolved",
+          "evidence": {
+            "url": "https://medlineplus.gov/ency/article/003689.htm",
+            "locator": "Radioactive iodine uptake — thyroid nuclear uptake test, distinct from serum thyroid function tests",
+            "method": "web_search_result"
+          },
+          "resolution": "Visible metadata distinguishes specimen or test type without changing the official range."
+        }
+      ]
+    },
+    {
+      "id": "pth",
+      "decision": "approved",
+      "name": "Intact PTH",
+      "context": null,
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "10–60 pg/mL",
+      "si": "10–60 ng/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L228",
+        "analyte": "Intact PTH",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "hydroxycorticosteroids-male",
+      "decision": "approved",
+      "name": "17-Hydroxycorticosteroids",
+      "context": "Male · 24-hour urine",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "3.0–10.0 mg/24 h",
+      "si": "8.2–27.6 μmol/24 h",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L229",
+        "analyte": "17-Hydroxycorticosteroids",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": [
+        {
+          "id": "specimen-context-hydroxycorticosteroids-male",
+          "severity": "minor",
+          "field": "section.specimen / row.context",
+          "description": "The numerical reference is faithful to USMLE, but a literal Serum specimen label must not imply that this is a serum concentration assay.",
+          "requiredContext": "24-hour urine",
+          "decision": "resolved",
+          "evidence": {
+            "url": "https://www.ucsfhealth.org/care/medical-tests/17-hydroxycorticosteroids-urine-test",
+            "locator": "How the Test is Performed — a 24-hour urine sample is needed",
+            "method": "web_search_result"
+          },
+          "resolution": "Visible metadata distinguishes specimen or test type without changing the official range."
+        }
+      ]
+    },
+    {
+      "id": "hydroxycorticosteroids-female",
+      "decision": "approved",
+      "name": "17-Hydroxycorticosteroids",
+      "context": "Female · 24-hour urine",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "2.0–8.0 mg/24 h",
+      "si": "5.5–22.0 μmol/24 h",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L230",
+        "analyte": "17-Hydroxycorticosteroids",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": [
+        {
+          "id": "specimen-context-hydroxycorticosteroids-female",
+          "severity": "minor",
+          "field": "section.specimen / row.context",
+          "description": "The numerical reference is faithful to USMLE, but a literal Serum specimen label must not imply that this is a serum concentration assay.",
+          "requiredContext": "24-hour urine",
+          "decision": "resolved",
+          "evidence": {
+            "url": "https://www.ucsfhealth.org/care/medical-tests/17-hydroxycorticosteroids-urine-test",
+            "locator": "How the Test is Performed — a 24-hour urine sample is needed",
+            "method": "web_search_result"
+          },
+          "resolution": "Visible metadata distinguishes specimen or test type without changing the official range."
+        }
+      ]
+    },
+    {
+      "id": "ketosteroids-male",
+      "decision": "approved",
+      "name": "17-Ketosteroids, total",
+      "context": "Male · 24-hour urine",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "8–20 mg/24 h",
+      "si": "28–70 μmol/24 h",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L231",
+        "analyte": "17-Ketosteroids, total",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": [
+        {
+          "id": "specimen-context-ketosteroids-male",
+          "severity": "minor",
+          "field": "section.specimen / row.context",
+          "description": "The numerical reference is faithful to USMLE, but a literal Serum specimen label must not imply that this is a serum concentration assay.",
+          "requiredContext": "24-hour urine",
+          "decision": "resolved",
+          "evidence": {
+            "url": "https://mlabs.umich.edu/tests/17-ketosteroids-urine",
+            "locator": "Specimen collection — collect a 24-hour urine specimen",
+            "method": "web_search_result"
+          },
+          "resolution": "Visible metadata distinguishes specimen or test type without changing the official range."
+        }
+      ]
+    },
+    {
+      "id": "ketosteroids-female",
+      "decision": "approved",
+      "name": "17-Ketosteroids, total",
+      "context": "Female · 24-hour urine",
+      "sectionId": "endocrine",
+      "sectionSpecimen": "Hormones & endocrine testing",
+      "reference": "6–15 mg/24 h",
+      "si": "21–52 μmol/24 h",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L232",
+        "analyte": "17-Ketosteroids, total",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": [
+        {
+          "id": "specimen-context-ketosteroids-female",
+          "severity": "minor",
+          "field": "section.specimen / row.context",
+          "description": "The numerical reference is faithful to USMLE, but a literal Serum specimen label must not imply that this is a serum concentration assay.",
+          "requiredContext": "24-hour urine",
+          "decision": "resolved",
+          "evidence": {
+            "url": "https://mlabs.umich.edu/tests/17-ketosteroids-urine",
+            "locator": "Specimen collection — collect a 24-hour urine specimen",
+            "method": "web_search_result"
+          },
+          "resolution": "Visible metadata distinguishes specimen or test type without changing the official range."
+        }
+      ]
+    },
+    {
+      "id": "iga",
+      "decision": "approved",
+      "name": "IgA",
+      "context": null,
+      "sectionId": "immunoglobulins",
+      "sectionSpecimen": "Serum",
+      "reference": "76–390 mg/dL",
+      "si": "0.76–3.90 g/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L234",
+        "analyte": "IgA",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "ige",
+      "decision": "approved",
+      "name": "IgE",
+      "context": null,
+      "sectionId": "immunoglobulins",
+      "sectionSpecimen": "Serum",
+      "reference": "0–380 IU/mL",
+      "si": "0–380 kIU/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L235",
+        "analyte": "IgE",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "igg",
+      "decision": "approved",
+      "name": "IgG",
+      "context": null,
+      "sectionId": "immunoglobulins",
+      "sectionSpecimen": "Serum",
+      "reference": "650–1500 mg/dL",
+      "si": "6.5–15.0 g/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L236",
+        "analyte": "IgG",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "igm",
+      "decision": "approved",
+      "name": "IgM",
+      "context": null,
+      "sectionId": "immunoglobulins",
+      "sectionSpecimen": "Serum",
+      "reference": "50–300 mg/dL",
+      "si": "0.5–3.0 g/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L237",
+        "analyte": "IgM",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "po2",
+      "decision": "approved",
+      "name": "PO₂",
+      "context": null,
+      "sectionId": "blood-gases",
+      "sectionSpecimen": "Room air",
+      "reference": "75–105 mm Hg",
+      "si": "10.0–14.0 kPa",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L239",
+        "analyte": "Po2",
+        "subgroup": "Arterial blood, room air"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "pco2",
+      "decision": "approved",
+      "name": "PCO₂",
+      "context": null,
+      "sectionId": "blood-gases",
+      "sectionSpecimen": "Room air",
+      "reference": "33–45 mm Hg",
+      "si": "4.4–5.9 kPa",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L240",
+        "analyte": "Pco2",
+        "subgroup": "Arterial blood, room air"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "ph",
+      "decision": "approved",
+      "name": "pH",
+      "context": null,
+      "sectionId": "blood-gases",
+      "sectionSpecimen": "Room air",
+      "reference": "7.35–7.45",
+      "si": "[H⁺] 36–44 nmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L241–242",
+        "analyte": "pH",
+        "subgroup": "Arterial blood, room air"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "csf-cells",
+      "decision": "approved",
+      "name": "Cell count",
+      "context": null,
+      "sectionId": "csf",
+      "sectionSpecimen": "CSF",
+      "reference": "0–5/mm³",
+      "si": "0–5 × 10⁶/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L244–245",
+        "analyte": "Cell count",
+        "subgroup": "Cerebrospinal fluid"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "csf-chloride",
+      "decision": "approved",
+      "name": "Chloride",
+      "context": null,
+      "sectionId": "csf",
+      "sectionSpecimen": "CSF",
+      "reference": "118–132 mEq/L",
+      "si": "118–132 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L246",
+        "analyte": "Chloride",
+        "subgroup": "Cerebrospinal fluid"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "csf-gamma-globulin",
+      "decision": "approved",
+      "name": "Gamma globulin",
+      "context": null,
+      "sectionId": "csf",
+      "sectionSpecimen": "CSF",
+      "reference": "3%–12% total proteins",
+      "si": "0.03–0.12",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L247",
+        "analyte": "Gamma globulin",
+        "subgroup": "Cerebrospinal fluid"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "csf-glucose",
+      "decision": "approved",
+      "name": "Glucose",
+      "context": null,
+      "sectionId": "csf",
+      "sectionSpecimen": "CSF",
+      "reference": "40–70 mg/dL",
+      "si": "2.2–3.9 mmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L248",
+        "analyte": "Glucose",
+        "subgroup": "Cerebrospinal fluid"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "csf-pressure",
+      "decision": "approved",
+      "name": "Pressure",
+      "context": null,
+      "sectionId": "csf",
+      "sectionSpecimen": "CSF",
+      "reference": "70–180 mm H₂O",
+      "si": "70–180 mm H₂O",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L249",
+        "analyte": "Pressure",
+        "subgroup": "Cerebrospinal fluid"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "csf-protein",
+      "decision": "approved",
+      "name": "Proteins, total",
+      "context": null,
+      "sectionId": "csf",
+      "sectionSpecimen": "CSF",
+      "reference": "<40 mg/dL",
+      "si": "<0.40 g/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 8,
+        "pdfPageIndex": 8,
+        "textLocator": "L250",
+        "analyte": "Proteins, total",
+        "subgroup": "Cerebrospinal fluid"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "hematocrit-male",
+      "decision": "approved",
+      "name": "Hematocrit",
+      "context": "Male",
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "41%–53%",
+      "si": "0.41–0.53",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L255",
+        "analyte": "Hematocrit",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "hematocrit-female",
+      "decision": "approved",
+      "name": "Hematocrit",
+      "context": "Female",
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "36%–46%",
+      "si": "0.36–0.46",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L256",
+        "analyte": "Hematocrit",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "hemoglobin-male",
+      "decision": "approved",
+      "name": "Hemoglobin, blood",
+      "context": "Male",
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "13.5–17.5 g/dL",
+      "si": "135–175 g/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L257",
+        "analyte": "Hemoglobin, blood",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "hemoglobin-female",
+      "decision": "approved",
+      "name": "Hemoglobin, blood",
+      "context": "Female",
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "12.0–16.0 g/dL",
+      "si": "120–160 g/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L258",
+        "analyte": "Hemoglobin, blood",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "mch",
+      "decision": "approved",
+      "name": "Mean corpuscular hemoglobin (MCH)",
+      "context": null,
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "25–35 pg/cell",
+      "si": "0.39–0.54 fmol/cell",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L259",
+        "analyte": "Mean corpuscular hemoglobin (MCH)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "mchc",
+      "decision": "approved",
+      "name": "Mean corpuscular hemoglobin concentration (MCHC)",
+      "context": null,
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "31%–36% Hb/cell",
+      "si": "4.8–5.6 mmol Hb/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L260",
+        "analyte": "Mean corpuscular hemoglobin concentration (MCHC)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "mcv",
+      "decision": "approved",
+      "name": "Mean corpuscular volume (MCV)",
+      "context": null,
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "80–100 μm³",
+      "si": "80–100 fL",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L261",
+        "analyte": "Mean corpuscular volume (MCV)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "plasma-volume-male",
+      "decision": "approved",
+      "name": "Plasma volume",
+      "context": "Male",
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "25–43 mL/kg",
+      "si": "0.025–0.043 L/kg",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L263",
+        "analyte": "Plasma volume",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "plasma-volume-female",
+      "decision": "approved",
+      "name": "Plasma volume",
+      "context": "Female",
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "28–45 mL/kg",
+      "si": "0.028–0.045 L/kg",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L264",
+        "analyte": "Plasma volume",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "red-cell-volume-male",
+      "decision": "approved",
+      "name": "Red cell volume",
+      "context": "Male",
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "20–36 mL/kg",
+      "si": "0.020–0.036 L/kg",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L265",
+        "analyte": "Red cell volume",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "red-cell-volume-female",
+      "decision": "approved",
+      "name": "Red cell volume",
+      "context": "Female",
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "19–31 mL/kg",
+      "si": "0.019–0.031 L/kg",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L266",
+        "analyte": "Red cell volume",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "wbc",
+      "decision": "approved",
+      "name": "Leukocyte count (WBC)",
+      "context": null,
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "4500–11,000/mm³",
+      "si": "4.5–11.0 × 10⁹/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L267–268",
+        "analyte": "Leukocyte count (WBC)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "neutrophils-segmented",
+      "decision": "approved",
+      "name": "Neutrophils, segmented",
+      "context": null,
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "54%–62%",
+      "si": "0.54–0.62",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L269",
+        "analyte": "Neutrophils, segmented",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "neutrophils-bands",
+      "decision": "approved",
+      "name": "Neutrophils, bands",
+      "context": null,
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "3%–5%",
+      "si": "0.03–0.05",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L270",
+        "analyte": "Neutrophils, bands",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "lymphocytes",
+      "decision": "approved",
+      "name": "Lymphocytes",
+      "context": null,
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "25%–33%",
+      "si": "0.25–0.33",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L271",
+        "analyte": "Lymphocytes",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "monocytes",
+      "decision": "approved",
+      "name": "Monocytes",
+      "context": null,
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "3%–7%",
+      "si": "0.03–0.07",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L272",
+        "analyte": "Monocytes",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "eosinophils",
+      "decision": "approved",
+      "name": "Eosinophils",
+      "context": null,
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "1%–3%",
+      "si": "0.01–0.03",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L273",
+        "analyte": "Eosinophils",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "basophils",
+      "decision": "approved",
+      "name": "Basophils",
+      "context": null,
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "0%–0.75%",
+      "si": "0.00–0.0075",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L274",
+        "analyte": "Basophils",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "platelets",
+      "decision": "approved",
+      "name": "Platelet count",
+      "context": null,
+      "sectionId": "cbc",
+      "sectionSpecimen": "Hematologic · CBC",
+      "reference": "150,000–400,000/mm³",
+      "si": "150–400 × 10⁹/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L275–276",
+        "analyte": "Platelet count",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "ptt",
+      "decision": "approved",
+      "name": "Partial thromboplastin time (PTT/aPTT), activated",
+      "context": null,
+      "sectionId": "coagulation",
+      "sectionSpecimen": "Hematologic",
+      "reference": "25–40 seconds",
+      "si": "25–40 seconds",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L278",
+        "analyte": "Partial thromboplastin time (PTT/aPTT), activated",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "pt",
+      "decision": "approved",
+      "name": "Prothrombin time (PT)",
+      "context": null,
+      "sectionId": "coagulation",
+      "sectionSpecimen": "Hematologic",
+      "reference": "11–15 seconds",
+      "si": "11–15 seconds",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L279",
+        "analyte": "Prothrombin time (PT)",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "d-dimer",
+      "decision": "approved",
+      "name": "D-dimer",
+      "context": null,
+      "sectionId": "coagulation",
+      "sectionSpecimen": "Hematologic",
+      "reference": "≤250 ng/mL",
+      "si": "≤1.4 nmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L280",
+        "analyte": "D-dimer",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "reticulocytes",
+      "decision": "approved",
+      "name": "Reticulocyte count",
+      "context": null,
+      "sectionId": "other-hematologic",
+      "sectionSpecimen": "Hematologic",
+      "reference": "0.5%–1.5%",
+      "si": "0.005–0.015",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L282",
+        "analyte": "Reticulocyte count",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "rbc-male",
+      "decision": "approved",
+      "name": "Erythrocyte count (RBC)",
+      "context": "Male",
+      "sectionId": "other-hematologic",
+      "sectionSpecimen": "Hematologic",
+      "reference": "4.3–5.9 million/mm³",
+      "si": "4.3–5.9 × 10¹²/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L283–284",
+        "analyte": "Erythrocyte count (RBC)",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "rbc-female",
+      "decision": "approved",
+      "name": "Erythrocyte count (RBC)",
+      "context": "Female",
+      "sectionId": "other-hematologic",
+      "sectionSpecimen": "Hematologic",
+      "reference": "3.5–5.5 million/mm³",
+      "si": "3.5–5.5 × 10¹²/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L285",
+        "analyte": "Erythrocyte count (RBC)",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "esr-male",
+      "decision": "approved",
+      "name": "Erythrocyte sedimentation rate (Westergren)",
+      "context": "Male",
+      "sectionId": "other-hematologic",
+      "sectionSpecimen": "Hematologic",
+      "reference": "0–15 mm/h",
+      "si": "0–15 mm/h",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L286",
+        "analyte": "Erythrocyte sedimentation rate (Westergren)",
+        "subgroup": "Male"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "esr-female",
+      "decision": "approved",
+      "name": "Erythrocyte sedimentation rate (Westergren)",
+      "context": "Female",
+      "sectionId": "other-hematologic",
+      "sectionSpecimen": "Hematologic",
+      "reference": "0–20 mm/h",
+      "si": "0–20 mm/h",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L287",
+        "analyte": "Erythrocyte sedimentation rate (Westergren)",
+        "subgroup": "Female"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "cd4",
+      "decision": "approved",
+      "name": "CD4⁺ T-lymphocyte count",
+      "context": null,
+      "sectionId": "other-hematologic",
+      "sectionSpecimen": "Hematologic",
+      "reference": "≥500/mm³",
+      "si": "≥0.5 × 10⁹/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L288–289",
+        "analyte": "CD4+ T-lymphocyte count",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "hba1c",
+      "decision": "approved",
+      "name": "Hemoglobin A1c",
+      "context": null,
+      "sectionId": "blood-endocrine",
+      "sectionSpecimen": "Hematologic · Endocrine",
+      "reference": "≤6%",
+      "si": "≤42 mmol/mol",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L291",
+        "analyte": "Hemoglobin A1c",
+        "subgroup": ""
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "urine-calcium",
+      "decision": "approved",
+      "name": "Calcium",
+      "context": null,
+      "sectionId": "urine",
+      "sectionSpecimen": "Urine",
+      "reference": "100–300 mg/24 h",
+      "si": "2.5–7.5 mmol/24 h",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L293",
+        "analyte": "Calcium",
+        "subgroup": "Urine, 24 h"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "urine-osmolality",
+      "decision": "approved",
+      "name": "Osmolality",
+      "context": null,
+      "sectionId": "urine",
+      "sectionSpecimen": "Urine",
+      "reference": "50–1200 mOsmol/kg H₂O",
+      "si": "50–1200 mOsmol/kg H₂O",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L294",
+        "analyte": "Osmolality",
+        "subgroup": "Urine"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "urine-oxalate",
+      "decision": "approved",
+      "name": "Oxalate",
+      "context": null,
+      "sectionId": "urine",
+      "sectionSpecimen": "Urine",
+      "reference": "8–40 μg/mL",
+      "si": "90–445 μmol/L",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L295",
+        "analyte": "Oxalate",
+        "subgroup": "Urine"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "urine-protein",
+      "decision": "approved",
+      "name": "Proteins, total",
+      "context": null,
+      "sectionId": "urine",
+      "sectionSpecimen": "Urine",
+      "reference": "<150 mg/24 h",
+      "si": "<0.15 g/24 h",
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L296",
+        "analyte": "Proteins, total",
+        "subgroup": "Urine, 24 h"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    },
+    {
+      "id": "bmi",
+      "decision": "approved",
+      "name": "Body mass index (BMI)",
+      "context": "Adult",
+      "sectionId": "bmi",
+      "sectionSpecimen": "Adult",
+      "reference": "19–25 kg/m²",
+      "si": null,
+      "source": {
+        "url": "https://www.usmle.org/sites/default/files/2021-10/Step_1_Sample_Items.pdf",
+        "printedPage": 9,
+        "pdfPageIndex": 9,
+        "textLocator": "L297",
+        "analyte": "Body mass index (BMI)",
+        "subgroup": "Adult"
+      },
+      "checks": {
+        "conventionalRange": true,
+        "conventionalUnit": true,
+        "siRange": true,
+        "siUnit": true,
+        "inequalityAndPrecision": true,
+        "subgroup": true,
+        "sourcePage": true
+      },
+      "findings": []
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+/* One calm interaction language. Motion is event-driven; no decorative loops. */
+.mq-root {
+  --mq-motion-fast: 180ms; --mq-motion-slow: 320ms;
+  --mq-control-glow: 0 0 0 1px var(--mq-pat-line), 0 7px 18px -9px var(--mq-actionShadow), inset 0 1px 0 var(--mq-reflection);
+}
+.mq-root :is(.mq-button, .mq-chip, .mq-segmented button, .mq-tablist button, .mq-question-number) {
+  position: relative;
+  transition: background-color var(--mq-motion-fast) ease, border-color var(--mq-motion-fast) ease,
+    box-shadow var(--mq-motion-slow) ease, color var(--mq-motion-fast) ease, transform var(--mq-motion-slow) var(--mq-ease);
+}
+.mq-root .mq-button::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+  background: linear-gradient(120deg, var(--mq-reflection), transparent 60%);
+  transition: opacity var(--mq-motion-slow) ease;
+}
+.mq-root .mq-button--primary::before { background: linear-gradient(120deg, var(--mq-actionShine), transparent 65%); }
+.mq-icon { flex: none; transform-origin: center; transition: transform var(--mq-motion-slow) var(--mq-ease); }
+.mq-root :is(.mq-button, .mq-chip, .mq-segmented button, .mq-tablist button)[aria-pressed=true],
+.mq-root .mq-button[aria-expanded=true] { box-shadow: inset 0 1px 0 var(--mq-reflection), 0 0 0 1px var(--mq-pat-line); }
+.mq-root .mq-button[aria-expanded=true] { color: var(--mq-ok-ink); background: var(--mq-sel); border-color: var(--mq-pat-line); }
+.mq-tablist button::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 2px; height: 2px; border-radius: 2px; background: var(--mq-ok); opacity: 0; transform: scaleX(.35); transition: opacity var(--mq-motion-fast) ease, transform var(--mq-motion-slow) var(--mq-ease); }
+.mq-tablist button[aria-selected=true]::after { opacity: 1; transform: scaleX(1); }
+.mq-root :is(.mq-option, .mq-system-row, .mq-concept-interaction [role=radio], .mq-concept-interaction .ficha) {
+  transition: border-color var(--mq-motion-fast) ease, background-color var(--mq-motion-fast) ease, box-shadow var(--mq-motion-slow) ease;
+}
+.mq-option--selected .mq-letter { background: var(--mq-ok); color: var(--mq-on-ok); }
+.mq-root .mq-question-number > .mq-icon--flag { position: absolute; width: 12px; height: 12px; top: 0; right: 0; color: var(--mq-mark-ink); fill: var(--mq-surface); }
+.mq-root :is(.mq-button, .mq-chip, .mq-segmented button, .mq-tablist button, .mq-question-number):focus-visible {
+  outline: 2px solid var(--mq-ok); outline-offset: 3px; box-shadow: var(--mq-control-glow);
+}
+.mq-root :is(input, select, textarea) { transition: border-color var(--mq-motion-fast) ease, box-shadow var(--mq-motion-fast) ease; }
+.mq-root :is(input, select, textarea):focus-visible { box-shadow: 0 0 0 4px var(--mq-ok-tint); }
+.mq-progress > span { transition: width 400ms var(--mq-ease); }
+.mq-rings .mq-ring-outer, .mq-rings .mq-ring-inner { transition: stroke-dasharray 400ms var(--mq-ease); }
+.mq-root :is(.mq-lab-reference, .mq-result, .mq-saved, .mq-dialog[open], .mq-explanation-pane) { animation: mq-panel-enter 280ms var(--mq-ease) both; }
+.mq-tabpanel > :first-child { animation: mq-panel-enter 220ms var(--mq-ease) both; }
+@keyframes mq-panel-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (hover: hover) and (pointer: fine) {
+  .mq-root .mq-button:not(:disabled):hover { transform: translateY(-2px); border-color: var(--mq-hoverline); box-shadow: var(--mq-control-glow); }
+  .mq-root .mq-button:not(:disabled):hover::before { opacity: 1; }
+  .mq-root .mq-button--primary:not(:disabled):hover { border-color: var(--mq-actionEdge); box-shadow: 0 10px 24px -8px var(--mq-actionShadow), inset 0 1px 0 var(--mq-actionShine); }
+  .mq-root .mq-button--danger:not(:disabled):hover { background: var(--mq-bad-tint); border-color: var(--mq-bad); box-shadow: 0 6px 18px -12px var(--mq-bad); }
+  .mq-root :is(.mq-chip, .mq-segmented button, .mq-tablist button, .mq-question-number):not(:disabled):hover { box-shadow: var(--mq-control-glow); }
+  .mq-root :is(.mq-chip, .mq-segmented button):not(:disabled):not([aria-pressed=true]):hover,
+  .mq-root .mq-tablist button:not([aria-selected=true]):hover { background: var(--mq-hover); color: var(--mq-text); }
+  .mq-root .mq-question-number:not(:disabled):hover { transform: translateY(-2px); border-color: var(--mq-hoverline); }
+  .mq-button:not(:disabled):hover :is(.mq-icon--arrow, .mq-icon--play) { transform: translateX(3px); }
+  .mq-button:not(:disabled):hover .mq-icon--back { transform: translateX(-3px); }
+  .mq-button:not(:disabled):hover :is(.mq-icon--settings, .mq-icon--sun, .mq-icon--retry) { transform: rotate(35deg); }
+  .mq-button:not(:disabled):hover :is(.mq-icon--moon, .mq-icon--labs, .mq-icon--flag) { transform: rotate(-10deg) scale(1.08); }
+  .mq-button:not(:disabled):hover :is(.mq-icon--check, .mq-icon--pause, .mq-icon--dashboard) { transform: scale(1.12); }
+  .mq-options:not(:disabled) .mq-option:hover { border-color: var(--mq-hoverline); box-shadow: inset 3px 0 0 var(--mq-ok), 0 4px 16px -12px var(--mq-actionShadow); }
+  .mq-system-row:hover { box-shadow: inset 3px 0 0 var(--mq-ok); }
+  .mq-concept-interaction [role=radio]:not([aria-disabled=true]):hover { border-color: var(--mq-hoverline); box-shadow: inset 3px 0 0 var(--mq-ok); }
+  .mq-root a:hover { text-decoration-thickness: 2px; }
+  .mq-lab-footer a:hover .mq-icon { transform: translate(2px,-2px); }
+}
+.mq-root :is(.mq-button, .mq-chip, .mq-segmented button, .mq-tablist button, .mq-question-number):not(:disabled):active { transform: translateY(0) scale(.97); }
+@media (hover: none) { .mq-root .mq-button:not(:disabled):hover { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .mq-root *, .mq-root *::before, .mq-root *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .mq-root :is(button, .mq-icon):is(:hover, :active), .mq-root button:hover .mq-icon, .mq-root a:hover .mq-icon { transform: none !important; }
+  .mq-tablist button[aria-selected=true]::after { transform: none; }
+}

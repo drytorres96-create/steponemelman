@@ -1,0 +1,45 @@
+.mq-root .mq-lab-reference {
+  display: flex; flex-direction: column; gap: 12px; padding: 18px;
+  height: min(610px, 78dvh); min-height: 340px; overflow: auto; font-size: 13px;
+  scrollbar-width: thin; overscroll-behavior: contain;
+}
+.mq-lab-heading { display: flex; align-items: center; gap: 11px; flex: none; }
+.mq-lab-heading p { font-size: 11px; color: var(--mq-muted); margin-top: 3px; }
+.mq-lab-emblem { display: grid; place-items: center; width: 38px; height: 42px; flex: none; color: var(--mq-ok-ink); background: var(--mq-sel); border: 1px solid var(--mq-pat-line); border-radius: 12px; box-shadow: inset 0 1px 0 var(--mq-reflection); }
+.mq-lab-emblem svg { width: 22px; height: 22px; }
+.mq-lab-search { position: relative; flex: none; display: flex; align-items: center; }
+.mq-lab-search > svg { position: absolute; left: 12px; color: var(--mq-muted); pointer-events: none; }
+.mq-root .mq-lab-reference .mq-lab-search input { width: 100%; min-width: 0; padding: 11px 46px 11px 38px; font-size: 12px; }
+.mq-lab-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.mq-lab-search > button { position: absolute; right: 0; border-color: transparent; padding: 8px; }
+.mq-lab-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: none; }
+.mq-root .mq-lab-controls select { flex: 1 1 120px; width: 120px; min-width: 0; font-size: 12px; }
+.mq-lab-controls .mq-segmented { flex: 1 0 166px; padding: 2px; }
+.mq-lab-controls .mq-segmented button { flex: 0 0 auto; font-size: 11px; padding: 8px; white-space: nowrap; }
+.mq-lab-controls .mq-segmented button:first-child { flex: 1; }
+.mq-lab-count { font-size: 11px; color: var(--mq-muted); flex: none; overflow-wrap: anywhere; }
+.mq-lab-scroll { flex: 1; min-height: 140px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--mq-line2) transparent; border: 1px solid var(--mq-line); border-radius: 12px; background: var(--mq-inset); }
+.mq-lab-section + .mq-lab-section { border-top: 1px solid var(--mq-line2); }
+.mq-lab-section-heading { padding: 12px; display: grid; gap: 2px; background: var(--mq-sel); }
+.mq-lab-section-heading h3 { font-size: 13px; color: var(--mq-ok-ink); }
+.mq-lab-section-heading > span { font-size: 10px; color: var(--mq-muted); }
+.mq-root .mq-lab-reference table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
+.mq-root .mq-lab-reference th, .mq-root .mq-lab-reference td { text-align: left; vertical-align: top; padding: 11px 12px; border-bottom: 1px solid var(--mq-line); overflow-wrap: anywhere; }
+.mq-lab-reference thead { position: sticky; top: 0; z-index: 1; background: var(--mq-surface); box-shadow: 0 1px 0 var(--mq-line2); }
+.mq-lab-reference thead th { font-size: 10px; color: var(--mq-muted); font-weight: 600; }
+.mq-lab-reference th:first-child { width: 52%; }
+.mq-lab-reference tbody th { font-weight: 500; }
+.mq-lab-reference tbody td { color: var(--mq-text2); font-variant-numeric: tabular-nums; }
+.mq-lab-reference tr:last-child > * { border-bottom: 0; }
+.mq-lab-context { display: block; font-size: 10px; color: var(--mq-muted); margin-top: 4px; font-weight: 400; }
+.mq-lab-footer { flex: none; font-size: 10px; color: var(--mq-muted); }
+.mq-lab-footer a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: 11px; text-underline-offset: 4px; }
+.mq-lab-footer svg { width: 13px; height: 13px; }
+.mq-lab-empty { min-height: 170px; padding: 22px 14px; display: grid; justify-items: center; align-content: center; gap: 10px; text-align: center; color: var(--mq-muted); }
+.mq-lab-empty strong { color: var(--mq-text); }
+@media (hover: hover) and (pointer: fine) { .mq-lab-reference tbody tr:hover { background: var(--mq-hover); } }
+@media (min-width: 961px) and (min-height: 601px) {
+  .mq-workspace--study .mq-labs-pane { overflow: hidden; padding: 2px 3px 6px; }
+  .mq-root .mq-labs-pane > .mq-lab-reference { height: 100%; min-height: 0; }
+}
+@media (max-width: 480px) { .mq-root .mq-lab-reference { padding: 14px; gap: 10px; } .mq-root .mq-lab-reference .mq-lab-search input { font-size: 16px; } .mq-lab-search input::placeholder { font-size: 12px; } }
