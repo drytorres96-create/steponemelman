@@ -5,6 +5,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import { AuthGate } from './auth/AuthGate'
 import { NbmeProvider } from './nbme/NbmeProvider'
 import { Resguardo, FalloGeneral } from './components/Resguardo'
+import { myqbankEnabled } from './myqbank/activation'
 import './styles.css'
 import './editorial.css'
 import './organic.css'
@@ -16,7 +17,7 @@ import './premium.css'
 import './synapse.css'
 
 // El acceso no necesita descargar las pantallas de estudio antes de verificar la cuenta.
-const App = lazy(() => import('./App'))
+const App = lazy(() => myqbankEnabled() ? import('./myqbank/MyQBankApp') : import('./App'))
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

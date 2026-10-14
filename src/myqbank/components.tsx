@@ -43,9 +43,9 @@ export function Progress({ value, max, label }: { value: number; max: number; la
     <span style={{ width: `${percentage}%` }}/>
   </div>
 }
-export function Rings({ used, total, correct, compact = false }: { used: number; total: number; correct: number | null; compact?: boolean }) {
+export function Rings({ used, total, correct, evaluated = used, compact = false }: { used: number; total: number; correct: number | null; evaluated?: number; compact?: boolean }) {
   const outer = safePercent(used, total) ?? 0
-  const inner = correct === null ? null : safePercent(correct, used)
+  const inner = correct === null ? null : safePercent(correct, evaluated)
   return <div className={`mq-rings ${compact ? 'mq-rings--compact' : ''}`} role="img" aria-label={`${used} of ${total} answered${inner === null ? '' : `; ${inner}% correct`}`}>
     <svg viewBox="0 0 120 120" aria-hidden="true">
       <circle className="mq-ring-track" cx="60" cy="60" r="52"/><circle className="mq-ring-outer" cx="60" cy="60" r="52" pathLength="100" strokeDasharray={`${outer} 100`}/>

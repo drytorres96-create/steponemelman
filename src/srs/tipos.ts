@@ -44,6 +44,8 @@ export interface Intento {
   modo?: 'aprendizaje' | 'repaso' | 'examen'
   tipo_evidencia?: 'recuerdo' | 'discriminacion' | 'aplicacion'
   calificacion_actualizada_en?: number
+  /** Concurrent answers to one new block position stay ungraded and retain both texts. */
+  respuestas_en_conflicto?: string[]
   /** El veredicto lo decidió la IA sobre una respuesta libre, no el corrector propio. */
   calificado_por_ia?: boolean
   /** Yoel rectificó ese veredicto a mano; manda sobre el de la IA y no se vuelve a tocar. */

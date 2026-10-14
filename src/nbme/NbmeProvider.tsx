@@ -7,6 +7,7 @@ import { createNbmeApi, parseNbmeCatalog, parseNbmeQuestion, questionRefKey, Nbm
 import { preguntaConLecturasDudosas } from './texto'
 import { emptyNbmeState, parseNbmeState, mergeNbmeStates, startNbmeSession, setNbmeDraft,
   submitNbmeAnswer, reviewNbmeAnswer, updateNbmeSession, activateNbmeSession, deriveNbmeSession, updateNbmeFilters,
+  navigateNbmeSession, markNbmePosition, completeNbmeSession,
   discardNbmeSession, archiveNbmeSession, isNbmeSessionArchived, countNbmeSessionAttempts, setNbmeBankVersion, referenciasPendientesNbme } from './model'
 import { NbmeSyncEngine, parseNbmeSnapshot, stableNbmeJson, type NbmeSnapshot, type NbmeSyncReply } from './sync'
 import type { NbmeAttempt, NbmeCatalog, NbmeFilters, NbmeQuestion, NbmeQuestionRef, NbmeSession,
@@ -43,9 +44,13 @@ interface NbmeContextValue {
    * trajo de la red hace menos de diez minutos: las cajas abren una sesión por
    * pregunta y no tienen que esperar una descarga entera entre una y la siguiente.
    */
-  startSession(refs: NbmeQuestionRef[], options?: { title?: string; budgetMinutes?: 10 | 20 | 30 | null; reuseRecentCatalog?: boolean }): Promise<boolean>
+  startSession(refs: NbmeQuestionRef[], options?: { id?: string; mode?: 'tutor' | 'test'; title?: string; budgetMinutes?: 10 | 20 | 30 | null; reuseRecentCatalog?: boolean }): Promise<boolean>
+  goToQuestion(position: number): void
+  setEngaged(engaged: boolean): void
+  markPosition(position: number, field: 'flags' | 'skipped', value: boolean): void
+  completeSession(): void
   selectAnswer(optionId: string): void
-  checkAnswer(): void
+  checkAnswer(durationMs?: number): void
   nextQuestion(): void
   pauseSession(): void
   resumeSession(id: string): Promise<boolean>
@@ -183,7 +188,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       current.questionMs = 0
     }
     current.tickAt = now
-    current.running = !!session && id === engagedSession.current && !session.paused
+    current.running = !!session && session.completedAt === undefined && id === engagedSession.current && !session.paused
       && document.visibilityState === 'visible' && view?.phase !== 'complete'
     current.answering = current.running && view?.phase === 'question'
     if (mounted.current) setElapsedNow((session?.elapsedMs ?? 0) + current.pendingMs)
@@ -284,7 +289,11 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       const controller = new AbortController()
       controllers.current.add(controller)
       try {
-        const received = await api.questions(remaining, controller.signal)
+        const received: NbmeQuestion[] = []
+        for (let offset = 0; offset < remaining.length; offset += 20) {
+          received.push(...await api.questions(remaining.slice(offset, offset + 20), controller.signal))
+          if (!isCurrent()) return false
+        }
         if (!isCurrent()) return false
         for (const question of received) questions.current.set(questionRefKey(question), question)
         // Content cache is optional; progress persistence has its own strict error handling.
@@ -481,11 +490,11 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     }
   }, [persist, syncNow])
 
-  const startSession = useCallback(async (refs: NbmeQuestionRef[], options: { title?: string; budgetMinutes?: 10 | 20 | 30 | null; reuseRecentCatalog?: boolean } = {}): Promise<boolean> => {
+  const startSession = useCallback(async (refs: NbmeQuestionRef[], options: { id?: string; mode?: 'tutor' | 'test'; title?: string; budgetMinutes?: 10 | 20 | 30 | null; reuseRecentCatalog?: boolean } = {}): Promise<boolean> => {
     if (actionLock.current || !engineRef.current || !catalog) return false
-    if (!refs.length || refs.length > 20 || new Set(refs.map(questionRefKey)).size !== refs.length
+    if (!refs.length || refs.length > 80 || new Set(refs.map(questionRefKey)).size !== refs.length
       || refs.some(ref => !catalog.questions.some(q => q.status === 'ready' && questionRefKey(q) === questionRefKey(ref)))) {
-      setError('Selecciona entre una y veinte preguntas disponibles para estudiar.')
+      setError('Selecciona entre una y ochenta preguntas disponibles para estudiar.')
       return false
     }
     actionLock.current = true
@@ -506,10 +515,10 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       }
       if (!await ensureQuestions(refs)) return false
       if (!mounted.current || epoch !== aliveEpoch.current) return false
-      const id = crearUUID()
+      const id = options.id ?? crearUUID()
       flushTime()
       edit(previous => startNbmeSession(previous, { id, title: options.title || 'Preguntas de aplicación', refs,
-        budgetMinutes: options.budgetMinutes ?? null }))
+        budgetMinutes: options.budgetMinutes ?? null, mode: options.mode }))
       setShownSessionId(id)
       engagedSession.current = id
       tickTime()
@@ -575,7 +584,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       || !question?.options.some(option => option.id === optionId)) return
     edit(previous => setNbmeDraft(previous, id, view.current!.position, optionId))
   }, [edit])
-  const checkAnswer = useCallback(() => {
+  const checkAnswer = useCallback((savedDuration?: number) => {
     if (accessDenied.current) return
     const id = actual.current.activeSessionId
     const view = id ? deriveNbmeSession(actual.current, id) : null
@@ -589,7 +598,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     const optionId = actual.current.sessions[id].drafts[String(view.current.position)]?.optionId
     if (!optionId) return
     flushTime()
-    const durationMs = Math.max(0, Math.min(clock.current.questionMs, 3_600_000))
+    const durationMs = Math.max(0, Math.min(actual.current.sessions[id].mode && savedDuration !== undefined && Number.isFinite(savedDuration) ? savedDuration : clock.current.questionMs, 3_600_000))
     edit(previous => submitNbmeAnswer(previous, id, view.current!.position, question, optionId, durationMs))
     tickTime()
   }, [edit, flushTime, tickTime])
@@ -599,9 +608,31 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     const view = id ? deriveNbmeSession(actual.current, id) : null
     if (!id || !view?.current || view.phase !== 'feedback' || actual.current.sessions[id].paused) return
     flushTime()
-    edit(previous => reviewNbmeAnswer(previous, id, view.current!.position))
+    edit(previous => {
+      const next = reviewNbmeAnswer(previous, id, view.current!.position)
+      return previous.sessions[id].mode ? navigateNbmeSession(next, id, Math.min(view.current!.position + 1, previous.sessions[id].initial.length - 1)) : next
+    })
     tickTime()
   }, [edit, flushTime, tickTime])
+  const goToQuestion = useCallback((position: number) => {
+    const id = actual.current.activeSessionId ?? shownSessionId
+    if (!id) return
+    flushTime(); edit(previous => navigateNbmeSession(previous, id, position)); tickTime()
+  }, [edit, flushTime, tickTime, shownSessionId])
+  const setEngaged = useCallback((engaged: boolean) => {
+    flushTime()
+    engagedSession.current = engaged ? actual.current.activeSessionId : null
+    tickTime()
+  }, [flushTime, tickTime])
+  const markPosition = useCallback((position: number, field: 'flags' | 'skipped', value: boolean) => {
+    const id = actual.current.activeSessionId ?? shownSessionId
+    if (id) edit(previous => markNbmePosition(previous, id, position, field, value))
+  }, [edit, shownSessionId])
+  const completeSession = useCallback(() => {
+    const id = actual.current.activeSessionId ?? shownSessionId
+    if (!id) return
+    flushTime(); edit(previous => completeNbmeSession(previous, id)); engagedSession.current = null; tickTime()
+  }, [edit, flushTime, tickTime, shownSessionId])
   const pauseSession = useCallback(() => {
     flushTime()
     const id = actual.current.activeSessionId
@@ -646,7 +677,9 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       .filter((attempt): attempt is NbmeAttempt => !!attempt && !attempt.correct && !attempt.conflict)
     if (!attempts.length) return []
     const epoch = aliveEpoch.current
-    const loaded = await api.questions(attempts.map(attempt => ({ id: attempt.questionId, revision: attempt.revision })), signal)
+    if (session.mode === 'test' && session.completedAt === undefined) return []
+    const loaded: NbmeQuestion[] = []
+    for (let offset = 0; offset < attempts.length; offset += 20) loaded.push(...await api.questions(attempts.slice(offset, offset + 20).map(attempt => ({ id: attempt.questionId, revision: attempt.revision })), signal))
     if (!mounted.current || epoch !== aliveEpoch.current || signal?.aborted) throw new Error('La revisión se ha cerrado.')
     if (isNbmeSessionArchived(actual.current, id)) throw new Error('Esta sesión ya no está en la biblioteca.')
     return loaded.map((question, index) => ({ question, attempt: attempts[index] }))
@@ -656,7 +689,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     selectedOption, currentFeedback: sessionView?.attempt ?? null, filters: state.filters, loading, questionLoading, busy,
     elapsedMs, budgetReached, error: error ?? storageWarning, storageWarning, syncStatus, catalogStale,
     localNotice, dismissLocalNotice: () => setLocalNotice(null),
-    startSession, selectAnswer, checkAnswer, nextQuestion,
+    startSession, selectAnswer, checkAnswer, nextQuestion, goToQuestion, setEngaged, markPosition, completeSession,
     pauseSession, resumeSession, discardSession, archiveSession, reviewSessionFailures, attemptsInSession, continueSession,
     continueWithoutBudget: continueSession, setFilters, syncNow, reloadCatalog, retryQuestionLoad, loadFigure }
   return <NbmeContext.Provider value={value}>{children}</NbmeContext.Provider>

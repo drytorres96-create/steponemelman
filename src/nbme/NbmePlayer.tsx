@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject, type ReactNode } from 'react'
 import { Modal } from '../components/comunes'
 import { FigureViewer } from './FigureViewer'
 import { useNbme } from './NbmeProvider'
@@ -6,25 +6,28 @@ import { analizarColumnasOpciones, analizarEnunciado, normalizarTexto, preguntaC
 import type { NbmeQuestion } from './types'
 import { CorreccionErrorIA } from '../components/CorreccionErrorIA'
 import { RecuperacionTrasFallo } from './RecuperacionTrasFallo'
+import { myqbankEnabled } from '../myqbank/activation'
+import { HighlightText } from '../myqbank/HighlightText'
+import { AdaptiveExplanation, StudyHighlights, legacyHighlightSource } from '../myqbank/LegacyStudy'
 import './nbme.css'
 
-interface LoadedFigure { assetId: string; alt: string; url: string }
+export interface LoadedFigure { assetId: string; alt: string; url: string }
 
 /**
  * Presenta el enunciado importado: prosa en párrafos y, cuando la extracción
  * permite reconstruirla sin ambigüedad, la tabla de laboratorio en dos columnas.
  */
-function Enunciado({ texto }: { texto: string }) {
+export function Enunciado({ texto, renderText = value => value }: { texto: string; renderText?: (text: string, region: string) => ReactNode }) {
   const bloques = useMemo(() => analizarEnunciado(texto), [texto])
   return <div className="nbme-stem" lang="en">
     {bloques.map((bloque, indice) => bloque.tipo === 'parrafo'
-      ? <p key={indice} className="nbme-stem-parrafo">{bloque.texto}</p>
+      ? <p key={indice} className="nbme-stem-parrafo">{renderText(bloque.texto, `paragraph:${indice}`)}</p>
       : bloque.tipo === 'tabla'
         ? <div key={indice} className="nbme-lab-scroll nbme-matrix-scroll" tabIndex={0} role="region" aria-label="Tabla del enunciado">
           <table className="nbme-lab-tabla nbme-matrix">
             <thead><tr>{bloque.columnas.map((columna, i) => <th key={i} scope="col">{columna}</th>)}</tr></thead>
             <tbody>{bloque.filas.map((fila, i) => <tr key={i}>{fila.map((celda, j) => j === 0
-              ? <th key={j} scope="row">{celda}</th> : <td key={j}>{celda}</td>)}</tr>)}</tbody>
+              ? <th key={j} scope="row">{renderText(celda, `table:${indice}:${i}:${j}`)}</th> : <td key={j}>{renderText(celda, `table:${indice}:${i}:${j}`)}</td>)}</tr>)}</tbody>
           </table>
         </div>
       : <figure key={indice} className="nbme-lab">
@@ -33,8 +36,8 @@ function Enunciado({ texto }: { texto: string }) {
           <table className="nbme-lab-tabla">
             <tbody>
               {bloque.filas.map((fila, i) => <tr key={i}>
-                <th scope="row">{fila.etiqueta}</th>
-                <td>{fila.valor}{fila.dudoso && <abbr className="nbme-dudoso" title="Lectura dudosa en la fuente: contrasta este valor con el PDF">?</abbr>}</td>
+                <th scope="row">{renderText(fila.etiqueta, `lab:${indice}:${i}:label`)}</th>
+                <td>{renderText(fila.valor, `lab:${indice}:${i}:value`)}{fila.dudoso && <abbr className="nbme-dudoso" title="Lectura dudosa en la fuente: contrasta este valor con el PDF">?</abbr>}</td>
               </tr>)}
             </tbody>
           </table>
@@ -66,7 +69,7 @@ function decodeFigure(url: string, signal: AbortSignal): Promise<void> {
   })
 }
 
-function useQuestionFigures(question: NbmeQuestion | null, target: RefObject<HTMLDivElement>) {
+export function useQuestionFigures(question: NbmeQuestion | null, target: RefObject<HTMLDivElement>) {
   const { loadFigure } = useNbme()
   const [figures, setFigures] = useState<LoadedFigure[]>([])
   const [loading, setLoading] = useState(false)
@@ -202,6 +205,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
     <p className="sutil">Puedes iniciar una nueva o retomar una guardada.</p><button className="btn principal" onClick={onSalir}>{etiquetaSalida ?? 'Elegir preguntas'}</button></div>
 
   const scoredFirst = sessionView.firstAnswered - sessionView.firstConflicts
+  if (currentSession.mode) return <section className="tarjeta"><h1>My Q Bank block</h1><p>This block keeps its saved mode and navigation in My Q Bank.</p><a className="btn principal" href="?workspace=myqbank#dashboard">Open My Q Bank</a></section>
   if (sessionView.phase === 'complete') return <section className="nbme-player tarjeta pila" aria-labelledby="nbme-complete-title">
     <div><span className="etq verde">Sesión terminada</span><h1 id="nbme-complete-title" style={{ marginTop: 10 }}>Práctica completada</h1></div>
     <p>{currentSession.title}</p>
@@ -227,8 +231,11 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
   const relatedLinks = reviewedLinks.length ? reviewedLinks : (currentQuestion?.conceptLinks ?? []).filter(link => link.review === 'suggested' && link.confidence >= 0.74)
   const conceptIds = [...new Set(relatedLinks.map(link => link.conceptId))].slice(0, 3)
   const suggestedLinks = conceptIds.length > 0 && !reviewedLinks.length
+  const mq = myqbankEnabled()
+  const tx = (es: string, en: string) => mq ? en : es
+  const highlighted = (text: string, region: string) => mq && currentQuestion ? <HighlightText text={text} source={legacyHighlightSource(currentQuestion)} region={region}/> : text
 
-  return <div className={`nbme-player pila${recuperando ? ' recuperando' : ''}`}>
+  return <StudyHighlights selectionKey={`${currentSession.id}:${sessionView.current?.position}`}><div className={`nbme-player pila${recuperando ? ' recuperando' : ''}`}>
     <p className="mini">National Board of Medical Examiners (NBME)</p>
     <header className={`nbme-player-header${modoPaso ? ' paso' : ''}`}>
       {!modoPaso && <div><p className="mini">{currentSession.title}</p><p className="sutil">Primera vuelta: {sessionView.firstAnswered}/{sessionView.initialCount} · Correcciones pendientes: {sessionView.pendingErrors}</p></div>}
@@ -253,7 +260,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
               </h1>
               <p className="mini">{yaPracticada ? 'Pregunta ya practicada aquí' : 'Pregunta nueva aquí'}
                 {reintentoTrasExplicacion && ' · Corrección tras ver la explicación'}</p>
-              <Enunciado texto={columnasOpciones?.enunciado ?? currentQuestion.stem} />
+              <Enunciado texto={columnasOpciones?.enunciado ?? currentQuestion.stem} renderText={(text, region) => highlighted(text, `stem:${region}`)}/>
               {currentQuestion.figureRequired && !currentQuestion.figures.length && <p role="alert" className="nbme-error">Falta una figura necesaria para responder esta pregunta.</p>}
               {!!currentQuestion.figures.length && <div id="nbme-figures" ref={figureRef} tabIndex={-1} className="nbme-question-images">
                 {figures.waiting && <p className="sutil nbme-figure-placeholder">Figura de la pregunta</p>}
@@ -274,8 +281,8 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
                       <input type="radio" name={`nbme-answer-${sessionView.current?.position}`} value={option.id} checked={isSelected} onChange={() => selectAnswer(option.id)} />
                       <span className="nbme-option-letter">{option.id}.</span><span className="nbme-option-text" lang="en">
                         {columnasOpciones ? <span className="nbme-option-cells" style={{ gridTemplateColumns: `repeat(${columnasOpciones.columnas.length}, minmax(0, 1fr))` }}>
-                          {columnasOpciones.filas[option.id].map((valor, i) => <span key={i} className="nbme-option-cell"><small>{columnasOpciones.columnas[i]}</small><span>{valor}</span></span>)}
-                        </span> : normalizarTexto(option.text)}
+                          {columnasOpciones.filas[option.id].map((valor, i) => <span key={i} className="nbme-option-cell"><small>{columnasOpciones.columnas[i]}</small><span>{highlighted(valor, `option:${option.id}:cell:${i}`)}</span></span>)}
+                        </span> : highlighted(normalizarTexto(option.text), `option:${option.id}`)}
                         {isCorrect && <span className="nbme-option-state" lang="es"><span aria-hidden="true">✓</span> Respuesta correcta</span>}
                         {isIncorrect && <span className="nbme-option-state" lang="es"><span aria-hidden="true">×</span> Tu respuesta incorrecta</span>}
                       </span>
@@ -283,7 +290,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
                   })}
                 </fieldset>
                 {!feedback && <><p className="mini" style={{ marginTop: 10 }}>También puedes seleccionar con la letra de la opción.</p>
-                  <div className="nbme-actions" style={{ marginTop: 16 }}><button className="btn principal" type="submit" disabled={!canAnswer}>Comprobar respuesta</button></div></>}
+                  <div className="nbme-actions" style={{ marginTop: 16 }}><button className="btn principal" type="submit" disabled={!canAnswer}>{tx('Comprobar respuesta', 'Submit answer')}</button></div></>}
               </form>
             </section>
 
@@ -295,16 +302,16 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
                       : 'Esta pregunta volverá durante la práctica. Puedes pausar cuando lo necesites.'}</p></div>
               {!feedback.conflict && <p className="nbme-respuesta"><b>Respuesta: {currentQuestion.answer}.</b> <span lang="en">{normalizarTexto(currentQuestion.options.find(option => option.id === currentQuestion.answer)?.text ?? '')}</span></p>}
               {reintentoTrasExplicacion && <p className="mini">Esta corrección tuvo la explicación previa. Se registra aparte de la primera vuelta.</p>}
-              {currentQuestion.objective && <div className="session-feedback-key"><h3>Objetivo del aprendizaje</h3><TextoFuente texto={currentQuestion.objective} /></div>}
+              {mq ? <AdaptiveExplanation source={currentQuestion}/> : <>{currentQuestion.objective && <div className="session-feedback-key"><h3>Objetivo del aprendizaje</h3><TextoFuente texto={currentQuestion.objective} /></div>}
               {distractorElegido && <div className="nbme-distractor session-feedback-key"><h3>Por qué tu opción no responde</h3><b>{feedback.optionId}. <span lang="en">{normalizarTexto(currentQuestion.options.find(option => option.id === feedback.optionId)?.text ?? '')}</span></b><TextoFuente texto={distractorElegido} /></div>}
               {currentQuestion.explanation && currentQuestion.explanation !== currentQuestion.objective && <div><h3>Fundamento de la respuesta</h3><TextoFuente texto={currentQuestion.explanation} /></div>}
               {currentQuestion.options.some(option => option.id !== currentQuestion.answer && (!distractorElegido || option.id !== feedback.optionId) && currentQuestion.distractorExplanations?.[option.id]) && <details className="nbme-details"><summary>Por qué las otras opciones no</summary>
                 <div className="pila nbme-distractores">{currentQuestion.options.filter(option => option.id !== currentQuestion.answer && (!distractorElegido || option.id !== feedback.optionId) && currentQuestion.distractorExplanations?.[option.id]).map(option => <div key={option.id} className="nbme-distractor"><b>{option.id}. <span lang="en">{normalizarTexto(option.text)}</span></b><TextoFuente texto={currentQuestion.distractorExplanations?.[option.id] ?? ''} /></div>)}</div>
-              </details>}
+              </details>}</>}
               <p className="mini">Fuente: {source}. Explicación procedente del material importado.</p>
               {suggestedLinks && <p className="mini">Relación sugerida; confirma que corresponde al fundamento.</p>}
               <div className="nbme-actions"><button ref={continuarRef} className="btn principal" disabled={busy}
-                onClick={modoPaso && onPasoCompleto ? onPasoCompleto : nextQuestion}>Continuar</button>
+                onClick={modoPaso && onPasoCompleto ? onPasoCompleto : nextQuestion}>{tx('Continuar', 'Next question')}</button>
                 {!recuperarErrores && conceptIds.length > 0 && onEstudiar && <button className="btn fantasma" onClick={() => { pauseSession(); onEstudiar(conceptIds) }}>{suggestedLinks ? 'Explorar conceptos relacionados' : 'Repasar fundamento'}</button>}
                 {!recuperarErrores && conceptIds.length === 0 && onBuscar && <button className="btn fantasma" onClick={() => { pauseSession(); onBuscar(currentQuestion) }}>Explorar fundamentos</button>}
               </div>
@@ -319,5 +326,5 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
       {(syncStatus.state === 'error' || syncStatus.state === 'offline') && <button className="btn pequeno fantasma" disabled={busy} style={{ marginLeft: 8 }} onClick={() => void syncNow()}>Reintentar</button>}
     </div>
     {expandedFigure && <Modal titulo="Figura de la pregunta" onCerrar={() => setExpandedFigure(null)} ancho={1100}><FigureViewer key={expandedFigure.url} url={expandedFigure.url} alt={expandedFigure.alt || 'Figura ampliada de la pregunta'} /></Modal>}
-  </div>
+  </div></StudyHighlights>
 }

@@ -33,6 +33,7 @@ beforeEach(() => {
     busy: false, error: null, storageWarning: null, localNotice: null, dismissLocalNotice: vi.fn(), elapsedMs: 0, budgetReached: false,
     syncStatus: { state: 'synced', message: '', lastSyncedAt: 1 },
     startSession: vi.fn().mockResolvedValue(true), selectAnswer: vi.fn(), checkAnswer: vi.fn(), nextQuestion: vi.fn(),
+    goToQuestion: vi.fn(), setEngaged: vi.fn(), markPosition: vi.fn(), completeSession: vi.fn(),
     discardSession: vi.fn().mockReturnValue(true), attemptsInSession: vi.fn().mockReturnValue(0),
     archiveSession: vi.fn().mockReturnValue(true), reviewSessionFailures: vi.fn().mockResolvedValue([]),
     catalogStale: false,

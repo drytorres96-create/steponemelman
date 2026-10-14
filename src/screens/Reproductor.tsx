@@ -20,6 +20,9 @@ import type { PresentacionIA } from '../lib/contexto-ia'
 import { Cronometro } from '../components/Cronometro'
 import { BotonPiel, usePielEstudio } from '../components/PielEstudio'
 import { tiempoLegible } from '../lib/tiempo'
+import { myqbankEnabled } from '../myqbank/activation'
+import { HighlightText } from '../myqbank/HighlightText'
+import { AdaptiveExplanation, StudyHighlights, legacyHighlightSource } from '../myqbank/LegacyStudy'
 import { buscarIntentoPaso, conAyuda, diasParaCalificacion, identificarPregunta, necesitaReintento, resumirCorrecciones, resumirIntentos, RelojActividad, siguienteCola, versionPregunta } from './sesion'
 
 export interface Cola { titulo: string; subtitulo: string; ruta: string; modulo: string; conceptos: Concepto[]; sessionId?: string; presupuestoMinutos?: 10 | 20 | 30 }
@@ -421,8 +424,9 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
         {t.pregunta_version && t.pregunta_version !== versionPregunta(concepto) && <p className="mini">El contenido cambió desde tu respuesta. Se muestra la versión actual.</p>}
         <p style={{ marginTop: 12 }}>{concepto.evaluacion.pregunta}</p>
         <p>Tu respuesta: <b>{t.respuesta_dada || 'No registrada en esta versión anterior'}</b></p>
-        <p>Respuesta de referencia: <b>{concepto.respuesta_canonica}</b></p><p>{concepto.explicacion}</p>
-        {concepto.evaluacion.opciones?.filter(o => !o.correcta && o.por_que).map(o => <p className="mini" key={o.texto}><b>{o.texto}:</b> {o.por_que}</p>)}
+        <p>Respuesta de referencia: <b>{concepto.respuesta_canonica}</b></p>
+        {myqbankEnabled() ? <StudyHighlights selectionKey={id}><AdaptiveExplanation source={concepto}/></StudyHighlights> : <><p>{concepto.explicacion}</p>
+          {concepto.evaluacion.opciones?.filter(o => !o.correcta && o.por_que).map(o => <p className="mini" key={o.texto}><b>{o.texto}:</b> {o.por_que}</p>)}</>}
       </details>
     })}
   </div>
@@ -529,21 +533,23 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
   const dominio = resumenDominio(p, estado.criterios)
   const cercania = cercaniaDominio(p, estado.criterios)
   const modo = modoEnsenanza(c)
+  const mq = myqbankEnabled(), source = legacyHighlightSource(c)
+  const tx = (es: string, en: string) => mq ? en : es
 
-  return <div className="reproductor pila">
+  return <StudyHighlights selectionKey={preguntaId}><div className="reproductor pila">
     {presupuesto && <Cronometro msVisibles={msVisibles} presupuesto={presupuesto} sinLimite={sinLimite} />}
     <p className="mini session-presentation">{historialAnterior.length ? 'Concepto ya practicado aquí' : 'Concepto nuevo aquí'}
       {c.variante_id && <> · {c.interaccion.recomendada === 'caso_clinico' ? 'Aplicación en un caso' : 'Distinguir conceptos'} · {historialAnterior.some(t => t.variante_id === c.variante_id) ? 'Variante ya practicada' : 'Primera presentación de esta variante'}</>}</p>
     <div className="fila session-toolbar" style={{ justifyContent: 'space-between' }}>
-      <div className="fila" style={{ gap: 8 }}>
+      {!mq && <div className="fila" style={{ gap: 8 }}>
         <span className="etq">{c.clasificacion.disciplina_primaria}</span><span className="etq">{c.clasificacion.sistema_primario}</span>
         {/* En un recorrido sobran el formato y el estado: la caja ya dice por dónde va, y un «Requiere repaso» en rojo sólo presiona. */}
         {!enSesion && <span className="etq violeta">{NOMBRE_INTERACCION[c.interaccion.recomendada]}</span>}
         {!examenSinAyuda && !enSesion && <EtiquetaEstado estado={calcularEstado(p, estado.criterios)} />}
-      </div>
+      </div>}
       <div className="fila" style={{ gap: 8 }}>
         <BotonPiel piel={pielEstudio.piel} alternar={pielEstudio.alternar} />
-        <button className="btn pequeno fantasma" onClick={pausar}>Necesito una pausa</button>
+        <button className="btn pequeno fantasma" onClick={pausar}>{tx('Necesito una pausa', 'Pause')}</button>
       </div>
     </div>
     {!enSesion && <><div className="fila" style={{ justifyContent: 'space-between' }}><span className="mini">{reintento
@@ -565,11 +571,12 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
       </div>}
       <div hidden={fase === 'ensenanza'}>
         {fase === 'tarea' && explicacionPrevia && !examenSinAyuda && c.clasificacion.disciplina_primaria === 'Bioquímica' && <p className="aviso">Con la explicación oculta, di en voz alta: qué cambió → qué proceso afecta → qué consecuencia esperas y por qué. Después completa esta misma pregunta. Esto sustituye releer; cuenta como práctica con ayuda previa.</p>}
-        <div className="pregunta" ref={enunciadoRef}>{c.evaluacion.pregunta}</div>
+        <div className="pregunta" ref={enunciadoRef}>{mq ? <HighlightText text={c.evaluacion.pregunta} source={source} region="stem"/> : c.evaluacion.pregunta}</div>
         {!examenSinAyuda && pistas > 0 && c.pistas.slice(0, pistas).map((t, k) => <div key={k} className="pista"><b>Pista {k + 1}:</b> {t}</div>)}
         {(!examenSinAyuda || fase === 'tarea') && <Interaccion key={`interaccion-${preguntaId}`} c={c} semilla={preguntaId} ocultarFeedback={examenSinAyuda}
+          english={mq} renderText={mq ? (text, region) => <HighlightText text={text} source={source} region={region}/> : undefined}
           bloqueado={fase !== 'tarea' || esperandoIA} resultado={res} onResponder={responder} />}
-        {fase === 'tarea' && <details key={`confianza-${preguntaId}`} className="mini session-confidence"><summary>Registrar confianza (opcional)</summary><div className="fila" style={{ gap: 6, marginTop: 8 }}>
+        {fase === 'tarea' && !mq && <details key={`confianza-${preguntaId}`} className="mini session-confidence"><summary>Registrar confianza (opcional)</summary><div className="fila" style={{ gap: 6, marginTop: 8 }}>
           {([[1, 'Poca'], [2, 'Media'], [3, 'Mucha']] as const).map(([v, t]) => <button key={v} className={`btn pequeno ${confianza === v ? 'principal' : 'fantasma'}`}
             aria-pressed={confianza === v} disabled={esperandoIA} onClick={() => { setConfianza(v); guardarPaso({ confianza: v }) }}>{t}</button>)}
         </div></details>}
@@ -606,16 +613,15 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
           ? 'Este fallo queda guardado; volverá en las cajas de los próximos días.'
           : 'Este concepto volverá al final de la cola hasta que lo aciertes.'}</p>}
         {(res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que) && <p className="session-feedback-key">{res.detalle || c.evaluacion.opciones?.find(o => !o.correcta && o.texto === res.respuestaDada)?.por_que}</p>}
-        {c.patron && <p className="patron session-feedback-key"><b>Si ves esto → piensa:</b> {c.patron}</p>}
-        <p>{c.explicacion}</p>
-        {c.confusiones.length > 0 && <p className="mini">No lo confundas con: {c.confusiones.join(' · ')}</p>}
+        {mq ? <AdaptiveExplanation source={c}/> : <>{c.patron && <p className="patron session-feedback-key"><b>Si ves esto → piensa:</b> {c.patron}</p>}
+          <p>{c.explicacion}</p>{c.confusiones.length > 0 && <p className="mini">No lo confundas con: {c.confusiones.join(' · ')}</p>}</>}
         {/* Una sola decisión tras responder: seguir o, si el corrector no supo, decir tú si la sabías. */}
         {res.veredicto === 'revision'
           ? <div className="fila autoevaluacion">
             <button className="btn principal" onClick={() => autocalificar(true)}>La sabía</button>
             <button className="btn principal" onClick={() => autocalificar(false)}>No la sabía</button>
           </div>
-          : <button ref={siguienteRef} className="btn principal" onClick={avanzar}>Siguiente pregunta</button>}
+          : <button ref={siguienteRef} className="btn principal" onClick={avanzar}>{tx('Siguiente pregunta', 'Next question')}</button>}
         {!presentacionCambio && ['incorrecta', 'parcial', 'ortografia'].includes(res.veredicto) && <CorreccionErrorIA
           key={`${preguntaId}:${res.respuestaDada}`} peticion={{ tipo: 'concepto', resultado: res.veredicto as 'incorrecta' | 'parcial' | 'ortografia',
             presentacion: { conceptId: c.concept_id, answer: res.respuestaDada.slice(0, 500), questionId: preguntaId,
@@ -661,5 +667,5 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
       {fase === 'ortografia' && c.escritura_correctiva.termino && <div className="pila"><EscrituraCorrectiva termino={c.escritura_correctiva.termino} onHecho={avanzar} /><button className="btn" onClick={avanzar}>Continuar sin practicar escritura</button></div>}
     </div>
     {verFuente && !examenSinAyuda && <Modal titulo="Fuente del concepto" onCerrar={() => setVerFuente(false)}><PanelFuente c={c} /></Modal>}
-  </div>
+  </div></StudyHighlights>
 }

@@ -2,6 +2,7 @@ import { nuevoProgreso, programar } from '../srs/fsrs'
 import { CRITERIOS_POR_DEFECTO, calcularEstado, evaluarDominio, type CriteriosDominio, sonCriteriosHeredados } from '../srs/mastery'
 import { intentoCorrecto, NOMBRE_ERROR, NOMBRE_ESTADO, type Intento, type ProgresoConcepto } from '../srs/tipos'
 import type { VersionFormato } from '../lib/formatos'
+import { parseBlocks, mergeBlocks, type StudyBlock } from '../myqbank/blocks'
 
 export const CORPUS_VERSION = '1.0.5' as const
 
@@ -56,6 +57,7 @@ export interface VistaConcepto {
 }
 
 export interface EstadoApp {
+  myqbankBlocks?: Record<string, StudyBlock>
   version: 1
   corpus_version: typeof CORPUS_VERSION
   progreso: Record<string, ProgresoConcepto>
@@ -109,6 +111,7 @@ function leerIntento(v: unknown): Intento | null {
   if (v.modo !== undefined && !['aprendizaje', 'repaso', 'examen'].includes(String(v.modo))) return null
   if (v.tipo_evidencia !== undefined && !['recuerdo', 'discriminacion', 'aplicacion'].includes(String(v.tipo_evidencia))) return null
   if (v.calificacion_actualizada_en !== undefined && !numero(v.calificacion_actualizada_en, v.ts)) return null
+  if (v.respuestas_en_conflicto !== undefined && (!Array.isArray(v.respuestas_en_conflicto) || v.respuestas_en_conflicto.length > 80 || v.respuestas_en_conflicto.some(s => typeof s !== 'string' || s.length > 10000))) return null
   return {
     ...(v.respuesta_dada !== undefined ? { respuesta_dada: v.respuesta_dada as string } : {}),
     ...(v.pregunta_id !== undefined ? { pregunta_id: v.pregunta_id as string } : {}),
@@ -121,6 +124,7 @@ function leerIntento(v: unknown): Intento | null {
     ...(v.modo !== undefined ? { modo: v.modo as Intento['modo'] } : {}),
     ...(v.tipo_evidencia !== undefined ? { tipo_evidencia: v.tipo_evidencia as Intento['tipo_evidencia'] } : {}),
     ...(v.calificacion_actualizada_en !== undefined ? { calificacion_actualizada_en: v.calificacion_actualizada_en as number } : {}),
+    ...(v.respuestas_en_conflicto !== undefined ? { respuestas_en_conflicto: v.respuestas_en_conflicto as string[] } : {}),
     ...(v.calificado_por_ia !== undefined ? { calificado_por_ia: v.calificado_por_ia as boolean } : {}),
     ...(v.correccion_manual !== undefined ? { correccion_manual: v.correccion_manual as boolean } : {}),
     ...(v.attempt_id !== undefined ? { attempt_id: v.attempt_id as string } : {}),
@@ -283,6 +287,8 @@ export function leerEstadoDesconocido(v: unknown): EstadoApp | null {
   if (v.msEstudio !== undefined && !numero(v.msEstudio)) return null
   if (v.vistoAlguna !== undefined && typeof v.vistoAlguna !== 'boolean') return null
   const conceptosVistos = v.conceptosVistos === undefined ? undefined : leerConceptosVistos(v.conceptosVistos)
+  const myqbankBlocks = v.myqbankBlocks === undefined ? undefined : parseBlocks(v.myqbankBlocks)
+  if (myqbankBlocks === null) return null
   if (conceptosVistos === null) return null
   if (v.fieldUpdatedAt !== undefined && (!esObjeto(v.fieldUpdatedAt)
     || !numero(v.fieldUpdatedAt.criterios) || !numero(v.fieldUpdatedAt.reanudable))) return null
@@ -291,6 +297,7 @@ export function leerEstadoDesconocido(v: unknown): EstadoApp | null {
     version: 1,
     corpus_version: CORPUS_VERSION,
     progreso,
+    ...(myqbankBlocks !== undefined ? { myqbankBlocks } : {}),
     sesiones: sesiones as RegistroSesion[],
     criterios,
     reanudable,
@@ -345,8 +352,15 @@ export function reconstruirProgreso(id: string, registros: Intento[], criterios:
     // Si un archivo contiene dos versiones de un UUID, ambos dispositivos eligen la misma.
     const marcaNueva = i.calificacion_actualizada_en ?? i.ts
     const marcaAnterior = anterior?.calificacion_actualizada_en ?? anterior?.ts ?? 0
-    const elegido = !anterior || marcaNueva > marcaAnterior || (marcaNueva === marcaAnterior
+    let elegido = !anterior || marcaNueva > marcaAnterior || (marcaNueva === marcaAnterior
       && versionIntento(i) > versionIntento(anterior)) ? i : anterior
+    if (anterior && i.session_id && i.pregunta_id?.startsWith(`${i.session_id}:mq:`)) {
+      const answers = [...new Set([i.respuesta_dada ?? '', anterior.respuesta_dada ?? '', ...(i.respuestas_en_conflicto ?? []), ...(anterior.respuestas_en_conflicto ?? [])])].sort()
+      if (answers.length > 1) {
+        const first = i.ts < anterior.ts || i.ts === anterior.ts && (i.respuesta_dada ?? '') < (anterior.respuesta_dada ?? '') ? i : anterior
+        elegido = { ...first, resultado: 'revision', calificacion: 1, tipo_error: 'error_por_revisar', respuestas_en_conflicto: answers }
+      }
+    }
     porId.set(key, anterior && i.pregunta_id ? {
       ...elegido,
       pistas_usadas: Math.max(i.pistas_usadas, anterior.pistas_usadas),
@@ -419,6 +433,7 @@ export function combinarEstados(a: EstadoApp, b: EstadoApp): EstadoApp {
     conceptosVistos[id] = x && y ? unirVista(x, y) : (x ?? y)!
   }
   return { version: 1, corpus_version: CORPUS_VERSION, progreso,
+    ...(a.myqbankBlocks || b.myqbankBlocks ? { myqbankBlocks: mergeBlocks(a.myqbankBlocks, b.myqbankBlocks) } : {}),
     sesiones: [...porSesion.values()].sort((x, y) => x.inicio - y.inicio || compararTexto(x.id, y.id)),
     criterios, reanudable: unirReanudable(a, b),
     fieldUpdatedAt: { criterios: Math.max(marca(a, 'criterios'), marca(b, 'criterios')),
