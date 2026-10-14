@@ -1,0 +1,29 @@
+/* User-supplied ZIP palette. Values preserved; selectors and variables scoped to My Q Bank. */
+.mq-root[data-theme="dark"]{
+  --mq-bg:#0B0F10;--mq-bar:#11171A;--mq-surface:#13191C;--mq-surfaceStart:#1A2226;--mq-inset:#0E1315;--mq-chip:#1B2427;--mq-dim:#0F1417;
+  --mq-line:#25302F;--mq-line2:#32403E;--mq-line3:#1D2625;--mq-edge:#33423F;--mq-hover:#1D2927;--mq-hoverline:#4C6660;
+  --mq-text:#EEF4F1;--mq-text2:#D0DAD5;--mq-text3:#BAC7C0;--mq-muted:#A3B3AB;--mq-faint:#869790;--mq-arrow:#587169;
+  --mq-ok:#70D5BC;--mq-ok-ink:#8FE0C8;--mq-on-ok:#0C2C22;--mq-ok-tint:#4EBC9B2E;--mq-ok-soft:#70D5BC73;--mq-ok-why:#3C9C80;--mq-ring:#3C9C80;
+  --mq-bad:#F4A18B;--mq-bad-ink:#F6B5A3;--mq-on-bad:#43261E;--mq-bad-tint:#DB81652E;--mq-bad-soft:#F4A18B80;--mq-bad-why:#B06A55;
+  --mq-mark:#F4A18B;--mq-mark-ink:#F6B5A3;--mq-on-mark:#43261E;--mq-mark-tint:#DB81652B;
+  --mq-brand:#EEF4F1;--mq-sel:#18382F;--mq-pat:#122E27;--mq-pat-line:#2A5A4B;--mq-end-line:#7A4C3F;--mq-disabled:#1C2625;
+  --mq-on-accent:#0C2C22;--mq-action:linear-gradient(125deg,#91D7AD,#68CEB7);--mq-actionEdge:#9DE4C3;--mq-actionShine:#EEFFF288;--mq-actionShadow:#55D4A14D;
+  --mq-hl:#CDB75F;--mq-hl-ink:#1B1600;--mq-hl-edge:#E6D58A55;--mq-reflection:#E6FFF42E;--mq-shadow:#000000E0;--mq-markShadow:#00000080;
+  --mq-stage:radial-gradient(ellipse at 6% 12%,#2C7A6240,transparent 60%),radial-gradient(ellipse at 98% 80%,#D9795F38,transparent 52%),radial-gradient(ellipse at 52% -15%,#8A9A9420,transparent 55%),linear-gradient(145deg,#080B0C,#0F1514 50%,#181D1E);
+  --mq-vignette:#0000008C;
+  color-scheme:dark;
+}
+.mq-root[data-theme="light"]{
+  --mq-bg:#EFF6F1;--mq-bar:#FCFEFA;--mq-surface:#ECF6F0;--mq-surfaceStart:#FCFEFA;--mq-inset:#E4F0E8;--mq-chip:#E1EFE5;--mq-dim:#F2F8F0;
+  --mq-line:#CFDDD3;--mq-line2:#B9CFC2;--mq-line3:#DCE8E0;--mq-edge:#E2F0E5;--mq-hover:#E1EFE5;--mq-hoverline:#8FB0A0;
+  --mq-text:#15382F;--mq-text2:#2E5447;--mq-text3:#3F6354;--mq-muted:#49675A;--mq-faint:#5C7A6C;--mq-arrow:#9AB5A8;
+  --mq-ok:#0D756B;--mq-ok-ink:#0B5F57;--mq-on-ok:#FFFFFF;--mq-ok-tint:#88D6BF40;--mq-ok-soft:#0D756B66;--mq-ok-why:#88D6BF;--mq-ring:#88D6BF;
+  --mq-bad:#F19A86;--mq-bad-ink:#A8482F;--mq-on-bad:#4A2820;--mq-bad-tint:#F3A48D40;--mq-bad-soft:#F19A8699;--mq-bad-why:#F3A48D;
+  --mq-mark:#F19A86;--mq-mark-ink:#A8482F;--mq-on-mark:#4A2820;--mq-mark-tint:#F3A48D40;
+  --mq-brand:#15382F;--mq-sel:#DCEFE6;--mq-pat:#E1F2EA;--mq-pat-line:#A9D6C4;--mq-end-line:#E7B1A2;--mq-disabled:#DCE8E0;
+  --mq-on-accent:#FFFFFF;--mq-action:linear-gradient(125deg,#1B6A51,#0D756B);--mq-actionEdge:#166650;--mq-actionShine:#FFFFFF44;--mq-actionShadow:#167C6099;
+  --mq-hl:#EBD36F;--mq-hl-ink:#2B2300;--mq-hl-edge:#B8962E55;--mq-reflection:#FFFFFFDF;--mq-shadow:#1B584F55;--mq-markShadow:#174D432B;
+  --mq-stage:radial-gradient(ellipse at 5% 15%,#88D6BF73,transparent 64%),radial-gradient(ellipse at 98% 76%,#F3A48D80,transparent 54%),radial-gradient(ellipse at 52% -15%,#FFFFFFE8,transparent 55%),linear-gradient(145deg,#F2F8F0,#E1EFE5 52%,#CEE5DB);
+  --mq-vignette:#174D431A;
+  color-scheme:light;
+}

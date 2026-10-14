@@ -1,6 +1,14 @@
 # Acuerdo de trabajo de StepOneMelman
 
 - UI en español; preguntas y contenido médico en inglés. Examen: 21-dic-2026.
+- Actualización aprobada el 14-oct-2026 para la reedición My Q Bank: controles
+  nuevos en inglés como los ZIP; explicaciones, mecanismos y drills nuevos en
+  español; enunciados y opciones NBME en inglés. Fase 1 autorizada: tokens,
+  componentes, vista previa aislada y contratos. Entrada `preview/myqbank/`,
+  datos sintéticos, sin conectar progreso ni publicar cambios de base.
+  El dashboard futuro integra Progreso y un constructor NBME / Mehlman Concepts /
+  Mixed; Settings conserva metas y cálculos. Biblioteca se retira en la fase 3,
+  no de los recorridos de producción durante esta fase. Ver `docs/myqbank-phase-1/`.
 - Mejorar lo existente; no reconstruir. Melman consolida; AMBOSS y simulacros miden.
 - React 18, Vite 6, TypeScript; Workers Static Assets y API en `src/server/worker.ts`.
 - Worker incluye NBME, explicación y proxy del plan; revisar rutas reales.

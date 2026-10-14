@@ -1,0 +1,61 @@
+.mq-root {
+  --mq-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mq-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+  --mq-radius: 19px; --mq-control-radius: 11px; --mq-ease: cubic-bezier(.22,.61,.36,1);
+  --mq-card-shadow: 0 24px 40px -20px var(--mq-shadow), 0 7px 15px -10px var(--mq-shadow), inset 0 1px 0 var(--mq-reflection);
+  /* Opt-in aliases allow existing components to migrate one screen at a time. */
+  --bg: var(--mq-bg); --panel: var(--mq-surface); --panel-2: var(--mq-surfaceStart);
+  --texto: var(--mq-text); --texto-2: var(--mq-text2); --texto-3: var(--mq-muted);
+  --linea: var(--mq-line); --linea-suave: var(--mq-line3); --radio: var(--mq-radius);
+  --fuente: var(--mq-font); --mono: var(--mq-mono);
+  font-family: var(--mq-font); font-size: 16px; line-height: 1.5;
+  color: var(--mq-text); background: var(--mq-stage); min-height: 100dvh;
+  isolation: isolate; position: relative; -webkit-font-smoothing: antialiased;
+}
+.mq-root *, .mq-root *::before, .mq-root *::after { box-sizing: border-box; }
+.mq-root h1, .mq-root h2, .mq-root h3, .mq-root p { margin: 0; }
+.mq-root h1 { font-size: 24px; letter-spacing: -.7px; line-height: 1.25; }
+.mq-root h2 { font-size: 17px; letter-spacing: -.35px; line-height: 1.35; font-weight: 600; }
+.mq-root h3 { font-size: 14px; font-weight: 600; }
+.mq-root button, .mq-root select, .mq-root input { font: inherit; }
+.mq-root button { cursor: pointer; }
+.mq-root button:disabled { cursor: not-allowed; opacity: .5; }
+.mq-root :focus-visible { outline: 2px solid var(--mq-ok); outline-offset: 3px; }
+.mq-root a { color: var(--mq-ok-ink); }
+.mq-root button { transition: background-color .25s var(--mq-ease), border-color .25s var(--mq-ease), transform .25s var(--mq-ease); }
+.mq-brand { display: flex; gap: 10px; align-items: center; white-space: nowrap; }
+.mq-brand img { object-fit: contain; filter: drop-shadow(0 8px 8px var(--mq-markShadow)); }
+.mq-brand span { font-size: 23px; font-weight: 650; letter-spacing: -.9px; }
+.mq-card { min-width: 0; padding: 20px; border: 1px solid var(--mq-edge); border-radius: var(--mq-radius); background: linear-gradient(145deg, var(--mq-surfaceStart), var(--mq-surface)); box-shadow: var(--mq-card-shadow); }
+.mq-button { min-height: 44px; min-width: 44px; padding: 10px 15px; border-radius: var(--mq-control-radius); border: 1px solid var(--mq-line2); color: var(--mq-text2); background: transparent; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px !important; }
+.mq-button--primary { color: var(--mq-on-accent); background: var(--mq-action); border-color: var(--mq-actionEdge); box-shadow: 0 9px 18px -10px var(--mq-actionShadow), inset 0 1px 0 var(--mq-actionShine); font-weight: 600 !important; }
+.mq-button--danger { border-color: var(--mq-end-line); color: var(--mq-bad-ink); }
+.mq-button:not(:disabled):hover { transform: translateY(-1px); border-color: var(--mq-hoverline); }
+.mq-button--ghost:not(:disabled):hover { background: var(--mq-hover); }
+.mq-button[aria-pressed="true"] { background: var(--mq-sel); border-color: var(--mq-ok); color: var(--mq-ok-ink); }
+.mq-segmented { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--mq-line2); border-radius: 12px; }
+.mq-segmented button { flex: 1; min-width: 44px; min-height: 44px; padding: 8px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--mq-muted); font-size: 13px; font-weight: 600; }
+.mq-segmented button[aria-pressed="true"] { background: var(--mq-action); color: var(--mq-on-accent); }
+.mq-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--mq-line2); border-radius: 11px; color: var(--mq-text2); background: transparent; font-size: 13px !important; }
+.mq-chip[aria-pressed="true"] { background: var(--mq-sel); border-color: var(--mq-ok); color: var(--mq-text); }
+.mq-chip:not(:disabled):hover { border-color: var(--mq-hoverline); }
+.mq-progress { height: 7px; border-radius: 6px; background: var(--mq-line3); overflow: hidden; min-width: 24px; }
+.mq-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--mq-ok); }
+.mq-rings { width: 148px; height: 148px; position: relative; margin: 12px auto; flex-shrink: 0; }
+.mq-rings svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.mq-rings circle { fill: none; stroke-width: 7px; stroke-linecap: round; }
+.mq-ring-track { stroke: var(--mq-line3); }.mq-ring-outer { stroke: var(--mq-ok); }.mq-ring-inner { stroke: var(--mq-bad); }
+.mq-rings > div { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.mq-rings strong { font: 600 29px var(--mq-mono); }.mq-rings span { color: var(--mq-muted); font-size: 11px; }
+.mq-rings--compact { width: 88px; height: 88px; margin: 0 auto; }.mq-rings--compact strong { font-size: 19px; }
+.mq-tabs { display: flex; flex-direction: column; gap: 14px; min-height: 0; flex: 1; }
+.mq-tablist { display: flex; gap: 3px; padding: 4px; border: 1px solid var(--mq-line); border-radius: 13px; background: var(--mq-surface); overflow-x: auto; flex-shrink: 0; scrollbar-width: thin; }
+.mq-tablist button { flex: 1 0 auto; min-height: 44px; padding: 8px 11px; border: 0; border-radius: 9px; background: transparent; color: var(--mq-muted); font-size: 12px; font-weight: 600; }
+.mq-tablist button[aria-selected="true"] { color: var(--mq-text); background: var(--mq-sel); }
+.mq-tab-number { color: var(--mq-ok); margin-right: 7px; font: 600 10px var(--mq-mono); }
+.mq-tabpanel, .mq-single-section { min-height: 0; flex: 1; display: flex; flex-direction: column; }
+.mq-state { display: grid; justify-items: center; gap: 12px; padding: 30px 18px; text-align: center; color: var(--mq-muted); }
+.mq-state h2 { color: var(--mq-text); }.mq-state--error h2 { color: var(--mq-bad-ink); }
+.mq-loader { width: 28px; height: 28px; border: 3px solid var(--mq-line); border-top-color: var(--mq-ok); border-radius: 50%; animation: mq-spin .9s linear infinite; }
+@keyframes mq-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .mq-root *, .mq-root *::before, .mq-root *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } .mq-root button:hover { transform: none !important; } }

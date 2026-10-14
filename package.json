@@ -11,7 +11,10 @@
     "test": "vitest run --pool=forks --maxWorkers=1",
     "test:nube": "vitest run src/__tests__/sync.test.ts src/__tests__/estado-model.test.ts src/auth --pool=forks --maxWorkers=1",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "dev:myqbank": "vite --config vite.myqbank.config.ts",
+    "build:myqbank": "tsc -b && vite build --config vite.myqbank.config.ts",
+    "e2e:myqbank": "playwright test --config playwright.myqbank.config.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.116.0",

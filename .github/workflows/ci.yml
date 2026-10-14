@@ -21,6 +21,19 @@ jobs:
       - id: browser
         run: npx playwright install --with-deps chromium
       - run: npm run e2e
+      - name: Build isolated My Q Bank preview
+        run: npm run build:myqbank
+      - name: Verify My Q Bank preview
+        run: npm run e2e:myqbank
+      - name: My Q Bank preview and visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: myqbank-phase-1-preview
+          path: |
+            dist-myqbank/
+            test-results/myqbank/
+          retention-days: 14
       - name: Checkout visual baseline (synthetic fixtures only)
         if: always() && steps.browser.outcome == 'success'
         uses: actions/checkout@v4
