@@ -1,9 +1,10 @@
 import { chromium } from '@playwright/test'
 import { spawn } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
-const out='docs/myqbank-phases-2-4/after'
+const evidence=process.env.MYQBANK_EVIDENCE_DIR || 'docs/myqbank-phases-2-4'
+const out=`${evidence}/after`
 await mkdir(out,{recursive:true})
-await mkdir('docs/myqbank-phases-2-4/before',{recursive:true})
+await mkdir(`${evidence}/before`,{recursive:true})
 const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--config','e2e/arnes/vite.config.ts','--host','127.0.0.1','--port','5205'],{stdio:'pipe'})
 let serverLog=''
 server.stdout.on('data',data=>{serverLog+=data})
@@ -53,10 +54,10 @@ try {
     if(theme==='light'){
       await auth.goto(`${base}/?escena=abierto#ajustes`)
       await auth.getByRole('heading',{name:'Ajustes',exact:true}).waitFor()
-      await auth.screenshot({path:`docs/myqbank-phases-2-4/before/settings-${width}.png`,fullPage:true})
+      await auth.screenshot({path:`${evidence}/before/settings-${width}.png`,fullPage:true})
       await auth.goto(`${base}/?auth-scene=1`)
       await auth.getByRole('heading',{name:'Vuelve a tu estudio'}).waitFor()
-      await auth.screenshot({path:`docs/myqbank-phases-2-4/before/auth-${width}.png`,fullPage:true})
+      await auth.screenshot({path:`${evidence}/before/auth-${width}.png`,fullPage:true})
     }
     await auth.goto(`${base}/?auth-scene=1&workspace=myqbank`)
     await auth.getByRole('heading',{name:'Welcome back'}).waitFor()

@@ -11,7 +11,7 @@ import { HighlightText } from '../myqbank/HighlightText'
 import { AdaptiveExplanation, StudyHighlights, legacyHighlightSource } from '../myqbank/LegacyStudy'
 import './nbme.css'
 
-export interface LoadedFigure { assetId: string; alt: string; url: string }
+export interface LoadedFigure { assetId: string; alt: string; url: string; sha256?: string }
 
 /**
  * Presenta el enunciado importado: prosa en párrafos y, cuando la extracción
@@ -25,13 +25,13 @@ export function Enunciado({ texto, renderText = value => value }: { texto: strin
       : bloque.tipo === 'tabla'
         ? <div key={indice} className="nbme-lab-scroll nbme-matrix-scroll" tabIndex={0} role="region" aria-label="Tabla del enunciado">
           <table className="nbme-lab-tabla nbme-matrix">
-            <thead><tr>{bloque.columnas.map((columna, i) => <th key={i} scope="col">{columna}</th>)}</tr></thead>
+            <thead><tr>{bloque.columnas.map((columna, i) => <th key={i} scope="col">{renderText(columna, `table:${indice}:heading:${i}`)}</th>)}</tr></thead>
             <tbody>{bloque.filas.map((fila, i) => <tr key={i}>{fila.map((celda, j) => j === 0
               ? <th key={j} scope="row">{renderText(celda, `table:${indice}:${i}:${j}`)}</th> : <td key={j}>{renderText(celda, `table:${indice}:${i}:${j}`)}</td>)}</tr>)}</tbody>
           </table>
         </div>
       : <figure key={indice} className="nbme-lab">
-        <figcaption className="nbme-lab-encabezado">{bloque.encabezado}</figcaption>
+        <figcaption className="nbme-lab-encabezado">{renderText(bloque.encabezado, `lab:${indice}:caption`)}</figcaption>
         <div className="nbme-lab-scroll" tabIndex={0} role="region" aria-label="Laboratorio de la pregunta">
           <table className="nbme-lab-tabla">
             <tbody>
@@ -96,8 +96,14 @@ export function useQuestionFigures(question: NbmeQuestion | null, target: RefObj
         if (controller.signal.aborted) return
         urls = blobs.map(blob => URL.createObjectURL(blob))
         await Promise.all(urls.map(url => decodeFigure(url, controller.signal)))
+        const hashes = await Promise.all(blobs.map(async blob => {
+          try {
+            const hash = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())
+            return [...new Uint8Array(hash)].map(n => n.toString(16).padStart(2, '0')).join('')
+          } catch { return undefined }
+        }))
         if (controller.signal.aborted) return
-        setFigures(assets.map((figure, index) => ({ ...figure, url: urls[index] })))
+        setFigures(assets.map((figure, index) => ({ ...figure, url: urls[index], sha256: hashes[index] })))
         setLoadedIdentity(identity)
         setLoading(false)
       }).catch(() => {
@@ -302,7 +308,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
                       : 'Esta pregunta volverá durante la práctica. Puedes pausar cuando lo necesites.'}</p></div>
               {!feedback.conflict && <p className="nbme-respuesta"><b>Respuesta: {currentQuestion.answer}.</b> <span lang="en">{normalizarTexto(currentQuestion.options.find(option => option.id === currentQuestion.answer)?.text ?? '')}</span></p>}
               {reintentoTrasExplicacion && <p className="mini">Esta corrección tuvo la explicación previa. Se registra aparte de la primera vuelta.</p>}
-              {mq ? <AdaptiveExplanation source={currentQuestion}/> : <>{currentQuestion.objective && <div className="session-feedback-key"><h3>Objetivo del aprendizaje</h3><TextoFuente texto={currentQuestion.objective} /></div>}
+              {mq ? <AdaptiveExplanation source={currentQuestion} figures={figures.figures}/> : <>{currentQuestion.objective && <div className="session-feedback-key"><h3>Objetivo del aprendizaje</h3><TextoFuente texto={currentQuestion.objective} /></div>}
               {distractorElegido && <div className="nbme-distractor session-feedback-key"><h3>Por qué tu opción no responde</h3><b>{feedback.optionId}. <span lang="en">{normalizarTexto(currentQuestion.options.find(option => option.id === feedback.optionId)?.text ?? '')}</span></b><TextoFuente texto={distractorElegido} /></div>}
               {currentQuestion.explanation && currentQuestion.explanation !== currentQuestion.objective && <div><h3>Fundamento de la respuesta</h3><TextoFuente texto={currentQuestion.explanation} /></div>}
               {currentQuestion.options.some(option => option.id !== currentQuestion.answer && (!distractorElegido || option.id !== feedback.optionId) && currentQuestion.distractorExplanations?.[option.id]) && <details className="nbme-details"><summary>Por qué las otras opciones no</summary>

@@ -15,6 +15,6 @@ export function legacyHighlightSource(source: Concepto | NbmeQuestion): Highligh
     ? { material: 'concept', sourceId: source.concept_id, sourceRevision: versionPregunta(source), variantId: source.variante_id ?? '', editorialVersion: '' }
     : { material: 'nbme', sourceId: source.id, sourceRevision: source.revision, variantId: '', editorialVersion: '' }
 }
-export function AdaptiveExplanation({ source }: { source: Concepto | NbmeQuestion }) {
-  return <Explanation source={source} highlightSource={legacyHighlightSource(source)}/>
+export function AdaptiveExplanation({ source, figures }: { source: Concepto | NbmeQuestion; figures?: {assetId: string; sha256?: string}[] }) {
+  return <Explanation source={source} highlightSource={legacyHighlightSource(source)} figures={figures}/>
 }

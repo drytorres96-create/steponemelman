@@ -91,3 +91,25 @@ describe('durable highlight anchors', () => {
     expect(mergeAnnotation(deleted, { ...a, changedAt: 300 })).toEqual(deleted)
   })
 })
+
+// Mode changes preserve assistance per concept, without reclassifying unanswered items.
+it('does not infer previous explanations merely from a mode change', async () => {
+  const { createBlock, modeChangeEvidence, mergeBlock } = await import('./blocks')
+  const { myqbankConcepts } = await import('../../e2e/arnes/myqbank-fixture')
+  const entries = myqbankConcepts.slice(0,2).map(concept => ({kind:'concept' as const,id:concept.concept_id,revision:'qa',concept}))
+  const tutor = createBlock('mode-source',entries,'tutor',100)
+  expect(modeChangeEvidence(tutor,[]).assistedConceptIds).toEqual([])
+  expect(modeChangeEvidence(tutor,[entries[0].id]).assistedConceptIds).toEqual([entries[0].id])
+  const test = createBlock('mode-test',entries,'test',100)
+  expect(modeChangeEvidence(test,[entries[0].id]).assistedConceptIds).toEqual([])
+  expect(modeChangeEvidence({...test,completedAt:200},[entries[0].id]).assistedConceptIds).toEqual([entries[0].id])
+  const changed = {...test,...modeChangeEvidence(tutor,[entries[0].id])}
+  expect(mergeBlock(changed,test).assistedConceptIds).toEqual([entries[0].id])
+  expect(modeChangeEvidence(changed,[]).assistedConceptIds).toEqual([entries[0].id])
+  const closed = markBlock({...test,completedAt:200},'reviewed',0,true,201)
+  const navigated = patchBlock(closed,{cursor:1,paused:true},202)
+  expect(modeChangeEvidence(navigated,entries.map(e=>e.id)).assistedConceptIds).toEqual(entries.map(e=>e.id).sort())
+  const a = {...test,assistedConceptIds:[entries[0].id]}, b = {...test,assistedConceptIds:[entries[1].id]}
+  expect(mergeBlock(a,b)).toEqual(mergeBlock(b,a))
+  expect(parseBlocks({[test.id]:mergeBlock(a,b)})).not.toBeNull()
+})

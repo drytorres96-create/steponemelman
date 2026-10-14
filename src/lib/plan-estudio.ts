@@ -7,6 +7,7 @@ export const DIAS_ERROR_RECIENTE = 7
 const SEMANA = DIAS_ERROR_RECIENTE * 86_400_000
 
 type Progreso = Record<string, ProgresoConcepto>
+export type ConceptoPlan = Pick<Concepto, 'concept_id'> & { clasificacion: Pick<Concepto['clasificacion'], 'tipo_conocimiento' | 'dificultad'> }
 
 /** La sincronización puede traer intentos en otro orden: manda su fecha, no su posición. */
 export function ultimoIntento(p?: ProgresoConcepto): Intento | undefined {
@@ -24,13 +25,13 @@ export function limiteValido(limite: number): number {
   return Number.isFinite(limite) ? Math.max(0, Math.floor(limite)) : 0
 }
 
-export function conceptosUnicos(conceptos: Concepto[]): Concepto[] {
+export function conceptosUnicos<T extends Pick<Concepto, 'concept_id'>>(conceptos: T[]): T[] {
   return [...new Map(conceptos.map(c => [c.concept_id, c])).values()]
 }
 
 /** Orden editorial inicial; no presupone un grafo de prerrequisitos ni bloquea otros temas. */
-export function ordenarFundamentos(conceptos: Concepto[]): Concepto[] {
-  const nivel = (c: Concepto): number => {
+export function ordenarFundamentos<T extends ConceptoPlan>(conceptos: T[]): T[] {
+  const nivel = (c: ConceptoPlan): number => {
     switch (c.clasificacion.tipo_conocimiento) {
       case 'Definición': case 'Terminología': case 'Relación estructura-función': return 0
       case 'Mecanismo': case 'Relación causa-efecto': case 'Secuencia': return 1
@@ -42,14 +43,14 @@ export function ordenarFundamentos(conceptos: Concepto[]): Concepto[] {
     || a.clasificacion.dificultad - b.clasificacion.dificultad)
 }
 
-export function conceptosVencidos(conceptos: Concepto[], progreso: Progreso, ahora = Date.now()): Concepto[] {
+export function conceptosVencidos<T extends Pick<Concepto, 'concept_id'>>(conceptos: T[], progreso: Progreso, ahora = Date.now()): T[] {
   return conceptosUnicos(conceptos).filter(c => progreso[c.concept_id]?.intentos.length
     && estaVencido(progreso[c.concept_id], ahora))
     .sort((a, b) => prioridad(progreso[b.concept_id], ahora) - prioridad(progreso[a.concept_id], ahora))
 }
 
 /** Un fallo histórico deja de ser motivo de prioridad cuando el último intento es correcto. */
-export function erroresRecientesPendientes(conceptos: Concepto[], progreso: Progreso, ahora = Date.now()): Concepto[] {
+export function erroresRecientesPendientes<T extends Pick<Concepto, 'concept_id'>>(conceptos: T[], progreso: Progreso, ahora = Date.now()): T[] {
   return conceptosUnicos(conceptos).filter(c => {
     const i = ultimoIntentoResuelto(progreso[c.concept_id])
     return i && !intentoCorrecto(i) && i.ts <= ahora && i.ts >= ahora - SEMANA
@@ -60,8 +61,8 @@ export function erroresRecientesPendientes(conceptos: Concepto[], progreso: Prog
   })
 }
 
-export interface PlanDiario {
-  conceptos: Concepto[]
+export interface PlanDiario<T extends ConceptoPlan = Concepto> {
+  conceptos: T[]
   limite: number
   vencidos: number
   errores: number
@@ -85,7 +86,7 @@ export const TOPE_REPASO = 0.7
  * Cada revisión ocupa una plaza: al acumularse repaso disminuyen los conceptos nuevos.
  * Si todo lo visto está al día y no quedan nuevos, la sesión puede quedar vacía.
  */
-export function construirPlanDiario(conceptos: Concepto[], progreso: Progreso, limite: number, ahora = Date.now()): PlanDiario {
+export function construirPlanDiario<T extends ConceptoPlan>(conceptos: T[], progreso: Progreso, limite: number, ahora = Date.now()): PlanDiario<T> {
   const maximo = limiteValido(limite)
   const base = conceptosUnicos(conceptos)
   const vencidos = conceptosVencidos(base, progreso, ahora)

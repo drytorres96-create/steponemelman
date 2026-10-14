@@ -28,6 +28,33 @@
 
 ## Límites y autorización vigente
 
+- Actualización posterior del 14-oct-2026: MyQBank conserva controles y preguntas
+  NBME en inglés y explicaciones, mecanismos y drills nuevos en español. El usuario
+  confirmó conservar el encargo español de Claude después de compartir la lista de
+  diseño; esa confirmación sustituye el punto de contenido todo en inglés.
+  Desktop sin scroll de página, con scroll interno cuando sea necesario. Labs antes
+  de responder a la derecha, después debajo de la viñeta a la izquierda. Ocultar IDs
+  y etiquetas; resaltado directo al seleccionar y borrado al volver a seleccionar
+  o hacer clic. Tutor/Test puede cambiar durante estudio creando otro bloque sin
+  alterar el anterior. Una pasada visual agrupada en cinco ajustes y revisión móvil
+  y escritorio; conservar el tema claro y paleta carbón/jade/bosque/coral oscura.
+
+- El 14-oct-2026 el usuario autorizó comenzar la fase 5: cobertura editorial,
+  validación y publicación. Autorizó una segunda revisión por otro agente para
+  cada ítem, con fuentes y registro explícito como revisión por IA, sin atribuir
+  aprobación médica humana. Conservar la revisión independiente por ID y texto
+  exacto, los originales y el historial; no aprobar ítems con observaciones sin
+  resolver. La activación general requiere las comprobaciones de producto.
+
+- El 14-oct-2026 el usuario amplió el encargo a Claude Code para toda la redacción
+  editorial pendiente de NBME y Mehlman, variantes, fuentes, figuras y propuestas
+  de corrección. Codex conserva software, diseño, revisión independiente final,
+  integración y publicación. La asignación privada vigente está en `corpus_assets`,
+  `audits/myqbank/2026-10-14/claude-full/assignment.json`; sustituye al encargo de
+  100 NBME y preserva los 18 textos exactos del piloto revisados por IA. Consultar
+  esa asignación y las entregas antes de duplicar trabajo editorial. Preparar el
+  encargo no significa que Claude ya haya comenzado o que los textos estén publicados.
+
 - El 14-oct-2026 el usuario autorizó corregir la fase 1 e implementar las fases
   2, 3 y 4 consecutivamente. Esa autorización incluye sesiones persistentes,
   migración privada de anotaciones, dashboard real y estudio adaptativo con

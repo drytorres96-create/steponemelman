@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
 import { Interaccion, usaTextoLibre, type Resultado } from '../components/interacciones'
@@ -11,7 +11,7 @@ import { analizarColumnasOpciones, normalizarTexto, preguntaConLecturasDudosas }
 import { FigureViewer } from '../nbme/FigureViewer'
 import { Modal } from '../components/comunes'
 import { RecuperacionTrasFallo } from '../nbme/RecuperacionTrasFallo'
-import { Button, Card, Icon, Rings, StateMessage } from './components'
+import { Button, Card, Icon, Rings, Segmented, StateMessage } from './components'
 import { blockOpportunity, blockTime, timeBlock, draftBlock, markBlock, patchBlock, type StudyBlock } from './blocks'
 import { crearUUID } from '../store/model'
 import { nbmePosition } from './selection'
@@ -21,15 +21,16 @@ import { Highlighter, HighlightText, type HighlightSource } from './HighlightTex
 import { LabReference } from './LabReference'
 import { useAnnotations } from './AnnotationProvider'
 
-export function Study({ block, onExit, onRetry }: { block: StudyBlock; onExit: () => void; onRetry: (block: StudyBlock) => Promise<void> }) {
-  return <Highlighter key={block.id} selectionKey={`${block.cursor}`}><StudyBody block={block} onExit={onExit} onRetry={onRetry}/></Highlighter>
+export function Study({ block, onExit, onRetry, onModeChange, busy = false }: { block: StudyBlock; onExit: () => void; onRetry: (block: StudyBlock) => Promise<void>; onModeChange: (block: StudyBlock, mode: StudyBlock['mode']) => Promise<void>; busy?: boolean }) {
+  return <Highlighter key={block.id} selectionKey={`${block.cursor}`}><StudyBody block={block} onExit={onExit} onRetry={onRetry} onModeChange={onModeChange} busy={busy}/></Highlighter>
 }
-function StudyBody({ block, onExit, onRetry }: { block: StudyBlock; onExit: () => void; onRetry: (block: StudyBlock) => Promise<void> }) {
+function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { block: StudyBlock; onExit: () => void; onRetry: (block: StudyBlock) => Promise<void>; onModeChange: (block: StudyBlock, mode: StudyBlock['mode']) => Promise<void>; busy?: boolean }) {
   const app = useApp(), nbme = useNbme(), annotations = useAnnotations()
   const latestApp = useRef(app); latestApp.current = app
   const [rail, setRail] = useState(true), [labs, setLabs] = useState(false), [endOpen, setEndOpen] = useState(false)
   const [expanded, setExpanded] = useState<LoadedFigure | null>(null), [grading, setGrading] = useState(false), [message, setMessage] = useState('')
   const [recovery, setRecovery] = useState(false), [recovering, setRecovering] = useState(false)
+  const endTitle = useId()
   const dialog = useRef<HTMLDialogElement>(null), figureRoot = useRef<HTMLDivElement>(null), heading = useRef<HTMLHeadingElement>(null)
   const feedback = useRef<HTMLDivElement>(null)
   const submitLock = useRef(false), current = useRef(block); current.current = block
@@ -44,6 +45,7 @@ function StudyBody({ block, onExit, onRetry }: { block: StudyBlock; onExit: () =
   const conceptAttempt = concept ? app.estado.progreso[concept.concept_id]?.intentos.find(i => i.session_id === block.id && i.pregunta_id === opportunity) : undefined
   const questionAttempt = entry.kind === 'nbme' ? nbme.state.attempts[`${block.id}:${qPosition}`] : undefined
   const submitted = !!conceptAttempt || !!questionAttempt, closed = block.completedAt !== undefined
+  const labsLeft = submitted || closed
   const reveal = canReveal(block.mode, submitted, closed)
   const result: Resultado | null = conceptAttempt ? { veredicto: conceptAttempt.resultado ?? 'revision', tipoError: conceptAttempt.tipo_error,
     recuperacionActiva: conceptAttempt.recuperacion_activa, respuestaDada: conceptAttempt.respuesta_dada ?? '' } : null
@@ -64,7 +66,13 @@ function StudyBody({ block, onExit, onRetry }: { block: StudyBlock; onExit: () =
   const correctCount = states.filter(s => s === 'correct').length
   const ready = question?.status === 'ready' && !preguntaConLecturasDudosas(question) && nbme.currentSession?.id === block.id
     && nbme.sessionView?.current?.position === qPosition && !!nbme.catalog?.questions.some(q => q.id === entry.id && q.status === 'ready')
-  const canSubmitNbme = ready && !closed && !submitted && !!nbme.selectedOption && !nbme.busy && (!question?.figureRequired || figures.ready)
+  const canSubmitNbme = !busy && ready && !closed && !submitted && !!nbme.selectedOption && !nbme.busy && (!question?.figureRequired || figures.ready)
+  // Record exposure when feedback is revealed, including map/arrow navigation and reloads.
+  useEffect(() => {
+    if (submitted && reveal && !block.reviewed[block.cursor]?.value) {
+      latestApp.current.guardarBloque(markBlock(current.current, 'reviewed', block.cursor, true))
+    }
+  }, [opportunity, submitted, reveal, block.reviewed[block.cursor]?.value])
   useEffect(() => { alive.current = true; const controller = new AbortController(); abort.current = controller; return () => { alive.current = false; controller.abort() } }, [])
   useEffect(() => { if (endOpen) dialog.current?.showModal(); else dialog.current?.close() }, [endOpen])
   useEffect(() => {
@@ -98,7 +106,7 @@ function StudyBody({ block, onExit, onRetry }: { block: StudyBlock; onExit: () =
   }, [closed, nbme.currentSession?.id, nbme.currentSession?.completedAt])
   const save = app.guardarBloque
   function move(position: number) {
-    if (grading || recovering) return
+    if (grading || recovering || busy) return
     save(patchBlock(current.current, { cursor: position }))
     if (block.entries[position].kind === 'nbme') nbme.goToQuestion(nbmePosition(block.entries, position))
   }
@@ -118,7 +126,7 @@ function StudyBody({ block, onExit, onRetry }: { block: StudyBlock; onExit: () =
       resultado: r.veredicto, interaccion: concept.interaccion.recomendada, recuperacion_activa: r.recuperacionActiva,
       pistas_usadas: 0, ms: existing?.ms ?? duration, tipo_error: r.tipoError, confianza_declarada: null, respuesta_dada: r.respuestaDada,
       pregunta_id: opportunity, pregunta_version: entry.revision, evaluador_version: EVALUADOR_VERSION, fuente_consultada: false,
-      explicacion_previa: !!block.retryOf, modo: block.mode === 'test' ? 'examen' : 'repaso',
+      explicacion_previa: !!block.retryOf || !!block.assistedConceptIds?.includes(concept.concept_id), modo: block.mode === 'test' ? 'examen' : 'repaso',
       tipo_evidencia: concept.interaccion.recomendada === 'caso_clinico' ? 'aplicacion' : r.recuperacionActiva ? 'recuerdo' : 'discriminacion',
       ...(concept.variante_id ? { variante_id: concept.variante_id, primera_presentacion: !app.progresoDe(concept.concept_id).intentos.some(t => t.variante_id === concept.variante_id) } : {}),
       ...(ai ? { calificado_por_ia: true } : {}), ...(existing && !pending ? { calificacion_actualizada_en: Date.now() } : {}) }
@@ -144,25 +152,26 @@ function StudyBody({ block, onExit, onRetry }: { block: StudyBlock; onExit: () =
   }
   return <>
     {nbme.error && entry.kind === 'nbme' && <p role="alert">{nbme.error}</p>}
-    <div className="mq-study-tools"><div className="mq-inline"><Button aria-label="Toggle question navigator" aria-pressed={rail} onClick={() => setRail(v => !v)}><Icon name="rail"/></Button><span className="mq-mode-label">{block.mode === 'test' ? 'Test' : 'Tutor'}</span><span className="mq-small mq-muted">{closed ? 'Block complete' : `${answered} answers saved`}</span></div>
-      <div className="mq-inline"><Button aria-label="Previous question" disabled={!block.cursor || grading || recovering} onClick={() => move(block.cursor - 1)}><Icon name="back"/></Button><span className="mq-position">{block.cursor + 1} / {block.entries.length}</span><Button aria-label="Next question" disabled={block.cursor === block.entries.length - 1 || grading || recovering} onClick={() => move(block.cursor + 1)}><Icon name="arrow"/></Button></div>
-      <div className="mq-inline"><Button aria-pressed={!!block.flags[block.cursor]?.value} onClick={() => save(markBlock(current.current, 'flags', block.cursor, !block.flags[block.cursor]?.value))}><Icon name="flag"/>Flag</Button><Button aria-expanded={labs} onClick={() => setLabs(v => !v)}><Icon name="labs"/>Labs</Button><Button disabled={grading || recovering} onClick={pause}>{closed ? 'Dashboard' : 'Pause'}</Button><Button variant="danger" disabled={closed || grading || recovering} onClick={() => setEndOpen(true)}>End block</Button></div>
+    <div className="mq-study-tools"><div className="mq-inline"><Button aria-label="Toggle question navigator" aria-pressed={rail} onClick={() => setRail(v => !v)}><Icon name="rail"/></Button><Segmented label="Study mode" value={block.mode} disabled={busy || grading || recovering} options={[{value:'tutor',label:'Tutor'},{value:'test',label:'Test'}]} onChange={mode => { if (mode !== block.mode) { const timed = timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()); save(timed); void onModeChange(timed, mode) } }}/><span className="mq-mode-help">Changing mode starts a new block.</span><span className="mq-small mq-muted">{closed ? 'Block complete' : `${answered} answers saved`}</span></div>
+      <div className="mq-inline"><Button aria-label="Previous question" disabled={!block.cursor || grading || recovering || busy} onClick={() => move(block.cursor - 1)}><Icon name="back"/></Button><span className="mq-position">{block.cursor + 1} / {block.entries.length}</span><Button aria-label="Next question" disabled={block.cursor === block.entries.length - 1 || grading || recovering || busy} onClick={() => move(block.cursor + 1)}><Icon name="arrow"/></Button></div>
+      <div className="mq-inline"><Button aria-pressed={!!block.flags[block.cursor]?.value} onClick={() => save(markBlock(current.current, 'flags', block.cursor, !block.flags[block.cursor]?.value))}><Icon name="flag"/>Flag</Button><Button aria-expanded={labs} onClick={() => setLabs(v => !v)}><Icon name="labs"/>Labs</Button><Button disabled={grading || recovering || busy} onClick={pause}>{closed ? 'Dashboard' : 'Pause'}</Button><Button variant="danger" disabled={closed || grading || recovering || busy} onClick={() => setEndOpen(true)}>End block</Button></div>
     </div>
-    <main id="mq-main" tabIndex={-1} className={`mq-study ${rail ? '' : 'mq-study--no-rail'} ${reveal ? 'mq-study--revealed' : ''} ${labs && !reveal ? 'mq-study--labs' : ''}`}>
+    <main id="mq-main" tabIndex={-1} className={`mq-study ${rail ? '' : 'mq-study--no-rail'} ${reveal ? 'mq-study--revealed' : ''} ${labs && !labsLeft ? 'mq-study--labs' : ''}`}>
       {rail && <Card className="mq-rail" aria-label="Question navigator"><Rings used={answered} total={block.entries.length} correct={block.mode === 'test' && !closed ? null : correctCount} evaluated={evaluated} compact/><p className="mq-small mq-muted">{block.mode === 'test' && !closed ? 'Answers saved' : `${correctCount} correct · ${states.filter(s => s === 'pending').length} pending`}</p><details className="mq-mobile-map"><summary>Question map</summary></details>
-        <div className="mq-question-grid">{states.map((state, i) => <button type="button" key={i} className={`mq-question-number mq-question-number--${state}`} aria-current={i === block.cursor ? 'step' : undefined} aria-label={`Question ${i + 1}, ${state}${block.flags[i]?.value ? ', flagged' : ''}`} disabled={grading || recovering} onClick={() => move(i)}>{i + 1}{block.flags[i]?.value && <span aria-hidden="true">⚑</span>}</button>)}</div>
+        <div className="mq-question-grid">{states.map((state, i) => <button type="button" key={i} className={`mq-question-number mq-question-number--${state}`} aria-current={i === block.cursor ? 'step' : undefined} aria-label={`Question ${i + 1}, ${state}${block.flags[i]?.value ? ', flagged' : ''}`} disabled={grading || recovering || busy} onClick={() => move(i)}>{i + 1}{block.flags[i]?.value && <span aria-hidden="true">⚑</span>}</button>)}</div>
       </Card>}
-      <div className="mq-question-pane">{closed && <div className="mq-complete" role="status"><strong>Block complete</strong><span>{correctCount} / {evaluated} graded correct · {block.entries.length - answered} unanswered · {states.filter(s => s === 'pending').length} pending</span><Button onClick={() => void onRetry(block)}>Practice again</Button></div>}
-        <Card className="mq-stem"><div className="mq-heading"><span className="mq-eyebrow">{entry.kind === 'nbme' ? 'NBME' : 'MEHLMAN CONCEPT'}</span><span>{entry.id}</span></div><h1 ref={heading} tabIndex={-1}>Question {block.cursor + 1}</h1>
+      <div className="mq-question-pane">{closed && <div className="mq-complete" role="status"><strong>Block complete</strong><span>{correctCount} / {evaluated} graded correct · {block.entries.length - answered} unanswered · {states.filter(s => s === 'pending').length} pending</span><Button aria-label="Practice again" title="Practice again" disabled={busy} onClick={() => void onRetry(block)}><Icon name="retry"/></Button></div>}
+        <Card className="mq-stem"><h1 ref={heading} tabIndex={-1}>Question {block.cursor + 1}</h1>
           {concept ? <><p><HighlightText text={concept.evaluacion.pregunta} source={source} region="stem"/></p>{concept.contexto && <p><HighlightText text={concept.contexto} source={source} region="context"/></p>}</>
             : question ? <Enunciado texto={columns?.enunciado ?? question.stem} renderText={(text, region) => <HighlightText text={text} source={source} region={`stem:${region}`}/>}/>
               : <StateMessage state="error" title="Question unavailable" action={<Button onClick={() => void nbme.retryQuestionLoad()}>Retry</Button>}>Your saved place and answers are preserved.</StateMessage>}
           {!!question?.figures.length && <div ref={figureRoot} className="nbme-question-images">{(figures.waiting || figures.loading) && <p role="status">Loading figure…</p>}{figures.error && <p role="alert">Figure unavailable. <Button onClick={figures.retry}>Retry figure</Button></p>}{figures.figures.map(f => <Button key={f.assetId} className="nbme-image-button" onClick={() => setExpanded(f)} aria-label={`Expand figure: ${f.alt}`}><img src={f.url} alt={f.alt || 'Question figure'}/></Button>)}</div>}
         </Card>
-        {concept && <div className="mq-concept-interaction"><Interaccion key={opportunity} c={concept} semilla={opportunity} bloqueado={submitted || closed || grading} resultado={result} ocultarFeedback={!reveal}
+        {labs && labsLeft && <LabReference source={source}/>}
+        {concept && <div className="mq-concept-interaction"><Interaccion key={opportunity} c={concept} semilla={opportunity} bloqueado={submitted || closed || grading || busy} resultado={result} ocultarFeedback={!reveal}
           draft={block.drafts[block.cursor]?.value} onDraft={value => save(draftBlock(current.current, block.cursor, value))} english renderText={(text, region) => <HighlightText text={text} source={source} region={region}/>} onResponder={r => void submitConcept(r)}/></div>}
         {question && <form onSubmit={e => { e.preventDefault(); if (canSubmitNbme) { const timed = timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()); nbme.checkAnswer(blockTime(timed, block.cursor)); save(markBlock(timed, 'skipped', block.cursor, false)) } }}>
-          <fieldset className="mq-options" disabled={submitted || closed || !ready || nbme.busy}><legend className="mq-sr-only">Choose your answer</legend>{question.options.map(option => {
+          <fieldset className="mq-options" disabled={submitted || closed || !ready || nbme.busy || busy}><legend className="mq-sr-only">Choose your answer</legend>{question.options.map(option => {
             const chosen = (questionAttempt?.optionId ?? nbme.selectedOption) === option.id
             const state = reveal && !uncertain && option.id === question.answer ? 'correct' : reveal && !uncertain && chosen ? 'incorrect' : chosen ? 'selected' : ''
             return <label className={`mq-option mq-option--${state}`} key={option.id}><input type="radio" name={opportunity} checked={chosen} onChange={() => nbme.selectAnswer(option.id)}/><span className="mq-letter">{option.id}</span><span lang="en"><HighlightText text={columns ? columns.columnas.map((c, i) => `${c}: ${columns.filas[option.id][i]}`).join(' · ') : normalizarTexto(option.text)} source={source} region={`option:${option.id}`}/></span>{state === 'correct' && <small>Correct answer</small>}{state === 'incorrect' && <small>Your answer</small>}</label>
@@ -171,20 +180,20 @@ function StudyBody({ block, onExit, onRetry }: { block: StudyBlock; onExit: () =
         {submitted && !reveal && <div className="mq-saved" role="status"><Icon name="check"/><div><strong>Answer saved</strong><p>Results appear when you end the block.</p></div></div>}
         {!submitted && closed && <p role="status">Not answered · no grade recorded.</p>}
         {grading && <p role="status">Answer saved · checking the response…</p>}{message && reveal && <p role="status">{message}</p>}
-        <div className="mq-answer-actions"><Button disabled={grading || recovering} variant={submitted ? 'primary' : 'ghost'} onClick={next}>{block.cursor === block.entries.length - 1 ? closed ? 'Last question' : 'Finish block' : submitted ? 'Next question' : closed ? 'Next question' : 'Skip for now'}<Icon name="arrow"/></Button></div>
-        <p className="mq-small mq-muted" role="status">{app.sincronizacion.mensaje} · {nbme.storageWarning ?? nbme.syncStatus.message}</p>
+        <div className="mq-answer-actions"><Button disabled={grading || recovering || busy} variant={submitted ? 'primary' : 'ghost'} onClick={next}>{block.cursor === block.entries.length - 1 ? closed ? 'Last question' : 'Finish block' : submitted ? 'Next question' : closed ? 'Next question' : 'Skip for now'}<Icon name="arrow"/></Button></div>
+        <p className="mq-small mq-muted" role="status">{app.sincronizacion.estado === 'error' || nbme.syncStatus.state === 'error' || nbme.storageWarning ? 'Sync needs attention. Keep this page open and retry in Settings.' : app.sincronizacion.estado === 'sincronizado' && nbme.syncStatus.state === 'synced' ? 'Progress synced' : 'Saving progress…'}</p>
         <p className="mq-small mq-muted">{annotations.status} <Button onClick={() => void annotations.sync()}>Sync annotations</Button></p>
       </div>
-      {labs && !reveal && <aside className="mq-labs-pane"><LabReference/></aside>}
+      {labs && !labsLeft && <aside className="mq-labs-pane"><LabReference source={source}/></aside>}
       {reveal && <aside className="mq-explanation-pane" aria-label="Explanation"><div ref={feedback} tabIndex={-1} role="status" className={`mq-result ${uncertain ? '' : correct ? 'mq-result--correct' : 'mq-result--incorrect'}`}><Icon name={correct ? 'check' : 'close'}/><strong>{uncertain ? 'Answer pending review' : correct ? 'Correct' : 'Incorrect'}</strong></div>
         {uncertain && conceptAttempt?.respuestas_en_conflicto && <p>Different answers were saved on two devices. This item remains ungraded; use Practice again after ending the block.</p>}
         {uncertain && concept && result && !conceptAttempt?.respuestas_en_conflicto && usaTextoLibre(concept) && <Button disabled={grading} onClick={() => void submitConcept(result)}>Check pending answer</Button>}
-        {(concept || question) && <Explanation source={concept ?? question!} highlightSource={source}/>}
+        {(concept || question) && <Explanation source={concept ?? question!} highlightSource={source} figures={figures.figures}/>}
         {question && questionAttempt && !questionAttempt.correct && !questionAttempt.conflict && <><Button aria-expanded={recovery} onClick={() => setRecovery(v => !v)}>Guided recovery</Button>{recovery && <RecuperacionTrasFallo pregunta={question} intento={questionAttempt} onActividad={setRecovering} onSiguiente={next}/>}</>}
-        {labs && <LabReference/>}
+        <div className="mq-explanation-actions"><Button variant="primary" disabled={grading || recovering || busy} onClick={closed && block.cursor === block.entries.length - 1 ? onExit : next}>{block.cursor === block.entries.length - 1 ? closed ? 'Back to dashboard' : 'Finish block' : 'Next question'}<Icon name="arrow"/></Button></div>
       </aside>}
     </main>
-    <dialog className="mq-dialog" ref={dialog} onCancel={() => setEndOpen(false)} onClose={() => setEndOpen(false)}><h2>End this block?</h2><p>{answered} of {block.entries.length} answered. Unanswered items remain ungraded.</p><div className="mq-inline"><Button onClick={() => setEndOpen(false)}>Keep studying</Button><Button variant="primary" onClick={() => { save(patchBlock(current.current, { completedAt: Date.now(), paused: true })); if (nbme.currentSession?.id === block.id) nbme.completeSession(); setEndOpen(false) }}>End and review</Button></div></dialog>
+    <dialog className="mq-dialog" aria-labelledby={endTitle} ref={dialog} onCancel={() => setEndOpen(false)} onClose={() => setEndOpen(false)}><h2 id={endTitle}>End this block?</h2><p>{answered} of {block.entries.length} answered. Unanswered items remain ungraded.</p><div className="mq-inline"><Button onClick={() => setEndOpen(false)}>Keep studying</Button><Button variant="primary" onClick={() => { save(patchBlock(current.current, { completedAt: Date.now(), paused: true })); if (nbme.currentSession?.id === block.id) nbme.completeSession(); setEndOpen(false) }}>End and review</Button></div></dialog>
     {expanded && <Modal titulo="Question figure" onCerrar={() => setExpanded(null)} ancho={1100}><FigureViewer url={expanded.url} alt={expanded.alt}/></Modal>}
   </>
 }

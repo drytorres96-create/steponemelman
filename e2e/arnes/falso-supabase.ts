@@ -1,10 +1,12 @@
 import { parseNbmeState } from '../../src/nbme/model'
 import { estadoNbmeReal, NBME_REAL_TOKEN, NBME_REAL_USER } from './nbme-real-fixture'
+import { myqbankConcepts } from './myqbank-fixture'
 
 /** Synthetic in-memory remote progress. No network/database client is imported here. */
 const parametros = new URL(location.href).searchParams
 const conProveedorReal = parametros.get('proveedor') === 'nbme-real'
 const annotations = new Map<string, any>(JSON.parse(localStorage.getItem('qa-myqbank-annotations') ?? '[]'))
+declare global { interface Window { __qaEditorialAssets?: Record<string, unknown>; __qaEditorialDelay?: Record<string, number>; __qaCatalogFailure?: boolean } }
 let row = { user_id: NBME_REAL_USER, state: estadoNbmeReal(), revision: 1,
   generation: 'synthetic-nbme-generation', updated_at: new Date().toISOString() }
 export const supabase = {
@@ -13,7 +15,14 @@ export const supabase = {
     : parametros.get('ia') === '1' ? { access_token: NBME_REAL_TOKEN, user: { id: 'QA-user' } } : null }, error: null }) },
   from(table: string) {
     if (table === 'myqbank_annotations') return { select: () => ({ eq: () => ({ order: () => ({ range: async (start: number, end: number) => ({ data: [...annotations.values()].slice(start,end+1), error: null }) }) }) }) }
-    if (table === 'corpus_assets' || table === 'nbme_assets') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data:null,error:null }) }) }) }
+    if (table === 'corpus_assets' || table === 'nbme_assets') return { select: () => ({ eq: (_field: string, path: string) => ({ maybeSingle: async () => {
+      const payload = structuredClone(window.__qaEditorialAssets?.[path] ?? null)
+      if (window.__qaEditorialDelay?.[path]) await new Promise(resolve => setTimeout(resolve, window.__qaEditorialDelay![path]))
+      if (path.startsWith('myqbank/explanations/')) return {data:payload ? {payload} : null,error:null}
+      if (window.__qaCatalogFailure) return {data:null,error: new Error('Synthetic unavailable catalog')}
+      return ({
+      data: table === 'corpus_assets' && path === 'myqbank/catalogs/1.0.5.json'
+        ? {payload:{schemaVersion:1,corpusVersion:'1.0.5',items:myqbankConcepts.map(({concept_id,objetivo,clasificacion,calidad})=>({concept_id,objetivo,clasificacion,calidad}))}} : null,error:null }) } }) }) }
     if (!conProveedorReal || table !== 'nbme_state') throw new Error('Only synthetic nbme_state is available in this harness.')
     return { select: () => ({ eq: (_field: string, userId: string) => ({ maybeSingle: async () => ({
       data: userId === NBME_REAL_USER ? structuredClone(row) : null, error: null,
