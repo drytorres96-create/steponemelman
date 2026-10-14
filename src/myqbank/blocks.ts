@@ -23,10 +23,13 @@ export const StudyBlockZ = z.object({
   drafts: z.record(z.object({ value: InteractionDraftZ, changedAt: stamp })),
   skipped: z.record(mark), flags: z.record(mark), reviewed: z.record(mark),
   retryOf: id.optional(),
+  modeChangedFrom: id.optional(),
+  assistedConceptIds: z.array(id).max(80).optional(),
   timeMs: z.record(z.record(stamp.max(3_600_000))).optional(),
 }).superRefine((b, ctx) => {
   if (b.cursor >= b.entries.length || new Set(b.entries.map(e => `${e.kind}:${e.id}`)).size !== b.entries.length
     || b.entries.some(e => e.kind === 'concept' && e.id !== e.concept.concept_id)
+    || b.assistedConceptIds?.some(id => !b.entries.some(e => e.kind === 'concept' && e.id === id))
     || b.completedAt !== undefined && b.completedAt < b.createdAt
     || ['drafts', 'skipped', 'flags', 'reviewed', 'timeMs'].some(field => Object.keys(b[field as 'flags'] ?? {}).some(k => !/^\d{1,2}$/.test(k) || Number(k) >= b.entries.length))) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid block identity or position' })
@@ -49,9 +52,12 @@ function mergeMap<T extends { changedAt: number }>(a: Record<string, T>, b: Reco
 /** Immutable presentation and mode; independent per-position clocks avoid losing another tab's draft. */
 export function mergeBlock(a: StudyBlock, b: StudyBlock): StudyBlock {
   if (a.id !== b.id || a.createdAt !== b.createdAt || a.mode !== b.mode || stable(a.entries) !== stable(b.entries)) throw new Error('Incompatible saved block')
+  if (a.modeChangedFrom && b.modeChangedFrom && a.modeChangedFrom !== b.modeChangedFrom) throw new Error('Incompatible mode change origin')
   const primary = a.changedAt > b.changedAt || a.changedAt === b.changedAt && stable(a) >= stable(b) ? a : b
   return { ...primary, drafts: mergeMap(a.drafts, b.drafts), skipped: mergeMap(a.skipped, b.skipped),
     flags: mergeMap(a.flags, b.flags), reviewed: mergeMap(a.reviewed, b.reviewed),
+    ...(a.modeChangedFrom || b.modeChangedFrom ? { modeChangedFrom: a.modeChangedFrom ?? b.modeChangedFrom } : {}),
+    ...(a.assistedConceptIds || b.assistedConceptIds ? { assistedConceptIds: [...new Set([...(a.assistedConceptIds ?? []), ...(b.assistedConceptIds ?? [])])].sort() } : {}),
     ...(a.timeMs || b.timeMs ? { timeMs: Object.fromEntries([...new Set([...Object.keys(a.timeMs ?? {}), ...Object.keys(b.timeMs ?? {})])].sort().map(position => [position,
       Object.fromEntries([...new Set([...Object.keys(a.timeMs?.[position] ?? {}), ...Object.keys(b.timeMs?.[position] ?? {})])].sort().map(run => [run, Math.max(a.timeMs?.[position]?.[run] ?? 0, b.timeMs?.[position]?.[run] ?? 0)]))])) } : {}),
     ...(a.completedAt !== undefined || b.completedAt !== undefined ? { completedAt: Math.max(a.completedAt ?? 0, b.completedAt ?? 0), paused: true } : {}),
@@ -65,6 +71,17 @@ export function createBlock(id: string, entries: BlockEntry[], mode: StudyBlock[
     cursor: 0, changedAt: now, paused: false, drafts: {}, skipped: {}, flags: {}, reviewed: {}, ...(retryOf ? { retryOf } : {}) })
 }
 export function blockOpportunity(blockId: string, position: number): string { return `${blockId}:mq:${position}` }
+/** Changing mode is a new block, not evidence that every previous explanation was seen. */
+export function modeChangeEvidence(block: StudyBlock, answeredConceptIds: string[]) {
+  const inherited = block.assistedConceptIds ?? []
+  const revealed = answeredConceptIds.filter(id => {
+    const position = block.entries.findIndex(e => e.kind === 'concept' && e.id === id)
+    return block.mode === 'tutor' || block.completedAt !== undefined && (block.cursor === position || block.reviewed[position]?.value)
+  })
+  const retry = block.retryOf ? block.entries.filter(e => e.kind === 'concept').map(e => e.id) : []
+  return { modeChangedFrom: block.id, assistedConceptIds: [...new Set([...inherited, ...revealed, ...retry])]
+    .filter(id => block.entries.some(e => e.kind === 'concept' && e.id === id)).sort() }
+}
 export function patchBlock(block: StudyBlock, patch: Partial<Pick<StudyBlock, 'cursor' | 'paused' | 'completedAt' | 'archivedAt'>>, now = Date.now()): StudyBlock {
   return StudyBlockZ.parse({ ...block, ...patch, changedAt: Math.max(now, block.changedAt + 1) })
 }

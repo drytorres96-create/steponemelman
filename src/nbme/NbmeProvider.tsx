@@ -44,7 +44,7 @@ interface NbmeContextValue {
    * trajo de la red hace menos de diez minutos: las cajas abren una sesión por
    * pregunta y no tienen que esperar una descarga entera entre una y la siguiente.
    */
-  startSession(refs: NbmeQuestionRef[], options?: { id?: string; mode?: 'tutor' | 'test'; title?: string; budgetMinutes?: 10 | 20 | 30 | null; reuseRecentCatalog?: boolean }): Promise<boolean>
+  startSession(refs: NbmeQuestionRef[], options?: { id?: string; mode?: 'tutor' | 'test'; title?: string; budgetMinutes?: 10 | 20 | 30 | null; reuseRecentCatalog?: boolean; pausePrevious?: boolean }): Promise<boolean>
   goToQuestion(position: number): void
   setEngaged(engaged: boolean): void
   markPosition(position: number, field: 'flags' | 'skipped', value: boolean): void
@@ -490,7 +490,7 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     }
   }, [persist, syncNow])
 
-  const startSession = useCallback(async (refs: NbmeQuestionRef[], options: { id?: string; mode?: 'tutor' | 'test'; title?: string; budgetMinutes?: 10 | 20 | 30 | null; reuseRecentCatalog?: boolean } = {}): Promise<boolean> => {
+  const startSession = useCallback(async (refs: NbmeQuestionRef[], options: { id?: string; mode?: 'tutor' | 'test'; title?: string; budgetMinutes?: 10 | 20 | 30 | null; reuseRecentCatalog?: boolean; pausePrevious?: boolean } = {}): Promise<boolean> => {
     if (actionLock.current || !engineRef.current || !catalog) return false
     if (!refs.length || refs.length > 80 || new Set(refs.map(questionRefKey)).size !== refs.length
       || refs.some(ref => !catalog.questions.some(q => q.status === 'ready' && questionRefKey(q) === questionRefKey(ref)))) {
@@ -517,7 +517,8 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       if (!mounted.current || epoch !== aliveEpoch.current) return false
       const id = options.id ?? crearUUID()
       flushTime()
-      edit(previous => startNbmeSession(previous, { id, title: options.title || 'Preguntas de aplicación', refs,
+      edit(previous => startNbmeSession(options.pausePrevious && previous.activeSessionId
+        ? updateNbmeSession(previous, previous.activeSessionId, { paused: true }) : previous, { id, title: options.title || 'Preguntas de aplicación', refs,
         budgetMinutes: options.budgetMinutes ?? null, mode: options.mode }))
       setShownSessionId(id)
       engagedSession.current = id

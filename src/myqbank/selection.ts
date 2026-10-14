@@ -1,14 +1,13 @@
-import type { Concepto } from '../schema/concept'
+import type { ConceptMetadata } from './catalog'
 import type { EstadoApp } from '../store/model'
 import type { NbmeCatalog, NbmeState } from '../nbme/types'
 import { questionProgress } from '../nbme/model'
-import { ultimoIntentoResuelto } from '../lib/plan-estudio'
-import { construirCola } from '../lib/rutas'
+import { ultimoIntentoResuelto, construirPlanDiario } from '../lib/plan-estudio'
 import { intentoCorrecto } from '../srs/tipos'
 import type { EligibleItem, Pool, Material } from './contracts'
 import type { BlockEntry } from './blocks'
-export interface BankItem extends EligibleItem { revision: string; concept?: Concepto; firstCorrect: boolean | null; seen: boolean; form?: string }
-export function bankItems(concepts: Concepto[], catalog: NbmeCatalog | null, study: EstadoApp, nbme: NbmeState): BankItem[] {
+export interface BankItem extends EligibleItem { revision: string; concept?: ConceptMetadata; firstCorrect: boolean | null; seen: boolean; form?: string }
+export function bankItems(concepts: ConceptMetadata[], catalog: NbmeCatalog | null, study: EstadoApp, nbme: NbmeState): BankItem[] {
   const marks = new Map<string, { flagged: boolean; skipped: boolean; flagTime: number; skipTime: number }>()
   for (const block of Object.values(study.myqbankBlocks ?? {})) block.entries.forEach((entry, i) => {
     const key = `${entry.kind}:${entry.id}`, previous = marks.get(key) ?? { flagged: false, skipped: false, flagTime: -1, skipTime: -1 }
@@ -42,7 +41,7 @@ export function selectBankItems(items: BankItem[], options: { material: Material
     && (!search || `${item.id} ${item.systems.join(' ')} ${item.concept?.objetivo ?? ''} ${item.concept?.clasificacion.tema ?? ''}`.toLocaleLowerCase().includes(search)))
     .map(item => [`${item.kind}:${item.id}`, item])).values()]
   const concepts = eligible.filter(i => i.kind === 'concept'), questions = eligible.filter(i => i.kind === 'nbme')
-  const ranked = construirCola('guiada', concepts.map(i => i.concept!), study.progreso, concepts.length, now)
+  const ranked = construirPlanDiario(concepts.map(i => i.concept!), study.progreso, concepts.length, now).conceptos
   const byId = new Map(concepts.map(i => [i.id, i]))
   const ordered = [...ranked.map(c => byId.get(c.concept_id)!), ...concepts.filter(c => !ranked.some(r => r.concept_id === c.id))]
   if (options.material !== 'mixed') return options.material === 'nbme' ? questions : ordered

@@ -22,7 +22,7 @@ import { Resguardo } from '../components/Resguardo'
 import { Brand, Button, Icon, StateMessage } from './components'
 import { Dashboard } from './Dashboard'
 import { AnnotationProvider, useAnnotations } from './AnnotationProvider'
-import { blockOpportunity, createBlock, patchBlock, type BlockEntry, type StudyBlock } from './blocks'
+import { blockOpportunity, createBlock, modeChangeEvidence, patchBlock, type BlockEntry, type StudyBlock } from './blocks'
 import type { BankItem } from './selection'
 import type { BlockMode } from './contracts'
 import './layout.css'
@@ -48,7 +48,7 @@ function Workspace() {
   const [legacy, setLegacy] = useState<{ cola: Cola; index: number } | null>(null), [details, setDetails] = useState(false)
   const block = activeId ? app.estado.myqbankBlocks?.[activeId] : null
   const studying = !['dashboard', 'settings'].includes(view)
-  useEffect(() => { document.title = 'My Q Bank'; document.documentElement.lang = 'en' }, [])
+  useEffect(() => { document.title = 'MyQBank'; document.documentElement.lang = 'en' }, [])
   const dashboard = () => { nbme.pauseSession(); setView('dashboard'); location.hash = 'dashboard'; setError(null) }
   useEffect(() => {
     const handler = () => { if (['#dashboard','#hoy','#progreso','#modulos'].includes(location.hash)) { nbme.pauseSession(); setView('dashboard') } else if (['#settings','#ajustes'].includes(location.hash)) { nbme.pauseSession(); setView('settings') } }
@@ -63,28 +63,33 @@ function Workspace() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not open the block.') }
     finally { setBusy(false) }
   }
-  async function create(items: BankItem[], mode: BlockMode, retryOf?: string, fixedEntries?: BlockEntry[]) {
+  async function create(items: BankItem[], mode: BlockMode, retryOf?: string, fixedEntries?: BlockEntry[], pausedBlock?: StudyBlock) {
     if (busy) return
     setBusy(true); setError(null)
     try {
       const id = crearUUID()
       const retryConcepts = fixedEntries ? await cargarConceptos(fixedEntries.filter(e => e.kind === 'concept').map(e => e.id), app.indice!.modulos) : null
+      const selectedConcepts = fixedEntries ? null : await cargarConceptos(items.filter(item => item.kind === 'concept').map(item => item.id), app.indice!.modulos)
       const entries: BlockEntry[] = fixedEntries ? fixedEntries.map((entry, index) => {
         if (entry.kind === 'nbme') return entry
         const original = retryConcepts?.get(entry.id)
         if (!original) throw new Error('A concept is unavailable. Your completed block is preserved.')
-        const concept = prepararConcepto(aplicarVariante(original, entry.concept.variante_id), { semilla: blockOpportunity(id, index), indice: index, ruta: 'repaso', version: 3 })
+        const concept = prepararConcepto(aplicarVariante(original, entry.concept.variante_id), { semilla: blockOpportunity(id, index), indice: index, ruta: mode === 'test' ? 'examen' : 'repaso', version: 3 })
         return { kind: 'concept', id: entry.id, revision: versionPregunta(concept), concept }
       }) : items.map((item, index) => {
         if (item.kind === 'nbme') return { kind: 'nbme', id: item.id, revision: item.revision }
-        const original = prepararPracticaConcepto(item.concept!, app.estado.progreso[item.id], app.estado.criterios, { ruta: mode === 'test' ? 'examen' : 'repaso', ahora: Date.now() })
+        const loaded = selectedConcepts?.get(item.id)
+        if (!loaded) throw new Error('A selected concept is unavailable. Reload the material and retry.')
+        const original = prepararPracticaConcepto(loaded, app.estado.progreso[item.id], app.estado.criterios, { ruta: mode === 'test' ? 'examen' : 'repaso', ahora: Date.now() })
         const concept = prepararConcepto(original, { semilla: blockOpportunity(id, index), indice: index, ruta: mode === 'test' ? 'examen' : 'repaso', version: 3 })
         return { kind: 'concept', id: item.id, revision: versionPregunta(concept), concept }
       })
-      const block = createBlock(id, entries, mode, Date.now(), retryOf)
+      const block = { ...createBlock(id, entries, mode, Date.now(), retryOf), ...(pausedBlock ? modeChangeEvidence(pausedBlock,
+        pausedBlock.entries.filter((entry, position) => entry.kind === 'concept' && app.estado.progreso[entry.id]?.intentos.some(attempt => attempt.session_id === pausedBlock.id && attempt.pregunta_id === blockOpportunity(pausedBlock.id, position))).map(entry => entry.id)) : {}) }
       if (new Blob([JSON.stringify({ ...app.estado, myqbankBlocks: { ...app.estado.myqbankBlocks, [id]: block } })]).size > 12 * 1024 * 1024) throw new Error('Your saved study history is approaching the storage limit. Export a backup in Settings before starting more blocks. Existing blocks remain available.')
       const refs = entries.filter(e => e.kind === 'nbme')
-      if (refs.length && !await nbme.startSession(refs, { id, mode, title: block.title, budgetMinutes: null })) throw new Error('Could not prepare the NBME block. Check the connection and retry.')
+      if (refs.length && !await nbme.startSession(refs, { id, mode, title: block.title, budgetMinutes: null, pausePrevious: !!pausedBlock })) throw new Error('Could not prepare the NBME block. Check the connection and retry.')
+      if (pausedBlock) app.guardarBloque(patchBlock(pausedBlock, { paused: true }))
       app.guardarBloque(block); setActiveId(id); setView('block'); location.hash = 'block'
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not prepare the block.') }
     finally { setBusy(false) }
@@ -129,7 +134,7 @@ function Workspace() {
   if (!app.indice) return <StateMessage state="error" title="Material unavailable" action={<Button onClick={() => location.reload()}>Retry</Button>}>{app.errorCarga}</StateMessage>
   const legacyPending = hayConceptosPendientes(app.estado.reanudable) || Object.values(nbme.state.sessions).some(s => !s.mode && s.paused && !nbme.state.archivedSessions?.[s.id])
   const pendingTest = Object.values(app.estado.myqbankBlocks ?? {}).some(b => b.mode === 'test' && b.completedAt === undefined)
-  return <div className="mq-root mq-preview mq-workspace" data-theme={theme.piel === 'claro' ? 'light' : 'dark'}>
+  return <div lang="en" className={`mq-root mq-preview mq-workspace ${view === 'block' ? 'mq-workspace--study' : ''}`} data-theme={theme.piel === 'claro' ? 'light' : 'dark'}>
     <a className="mq-skip-link" href="#mq-main">Skip to content</a><header className="mq-header"><Brand/>{!studying && <Button className="mq-dashboard-link" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={dashboard}>Dashboard</Button>}
       <div className="mq-header-actions"><Button aria-label={theme.piel === 'claro' ? 'Switch to dark theme' : 'Switch to light theme'} onClick={theme.alternar}><Icon name={theme.piel === 'claro' ? 'moon' : 'sun'}/></Button>
         {!studying && <Button aria-label="Settings" onClick={() => { setView('settings'); location.hash = 'settings' }}><Icon name="settings"/><span>Settings</span></Button>}</div>
@@ -141,12 +146,13 @@ function Workspace() {
         legacyResume={legacyPending ? <Button disabled={busy} onClick={() => void resumeLegacy()}>Resume earlier session</Button> : null}
         dailyGoal={pendingTest ? <p>Finish your Test block to update the daily goal.</p> : <Hoy compact onNuevo={newDaily} onCajas={openCajas} onRetomar={resumeLegacy} onBiblioteca={() => {}}/>}/>
         <details className="mq-progress-details" onToggle={e => setDetails(e.currentTarget.open)}><summary>Detailed progress and study plan</summary>{details && (pendingTest ? <p>End your Test block to see updated results.</p> : <ProgressDetails onNuevo={newDaily} onCajas={openCajas} onRetomar={resumeLegacy}/>)}</details></>}
-      {view === 'block' && block && <Study block={block} onExit={dashboard} onRetry={b => create([], 'tutor', b.id, b.entries)}/>}
-      {view === 'settings' && <main id="mq-main" className="mq-settings"><h1>Settings</h1><div className="mq-inline"><Button onClick={() => void Promise.all([app.sincronizarAhora(), nbme.syncNow(), annotations.sync()])}>Sync now</Button><Button onClick={async () => { const saved = await Promise.all([app.sincronizarAhora(), nbme.syncNow()]); await annotations.sync(); if (saved.every(Boolean) && !annotations.rows.some(r => r.dirty) || confirm('Some changes are pending. Keep a local backup and sign out?')) await auth.signOut() }}>Sign out</Button></div><Settings english extraBackup={{ myqbankAnnotations: { userId: auth.user!.id, rows: annotations.rows } }} restoreExtra={backup => annotations.restore(backup.myqbankAnnotations)}/></main>}
-      {view === 'cajas' && cajas && <main id="mq-main" className="mq-legacy-study"><SesionCajas items={cajas.items} titulo={cajas.title} onSalir={dashboard}/></main>}
-      {view === 'daily' && daily && <main id="mq-main" className="mq-legacy-study"><SesionMixta sesion={daily} efimera onSalir={dashboard} etiquetaSalida="Dashboard"/></main>}
-      {view === 'legacy-concepts' && legacy && <main id="mq-main" className="mq-legacy-study"><Reproductor cola={legacy.cola} indiceInicial={legacy.index} onSalir={dashboard} etiquetaSalida="Dashboard"/></main>}
-      {view === 'legacy-nbme' && <main id="mq-main" className="mq-legacy-study"><NbmePlayer recuperarErrores onSalir={dashboard} etiquetaSalida="Dashboard"/></main>}
+      {view === 'block' && error && <p role="alert">{error}</p>}
+      {view === 'block' && block && <Study block={block} busy={busy} onModeChange={(b, mode) => create([], mode, undefined, b.entries, b)} onExit={dashboard} onRetry={b => create([], 'tutor', b.id, b.entries)}/>}
+      {view === 'settings' && <main id="mq-main" tabIndex={-1} className="mq-settings"><h1>Settings</h1><div className="mq-inline"><Button onClick={() => void Promise.all([app.sincronizarAhora(), nbme.syncNow(), annotations.sync()])}>Sync now</Button><Button onClick={async () => { const saved = await Promise.all([app.sincronizarAhora(), nbme.syncNow()]); await annotations.sync(); if (saved.every(Boolean) && !annotations.rows.some(r => r.dirty) || confirm('Some changes are pending. Keep a local backup and sign out?')) await auth.signOut() }}>Sign out</Button></div><Settings english extraBackup={{ myqbankAnnotations: { userId: auth.user!.id, rows: annotations.rows } }} restoreExtra={backup => annotations.restore(backup.myqbankAnnotations)}/></main>}
+      {view === 'cajas' && cajas && <main id="mq-main" tabIndex={-1} className="mq-legacy-study"><SesionCajas items={cajas.items} titulo={cajas.title} onSalir={dashboard}/></main>}
+      {view === 'daily' && daily && <main id="mq-main" tabIndex={-1} className="mq-legacy-study"><SesionMixta sesion={daily} efimera onSalir={dashboard} etiquetaSalida="Dashboard"/></main>}
+      {view === 'legacy-concepts' && legacy && <main id="mq-main" tabIndex={-1} className="mq-legacy-study"><Reproductor cola={legacy.cola} indiceInicial={legacy.index} onSalir={dashboard} etiquetaSalida="Dashboard"/></main>}
+      {view === 'legacy-nbme' && <main id="mq-main" tabIndex={-1} className="mq-legacy-study"><NbmePlayer recuperarErrores onSalir={dashboard} etiquetaSalida="Dashboard"/></main>}
     </Suspense></Resguardo>
   </div>
 }
