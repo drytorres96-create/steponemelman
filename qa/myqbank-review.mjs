@@ -1,4 +1,4 @@
-import { chromium } from '@playwright/test'
+import { chromium, expect } from '@playwright/test'
 import { spawn } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 const evidence=process.env.MYQBANK_EVIDENCE_DIR || 'docs/myqbank-phases-2-4'
@@ -29,22 +29,22 @@ try {
       return r.fulfill({status:503,json:{error:'Synthetic QA backend'}})
     })
     await page.goto(`${base}/?workspace=myqbank&proveedor=nbme-real&escena=abierto`)
-    await page.getByRole('button',{name:'Start 5-question block'}).waitFor({state:'visible'})
+    await expect(page.getByRole('button',{name:'Start 5-question block'})).toBeEnabled()
     const root=page.locator('.mq-workspace')
     if(await root.getAttribute('data-theme')!==theme)await page.getByRole('button',{name:/Switch to .* theme/}).click()
-    await page.screenshot({path:`${out}/dashboard-${width}-${theme}.png`,fullPage:true})
+    await page.screenshot({path:`${out}/dashboard-${width}-${theme}.png`,fullPage:true,animations:'disabled'})
     await page.getByRole('button',{name:'Settings',exact:true}).click()
     await page.getByRole('heading',{name:'Settings',exact:true}).waitFor()
-    await page.screenshot({path:`${out}/settings-${width}-${theme}.png`,fullPage:true})
+    await page.screenshot({path:`${out}/settings-${width}-${theme}.png`,fullPage:true,animations:'disabled'})
     await page.getByRole('button',{name:'Dashboard',exact:true}).click()
     await page.getByRole('button',{name:'Start 5-question block'}).click()
     await page.getByRole('heading',{name:'Question 1',exact:true}).waitFor()
     await page.getByRole('button',{name:'Labs',exact:true}).click()
-    await page.screenshot({path:`${out}/study-before-${width}-${theme}.png`,fullPage:true})
+    await page.screenshot({path:`${out}/study-before-${width}-${theme}.png`,fullPage:true,animations:'disabled'})
     await page.getByText('The second sample is larger.',{exact:true}).click()
     await page.getByRole('button',{name:'Submit answer',exact:true}).click()
     await page.getByText('Correct answer',{exact:true}).waitFor()
-    await page.screenshot({path:`${out}/study-after-${width}-${theme}.png`,fullPage:true})
+    await page.screenshot({path:`${out}/study-after-${width}-${theme}.png`,fullPage:true,animations:'disabled'})
     if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Horizontal overflow')
     if(errors.length)throw Error(errors.join('\n'))
     await context.close()
@@ -54,18 +54,18 @@ try {
     if(theme==='light'){
       await auth.goto(`${base}/?escena=abierto#ajustes`)
       await auth.getByRole('heading',{name:'Ajustes',exact:true}).waitFor()
-      await auth.screenshot({path:`${evidence}/before/settings-${width}.png`,fullPage:true})
+      await auth.screenshot({path:`${evidence}/before/settings-${width}.png`,fullPage:true,animations:'disabled'})
       await auth.goto(`${base}/?auth-scene=1`)
       await auth.getByRole('heading',{name:'Vuelve a tu estudio'}).waitFor()
-      await auth.screenshot({path:`${evidence}/before/auth-${width}.png`,fullPage:true})
+      await auth.screenshot({path:`${evidence}/before/auth-${width}.png`,fullPage:true,animations:'disabled'})
     }
     await auth.goto(`${base}/?auth-scene=1&workspace=myqbank`)
     await auth.getByRole('heading',{name:'Welcome back'}).waitFor()
     if(await auth.locator('.mq-auth').getAttribute('data-theme')!==theme)await auth.getByRole('button',{name:'Change theme',exact:true}).click()
-    await auth.screenshot({path:`${out}/auth-${width}-${theme}.png`,fullPage:true})
+    await auth.screenshot({path:`${out}/auth-${width}-${theme}.png`,fullPage:true,animations:'disabled'})
     await auth.getByRole('button',{name:'Forgot password?',exact:true}).click()
     await auth.getByRole('heading',{name:'Reset your password'}).waitFor()
-    await auth.screenshot({path:`${out}/recovery-${width}-${theme}.png`,fullPage:true})
+    await auth.screenshot({path:`${out}/recovery-${width}-${theme}.png`,fullPage:true,animations:'disabled'})
     if(await auth.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Auth horizontal overflow')
     await login.close()
   }

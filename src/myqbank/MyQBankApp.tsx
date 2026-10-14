@@ -135,12 +135,12 @@ function Workspace() {
   const legacyPending = hayConceptosPendientes(app.estado.reanudable) || Object.values(nbme.state.sessions).some(s => !s.mode && s.paused && !nbme.state.archivedSessions?.[s.id])
   const pendingTest = Object.values(app.estado.myqbankBlocks ?? {}).some(b => b.mode === 'test' && b.completedAt === undefined)
   return <div lang="en" className={`mq-root mq-preview mq-workspace ${view === 'block' ? 'mq-workspace--study' : ''}`} data-theme={theme.piel === 'claro' ? 'light' : 'dark'}>
-    <a className="mq-skip-link" href="#mq-main">Skip to content</a><header className="mq-header"><Brand/>{!studying && <Button className="mq-dashboard-link" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={dashboard}>Dashboard</Button>}
+    <a className="mq-skip-link" href="#mq-main">Skip to content</a><header className="mq-header"><Brand/>{!studying && <Button className="mq-dashboard-link" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={dashboard}><Icon name="dashboard"/>Dashboard</Button>}
       <div className="mq-header-actions"><Button aria-label={theme.piel === 'claro' ? 'Switch to dark theme' : 'Switch to light theme'} onClick={theme.alternar}><Icon name={theme.piel === 'claro' ? 'moon' : 'sun'}/></Button>
         {!studying && <Button aria-label="Settings" onClick={() => { setView('settings'); location.hash = 'settings' }}><Icon name="settings"/><span>Settings</span></Button>}</div>
     </header>
     {app.avisoLocal && <p role="status">{app.avisoLocal}<Button onClick={app.descartarAvisoLocal}>Dismiss</Button></p>}
-    <Resguardo key={view} alFallar={e => <StateMessage state="error" title="Could not open this screen" action={<Button onClick={dashboard}>Dashboard</Button>}>{e.message}</StateMessage>}>
+    <Resguardo key={view} alFallar={e => <StateMessage state="error" title="Could not open this screen" action={<Button onClick={dashboard}><Icon name="dashboard"/>Dashboard</Button>}>{e.message}</StateMessage>}>
     <Suspense fallback={<StateMessage state="loading" title="Opening your workspace">Your progress remains saved.</StateMessage>}>
       {view === 'dashboard' && <><Dashboard busy={busy} error={error} onStart={create} onResume={open}
         legacyResume={legacyPending ? <Button disabled={busy} onClick={() => void resumeLegacy()}>Resume earlier session</Button> : null}
