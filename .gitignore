@@ -12,3 +12,5 @@ public/data/
 .wrangler/
 playwright-report/
 test-results/
+
+dist-myqbank/

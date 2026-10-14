@@ -1,0 +1,117 @@
+import { expect, test } from '@playwright/test'
+
+const url = '/preview/myqbank/'
+for (const width of [390,1280,1440]) for (const theme of ['dark','light'] as const) {
+  test(`dashboard and study ${width}px ${theme}`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
+    const failures: string[] = []
+    page.on('pageerror', error => failures.push(error.message))
+    await page.goto(url)
+    await expect(page.locator('.mq-root')).toHaveAttribute('data-theme', theme)
+    expect(await page.locator('.mq-root').evaluate(el => getComputedStyle(el).getPropertyValue('--mq-bg').trim())).toBe(theme === 'light' ? '#EFF6F1' : '#0B0F10')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    if (width > 960) {
+      expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true)
+      await expect(page.getByRole('button',{ name: /Start \d+-question block/ })).toBeInViewport()
+    }
+    await page.screenshot({ path: info.outputPath(`dashboard-${width}-${theme}.png`), fullPage: true })
+    await page.getByRole('button',{ name: 'Resume block', exact: true }).click()
+    await expect(page.getByRole('tablist')).toHaveCount(0)
+    await page.getByRole('radio').nth(1).check()
+    await page.getByRole('button',{ name: 'Submit answer', exact: true }).click()
+    await expect(page.getByRole('tab',{ name: /Read the stem/ })).toBeVisible()
+    await expect(page.locator('.mq-explanation-content')).toHaveAttribute('lang','es')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.screenshot({ path: info.outputPath(`study-${width}-${theme}.png`), fullPage: true })
+    expect(failures).toEqual([])
+  })
+}
+
+test('test mode hides every result until explicit completion; drafts and flags survive pause', async ({ page }) => {
+  await page.goto(url)
+  await page.getByRole('button',{ name: 'Test', exact: true }).click()
+  await page.getByRole('button',{ name: /Start \d+-question block/ }).click()
+  await page.getByRole('radio').nth(1).check()
+  await page.getByRole('button',{ name: 'Flag', exact: true }).click()
+  await page.getByRole('button',{ name: 'Pause', exact: true }).click()
+  await page.getByRole('button',{ name: 'Resume block', exact: true }).click()
+  await expect(page.getByRole('radio').nth(1)).toBeChecked()
+  await expect(page.getByRole('button',{ name: 'Flag', exact: true })).toHaveAttribute('aria-pressed','true')
+  await page.getByRole('button',{ name: 'Submit answer', exact: true }).click()
+  await expect(page.getByText('Answer saved',{exact:true})).toBeVisible()
+  await expect(page.locator('.mq-result,.mq-explanation-pane,.mq-option--correct,.mq-option--incorrect,.mq-question-number--correct,.mq-question-number--incorrect')).toHaveCount(0)
+  await page.getByRole('button',{ name: 'End block', exact: true }).click()
+  await page.getByRole('button',{ name: 'Keep studying', exact: true }).click()
+  await expect(page.locator('.mq-result')).toHaveCount(0)
+  await page.getByRole('button',{ name: 'End block', exact: true }).click()
+  await page.getByRole('button',{ name: 'End and review', exact: true }).click()
+  await expect(page.locator('.mq-result--incorrect')).toBeVisible()
+  await expect(page.getByRole('radio').first()).toBeDisabled()
+})
+
+test('concept without alternatives has one useful panel and no forced tabs; calculation gets two', async ({ page }) => {
+  await page.goto(url)
+  await page.getByRole('button',{ name: 'Mehlman Concepts', exact: true }).click()
+  await page.getByRole('button',{ name: /Start \d+-question block/ }).click()
+  await page.getByRole('textbox',{name:'Your answer'}).fill('beta cells')
+  await page.getByRole('button',{ name: 'Submit answer', exact: true }).click()
+  await expect(page.locator('.mq-single-section')).toBeVisible()
+  await expect(page.getByRole('tablist')).toHaveCount(0)
+  await expect(page.getByText('Una asociación esencial')).toBeVisible()
+  await page.getByRole('button',{ name: 'Next question', exact: true }).last().click()
+  await page.getByRole('textbox',{name:'Your answer'}).fill('80')
+  await page.getByRole('button',{ name: 'Submit answer', exact: true }).click()
+  await expect(page.getByRole('tab')).toHaveCount(2)
+  await expect(page.getByRole('tab',{ name: /Every choice/ })).toHaveCount(0)
+})
+
+test('tabs work with keyboard and finite drills preserve the original result', async ({ page }) => {
+  await page.goto(url)
+  await page.getByRole('button',{ name: 'Resume block', exact: true }).click()
+  await page.getByRole('radio').nth(2).check()
+  await page.getByRole('button',{ name: 'Submit answer', exact: true }).click()
+  const first = page.getByRole('tab',{name:/Read the stem/})
+  await first.focus(); await page.keyboard.press('ArrowRight')
+  await expect(page.getByRole('tab',{name:/Mechanism/})).toBeFocused()
+  await page.keyboard.press('End')
+  await expect(page.getByRole('tab',{name:/Drills/})).toHaveAttribute('aria-selected','true')
+  await page.getByRole('button',{name:'Reveal answer'}).click()
+  await expect(page.getByText('Disminuye. Esa es la relación central del ejemplo.')).toBeVisible()
+  await expect(page.locator('.mq-result--correct')).toBeVisible()
+})
+
+test('preview is isolated from private services and persistence', async ({ page }) => {
+  const remoteRequests: string[] = []
+  page.on('request', request => { if (!request.url().startsWith('http://localhost:5180/')) remoteRequests.push(request.url()) })
+  await page.goto(url)
+  await page.getByRole('button',{name:'Settings',exact:true}).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByRole('button',{name:/Use (light|dark) theme/}).click()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('button',{name:'Settings',exact:true})).toBeFocused()
+  await page.getByRole('button',{name:'Resume block',exact:true}).click()
+  await page.getByRole('radio').first().check()
+  await page.getByRole('button',{name:'Submit answer',exact:true}).click()
+  expect(remoteRequests).toEqual([])
+  expect(await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length }))).toEqual({local:0,session:0})
+})
+
+test('zero eligible questions disable Start; overlapping pools do not inflate the queue', async ({ page }) => {
+  await page.goto(url)
+  const unused = Number(await page.getByRole('button',{name:/Unused/}).locator('.mq-mono').textContent())
+  const flagged = Number(await page.getByRole('button',{name:/Flagged/}).locator('.mq-mono').textContent())
+  await page.getByRole('button',{name:/Flagged/}).click()
+  const total = Number(await page.locator('.mq-summary').getByText(/^\d+$/).textContent())
+  expect(total).toBeLessThan(unused + flagged)
+  for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.uncheck()
+  await expect(page.getByRole('button',{name:'Start 0-question block'})).toBeDisabled()
+})
+
+test('reflow at the equivalent of 200 percent browser zoom keeps content reachable', async ({ page }) => {
+  await page.setViewportSize({width:720,height:450})
+  await page.goto(url)
+  await page.getByRole('button',{name:/Start \d+-question block/}).scrollIntoViewIfNeeded()
+  await expect(page.getByRole('button',{name:/Start \d+-question block/})).toBeInViewport()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
