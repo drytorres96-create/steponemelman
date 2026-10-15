@@ -5,8 +5,9 @@ import './tokens.css'
 import './components.css'
 import './interactions.css'
 
-export type IconName = 'sun' | 'moon' | 'settings' | 'arrow' | 'back' | 'flag' | 'labs' | 'rail' | 'check' | 'close' | 'play' | 'retry' | 'search' | 'external' | 'pause' | 'stop' | 'dashboard' | 'plus' | 'minus'
+export type IconName = 'sun' | 'moon' | 'settings' | 'arrow' | 'back' | 'flag' | 'labs' | 'rail' | 'check' | 'close' | 'play' | 'retry' | 'search' | 'external' | 'pause' | 'stop' | 'dashboard' | 'plus' | 'minus' | 'book'
 const paths: Record<IconName, ReactNode> = {
+  book: <><path d="M12 5v15M12 5C9 3 5 3 3 4v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-2-1-6-1-9 1Z"/></>,
   sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></>,
   moon: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/>,
   settings: <><path d="m9 3-.5 3-2 1L4 6 2 10l2.5 2L4 14l-2 1 2 4 3-1 2 1 .5 3h5l.5-3 2-1 3 1 2-4-2-1-.5-2 2.5-2-2-4-2.5 1-2-1-.5-3Z"/><circle cx="12" cy="12" r="3"/></>,
@@ -51,14 +52,14 @@ export function Progress({ value, max, label }: { value: number; max: number; la
     <span style={{ width: `${percentage}%` }}/>
   </div>
 }
-export function Rings({ used, total, correct, evaluated = used, compact = false }: { used: number; total: number; correct: number | null; evaluated?: number; compact?: boolean }) {
+export function Rings({ used, total, correct, evaluated = used, compact = false, noun = 'answered' }: { noun?: 'answered' | 'completed'; used: number; total: number; correct: number | null; evaluated?: number; compact?: boolean }) {
   const outer = safePercent(used, total) ?? 0
   const inner = correct === null ? null : safePercent(correct, evaluated)
-  return <div className={`mq-rings ${compact ? 'mq-rings--compact' : ''}`} role="img" aria-label={`${used} of ${total} answered${inner === null ? '' : `; ${inner}% correct`}`}>
+  return <div className={`mq-rings ${compact ? 'mq-rings--compact' : ''}`} role="img" aria-label={`${used} of ${total} ${noun}${inner === null ? '' : `; ${inner}% correct`}`}>
     <svg viewBox="0 0 120 120" aria-hidden="true">
       <circle className="mq-ring-track" cx="60" cy="60" r="52"/><circle className="mq-ring-outer" cx="60" cy="60" r="52" pathLength="100" strokeDasharray={`${outer} 100`}/>
       <circle className="mq-ring-track" cx="60" cy="60" r="40"/>{inner !== null && <circle className="mq-ring-inner" cx="60" cy="60" r="40" pathLength="100" strokeDasharray={`${inner} 100`}/>}
-    </svg><div><strong>{used}</strong><span>{compact ? `of ${total}` : 'answered'}</span></div>
+    </svg><div><strong>{used}</strong><span>{compact ? `of ${total}` : noun}</span></div>
   </div>
 }
 export function Tabs({ label, items, activeId, onChange, children }: {

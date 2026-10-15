@@ -12,10 +12,11 @@ import { FigureViewer } from '../nbme/FigureViewer'
 import { Modal } from '../components/comunes'
 import { RecuperacionTrasFallo } from '../nbme/RecuperacionTrasFallo'
 import { Button, Card, Icon, Rings, Segmented, StateMessage } from './components'
-import { blockOpportunity, blockTime, timeBlock, draftBlock, markBlock, patchBlock, type StudyBlock } from './blocks'
+import { blockOpportunity, blockTime, timeBlock, learnConcept, draftBlock, markBlock, patchBlock, type StudyBlock } from './blocks'
 import { crearUUID } from '../store/model'
 import { nbmePosition } from './selection'
 import { canReveal } from './contracts'
+import { recentLearning } from './learning'
 import { Explanation } from './Explanation'
 import { Highlighter, HighlightText, type HighlightSource } from './HighlightText'
 import { LabReference, useLabReference } from './LabReference'
@@ -46,23 +47,31 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
   const conceptAttempt = concept ? app.estado.progreso[concept.concept_id]?.intentos.find(i => i.session_id === block.id && i.pregunta_id === opportunity) : undefined
   const questionAttempt = entry.kind === 'nbme' ? nbme.state.attempts[`${block.id}:${qPosition}`] : undefined
   const submitted = !!conceptAttempt || !!questionAttempt, closed = block.completedAt !== undefined
-  const labsLeft = submitted || closed
-  const reveal = canReveal(block.mode, submitted, closed)
+  const learning = concept ? block.learning?.[block.cursor] : undefined
+  const learningOpen = !!learning && !submitted && (learning.open || closed)
+  const handled = submitted || !!learning
+  const labsLeft = handled || closed
+  const reveal = learningOpen || canReveal(block.mode, submitted, closed)
   const result: Resultado | null = conceptAttempt ? { veredicto: conceptAttempt.resultado ?? 'revision', tipoError: conceptAttempt.tipo_error,
     recuperacionActiva: conceptAttempt.recuperacion_activa, respuestaDada: conceptAttempt.respuesta_dada ?? '' } : null
   const uncertain = result?.veredicto === 'revision' || questionAttempt?.conflict
+  const assisted = !!conceptAttempt && (conceptAttempt.explicacion_previa || conceptAttempt.fuente_consultada || conceptAttempt.pistas_usadas > 0 || !!learning)
   const correct = conceptAttempt ? ['correcta', 'ortografia'].includes(conceptAttempt.resultado ?? '') : questionAttempt?.correct
   const source: HighlightSource = { material: entry.kind, sourceId: entry.id, sourceRevision: entry.revision,
     variantId: concept?.variante_id ?? '', editorialVersion: '' }
   const states = block.entries.map((item, position) => {
     const a = item.kind === 'concept' ? app.estado.progreso[item.id]?.intentos.find(i => i.session_id === block.id && i.pregunta_id === blockOpportunity(block.id, position)) : undefined
     const n = item.kind === 'nbme' ? nbme.state.attempts[`${block.id}:${nbmePosition(block.entries, position)}`] : undefined
-    if (!a && !n) return block.skipped[position]?.value ? 'skipped' : 'unanswered'
+    if (!a && !n) return block.learning?.[position] ? 'assisted' : block.skipped[position]?.value ? 'skipped' : 'unanswered'
     if (!canReveal(block.mode, true, closed)) return 'saved'
     if (a?.resultado === 'revision' || n?.conflict) return 'pending'
+    if (a && (a.explicacion_previa || a.fuente_consultada || a.pistas_usadas > 0 || block.learning?.[position])) return 'assisted'
     return a ? ['correcta', 'ortografia'].includes(a.resultado ?? '') ? 'correct' : 'incorrect' : n!.correct ? 'correct' : 'incorrect'
   })
-  const answered = states.filter(s => !['skipped', 'unanswered'].includes(s)).length
+  const completed = states.filter(s => !['skipped', 'unanswered'].includes(s)).length
+  const studied = block.entries.filter((item, position) => item.kind === 'concept' && block.learning?.[position] && !app.estado.progreso[item.id]?.intentos.some(i => i.session_id === block.id && i.pregunta_id === blockOpportunity(block.id, position))).length
+  const answered = completed - studied
+  const assistedCount = states.filter(s => s === 'assisted').length
   const evaluated = states.filter(s => ['correct', 'incorrect'].includes(s)).length
   const correctCount = states.filter(s => s === 'correct').length
   const ready = question?.status === 'ready' && !preguntaConLecturasDudosas(question) && nbme.currentSession?.id === block.id
@@ -70,10 +79,10 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
   const canSubmitNbme = !busy && ready && !closed && !submitted && !!nbme.selectedOption && !nbme.busy && (!question?.figureRequired || figures.ready)
   // Record exposure when feedback is revealed, including map/arrow navigation and reloads.
   useEffect(() => {
-    if (submitted && reveal && !block.reviewed[block.cursor]?.value) {
+    if (handled && reveal && !block.reviewed[block.cursor]?.value) {
       latestApp.current.guardarBloque(markBlock(current.current, 'reviewed', block.cursor, true))
     }
-  }, [opportunity, submitted, reveal, block.reviewed[block.cursor]?.value])
+  }, [opportunity, handled, reveal, block.reviewed[block.cursor]?.value])
   useEffect(() => { alive.current = true; const controller = new AbortController(); abort.current = controller; return () => { alive.current = false; controller.abort() } }, [])
   useEffect(() => { if (endOpen) dialog.current?.showModal(); else dialog.current?.close() }, [endOpen])
   useEffect(() => {
@@ -92,16 +101,16 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
   useEffect(() => {
     const position = block.cursor
     clock.current.reiniciar(current.current.timeMs?.[position]?.[timerRun.current] ?? 0)
-    const flush = () => { if (!closed && !submitted) latestApp.current.guardarBloque(timeBlock(current.current, position, timerRun.current, clock.current.leer())) }
+    const flush = () => { if (!closed && !submitted && !learningOpen) latestApp.current.guardarBloque(timeBlock(current.current, position, timerRun.current, clock.current.leer())) }
     const interval = setInterval(flush, 5000)
     window.addEventListener('pagehide', flush)
     return () => { clock.current.activar(false); flush(); clearInterval(interval); window.removeEventListener('pagehide', flush) }
-  }, [opportunity, closed, submitted])
+  }, [opportunity, closed, submitted, learningOpen])
   useEffect(() => {
-    const update = () => clock.current.activar(!closed && !submitted && !grading && document.visibilityState === 'visible')
+    const update = () => clock.current.activar(!closed && !submitted && !grading && !learningOpen && document.visibilityState === 'visible')
     update(); document.addEventListener('visibilitychange', update)
     return () => { clock.current.activar(false); document.removeEventListener('visibilitychange', update) }
-  }, [opportunity, submitted, closed, grading])
+  }, [opportunity, submitted, closed, grading, learningOpen])
   useEffect(() => {
     if (closed && nbme.currentSession?.id === block.id && nbme.currentSession.completedAt === undefined) nbme.completeSession()
   }, [closed, nbme.currentSession?.id, nbme.currentSession?.completedAt])
@@ -113,8 +122,8 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
   }
   function next() {
     let changed = current.current
-    if (submitted && reveal) changed = markBlock(changed, 'reviewed', block.cursor, true)
-    else if (!submitted && !closed) changed = markBlock(changed, 'skipped', block.cursor, true)
+    if (handled && reveal) changed = markBlock(changed, 'reviewed', block.cursor, true)
+    else if (!handled && !closed) changed = markBlock(changed, 'skipped', block.cursor, true)
     if (block.cursor + 1 < block.entries.length) save(patchBlock(changed, { cursor: block.cursor + 1 }))
     else { save(changed); if (!closed) setEndOpen(true) }
   }
@@ -127,14 +136,14 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
       resultado: r.veredicto, interaccion: concept.interaccion.recomendada, recuperacion_activa: r.recuperacionActiva,
       pistas_usadas: 0, ms: existing?.ms ?? duration, tipo_error: r.tipoError, confianza_declarada: null, respuesta_dada: r.respuestaDada,
       pregunta_id: opportunity, pregunta_version: entry.revision, evaluador_version: EVALUADOR_VERSION, fuente_consultada: false,
-      explicacion_previa: !!block.retryOf || !!block.assistedConceptIds?.includes(concept.concept_id), modo: block.mode === 'test' ? 'examen' : 'repaso',
+      explicacion_previa: !!existing?.explicacion_previa || !!block.retryOf || !!current.current.learning?.[block.cursor] || !!block.assistedConceptIds?.includes(concept.concept_id) || recentLearning(latestApp.current.estado, concept.concept_id, existing?.ts ?? Date.now()), modo: block.mode === 'test' ? 'examen' : 'repaso',
       tipo_evidencia: concept.interaccion.recomendada === 'caso_clinico' ? 'aplicacion' : r.recuperacionActiva ? 'recuerdo' : 'discriminacion',
       ...(concept.variante_id ? { variante_id: concept.variante_id, primera_presentacion: !app.progresoDe(concept.concept_id).intentos.some(t => t.variante_id === concept.variante_id) } : {}),
       ...(ai ? { calificado_por_ia: true } : {}), ...(existing && !pending ? { calificacion_actualizada_en: Date.now() } : {}) }
     app.registrarIntento(concept.concept_id, attempt)
   }
   async function submitConcept(r: Resultado) {
-    if (!concept || submitLock.current || closed || conceptAttempt && conceptAttempt.resultado !== 'revision') return
+    if (!concept || learningOpen || busy || submitLock.current || closed || conceptAttempt && conceptAttempt.resultado !== 'revision') return
     submitLock.current = true; clock.current.activar(false)
     const duration = blockTime(timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()), block.cursor)
     if (usaTextoLibre(concept) && r.respuestaDada.trim()) {
@@ -151,17 +160,24 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
     save(markBlock(current.current, 'skipped', block.cursor, false))
     submitLock.current = false
   }
+  function teach(open: boolean) {
+    if (!concept || submitted || closed || grading || busy) return
+    clock.current.activar(false)
+    const timed = timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer())
+    save(learnConcept(timed, block.cursor, open))
+    if (!open) { heading.current?.focus(); heading.current?.scrollIntoView({ block: 'nearest' }) }
+  }
   return <>
     {nbme.error && entry.kind === 'nbme' && <p role="alert">{nbme.error}</p>}
-    <div className="mq-study-tools"><div className="mq-inline"><Button aria-label="Toggle question navigator" aria-pressed={rail} onClick={() => setRail(v => !v)}><Icon name="rail"/></Button><Segmented label="Study mode" value={block.mode} disabled={busy || grading || recovering} options={[{value:'tutor',label:'Tutor'},{value:'test',label:'Test'}]} onChange={mode => { if (mode !== block.mode) { const timed = timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()); save(timed); void onModeChange(timed, mode) } }}/><span className="mq-mode-help">Changing mode starts a new block.</span><span className="mq-small mq-muted">{closed ? 'Block complete' : `${answered} answers saved`}</span></div>
+    <div className="mq-study-tools"><div className="mq-inline"><Button aria-label="Toggle question navigator" aria-pressed={rail} onClick={() => setRail(v => !v)}><Icon name="rail"/></Button><Segmented label="Study mode" value={block.mode} disabled={busy || grading || recovering} options={[{value:'tutor',label:'Tutor'},{value:'test',label:'Test'}]} onChange={mode => { if (mode !== block.mode) { const timed = timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()); save(timed); void onModeChange(timed, mode) } }}/><span className="mq-mode-help">Changing mode starts a new block.</span><span className="mq-small mq-muted">{closed ? 'Block complete' : `${answered} answers saved${studied ? ` · ${studied} studied with help` : ''}`}</span></div>
       <div className="mq-inline"><Button aria-label="Previous question" disabled={!block.cursor || grading || recovering || busy} onClick={() => move(block.cursor - 1)}><Icon name="back"/></Button><span className="mq-position">{block.cursor + 1} / {block.entries.length}</span><Button aria-label="Next question" disabled={block.cursor === block.entries.length - 1 || grading || recovering || busy} onClick={() => move(block.cursor + 1)}><Icon name="arrow"/></Button></div>
       <div className="mq-inline"><Button aria-pressed={!!block.flags[block.cursor]?.value} onClick={() => save(markBlock(current.current, 'flags', block.cursor, !block.flags[block.cursor]?.value))}><Icon name="flag"/>Flag</Button><Button aria-expanded={labs} onClick={() => setLabs(v => !v)}><Icon name="labs"/>Labs</Button><Button disabled={grading || recovering || busy} onClick={pause}><Icon name={closed ? 'dashboard' : 'pause'}/>{closed ? 'Dashboard' : 'Pause'}</Button><Button variant="danger" disabled={closed || grading || recovering || busy} onClick={() => setEndOpen(true)}><Icon name="stop"/>End block</Button></div>
     </div>
     <main id="mq-main" tabIndex={-1} className={`mq-study ${rail ? '' : 'mq-study--no-rail'} ${reveal ? 'mq-study--revealed' : ''} ${labs && !labsLeft ? 'mq-study--labs' : ''}`}>
-      {rail && <Card className="mq-rail" aria-label="Question navigator"><Rings used={answered} total={block.entries.length} correct={block.mode === 'test' && !closed ? null : correctCount} evaluated={evaluated} compact/><p className="mq-small mq-muted">{block.mode === 'test' && !closed ? 'Answers saved' : `${correctCount} correct · ${states.filter(s => s === 'pending').length} pending`}</p><details className="mq-mobile-map"><summary>Question map</summary></details>
+      {rail && <Card className="mq-rail" aria-label="Question navigator"><Rings used={completed} noun="completed" total={block.entries.length} correct={block.mode === 'test' && !closed ? null : correctCount} evaluated={evaluated} compact/><p className="mq-small mq-muted">{block.mode === 'test' && !closed ? 'Answers saved' : `${correctCount} correct · ${assistedCount} with help · ${states.filter(s => s === 'pending').length} pending`}</p><details className="mq-mobile-map"><summary>Question map</summary></details>
         <div className="mq-question-grid">{states.map((state, i) => <button type="button" key={i} className={`mq-question-number mq-question-number--${state}`} aria-current={i === block.cursor ? 'step' : undefined} aria-label={`Question ${i + 1}, ${state}${block.flags[i]?.value ? ', flagged' : ''}`} disabled={grading || recovering || busy} onClick={() => move(i)}>{i + 1}{block.flags[i]?.value && <Icon name="flag"/>}</button>)}</div>
       </Card>}
-      <div className="mq-question-pane">{closed && <div className="mq-complete" role="status"><strong>Block complete</strong><span>{correctCount} / {evaluated} graded correct · {block.entries.length - answered} unanswered · {states.filter(s => s === 'pending').length} pending</span><Button aria-label="Practice again" title="Practice again" disabled={busy} onClick={() => void onRetry(block)}><Icon name="retry"/></Button></div>}
+      <div className="mq-question-pane">{closed && <div className="mq-complete" role="status"><strong>Block complete</strong><span>{correctCount} / {evaluated} {assistedCount ? 'unassisted' : 'graded'} correct · {block.entries.length - completed} unanswered{assistedCount > 0 && <> · {assistedCount} with help</>} · {states.filter(s => s === 'pending').length} pending</span><Button aria-label="Practice again" title="Practice again" disabled={busy} onClick={() => void onRetry(block)}><Icon name="retry"/></Button></div>}
         <Card className="mq-stem"><h1 ref={heading} tabIndex={-1}>Question {block.cursor + 1}</h1>
           {concept ? <><p><HighlightText text={concept.evaluacion.pregunta} source={source} region="stem"/></p>{concept.contexto && <p><HighlightText text={concept.contexto} source={source} region="context"/></p>}</>
             : question ? <Enunciado texto={columns?.enunciado ?? question.stem} renderText={(text, region) => <HighlightText text={text} source={source} region={`stem:${region}`}/>}/>
@@ -169,8 +185,13 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
           {!!question?.figures.length && <div ref={figureRoot} className="nbme-question-images">{(figures.waiting || figures.loading) && <p role="status">Loading figure…</p>}{figures.error && <p role="alert">Figure unavailable. <Button onClick={figures.retry}>Retry figure</Button></p>}{figures.figures.map(f => <Button key={f.assetId} className="nbme-image-button" onClick={() => setExpanded(f)} aria-label={`Expand figure: ${f.alt}`}><img src={f.url} alt={f.alt || 'Question figure'}/></Button>)}</div>}
         </Card>
         {labs && labsLeft && <LabReference source={source} view={labView}/>}
-        {concept && <div className="mq-concept-interaction"><Interaccion key={opportunity} c={concept} semilla={opportunity} bloqueado={submitted || closed || grading || busy} resultado={result} ocultarFeedback={!reveal}
+        {concept && !learningOpen && <div className="mq-concept-interaction"><Interaccion key={opportunity} c={concept} semilla={opportunity} bloqueado={submitted || closed || grading || busy} resultado={result} ocultarFeedback={!reveal}
           draft={block.drafts[block.cursor]?.value} onDraft={value => save(draftBlock(current.current, block.cursor, value))} english renderText={(text, region) => <HighlightText text={text} source={source} region={region}/>} onResponder={r => void submitConcept(r)}/></div>}
+        {concept && !submitted && !closed && <div className="mq-learning-actions">
+          {block.mode === 'tutor' ? <><Button disabled={grading || busy} onClick={() => teach(!learningOpen)}><Icon name={learningOpen ? 'retry' : 'book'}/>{learningOpen ? 'Practice recall' : learning ? 'Review explanation' : 'Learn this concept'}</Button>
+            <p className="mq-small mq-muted">{learning ? 'Studied with help. Your next answer is assisted practice.' : 'Not sure yet? Read first, then try to recall it.'}</p></>
+            : <><Button disabled={grading || busy} onClick={() => { const timed = timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()); save(timed); void onModeChange(timed, 'tutor') }}><Icon name="book"/>Learn in Tutor</Button><p className="mq-small mq-muted">Starts a new Tutor block. Your Test answers stay saved.</p></>}
+        </div>}
         {question && <form onSubmit={e => { e.preventDefault(); if (canSubmitNbme) { const timed = timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()); nbme.checkAnswer(blockTime(timed, block.cursor)); save(markBlock(timed, 'skipped', block.cursor, false)) } }}>
           <fieldset className="mq-options" disabled={submitted || closed || !ready || nbme.busy || busy}><legend className="mq-sr-only">Choose your answer</legend>{question.options.map(option => {
             const chosen = (questionAttempt?.optionId ?? nbme.selectedOption) === option.id
@@ -179,22 +200,23 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
           })}</fieldset>{!submitted && !closed && <div className="mq-answer-actions"><Button type="submit" variant="primary" disabled={!canSubmitNbme}><Icon name="check"/>Submit answer</Button></div>}
         </form>}
         {submitted && !reveal && <div className="mq-saved" role="status"><Icon name="check"/><div><strong>Answer saved</strong><p>Results appear when you end the block.</p></div></div>}
-        {!submitted && closed && <p role="status">Not answered · no grade recorded.</p>}
+        {!handled && closed && <p role="status">Not answered · no grade recorded.</p>}
         {grading && <p role="status">Answer saved · checking the response…</p>}{message && reveal && <p role="status">{message}</p>}
-        <div className="mq-answer-actions"><Button disabled={grading || recovering || busy} variant={submitted ? 'primary' : 'ghost'} onClick={next}>{block.cursor === block.entries.length - 1 ? closed ? 'Last question' : 'Finish block' : submitted ? 'Next question' : closed ? 'Next question' : 'Skip for now'}<Icon name="arrow"/></Button></div>
+        <div className="mq-answer-actions"><Button disabled={grading || recovering || busy} variant={handled ? 'primary' : 'ghost'} onClick={next}>{block.cursor === block.entries.length - 1 ? closed ? 'Last question' : 'Finish block' : handled ? 'Next question' : closed ? 'Next question' : 'Skip for now'}<Icon name="arrow"/></Button></div>
         <p className="mq-small mq-muted" role="status">{app.sincronizacion.estado === 'error' || nbme.syncStatus.state === 'error' || nbme.storageWarning ? 'Sync needs attention. Keep this page open and retry in Settings.' : app.sincronizacion.estado === 'sincronizado' && nbme.syncStatus.state === 'synced' ? 'Progress synced' : 'Saving progress…'}</p>
         <p className="mq-small mq-muted">{annotations.status} <Button onClick={() => void annotations.sync()}>Sync annotations</Button></p>
       </div>
       {labs && !labsLeft && <aside className="mq-labs-pane"><LabReference source={source} view={labView}/></aside>}
-      {reveal && <aside className="mq-explanation-pane" aria-label="Explanation"><div ref={feedback} tabIndex={-1} role="status" className={`mq-result ${uncertain ? '' : correct ? 'mq-result--correct' : 'mq-result--incorrect'}`}><Icon name={correct ? 'check' : 'close'}/><strong>{uncertain ? 'Answer pending review' : correct ? 'Correct' : 'Incorrect'}</strong></div>
+      {reveal && <aside className="mq-explanation-pane" aria-label="Explanation"><div ref={feedback} tabIndex={-1} role="status" className={`mq-result ${learningOpen || assisted && correct ? 'mq-result--assisted' : uncertain ? '' : correct ? 'mq-result--correct' : 'mq-result--incorrect'}`}><Icon name={learningOpen ? 'book' : correct ? 'check' : 'close'}/><strong>{learningOpen ? 'Studied with help' : uncertain ? 'Answer pending review' : correct ? assisted ? 'Correct with help' : 'Correct' : 'Incorrect'}</strong></div>
+        {learningOpen && <p className="mq-small mq-muted">Saved as seen, with no grade. Find it later in the Learning pool.</p>}
         {uncertain && conceptAttempt?.respuestas_en_conflicto && <p>Different answers were saved on two devices. This item remains ungraded; use Practice again after ending the block.</p>}
         {uncertain && concept && result && !conceptAttempt?.respuestas_en_conflicto && usaTextoLibre(concept) && <Button disabled={grading} onClick={() => void submitConcept(result)}>Check pending answer</Button>}
         {(concept || question) && <Explanation source={concept ?? question!} highlightSource={source} figures={figures.figures}/>}
         {question && questionAttempt && !questionAttempt.correct && !questionAttempt.conflict && <><Button aria-expanded={recovery} onClick={() => setRecovery(v => !v)}>Guided recovery</Button>{recovery && <RecuperacionTrasFallo pregunta={question} intento={questionAttempt} onActividad={setRecovering} onSiguiente={next}/>}</>}
-        <div className="mq-explanation-actions"><Button variant="primary" disabled={grading || recovering || busy} onClick={closed && block.cursor === block.entries.length - 1 ? onExit : next}>{block.cursor === block.entries.length - 1 ? closed ? 'Back to dashboard' : 'Finish block' : 'Next question'}<Icon name="arrow"/></Button></div>
+        <div className="mq-explanation-actions">{learningOpen && !closed && <Button disabled={busy} onClick={() => teach(false)}><Icon name="retry"/>Hide and recall</Button>}<Button variant="primary" disabled={grading || recovering || busy} onClick={closed && block.cursor === block.entries.length - 1 ? onExit : next}>{block.cursor === block.entries.length - 1 ? closed ? 'Back to dashboard' : 'Finish block' : 'Next question'}<Icon name="arrow"/></Button></div>
       </aside>}
     </main>
-    <dialog className="mq-dialog" aria-labelledby={endTitle} ref={dialog} onCancel={() => setEndOpen(false)} onClose={() => setEndOpen(false)}><h2 id={endTitle}>End this block?</h2><p>{answered} of {block.entries.length} answered. Unanswered items remain ungraded.</p><div className="mq-inline"><Button onClick={() => setEndOpen(false)}>Keep studying</Button><Button variant="primary" onClick={() => { save(patchBlock(current.current, { completedAt: Date.now(), paused: true })); if (nbme.currentSession?.id === block.id) nbme.completeSession(); setEndOpen(false) }}>End and review</Button></div></dialog>
+    <dialog className="mq-dialog" aria-labelledby={endTitle} ref={dialog} onCancel={() => setEndOpen(false)} onClose={() => setEndOpen(false)}><h2 id={endTitle}>End this block?</h2><p>{answered} answered · {studied} studied with help · {block.entries.length - completed} unanswered. Studying without an answer records no grade.</p><div className="mq-inline"><Button onClick={() => setEndOpen(false)}>Keep studying</Button><Button variant="primary" onClick={() => { save(patchBlock(current.current, { completedAt: Date.now(), paused: true })); if (nbme.currentSession?.id === block.id) nbme.completeSession(); setEndOpen(false) }}>End and review</Button></div></dialog>
     {expanded && <Modal titulo="Question figure" onCerrar={() => setExpanded(null)} ancho={1100}><FigureViewer url={expanded.url} alt={expanded.alt}/></Modal>}
   </>
 }

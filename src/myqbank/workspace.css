@@ -65,3 +65,9 @@
 @media (max-width: 960px), (max-height: 600px) { .mq-workspace .mq-rail { width: 100%; } }
 
 .mq-complete > .mq-button { justify-self: end; }
+
+.mq-learning-actions { display: grid; justify-items: start; gap: 6px; padding: 12px 0; }
+.mq-learning-actions p { margin: 0; }
+.mq-workspace .mq-question-number--assisted { color: var(--mq-mark-ink); border-color: var(--mq-mark); background: var(--mq-inset); }
+.mq-result--assisted { color: var(--mq-mark-ink); border: 1px solid var(--mq-mark); background: var(--mq-inset); }
+.mq-workspace .mq-explanation-actions { flex-wrap: wrap; gap: 8px; }

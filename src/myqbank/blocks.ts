@@ -25,13 +25,16 @@ export const StudyBlockZ = z.object({
   retryOf: id.optional(),
   modeChangedFrom: id.optional(),
   assistedConceptIds: z.array(id).max(80).optional(),
+  /** Teaching exposure is durable, but is not a fabricated answer or grade. */
+  learning: z.record(z.object({ open: z.boolean(), viewedAt: stamp, changedAt: stamp })).optional(),
   timeMs: z.record(z.record(stamp.max(3_600_000))).optional(),
 }).superRefine((b, ctx) => {
   if (b.cursor >= b.entries.length || new Set(b.entries.map(e => `${e.kind}:${e.id}`)).size !== b.entries.length
     || b.entries.some(e => e.kind === 'concept' && e.id !== e.concept.concept_id)
     || b.assistedConceptIds?.some(id => !b.entries.some(e => e.kind === 'concept' && e.id === id))
     || b.completedAt !== undefined && b.completedAt < b.createdAt
-    || ['drafts', 'skipped', 'flags', 'reviewed', 'timeMs'].some(field => Object.keys(b[field as 'flags'] ?? {}).some(k => !/^\d{1,2}$/.test(k) || Number(k) >= b.entries.length))) {
+    || Object.keys(b.learning ?? {}).some(k => b.mode !== 'tutor' || b.entries[Number(k)]?.kind !== 'concept')
+    || ['drafts', 'skipped', 'flags', 'reviewed', 'timeMs', 'learning'].some(field => Object.keys(b[field as 'flags'] ?? {}).some(k => !/^\d{1,2}$/.test(k) || Number(k) >= b.entries.length))) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid block identity or position' })
   }
 })
@@ -56,6 +59,8 @@ export function mergeBlock(a: StudyBlock, b: StudyBlock): StudyBlock {
   const primary = a.changedAt > b.changedAt || a.changedAt === b.changedAt && stable(a) >= stable(b) ? a : b
   return { ...primary, drafts: mergeMap(a.drafts, b.drafts), skipped: mergeMap(a.skipped, b.skipped),
     flags: mergeMap(a.flags, b.flags), reviewed: mergeMap(a.reviewed, b.reviewed),
+    ...(a.learning || b.learning ? { learning: Object.fromEntries(Object.entries(mergeMap(a.learning ?? {}, b.learning ?? {})).map(([k, value]) => [k,
+      { ...value, viewedAt: Math.max(a.learning?.[k]?.viewedAt ?? 0, b.learning?.[k]?.viewedAt ?? 0) }])) } : {}),
     ...(a.modeChangedFrom || b.modeChangedFrom ? { modeChangedFrom: a.modeChangedFrom ?? b.modeChangedFrom } : {}),
     ...(a.assistedConceptIds || b.assistedConceptIds ? { assistedConceptIds: [...new Set([...(a.assistedConceptIds ?? []), ...(b.assistedConceptIds ?? [])])].sort() } : {}),
     ...(a.timeMs || b.timeMs ? { timeMs: Object.fromEntries([...new Set([...Object.keys(a.timeMs ?? {}), ...Object.keys(b.timeMs ?? {})])].sort().map(position => [position,
@@ -73,7 +78,7 @@ export function createBlock(id: string, entries: BlockEntry[], mode: StudyBlock[
 export function blockOpportunity(blockId: string, position: number): string { return `${blockId}:mq:${position}` }
 /** Changing mode is a new block, not evidence that every previous explanation was seen. */
 export function modeChangeEvidence(block: StudyBlock, answeredConceptIds: string[]) {
-  const inherited = block.assistedConceptIds ?? []
+  const inherited = [...(block.assistedConceptIds ?? []), ...Object.keys(block.learning ?? {}).map(k => block.entries[Number(k)].id)]
   const revealed = answeredConceptIds.filter(id => {
     const position = block.entries.findIndex(e => e.kind === 'concept' && e.id === id)
     return block.mode === 'tutor' || block.completedAt !== undefined && (block.cursor === position || block.reviewed[position]?.value)
@@ -99,3 +104,13 @@ export function timeBlock(block: StudyBlock, position: number, run: string, ms: 
     [run]: Math.max(block.timeMs?.[position]?.[run] ?? 0, Math.min(3_600_000, Math.max(0, Math.round(ms)))) } } })
 }
 export function blockTime(block: StudyBlock, position: number): number { return Math.min(3_600_000, Object.values(block.timeMs?.[position] ?? {}).reduce((a, b) => a + b, 0)) }
+
+export function learnConcept(block: StudyBlock, position: number, open: boolean, now = Date.now()): StudyBlock {
+  if (block.mode !== 'tutor' || block.completedAt !== undefined || block.entries[position]?.kind !== 'concept') return block
+  const previous = block.learning?.[position]
+  if (!open && !previous) return block
+  const changedAt = Math.max(now, (previous?.changedAt ?? 0) + 1)
+  return StudyBlockZ.parse({ ...block, learning: { ...block.learning, [position]: {
+    open, viewedAt: open ? Math.max(now, previous?.viewedAt ?? 0) : previous!.viewedAt, changedAt,
+  } }, skipped: { ...block.skipped, [position]: { value: false, changedAt: Math.max(changedAt, (block.skipped[position]?.changedAt ?? 0) + 1) } } })
+}
