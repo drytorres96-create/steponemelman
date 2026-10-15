@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { ConceptoZ, type Concepto, type Indice } from '../schema/concept'
 import { supabase } from '../lib/supabase'
 import { leer, escribir } from '../store/db'
+import { cargarTodo } from '../data/corpus'
 
 const MetadataZ = z.object({ concept_id: z.string().min(3), objetivo: z.string().min(1),
   clasificacion: ConceptoZ.shape.clasificacion.pick({ sistema_primario: true, sistemas_secundarios: true, tema: true, tipo_conocimiento: true, dificultad: true }),
@@ -26,14 +27,29 @@ export function buildConceptCatalog(index: Indice, concepts: Concepto[]) {
   validateConceptCatalog(catalog, index)
   return catalog
 }
+const pending = new Map<string, Promise<ConceptMetadata[]>>()
 export async function loadConceptCatalog(index: Indice): Promise<ConceptMetadata[]> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw Error('Sign in to load the concept catalog.')
   const path = conceptCatalogPath(index.corpus_version), key = `myqbank-catalog:${session.user.id}:${index.corpus_version}`
-  if (!navigator.onLine) return validateConceptCatalog(await leer(key), index)
-  const { data, error } = await supabase.from('corpus_assets').select('payload').eq('path', path).maybeSingle()
-  if (error || !data) throw Error('Could not load the concept catalog. Check your connection and retry.')
-  const items = validateConceptCatalog(data.payload, index)
-  await escribir(key, data.payload).catch(() => undefined)
-  return items
+  const existing = pending.get(key)
+  if (existing) return existing
+  const work = (async () => {
+    // Versioned metadata is immutable, like the versioned modules. AuthGate has
+    // already checked this account; never share a cache between accounts.
+    const cached = await leer(key).catch(() => null)
+    if (cached) { try { return validateConceptCatalog(cached, index) } catch { /* Fetch a valid copy. */ } }
+    if (!navigator.onLine) throw Error('Connect to load the concept catalog for this version.')
+    const { data, error } = await supabase.from('corpus_assets').select('payload').eq('path', path).maybeSingle()
+    if (error) throw Error('Could not load the concept catalog. Check your connection and retry.')
+    // Corpus releases may precede their optional lightweight selector catalog.
+    // Derive metadata from the same validated private modules in that case only;
+    // do not replace network denials with cached or older material.
+    const payload = data ? data.payload : buildConceptCatalog(index, await cargarTodo(index.modulos))
+    const items = validateConceptCatalog(payload, index)
+    await escribir(key, payload).catch(() => undefined)
+    return items
+  })()
+  pending.set(key, work)
+  try { return await work } finally { if (pending.get(key) === work) pending.delete(key) }
 }

@@ -6,6 +6,7 @@ import { Brand, AccessScene } from '../components/Editorial'
 import { APP_VERSION } from '../release'
 import './auth.css'
 import { myqbankEnabled } from '../myqbank/activation'
+import { withDeadline } from '../lib/deadline'
 import { MyQBankAuthFrame } from '../myqbank/AuthFrame'
 const tx = (es: string, en: string) => myqbankEnabled() ? en : es
 
@@ -56,7 +57,7 @@ function AuthForm() {
     if (myqbankEnabled()) redirect.searchParams.set('workspace', 'myqbank')
     try {
       if (mode === 'login') {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+        const { error: signInError } = await withDeadline(supabase.auth.signInWithPassword({ email: email.trim(), password }))
         if (signInError) throw signInError
       } else if (mode === 'signup') {
         const { data, error: signUpError } = await supabase.auth.signUp({
@@ -204,7 +205,7 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
     setChecking(true)
     setMembershipError(null)
     try {
-      const { data, error } = await supabase.from('app_members').select('user_id').eq('user_id', userId).maybeSingle()
+      const { data, error } = await withDeadline(supabase.from('app_members').select('user_id').eq('user_id', userId).maybeSingle())
       if (error) throw error
       if (generation === checkGeneration.current) {
         verified.current = { userId, allowed: data !== null }

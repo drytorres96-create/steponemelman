@@ -337,12 +337,24 @@ test('catalog errors can retry without selecting unavailable concepts', async ({
   await page.goto(url)
   await page.getByRole('button',{name:'Mehlman Concepts',exact:true}).click()
   await expect(page.getByText('Could not load concepts.',{exact:false})).toBeVisible()
-  await expect(page.getByRole('button',{name:/Start .*question block/})).toBeDisabled()
+  await expect(page.getByRole('button',{name:'Material unavailable',exact:true})).toBeDisabled()
   await expect(page.getByText('Loading available material…',{exact:true})).toHaveCount(0)
   await page.evaluate(()=>{window.__qaCatalogFailure=false})
-  await page.getByRole('button',{name:'Retry',exact:true}).click()
+  await page.getByRole('button',{name:'Retry concepts',exact:true}).click()
   await expect(page.getByRole('button',{name:'Start 5-question block'})).toBeEnabled()
   await expect(page.locator('.mq-coverage').first()).toBeVisible()
+})
+
+test('shows loading instead of zero while concepts are arriving', async ({page}) => {
+  await network(page)
+  await page.addInitScript(() => { window.__qaEditorialDelay = { 'myqbank/catalogs/1.0.5.json': 1500 } })
+  await page.goto(url)
+  await page.getByRole('button',{name:'Mehlman Concepts',exact:true}).click()
+  await expect(page.locator('.mq-summary').getByText('Loading material…',{exact:true})).toBeVisible()
+  await expect(page.getByRole('button',{name:'Loading material…',exact:true})).toBeDisabled()
+  await expect(page.locator('.mq-summary')).not.toContainText('0 unique items')
+  await expect(page.getByRole('button',{name:'Start 5-question block'})).toBeEnabled()
+  await expect(page.locator('.mq-summary')).toContainText('10 unique items')
 })
 
 test('failed mode switch keeps the current block usable without changing its history', async ({page}) => {
