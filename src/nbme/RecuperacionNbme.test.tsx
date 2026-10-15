@@ -1,10 +1,11 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-const mock = vi.hoisted(() => ({ generar: vi.fn() }))
+const mock = vi.hoisted(() => ({ generar: vi.fn(), policy: vi.fn() }))
 vi.mock('../lib/recuperacion-nbme-ia', () => ({ generarRecuperacionNbme: mock.generar }))
+vi.mock('../lib/nbme-source-safety', () => ({ loadNbmeSourceSafety: mock.policy }))
 import { RecuperacionNbme } from './RecuperacionNbme'
-import { claveRecuperacion, type ContenidoRecuperacion } from './recuperacion-modelo'
+import { claveRecuperacion, crearRecuperacion, responderRecuperacion, guardarRecuperacion, type ContenidoRecuperacion } from './recuperacion-modelo'
 
 const origen = { qid: 'QA-P0001', revision: 'qa-r1', optionId: 'B', attemptId: 'qa-session:0' }
 const contenido: ContenidoRecuperacion = { objetivo: 'Recover the synthetic alphabet order.', ejercicios: [
@@ -42,11 +43,85 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   localStorage.clear(); terminar.mockReset(); actividad.mockReset()
   mock.generar.mockReset().mockResolvedValue({ estado: 'ok', data: contenido })
+  mock.policy.mockReset().mockResolvedValue({ schemaVersion: 1, version: 'qa-1', review: 'approved', rules: [] })
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks() })
 
 describe('recuperar un fallo con una pregunta por turno', () => {
+  it.each(['blocked', 'missing'])('preserves old saved recovery without reading or exposing it when policy is %s', async policy => {
+    const saved = responderRecuperacion(crearRecuperacion('qa-owner', origen, contenido), 'alpha')
+    guardarRecuperacion(saved)
+    const key = claveRecuperacion('qa-owner', origen)!, before = localStorage.getItem(key)
+    mock.policy.mockResolvedValue(policy === 'missing' ? null : { schemaVersion: 1, version: 'qa-2', review: 'approved', rules: [
+      { source: { kind: 'nbme', id: origen.qid, revision: 'old-revision', sourceHash: 'a'.repeat(64) }, originalRecovery: 'reviewed_only' },
+    ] })
+    const read = vi.spyOn(Storage.prototype, 'getItem')
+    await renderizar()
+    expect(host.textContent).toContain('Reviewed recovery')
+    expect(host.textContent).not.toContain(contenido.objetivo)
+    expect(host.textContent).not.toContain('Retomar recuperación')
+    expect(read).not.toHaveBeenCalledWith(key)
+    expect(localStorage.getItem(key)).toBe(before)
+    expect(mock.generar).not.toHaveBeenCalled(); expect(actividad).not.toHaveBeenCalled()
+    await pulsar('Next question'); expect(terminar).toHaveBeenCalledWith('siguiente')
+  })
+  it('rechecks current policy before resuming a saved session and preserves its draft if access changed', async () => {
+    guardarRecuperacion(crearRecuperacion('qa-owner', origen, contenido))
+    const key = claveRecuperacion('qa-owner', origen)!, before = localStorage.getItem(key)
+    await renderizar(); expect(host.textContent).toContain('Retomar recuperación')
+    mock.policy.mockResolvedValue(null)
+    await pulsar('Retomar recuperación')
+    expect(host.textContent).toContain('Reviewed recovery')
+    expect(host.textContent).not.toContain(contenido.objetivo)
+    expect(localStorage.getItem(key)).toBe(before); expect(mock.generar).not.toHaveBeenCalled()
+    expect(actividad).not.toHaveBeenCalled()
+  })
+  it('ignores a late policy response after the account changes', async () => {
+    let finish!: (policy: unknown) => void
+    mock.policy.mockReturnValueOnce(new Promise(resolve => { finish = resolve })).mockResolvedValue(null)
+    await renderizar(); expect(host.textContent).toContain('Checking recovery')
+    await renderizar('other-owner'); expect(host.textContent).toContain('Reviewed recovery')
+    await act(async () => finish({ schemaVersion: 1, version: 'old', review: 'approved', rules: [] }))
+    expect(host.textContent).toContain('Reviewed recovery'); expect(mock.generar).not.toHaveBeenCalled()
+  })
+  it('ignores an earlier allow response after a newer check denied access', async () => {
+    mock.policy.mockResolvedValue(null)
+    await renderizar()
+    let finish!: (policy: unknown) => void
+    mock.policy.mockReturnValueOnce(new Promise(resolve => { finish = resolve })).mockResolvedValue(null)
+    await pulsar('Retry recovery availability'); await pulsar('Retry recovery availability')
+    await act(async () => finish({ schemaVersion: 1, version: 'old', review: 'approved', rules: [] }))
+    expect(host.textContent).toContain('Reviewed recovery')
+    expect(host.textContent).not.toContain('Practicar este error con IA')
+  })
+  it.each(['new', 'saved'])('cancels a pending policy check when leaving %s recovery', async mode => {
+    if (mode === 'saved') guardarRecuperacion(crearRecuperacion('qa-owner', origen, contenido))
+    await renderizar()
+    let finish!: (policy: unknown) => void
+    mock.policy.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+    await pulsar(mode === 'saved' ? 'Retomar recuperación' : 'Practicar este error con IA')
+    await pulsar('Volver a la pregunta original')
+    await act(async () => finish({ schemaVersion: 1, version: 'qa-1', review: 'approved', rules: [] }))
+    expect(mock.generar).not.toHaveBeenCalled(); expect(actividad).not.toHaveBeenCalled()
+    expect(host.textContent).not.toContain(contenido.objetivo)
+    expect(terminar).toHaveBeenCalledExactlyOnceWith('original')
+  })
+  it('does not generate after policy becomes unavailable and hides an already open original offline', async () => {
+    await renderizar()
+    mock.policy.mockResolvedValue(null)
+    await pulsar('Practicar este error con IA')
+    expect(mock.generar).not.toHaveBeenCalled()
+    mock.policy.mockResolvedValue({ schemaVersion: 1, version: 'qa-1', review: 'approved', rules: [] })
+    await pulsar('Retry recovery availability'); await pulsar('Practicar este error con IA')
+    expect(host.textContent).toContain(contenido.objetivo)
+    const key = claveRecuperacion('qa-owner', origen)!, before = localStorage.getItem(key)
+    await act(async () => window.dispatchEvent(new Event('offline')))
+    expect(host.textContent).not.toContain(contenido.objetivo)
+    expect(host.textContent).toContain('Reviewed recovery')
+    expect(localStorage.getItem(key)).toBe(before)
+    expect(actividad.mock.calls.map(call => call[0])).toEqual([true, false])
+  })
   it('requiere trigger manual, oculta soluciones y termina los cuatro formatos regresando al NBME', async () => {
     await renderizar()
     expect(mock.generar).not.toHaveBeenCalled()

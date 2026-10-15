@@ -6,12 +6,16 @@ import type { NbmeQuestion } from '../nbme/types'
 import { myqbankConcepts } from '../../e2e/arnes/myqbank-fixture'
 import { explanationHash, sourceIdentity, type EditorialExplanation } from './editorial'
 
-const fake = vi.hoisted(() => ({ user: { id: 'QA-owner' } as { id: string } | null, query: vi.fn(), read: vi.fn(), write: vi.fn(), db: new Map<string, unknown>() }))
+const fake = vi.hoisted(() => ({ user: { id: 'QA-owner' } as { id: string } | null, query: vi.fn(), read: vi.fn(), write: vi.fn(), db: new Map<string, unknown>(), annotations: true, save: vi.fn() }))
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ user: fake.user }) }))
 vi.mock('../lib/supabase', () => ({ supabase: { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: fake.query }) }) }) } }))
 vi.mock('../store/db', () => ({ leer: fake.read, escribir: fake.write }))
-vi.mock('./AnnotationProvider', () => ({ useAnnotations: () => ({ rows: [], ready: true, save: vi.fn() }) }))
+vi.mock('./AnnotationProvider', () => ({ useHasAnnotationProvider: () => fake.annotations, useAnnotations: () => {
+  if (!fake.annotations) throw new Error('No provider in legacy recovery')
+  return { rows: [], ready: true, save: fake.save }
+} }))
 import { Explanation } from './Explanation'
+import { Highlighter } from './HighlightText'
 
 const original = 'Synthetic original explanation.'
 let testId = 0
@@ -19,8 +23,8 @@ let source = { ...myqbankConcepts[0], explicacion: original }
 const highlightSource = { material: 'concept' as const, sourceId: source.concept_id, sourceRevision: 'qa', variantId: '', editorialVersion: '' }
 let host: HTMLDivElement, root: Root, commits: string[]
 function Capture() { useLayoutEffect(() => { commits.push(host.textContent ?? '') }); return null }
-const render = async (question: typeof source | NbmeQuestion = source, figures: { assetId: string; sha256?: string }[] = []) => {
-  await act(async () => root.render(<><Explanation source={question} highlightSource={highlightSource} figures={figures}/><Capture/></>))
+const render = async (question: typeof source | NbmeQuestion = source, figures: { assetId: string; sha256?: string }[] = [], drillsOnly = false) => {
+  await act(async () => root.render(<><Explanation source={question} highlightSource={highlightSource} figures={figures} drillsOnly={drillsOnly}/><Capture/></>))
 }
 const waitForText = async (text: string) => {
   await vi.waitFor(async () => { await act(async () => {}); expect(host.textContent).toContain(text) })
@@ -45,7 +49,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true })
   source = { ...myqbankConcepts[0], explicacion: original, respuesta_canonica: `synthetic test ${++testId}` }
-  fake.user = { id: 'QA-owner' }; fake.db.clear(); vi.resetAllMocks(); commits = []
+  fake.user = { id: 'QA-owner' }; fake.db.clear(); vi.resetAllMocks(); commits = []; fake.annotations = true
   fake.read.mockImplementation(async (key: string) => fake.db.get(key))
   fake.write.mockImplementation(async (key: string, value: unknown) => { fake.db.set(key, value) })
   fake.query.mockResolvedValue({ data: null, error: null })
@@ -55,6 +59,54 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks() })
 
 describe('explanation loading without unsafe original fallback', () => {
+  it.each([true, false])('keeps reviewed drill anchors with a provider and plain legacy rendering without one (%s)', async provider => {
+    fake.annotations = provider
+    const value = await approved()
+    value.sections[0] = { id: 'recall', label: 'Practice', heading: 'Recuperación', status: 'available',
+      drill: { prompt: 'Pregunta sintética revisada.', answer: 'Respuesta sintética revisada.' } }
+    value.evidence[0].sectionId = 'recall'
+    value.independentReview!.contentHash = await explanationHash(value)
+    fake.query.mockResolvedValue({ data: { payload: value }, error: null })
+    await act(async () => root.render(<Highlighter><Explanation source={source} highlightSource={highlightSource} drillsOnly/></Highlighter>))
+    await waitForText('Pregunta sintética revisada.')
+    const spans = host.querySelectorAll('.mq-highlight-text')
+    expect(spans).toHaveLength(provider ? 2 : 0)
+    if (provider) {
+      await act(async () => {
+        const range = document.createRange(); range.selectNodeContents(spans[0])
+        window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range)
+        spans[0].dispatchEvent(new Event('pointerup', { bubbles: true }))
+      })
+      expect(fake.save).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ ...highlightSource,
+        editorialVersion: value.version, region: 'recall:drill:prompt', quote: value.sections[0].drill!.prompt }))
+    }
+    await act(async () => {
+      const button = [...host.querySelectorAll('button')].find(button => button.textContent === 'Reveal answer')!
+      button.dispatchEvent(new Event('pointerdown', { bubbles: true })); button.click()
+    })
+    expect(host.querySelector('.mq-drill-answer')!.parentElement!.hidden).toBe(false)
+  })
+  it('offers only the exact reviewed drill, initially hidden, without original or explanation text', async () => {
+    const value = await approved()
+    value.sections.push({ id: 'recall', label: 'Practice', heading: 'Recuperación', status: 'available',
+      drill: { prompt: 'Pregunta sintética revisada.', answer: 'Respuesta sintética revisada.' } })
+    value.evidence.push({ sectionId: 'recall', sourceRef: 'https://example.org/synthetic', locator: 'Synthetic practice' })
+    value.independentReview!.contentHash = await explanationHash(value)
+    fake.query.mockResolvedValue({ data: { payload: value }, error: null })
+    await render(source, [], true); await waitForText('Pregunta sintética revisada.')
+    expect(host.textContent).not.toContain(original)
+    expect(host.textContent).not.toContain(value.sections[0].paragraphs![0])
+    expect(host.querySelector('.mq-drill-answer')!.parentElement!.hidden).toBe(true)
+    await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Reveal answer')!.click())
+    expect(host.querySelector('.mq-drill-answer')!.parentElement!.hidden).toBe(false)
+    expect(host.textContent).toContain('This practice does not change your original score.')
+  })
+  it.each(['missing', 'invalid', 'no drill'])('never falls back to original text in drill mode (%s)', async state => {
+    const value = await approved()
+    fake.query.mockResolvedValue({ data: state === 'missing' ? null : { payload: state === 'invalid' ? { ...value, version: 'changed' } : value }, error: null })
+    await render(source, [], true); await waitForText('Reviewed practice unavailable')
+    expect(host.textContent).not.toContain(original); expect(host.querySelector('.mq-drill-answer')).toBeNull()
+  })
   it('shows only loading until the exact reviewed companion arrives, without an original flash', async () => {
     const value = await approved(), request = deferred<{ data: { payload: EditorialExplanation }; error: null }>()
     fake.query.mockReturnValue(request.promise)

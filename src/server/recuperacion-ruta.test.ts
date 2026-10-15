@@ -55,11 +55,14 @@ function seleccionDelCatalogo(args: unknown, vinculada = false) {
 }
 function setup(pregunta = q, fragmentoVinculado = fragmentoRelacionado) {
   const permisos = { app: true, nbme: true, ready: true, user: 'synthetic-user', mismatch: false,
-    linked: false, editorial: false, corpusMismatch: false, step2: false, corpusHangs: false }
+    linked: false, editorial: false, corpusMismatch: false, step2: false, corpusHangs: false,
+    policy: { schemaVersion: 1, version: 'qa-1', review: 'approved', rules: [] } as unknown, policyStatus: 200 }
   const remoto = vi.fn(async (url: string) => {
     if (url.includes('/auth/v1/user')) return Response.json({ id: permisos.user, email_confirmed_at: '2026-01-01' })
     if (url.includes('app_members')) return Response.json(permisos.app ? [{ user_id: permisos.user }] : [])
     if (url.includes('nbme_members')) return Response.json(permisos.nbme ? [{ user_id: permisos.user }] : [])
+    if (decodeURIComponent(url).includes('myqbank/source-safety/v1.json')) return Response.json(
+      permisos.policy === null ? [] : [{ payload: permisos.policy }], { status: permisos.policyStatus })
     if (url.includes('catalog')) return Response.json([{ payload: { schemaVersion: 1, bankVersion: 'synthetic-bank',
       questions: [{ id: q.id, revision: 'synthetic-current-r2', status: permisos.ready ? 'ready' : 'blocked',
         conceptLinks: permisos.linked ? [{ conceptId: 'QA-C1', relation: 'tested', confidence: 0.9, review: 'suggested' }] : [] }] } }])
@@ -89,6 +92,23 @@ function setup(pregunta = q, fragmentoVinculado = fragmentoRelacionado) {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 
 describe('puerta de recuperación NBME', () => {
+  it.each(['blocked', 'missing', 'malformed', 'denied'])('never reaches AI or old cache when current source policy is %s', async state => {
+    const { call, env, storage, permisos } = setup()
+    // First create a real generated cache and quota record under a permitted policy.
+    expect((await call()).status).toBe(200)
+    const before = structuredClone(storage.values)
+    const blocked = { schemaVersion: 1, version: 'qa-2', review: 'approved', rules: [{
+      source: { kind: 'nbme', id: q.id, revision: 'another-revision', sourceHash: 'a'.repeat(64) }, originalRecovery: 'reviewed_only',
+    }] }
+    permisos.policy = state === 'missing' ? null : state === 'malformed' ? { ...blocked, review: 'pending' } : blocked
+    if (state === 'denied') permisos.policyStatus = 403
+    const result = await call()
+    expect(result.status).toBe(503)
+    expect(await result.json()).toMatchObject({ available: false, codigo: 'fuente_en_revision' })
+    expect(env.AI.run).toHaveBeenCalledOnce()
+    expect(storage.values).toEqual(before)
+    expect(env.COACH.get).toHaveBeenCalledOnce()
+  })
   it('resuelve los IDs del modelo desde el catálogo y devuelve únicamente preguntas respaldadas', async () => {
     const { call, env, storage } = setup()
     env.AI.run.mockImplementation(async (_modelo, args) => {

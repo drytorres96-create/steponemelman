@@ -13,6 +13,7 @@ import { INSTRUCCION_ERROR, MAX_TOKENS_ERROR, materialErrorConcepto, materialErr
 import { PeticionRecuperacionNbmeZ, type FuenteRecuperacion, type RecuperacionNbme } from './recuperacion-nbme'
 import { crearCatalogoRecuperacion, elegirRecuperacionVerificada, resolverSeleccionRecuperacion } from './catalogo-recuperacion'
 import { tieneClasificacionContradictoria } from './fuente-recuperacion-confiable'
+import { NBME_SOURCE_SAFETY_PATH, readNbmeSourceSafety, originalRecoveryAllowed } from '../nbme/source-safety'
 import { NOMBRE_ERROR, type TipoError } from '../srs/tipos'
 import { handleNbme } from './nbme'
 import { handlePlan, type PlanEnv } from './plan'
@@ -70,6 +71,7 @@ export const MOTIVOS = {
   concepto_largo: 'Este concepto es demasiado extenso para la ayuda de IA. Su explicación sigue disponible.',
   no_verificable: 'La ayuda no pudo respaldar su respuesta en la fuente, así que se descartó.',
   fuente_inconsistente: 'El material de esta pregunta contiene afirmaciones contradictorias. No se utilizarán para preparar ejercicios.',
+  fuente_en_revision: 'Usa la práctica revisada disponible para esta pregunta. Tu respuesta original se conserva.',
   interno: 'Algo falló en el servidor al preparar la ayuda. La explicación del concepto sigue disponible.',
   tiempo: 'Cloudflare tardó demasiado en preparar los ejercicios. Puedes volver a intentarlo o continuar tu pregunta.',
   proveedor: 'Cloudflare no pudo generar los ejercicios ahora. Puedes volver a intentarlo o continuar tu pregunta.',
@@ -1202,6 +1204,13 @@ async function handleRecuperacionNbme(request: Request, url: URL, env: Env): Pro
     if (!q || !q.options.some(o => o.id === input.optionId) || q.answer === input.optionId) {
       return json({ error: 'La recuperación necesita una opción incorrecta de esta pregunta.' }, 422)
     }
+    // Read current private policy before any original source, AI cache or quota.
+    // No missing/old client policy may authorize an original-derived recovery.
+    const policyResponse = await quien.get(`/rest/v1/nbme_assets?select=payload&path=eq.${encodeURIComponent(NBME_SOURCE_SAFETY_PATH)}`)
+    const policyRows: unknown = policyResponse.ok ? await policyResponse.json() : null
+    const policy = Array.isArray(policyRows) && policyRows.length === 1
+      ? readNbmeSourceSafety(policyRows[0]?.payload) : null
+    if (!originalRecoveryAllowed(policy, q.id)) return recuperacionUnavailable('fuente_en_revision')
     const material = materialErrorNbme(q, input.optionId)
     if (!material) return recuperacionUnavailable('no_verificable')
     let fuentes = await fuentesRecuperacion(quien.get, q, {

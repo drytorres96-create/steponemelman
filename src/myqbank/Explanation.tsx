@@ -10,7 +10,8 @@ import { Button, Card, Tabs } from './components'
 import { HighlightText, type HighlightSource } from './HighlightText'
 import { explanationPreview } from './summary'
 import { versionPregunta } from '../screens/sesion'
-function Section({ section, source, language }: { section: ExplanationSection; source: HighlightSource; language?: 'en' | 'es' }) {
+import { useHasAnnotationProvider } from './AnnotationProvider'
+function Section({ section, source, language, plain = false }: { section: ExplanationSection; source: HighlightSource; language?: 'en' | 'es'; plain?: boolean }) {
   const [answer, setAnswer] = useState(false), [expanded, setExpanded] = useState(false)
   const answerId = useId()
   const paragraphs = section.paragraphs ?? [], initial = paragraphs[0] ?? ''
@@ -22,14 +23,15 @@ function Section({ section, source, language }: { section: ExplanationSection; s
     {visibleParagraphs.map((p, i) => <p key={i}><HighlightText text={p} source={source} region={`${section.id}:paragraph:${i}`}/></p>)}
     {!!section.bullets?.length && <ul>{section.bullets.slice(0, expanded ? undefined : 3).map((b, i) => <li key={i}><HighlightText text={b} source={source} region={`${section.id}:bullet:${i}`}/></li>)}</ul>}
     {long && <Button lang="en" aria-expanded={expanded} onClick={() => setExpanded(v => !v)}>{expanded ? 'Show less' : 'Read full explanation'}</Button>}
-    {section.drill && <><p><HighlightText text={section.drill.prompt} source={source} region={`${section.id}:drill:prompt`}/></p><Button lang="en" aria-expanded={answer} aria-controls={answerId} onClick={() => setAnswer(v => !v)}>{answer ? 'Hide answer' : 'Reveal answer'}</Button><div id={answerId} hidden={!answer}><p className="mq-drill-answer"><HighlightText text={section.drill.answer} source={source} region={`${section.id}:drill:answer`}/></p></div><p lang="en" className="mq-small mq-muted">This practice does not change your original score.</p></>}
+    {section.drill && <><p>{plain ? section.drill.prompt : <HighlightText text={section.drill.prompt} source={source} region={`${section.id}:drill:prompt`}/>}</p><Button lang="en" aria-expanded={answer} aria-controls={answerId} onClick={() => setAnswer(v => !v)}>{answer ? 'Hide answer' : 'Reveal answer'}</Button><div id={answerId} hidden={!answer}><p className="mq-drill-answer">{plain ? section.drill.answer : <HighlightText text={section.drill.answer} source={source} region={`${section.id}:drill:answer`}/>}</p></div><p lang="en" className="mq-small mq-muted">This practice does not change your original score.</p></>}
   </div>
 }
 // Keep a failed persistent revocation effective across remounts in this browser session.
 const revokedCacheKeys = new Set<string>()
 type ExplanationResult = { status: 'approved'; editorial: EditorialExplanation } | { status: 'missing' | 'unavailable' }
-export function Explanation({ source, highlightSource, figures = [] }: { source: Concepto | NbmeQuestion; highlightSource: HighlightSource; figures?: { assetId: string; sha256?: string }[] }) {
+export function Explanation({ source, highlightSource, figures = [], drillsOnly = false }: { source: Concepto | NbmeQuestion; highlightSource: HighlightSource; figures?: { assetId: string; sha256?: string }[]; drillsOnly?: boolean }) {
   const { user } = useAuth()
+  const hasAnnotations = useHasAnnotationProvider()
   const userId = user?.id
   const [loaded, setLoaded] = useState<{ source: typeof source; userId: string | undefined; attempt: number; result: ExplanationResult } | null>(null)
   const [activeId, setActiveId] = useState(''), [attempt, setAttempt] = useState(0)
@@ -73,9 +75,17 @@ export function Explanation({ source, highlightSource, figures = [] }: { source:
     })().catch(() => finish({ status: 'unavailable' }))
     return () => { alive = false }
   }, [source, userId, attempt])
-  const sections = availableSections(editorial?.sections ?? (result?.status === 'missing' ? fallbackSections(source) : []))
+  const sections = availableSections(editorial?.sections ?? (!drillsOnly && result?.status === 'missing' ? fallbackSections(source) : []))
+    .filter(section => !drillsOnly || !!section.drill)
   const section = sections.find(s => s.id === activeId) ?? sections[0]
   const evidence = editorial?.evidence.filter(e => e.sectionId === section?.id) ?? []
+  if (drillsOnly) return <Card className="mq-explanation-card" lang="en">
+    {!result ? <p role="status">Loading reviewed practice…</p> : !editorial || !sections.length ? <>
+      <p role="status">Reviewed practice unavailable. Your answer is saved.</p>
+      <Button onClick={() => setAttempt(value => value + 1)}>Retry reviewed practice</Button>
+    </> : sections.map(s => <Section key={`${sourceIdentityKey(source)}:${editorial.version}:${s.id}`} plain={!hasAnnotations}
+      section={{ ...s, paragraphs: [], bullets: [] }} source={{ ...highlightSource, editorialVersion: editorial.version }} language={editorial.language}/>)}
+  </Card>
   if (!result) return <Card className="mq-explanation-card" lang="en"><p role="status">Loading explanation…</p></Card>
   if (!editorial && result.status !== 'missing') return <Card className="mq-explanation-card" lang="en">
     <p role="status">Explanation unavailable. Your answer is saved.</p>

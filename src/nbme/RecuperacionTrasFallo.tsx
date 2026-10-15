@@ -17,6 +17,7 @@ import './recuperacion-flujo.css'
 
 interface Props {
   pregunta: NbmeQuestion; intento: NbmeAttempt
+  figures?: { assetId: string; sha256?: string }[]
   onActividad: (activa: boolean) => void; onSiguiente: () => void
 }
 /** Montado dentro del jugador: salir del repaso devuelve la misma pregunta y su orquestador. */
@@ -26,7 +27,7 @@ export function RecuperacionTrasFallo(props: Props) {
   return user ? <Flujo key={key} {...props} ownerId={user.id} /> : null
 }
 
-function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId }: Props & { ownerId: string }) {
+function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId, figures }: Props & { ownerId: string }) {
   const { indice, estado, iniciarSesion } = useApp()
   const nbme = useNbme()
   const origen: OrigenRepasoNbme = { sessionId: intento.sessionId, attemptId: intento.id,
@@ -178,7 +179,7 @@ function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId }: Props &
         </> : <p className="mini">No hay conceptos suficientemente relacionados en el material disponible. Puedes usar el fundamento de esta pregunta y continuar el bloque.</p>}
         {guardada && !guardada.terminado && <button className="btn" disabled={cargando || volviendo} onClick={() => abrirRepaso(true)}>Retomar repaso guardado</button>}
         </div>
-        {!intento.correct && <RecuperacionNbme ownerId={ownerId}
+        {!intento.correct && <RecuperacionNbme ownerId={ownerId} pregunta={pregunta} figures={figures}
           origen={{ qid: pregunta.id, revision: pregunta.revision, optionId: intento.optionId, attemptId: intento.id }}
           onActividad={actividadIA} onTerminar={destino => void volver(destino)} />}
       </>}
