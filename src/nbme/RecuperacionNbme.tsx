@@ -3,6 +3,10 @@ import { generarRecuperacionNbme } from '../lib/recuperacion-nbme-ia'
 import { avanzarRecuperacion, claveRecuperacion, crearRecuperacion, guardarRecuperacion, leerRecuperacion,
   responderRecuperacion, type OrigenRecuperacion, type RecuperacionGuardada } from './recuperacion-modelo'
 import './recuperacion.css'
+import { loadNbmeSourceSafety } from '../lib/nbme-source-safety'
+import { originalRecoveryAllowed } from './source-safety'
+import type { NbmeQuestion } from './types'
+import { Explanation } from '../myqbank/Explanation'
 
 export interface RecuperacionNbmeProps {
   ownerId: string | null
@@ -10,15 +14,52 @@ export interface RecuperacionNbmeProps {
   onTerminar: (destino: 'original' | 'siguiente') => void
   puedeSeguir?: boolean
   onActividad?: (activa: boolean) => void
+  pregunta?: NbmeQuestion
+  figures?: { assetId: string; sha256?: string }[]
 }
 
 /** El cambio de cuenta/intento desmonta y cancela la petición anterior antes de mostrar otra práctica. */
 export function RecuperacionNbme(props: RecuperacionNbmeProps) {
   const clave = props.ownerId ? claveRecuperacion(props.ownerId, props.origen) : null
-  return clave && props.ownerId ? <PanelRecuperacion key={clave} {...props} ownerId={props.ownerId} /> : null
+  return clave && props.ownerId ? <RecoveryGate key={clave} {...props} ownerId={props.ownerId} /> : null
 }
 
-function PanelRecuperacion({ ownerId, origen, onTerminar, puedeSeguir = true, onActividad }: RecuperacionNbmeProps & { ownerId: string }) {
+function RecoveryGate(props: RecuperacionNbmeProps & { ownerId: string }) {
+  const [access, setAccess] = useState<'loading' | 'original' | 'reviewed'>('loading')
+  const alive = useRef(true)
+  const request = useRef(0)
+  const active = useRef(false)
+  const activity = (value: boolean) => { active.current = value; props.onActividad?.(value) }
+  const authorizeOriginal = async () => {
+    const sequence = ++request.current
+    const allowed = originalRecoveryAllowed(await loadNbmeSourceSafety(), props.origen.qid)
+    if (!alive.current || sequence !== request.current) return false
+    setAccess(allowed ? 'original' : 'reviewed')
+    return allowed
+  }
+  useEffect(() => {
+    alive.current = true
+    const offline = () => { request.current++; setAccess('reviewed'); if (active.current) activity(false) }
+    window.addEventListener('offline', offline)
+    void authorizeOriginal()
+    return () => { alive.current = false; request.current++; window.removeEventListener('offline', offline) }
+  }, [])
+  if (access === 'loading') return <p role="status" lang="en">Checking recovery availability…</p>
+  if (access === 'original') return <PanelRecuperacion {...props} onActividad={activity} authorizeOriginal={authorizeOriginal}/>
+  const q = props.pregunta
+  return <section className="recuperacion-nbme pila" aria-label="Reviewed recovery" lang="en">
+    <h3>Reviewed recovery</h3>
+    {q && q.id === props.origen.qid && q.revision === props.origen.revision
+      ? <Explanation source={q} figures={props.figures} drillsOnly highlightSource={{ material: 'nbme', sourceId: q.id,
+        sourceRevision: q.revision, variantId: '', editorialVersion: '' }}/>
+      : <p role="status">Reviewed practice unavailable. Your answer is saved.</p>}
+    <button className="btn" onClick={() => void authorizeOriginal()}>Retry recovery availability</button>
+    <div className="recuperacion-acciones"><button className="btn" onClick={() => props.onTerminar('original')}>Back to question</button>
+      {props.puedeSeguir !== false && <button className="btn" onClick={() => props.onTerminar('siguiente')}>Next question</button>}</div>
+  </section>
+}
+
+function PanelRecuperacion({ ownerId, origen, onTerminar, puedeSeguir = true, onActividad, authorizeOriginal }: RecuperacionNbmeProps & { ownerId: string; authorizeOriginal: () => Promise<boolean> }) {
   const [lectura] = useState(() => leerRecuperacion(ownerId, origen))
   const [sesion, setSesion] = useState<RecuperacionGuardada | null>(() => lectura.estado === 'ok' ? lectura.sesion : null)
   const [abierta, setAbierta] = useState(false)
@@ -55,6 +96,7 @@ function PanelRecuperacion({ ownerId, origen, onTerminar, puedeSeguir = true, on
     control.current?.abort()
     const abort = new AbortController(); control.current = abort
     setPensando(true); setAviso('')
+    if (!await authorizeOriginal() || abort.signal.aborted) { setPensando(false); return }
     onActividad?.(true)
     const r = await generarRecuperacionNbme({ ...origen, ...(razonamiento.trim() ? { razonamiento: razonamiento.trim() } : {}) }, abort.signal)
     if (abort.signal.aborted) return
@@ -62,6 +104,11 @@ function PanelRecuperacion({ ownerId, origen, onTerminar, puedeSeguir = true, on
     if (r.estado === 'sin_ia') { setAviso(r.motivo); onActividad?.(false); return }
     actualizar(crearRecuperacion(ownerId, origen, r.data))
     setAbierta(true)
+  }
+  const retomar = async () => {
+    control.current?.abort()
+    const abort = new AbortController(); control.current = abort
+    if (await authorizeOriginal() && !abort.signal.aborted) { setAbierta(true); onActividad?.(true) }
   }
   const comprobar = () => {
     if (sesion && !respuesta) actualizar(responderRecuperacion(sesion, sesion.borrador))
@@ -72,7 +119,7 @@ function PanelRecuperacion({ ownerId, origen, onTerminar, puedeSeguir = true, on
     {lectura.estado === 'invalido' && !sesion && <p className="mini" role="alert">La recuperación guardada no se pudo leer. Puedes generar otra; tu intento NBME se conserva.</p>}
     {!guardado && <p className="recuperacion-aviso" role="alert">No se pudo guardar esta práctica en el dispositivo. Puedes continuar aquí; mantén la página abierta si quieres terminarla.</p>}
     {!abierta && <>
-      {sesion ? <button className="btn" onClick={() => { setAbierta(true); onActividad?.(true) }}>{sesion.cerrada ? 'Ver recuperación guardada' : `Retomar recuperación · ${sesion.cursor + 1} de ${sesion.contenido.ejercicios.length}`}</button>
+      {sesion ? <button className="btn" onClick={() => void retomar()}>{sesion.cerrada ? 'Ver recuperación guardada' : `Retomar recuperación · ${sesion.cursor + 1} de ${sesion.contenido.ejercicios.length}`}</button>
         : <>
           <details><summary>Así lo razoné · opcional</summary><label className="recuperacion-razonamiento">¿Qué dato te llevó a elegir esa opción?
             <textarea value={razonamiento} maxLength={500} rows={2} onChange={e => setRazonamiento(e.target.value)} placeholder="Elegí esa opción porque…" /></label></details>

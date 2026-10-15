@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { installOriginalRecoveryPolicy } from './arnes/source-safety-fixture'
 
 /** Sábado: desde la 1.32.0 sólo el fin de semana trae preguntas NBME nuevas. */
 const LUNES = new Date('2026-10-17T07:30:00-04:00')
@@ -40,6 +41,7 @@ for (const width of [390, 1280]) {
     test.use({ viewport: { width, height: 844 }, colorScheme: piel, contextOptions: { reducedMotion: 'reduce' } })
 
     test('la elección, el resultado y el foco de teclado conservan señales inequívocas', async ({ page }) => {
+      await installOriginalRecoveryPolicy(page)
       await abrirPregunta(page)
       await page.keyboard.press('b')
       const seleccionada = page.locator('.nbme-option.selected')

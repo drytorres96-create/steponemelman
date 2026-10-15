@@ -15,10 +15,10 @@ export const supabase = {
     : parametros.get('ia') === '1' ? { access_token: NBME_REAL_TOKEN, user: { id: 'QA-user' } } : null }, error: null }) },
   from(table: string) {
     if (table === 'myqbank_annotations') return { select: () => ({ eq: () => ({ order: () => ({ range: async (start: number, end: number) => ({ data: [...annotations.values()].slice(start,end+1), error: null }) }) }) }) }
-    if (table === 'corpus_assets' || table === 'nbme_assets') return { select: () => ({ eq: (_field: string, path: string) => ({ maybeSingle: async () => {
+    if (table === 'corpus_assets' || table === 'nbme_assets') return { select: () => ({ eq: (_field: string, path: string) => ({ abortSignal() { return this }, maybeSingle: async () => {
       const payload = structuredClone(window.__qaEditorialAssets?.[path] ?? null)
       if (window.__qaEditorialDelay?.[path]) await new Promise(resolve => setTimeout(resolve, window.__qaEditorialDelay![path]))
-      if (path.startsWith('myqbank/explanations/')) return {data:payload ? {payload} : null,error:null}
+      if (path.startsWith('myqbank/explanations/') || path === 'myqbank/source-safety/v1.json') return {data:payload ? {payload} : null,error:null}
       if (window.__qaCatalogFailure) return {data:null,error: new Error('Synthetic unavailable catalog')}
       return ({
       data: table === 'corpus_assets' && path === 'myqbank/catalogs/1.0.5.json'

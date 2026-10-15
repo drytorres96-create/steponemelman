@@ -120,3 +120,4 @@ export function AnnotationProvider({ userId, children }: { userId: string; child
   return <C.Provider value={{ rows, ready, status, save, sync, restore }}>{children}</C.Provider>
 }
 export function useAnnotations() { const value = useContext(C); if (!value) throw new Error('Annotations require an account'); return value }
+export function useHasAnnotationProvider() { return useContext(C) !== null }

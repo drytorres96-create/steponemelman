@@ -327,6 +327,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
           </>}
     {recuperarErrores && feedback && !feedback.conflict && preguntaRecuperacion && <RecuperacionTrasFallo
       key={`${feedback.id}:${preguntaRecuperacion.revision}`} pregunta={preguntaRecuperacion} intento={feedback}
+      figures={figures.figures}
       onActividad={activa => { setRecuperando(activa); onRecuperacion?.(activa) }} onSiguiente={modoPaso && onPasoCompleto ? onPasoCompleto : nextQuestion} />}
     <div className="nbme-status" role="status"><span>{syncText}</span>
       {(syncStatus.state === 'error' || syncStatus.state === 'offline') && <button className="btn pequeno fantasma" disabled={busy} style={{ marginLeft: 8 }} onClick={() => void syncNow()}>Reintentar</button>}

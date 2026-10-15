@@ -1,5 +1,6 @@
 import type { Page, Route } from '@playwright/test'
 import { catalogoNbmeReal, NBME_REAL_SESSION, preguntaNbmeReal } from '../../e2e/arnes/nbme-real-fixture'
+import { installOriginalRecoveryPolicy } from '../../e2e/arnes/source-safety-fixture'
 
 /** Lunes 26-oct, día 15 de la meta (1.32.0). */
 export const AHORA = new Date('2026-10-26T11:30:00Z')
@@ -17,6 +18,7 @@ export const RECUPERACION = { objetivo: 'Distinguish the first, second and last 
 }
 
 export async function instalarRed(page: Page, generar: (route: Route, numero: number) => Promise<void>) {
+  await installOriginalRecoveryPolicy(page)
   const generaciones: { method: string; body: unknown; authorization?: string }[] = []
   const otrasIA: string[] = []
   const errores: string[] = []
