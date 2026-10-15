@@ -79,7 +79,7 @@ describe('compatibilidad de evidencia y mantenimiento con estados guardados', ()
     expect(estado.reanudable).toEqual(original.reanudable)
     expect(estado.sesiones).toEqual(original.sesiones)
     expect(raw).toEqual(original)
-    expect(EVALUADOR_VERSION).toBe('2.5.0')
+    expect(EVALUADOR_VERSION).toBe('2.5.1')
     expect(estado.progreso.D.intentos[0].evaluador_version).toBe('2.2.0')
   })
 

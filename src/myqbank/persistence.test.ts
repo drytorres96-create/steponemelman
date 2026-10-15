@@ -61,7 +61,8 @@ describe('My Q Bank persistence with legacy histories', () => {
     expect(questionProgress(closed, question.id)).toMatchObject({ firstCorrect: false, pendingError: true })
     expect(Object.keys(closed.attempts)).toHaveLength(1)
     expect(mergeNbmeStates(closed, base).sessions['QA-block'].completedAt).toBe(500)
-    expect(setNbmeDraft(navigateNbmeSession(closed, 'QA-block', 1), 'QA-block', 1, 'A')).toEqual(navigateNbmeSession(closed, 'QA-block', 1))
+    const navigated = navigateNbmeSession(closed, 'QA-block', 1, 600)
+    expect(setNbmeDraft(navigated, 'QA-block', 1, 'A', 700)).toEqual(navigated)
   })
   it('blocks cannot change mode or exact presentation and merge per-position drafts', () => {
     const block = createBlock('QA', [{ kind: 'nbme', id: 'QA-1', revision: 'r1' }, { kind: 'nbme', id: 'QA-2', revision: 'r1' }], 'test', 100)

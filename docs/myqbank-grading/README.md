@@ -7,8 +7,13 @@ AI. MyQBank also displayed a partial grade as “Incorrect”. Both study player
 retain accepted local answers without an AI request; the Worker independently checks
 the trusted, version-matched source before invoking the model or its cache. For other
 wordings the model receives the complete accepted-answer alternatives, and grading
-cache keys include evaluator version 2.5.0 and those alternatives. The free budget,
+cache keys include evaluator version 2.5.1 and those alternatives. The free budget,
 authentication, source gates and question identity checks remain in force.
+
+Version 2.5.1 records the evaluator revision required before releasing corrected
+editorial assessments. It retains the matching algorithm. Saved blocks keep their
+original questions and attempts retain their recorded evaluator versions; a newer
+source cannot recheck an attempt from a different question version.
 
 MyQBank distinguishes “Partially correct”, identifies AI grading and persists its short
 reason in optional attempt metadata. “Recheck accepted answer” appears only when a
