@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { installOriginalRecoveryPolicy } from './arnes/source-safety-fixture'
 
 /** Sábado: desde la 1.32.0 sólo el fin de semana trae preguntas NBME nuevas. */
 const LUNES = new Date('2026-10-17T11:30:00Z')
@@ -65,6 +66,7 @@ for (const width of [390, 1280]) test.describe(`IA gratuita a ${width}px`, () =>
   })
 
   test('un fallo de opciones NBME usa su letra y revisión y una cuota agotada permite continuar', async ({ page }) => {
+    await installOriginalRecoveryPolicy(page)
     const { NBME_REAL_TOKEN } = await import('./arnes/nbme-real-fixture')
     const consultas: { cuerpo: Record<string, unknown>; autorizacion: string | undefined }[] = []
     const correccionesAutomaticas: Record<string, unknown>[] = []

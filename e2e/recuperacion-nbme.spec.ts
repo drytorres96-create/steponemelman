@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { catalogoNbmeReal, NBME_REAL_SESSION, preguntaNbmeReal } from './arnes/nbme-real-fixture'
 import type { NbmeQuestion } from '../src/nbme/types'
+import { installOriginalRecoveryPolicy } from './arnes/source-safety-fixture'
 
 const CARPETA = path.resolve('docs/flujo-recuperacion-nbme')
 const IDS = ['C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10']
@@ -34,6 +35,7 @@ async function retomarPreguntas(page: Page) {
 }
 
 async function abrirFallo(page: Page, opciones: { estadoIA?: number; colaGeneralPendiente?: boolean } = {}) {
+  await installOriginalRecoveryPolicy(page)
   const llamadas: { path: string; body: unknown }[] = []
   await page.clock.install({ time: AHORA })
   await page.route('**/api/**', async route => {
