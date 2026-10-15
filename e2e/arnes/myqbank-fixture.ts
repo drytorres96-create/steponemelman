@@ -5,6 +5,7 @@ export const myqbankConcepts = formats.map((format, i) => ConceptoZ.parse({
   concept_id: `QA-FORMAT-${i}`, source: { doc: 'QA', doc_title: 'Synthetic QA', page: 1, item_id: `${i}`, fragment: 'Synthetic alpha is the reference response. Beta is the alternative.' },
   ...(format === 'completar' ? { variante_id: 'QA-fixed-completar' } : {}),
   objetivo: `Synthetic ${format}`, afirmacion: 'Synthetic alpha is the reference.', respuesta_canonica: format === 'numerico' ? '4' : 'alpha',
+  ...(format === 'recuperacion_libre' ? { sinonimos: ['first element', 'FIRST ELEMENT'] } : {}),
   explicacion: 'Ejemplo sintético: alfa es la respuesta de referencia. Este contenido sirve únicamente para comprobar la interfaz.',
   clasificacion: { disciplina_primaria: 'Fisiología', sistema_primario: i % 2 ? 'Renal' : 'Cardiovascular', tema: 'Synthetic QA', tipo_conocimiento: 'Asociación', dificultad: 1 },
   step: 'step1', interaccion: { recomendada: format, permitidas: [format] },

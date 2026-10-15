@@ -276,8 +276,8 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
       setFase('retro'); return
     }
     reloj.current.activar(false)
-    // Una palabra o frase corta la juzga la IA; lo demás lo resuelve el corrector propio.
-    if (usaTextoLibre(c) && r.respuestaDada.trim()) {
+    // Una respuesta ya aceptada no se envía a IA: conserva su calificación y no gasta cuota.
+    if (usaTextoLibre(c) && r.respuestaDada.trim() && !['correcta', 'ortografia'].includes(r.veredicto)) {
       calificando.current = true
       setEsperandoIA(true)
       void (async () => {
@@ -293,7 +293,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
         if (!vivoIA.current) return
         setEsperandoIA(false)
         setAvisoIA(fallo.estado === 'ok' ? null : fallo.motivo)
-        registrarRespuesta(fallo.estado === 'ok' ? veredictoDeIA(r, fallo) : r, fallo.estado === 'ok')
+        registrarRespuesta(fallo.estado === 'ok' ? veredictoDeIA(r, fallo) : r, fallo.estado === 'ok' && fallo.origen !== 'respuesta_aceptada')
       })()
       return
     }
@@ -360,7 +360,7 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
     const juzgado = veredictoDeIA(res, fallo)
     const actualizado: Intento = { ...intento, resultado: juzgado.veredicto, tipo_error: juzgado.tipoError,
       calificacion: juzgado.veredicto === 'correcta' ? 3 : juzgado.veredicto === 'incorrecta' ? 1 : 2,
-      calificado_por_ia: true,
+      calificado_por_ia: fallo.origen !== 'respuesta_aceptada',
       calificacion_actualizada_en: Math.max(Date.now(), (intento.calificacion_actualizada_en ?? intento.ts) + 1) }
     intentoActual.current = actualizado
     registrarIntento(c.concept_id, actualizado)

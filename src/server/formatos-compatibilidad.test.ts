@@ -43,7 +43,7 @@ function peticion(version: VersionFormato | undefined, huella?: string, index = 
   const c = prepararConcepto(original, { semilla: questionId, indice: index, ruta: 'repaso', version: version ?? 1 })
   return { c, request: new Request('https://site/api/calificar', { method: 'POST',
     headers: { Authorization: 'Bearer ' + 'x'.repeat(30) },
-    body: JSON.stringify({ conceptId: original.concept_id, answer: 'alfa', questionId,
+    body: JSON.stringify({ conceptId: original.concept_id, answer: 'first element', questionId,
       version: huella ?? versionPregunta(c), ...(version !== undefined ? { formatVersion: version } : {}),
       index, route: 'repaso', retry: false }),
   }) }
@@ -64,6 +64,36 @@ describe('reconstrucción de presentación entre navegador y Worker', () => {
     expect(c.interaccion.recomendada).toBe(version === 3 ? 'recuperacion_libre'
       : version === 2 ? 'opcion_multiple' : 'verdadero_falso')
     expect(env.AI.run).not.toHaveBeenCalled()
+  })
+
+  it.each(['alfa', 'ALPHA', '  alpha  '])('califica la respuesta aceptada %s sin IA ni caché', async answer => {
+    const { env, enviado } = setup()
+    const { request } = peticion(3)
+    const body = { ...await request.json(), answer }
+    const response = await worker.fetch(new Request(request.url, { method: 'POST', headers: request.headers, body: JSON.stringify(body) }), env)
+    expect(await response.json()).toMatchObject({ veredicto: 'correcta', origen: 'respuesta_aceptada' })
+    expect(enviado).not.toHaveBeenCalled()
+    expect(env.AI.run).not.toHaveBeenCalled()
+  })
+
+  it('envía alternativas del servidor, ignora sinónimos inyectados e invalida la caché antigua', async () => {
+    const { env, enviado } = setup()
+    const { request } = peticion(3)
+    const body = { ...await request.json(), answer: 'other', acceptedAnswers: ['other'], canonical: 'other' }
+    expect((await worker.fetch(new Request(request.url, { method: 'POST', headers: request.headers, body: JSON.stringify(body) }), env)).status).toBe(200)
+    const trusted = await enviado.mock.calls[0][0].json()
+    expect(trusted.acceptedAnswers).toContain('alpha')
+    expect(trusted.acceptedAnswers).not.toContain('other')
+    expect(trusted.canonical).toBe('alfa')
+    const previous = trusted.key
+    original.sinonimos.push('first element')
+    try {
+      const next = peticion(3)
+      await worker.fetch(next.request, env)
+      // Now the same answer is locally accepted; the old AI verdict cannot be used.
+      expect(enviado).toHaveBeenCalledOnce()
+    } finally { original.sinonimos.pop() }
+    expect(previous).toBeTruthy()
   })
 
   it('rechaza una huella de opciones al pedir una presentación V3 de recuerdo', async () => {

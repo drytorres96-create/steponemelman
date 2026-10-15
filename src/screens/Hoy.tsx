@@ -141,11 +141,12 @@ function useTic(cada = 60_000): void {
  * Ningún número de deuda fuera de los desplegables: los techos ya dicen lo que hay
  * que hacer.
  */
-export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar, compact = false }: {
+export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar, compact = false, busy = false }: {
   onNuevo: (material: MaterialNuevo) => void
   onCajas: (items: ItemCaja[], titulo: string) => void
   onBiblioteca: (tipo: 'conceptos' | 'preguntas') => void
   onRetomar?: AccionesRecuperacion['onRetomar']
+  busy?: boolean
   compact?: boolean
 }) {
   const { indice, estado, sincronizacion } = useApp()
@@ -277,7 +278,7 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar, compact = false
     <div className="mq-heading"><strong>Today's goal</strong><span>{interior.valor} / {interior.total}</span></div>
     <progress value={interior.valor} max={interior.total || 1} aria-label="Today's goal"/>
     <p>{completo ? viernes ? 'Rest day. Your reviews resume tomorrow.' : 'Daily goal complete. You can stop here.' : `${quedan} steps left · your daily target stays the same.`}</p>
-    {!completo && siguiente && <button className="mq-button mq-button--primary" onClick={siguiente === 'cajas' ? () => onCajas(pendientesCajas, tituloCajas) : empezarNuevo}>
+    {!completo && siguiente && <button className="mq-button mq-button--primary" disabled={busy} onClick={siguiente === 'cajas' ? () => onCajas(pendientesCajas, tituloCajas) : empezarNuevo}>
       {siguiente === 'cajas' ? 'Review due items' : "Study today's new items"}</button>}
     {fallo && <button className="mq-button" onClick={() => setReintento(v => v + 1)}>Retry weekly plan</button>}
   </div>

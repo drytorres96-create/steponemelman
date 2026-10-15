@@ -48,6 +48,8 @@ export interface Intento {
   respuestas_en_conflicto?: string[]
   /** El veredicto lo decidió la IA sobre una respuesta libre, no el corrector propio. */
   calificado_por_ia?: boolean
+  /** Motivo original de la IA; se conserva incluso tras una rectificación explícita. */
+  motivo_calificacion_ia?: string
   /** Yoel rectificó ese veredicto a mano; manda sobre el de la IA y no se vuelve a tocar. */
   correccion_manual?: boolean
   interaccion: string

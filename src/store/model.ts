@@ -107,6 +107,7 @@ function leerIntento(v: unknown): Intento | null {
   if (v.session_id !== undefined && v.session_id !== null && !idSeguro(v.session_id)) return null
   if (v.resultado !== undefined && !RESULTADOS.has(String(v.resultado))) return null
   if (v.respuesta_dada !== undefined && (typeof v.respuesta_dada !== 'string' || v.respuesta_dada.length > 10000)) return null
+  if (v.motivo_calificacion_ia !== undefined && (typeof v.motivo_calificacion_ia !== 'string' || v.motivo_calificacion_ia.length > 200)) return null
   for (const k of ['pregunta_id', 'pregunta_version', 'evaluador_version', 'variante_id']) if (v[k] !== undefined && !idSeguro(v[k])) return null
   for (const k of ['fuente_consultada', 'explicacion_previa', 'primera_presentacion', 'calificado_por_ia', 'correccion_manual']) if (v[k] !== undefined && typeof v[k] !== 'boolean') return null
   if (v.modo !== undefined && !['aprendizaje', 'repaso', 'examen'].includes(String(v.modo))) return null
@@ -127,6 +128,7 @@ function leerIntento(v: unknown): Intento | null {
     ...(v.calificacion_actualizada_en !== undefined ? { calificacion_actualizada_en: v.calificacion_actualizada_en as number } : {}),
     ...(v.respuestas_en_conflicto !== undefined ? { respuestas_en_conflicto: v.respuestas_en_conflicto as string[] } : {}),
     ...(v.calificado_por_ia !== undefined ? { calificado_por_ia: v.calificado_por_ia as boolean } : {}),
+    ...(v.motivo_calificacion_ia !== undefined ? { motivo_calificacion_ia: v.motivo_calificacion_ia as string } : {}),
     ...(v.correccion_manual !== undefined ? { correccion_manual: v.correccion_manual as boolean } : {}),
     ...(v.attempt_id !== undefined ? { attempt_id: v.attempt_id as string } : {}),
     ...(v.session_id !== undefined ? { session_id: v.session_id as string | null } : {}),
