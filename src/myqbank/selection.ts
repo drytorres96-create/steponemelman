@@ -6,8 +6,10 @@ import { ultimoIntentoResuelto, construirPlanDiario } from '../lib/plan-estudio'
 import { intentoCorrecto } from '../srs/tipos'
 import type { EligibleItem, Pool, Material } from './contracts'
 import type { BlockEntry } from './blocks'
+import { awaitingRecall, learningExposures } from './learning'
 export interface BankItem extends EligibleItem { revision: string; concept?: ConceptMetadata; firstCorrect: boolean | null; seen: boolean; form?: string }
 export function bankItems(concepts: ConceptMetadata[], catalog: NbmeCatalog | null, study: EstadoApp, nbme: NbmeState): BankItem[] {
+  const learning = learningExposures(study.myqbankBlocks)
   const marks = new Map<string, { flagged: boolean; skipped: boolean; flagTime: number; skipTime: number }>()
   for (const block of Object.values(study.myqbankBlocks ?? {})) block.entries.forEach((entry, i) => {
     const key = `${entry.kind}:${entry.id}`, previous = marks.get(key) ?? { flagged: false, skipped: false, flagTime: -1, skipTime: -1 }
@@ -28,9 +30,11 @@ export function bankItems(concepts: ConceptMetadata[], catalog: NbmeCatalog | nu
   return [...questions, ...concepts.filter(c => c.calidad.estado === 'aprobado').map(c => {
     const progress = study.progreso[c.concept_id], last = ultimoIntentoResuelto(progress)
     const hidden = last?.session_id && study.myqbankBlocks?.[last.session_id]?.mode === 'test' && study.myqbankBlocks[last.session_id].completedAt === undefined
-    const seen = !!progress?.intentos.length || !!study.conceptosVistos?.[c.concept_id]
+    const viewedAt = learning.get(c.concept_id)
+    const seen = viewedAt !== undefined || !!progress?.intentos.length || !!study.conceptosVistos?.[c.concept_id]
     return { id: c.concept_id, kind: 'concept' as const, revision: 'prepared-on-start', concept: c, seen, firstCorrect: null,
-      systems: [c.clasificacion.sistema_primario, ...c.clasificacion.sistemas_secundarios], pools: pool('concept', c.concept_id, seen, !!last && !hidden && !intentoCorrecto(last)) }
+      systems: [c.clasificacion.sistema_primario, ...c.clasificacion.sistemas_secundarios], pools: [...pool('concept', c.concept_id, seen, !!last && !hidden && !intentoCorrecto(last)),
+        ...(viewedAt !== undefined && awaitingRecall(study, c.concept_id, viewedAt) ? ['learning' as const] : [])] }
   })]
 }
 export function selectBankItems(items: BankItem[], options: { material: Material; systems: string[]; pools: Pool[]; form: string; search: string }, study: EstadoApp, now = Date.now()): BankItem[] {

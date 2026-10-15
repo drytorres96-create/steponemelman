@@ -9,9 +9,10 @@ import { reconstruirProgreso } from '../store/model'
 import { fechaEstudio, fechaISOEstudio, desplazarFechaEstudio } from '../lib/calendario-estudio'
 import { bankItems, selectBankItems, type BankItem } from './selection'
 import type { StudyBlock } from './blocks'
+import { awaitingRecall, learningExposures } from './learning'
 
 const materials = [{ value: 'nbme', label: 'NBME' }, { value: 'concepts', label: 'Mehlman Concepts' }, { value: 'mixed', label: 'Mixed' }] as const
-const pools = [{ value: 'unused', label: 'Unused' }, { value: 'incorrect', label: 'Incorrect' }, { value: 'flagged', label: 'Flagged' }, { value: 'skipped', label: 'Skipped' }] as const
+const pools = [{ value: 'unused', label: 'Unused' }, { value: 'incorrect', label: 'Incorrect' }, { value: 'flagged', label: 'Flagged' }, { value: 'skipped', label: 'Skipped' }, { value: 'learning', label: 'Learning' }] as const
 export function Dashboard({ onStart, onResume, dailyGoal, legacyResume, busy, error }: {
   onStart: (items: BankItem[], mode: BlockMode) => Promise<void>; onResume: (block: StudyBlock) => Promise<void>;
   dailyGoal: ReactNode; legacyResume: ReactNode; busy: boolean; error: string | null
@@ -42,6 +43,8 @@ export function Dashboard({ onStart, onResume, dailyGoal, legacyResume, busy, er
     return [id, attempts.length === p.intentos.length ? p : reconstruirProgreso(id, attempts, estado.criterios)]
   })), [estado])
   const conceptIds = [...new Set(indice?.modulos.flatMap(m => m.sesiones.flatMap(s => s.conceptos)) ?? [])]
+  const publishedIds = new Set(conceptIds)
+  const awaiting = [...learningExposures(estado.myqbankBlocks)].filter(([id, at]) => publishedIds.has(id) && awaitingRecall(estado, id, at)).length
   const mastery = resumenProgresoAprendizaje(conceptIds, visibleProgress, estado.criterios, now, estado.conceptosVistos)
   const used = bank.filter(i => i.seen).length, scored = bank.filter(i => i.kind === 'nbme' && i.firstCorrect !== null), correct = scored.filter(i => i.firstCorrect).length
   const rows = systems.map(id => {
@@ -69,7 +72,8 @@ export function Dashboard({ onStart, onResume, dailyGoal, legacyResume, busy, er
       <div className="mq-field"><h3>Material</h3><Segmented label="Material" value={material} onChange={value => { setMaterial(value); setSystems(null) }} options={materials}/></div>
       <div className="mq-suggestion"><strong>Five items. One clear next step.</strong><p>Your daily goal stays in place.</p><Button onClick={() => setSize(5)}>Use this</Button></div>
       <div className="mq-field"><h3>Mode</h3><Segmented label="Mode" value={mode} onChange={setMode} options={[{ value: 'tutor', label: 'Tutor' }, { value: 'test', label: 'Test' }]}/><p className="mq-small mq-muted">{mode === 'tutor' ? 'Explanation after each answer.' : 'Results and help stay hidden until you end the block.'}</p></div>
-      <div className="mq-field"><h3>Questions to draw from</h3><div className="mq-pool-grid">{pools.map(pool => <Chip key={pool.value} selected={selectedPools.includes(pool.value)} onClick={() => setPools(selectedPools.includes(pool.value) ? selectedPools.filter(p => p !== pool.value) : [...selectedPools, pool.value])}>{pool.label}<span>{selectBankItems(items, { ...selection, pools: [pool.value] }, estado, now).length}</span></Chip>)}</div></div>
+      <div className="mq-field"><h3>Questions to draw from</h3><div className="mq-pool-grid">{pools.filter(pool => pool.value !== 'learning' || material !== 'nbme').map(pool => <Chip key={pool.value} selected={selectedPools.includes(pool.value)} onClick={() => setPools(selectedPools.includes(pool.value) ? selectedPools.filter(p => p !== pool.value) : [...selectedPools, pool.value])}>{pool.label}<span>{selectBankItems(items, { ...selection, pools: [pool.value] }, estado, now).length}</span></Chip>)}</div></div>
+      {material !== 'nbme' && <p className="mq-small mq-muted">Learning: studied with help, awaiting a correct answer without help.{selectedPools.includes('learning') && ` Practice within ${estado.criterios.separacionHoras} hours of reading counts as assisted.`}</p>}
       <div className="mq-field"><h3>Number of questions</h3><div className="mq-count-row"><div className="mq-stepper"><Button aria-label="Fewer questions" disabled={size <= 5} onClick={() => setSize(n => n - 5)}><Icon name="minus"/></Button><output>{size}</output><Button aria-label="More questions" disabled={size >= 80} onClick={() => setSize(n => n + 5)}><Icon name="plus"/></Button></div>{[5,10,20,40,80].map(n => <Chip key={n} selected={size === n} onClick={() => setSize(n)}>{n}</Chip>)}</div></div>
       <details><summary>More filters</summary><div className="mq-field"><label>Search concepts or ID<input value={search} onChange={e => setSearch(e.target.value)}/></label><label>NBME form<select value={form} onChange={e => setForm(e.target.value)}><option value="all">All forms</option>{['27','28','29'].map(f => <option key={f}>{f}</option>)}</select></label></div></details>
       <dl className="mq-summary"><div><dt>Block</dt><dd>{count} items · {mode === 'test' ? 'Test' : 'Tutor'}</dd></div><div><dt>Available</dt><dd aria-live="polite">{eligible.length} unique items</dd></div><div><dt>Time</dt><dd>{material === 'nbme' && mode === 'test' ? `${Math.ceil(count * 1.5)} min target` : 'Untimed'}</dd></div></dl>
@@ -86,7 +90,7 @@ export function Dashboard({ onStart, onResume, dailyGoal, legacyResume, busy, er
       <div className="mq-stat-grid">{[['Answered / seen', used], ['NBME accuracy', scored.length ? `${safePercent(correct, scored.length)}%` : '—'], ['Mehlman mastered', mastery.dominioDemostrado], ['Maintenance current', mastery.mantenimientoAlDia]].map(([label, value]) => <div className="mq-stat" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
       <p className="mq-muted mq-small">NBME: first graded answers ({scored.length}). Mehlman: demonstrated mastery.</p>
       <dl className="mq-pace"><div><dt>NBME average time</dt><dd>{seconds === null ? '—' : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`} <span>/ 1:30</span></dd></div>
-        <div><dt>Blocks completed</dt><dd>{blocks.filter(b => b.completedAt !== undefined).length}</dd></div><div><dt>Mehlman seen</dt><dd>{mastery.vistos} / {mastery.total}</dd></div></dl>
+        <div><dt>Blocks completed</dt><dd>{blocks.filter(b => b.completedAt !== undefined).length}</dd></div><div><dt>Awaiting recall</dt><dd>{awaiting}</dd></div><div><dt>Mehlman seen</dt><dd>{mastery.vistos} / {mastery.total}</dd></div></dl>
       <details><summary>Saved blocks</summary><div className="mq-block-history">{blocks.map(b => <Button key={b.id} disabled={busy} onClick={() => void onResume(b)}>{b.title} · {b.completedAt === undefined ? 'Resume' : 'Review'}</Button>)}{!blocks.length && <p>No blocks yet.</p>}</div></details>
     </Card>
 

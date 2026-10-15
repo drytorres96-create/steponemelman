@@ -3,6 +3,7 @@ import { CRITERIOS_POR_DEFECTO, calcularEstado, evaluarDominio, type CriteriosDo
 import { intentoCorrecto, NOMBRE_ERROR, NOMBRE_ESTADO, type Intento, type ProgresoConcepto } from '../srs/tipos'
 import type { VersionFormato } from '../lib/formatos'
 import { parseBlocks, mergeBlocks, type StudyBlock } from '../myqbank/blocks'
+import { retainLearningEvidence } from '../myqbank/learning'
 
 export const CORPUS_VERSION = '1.0.5' as const
 
@@ -412,9 +413,13 @@ function elegirCampo<K extends 'criterios' | 'reanudable'>(a: EstadoApp, b: Esta
 /** Unión conmutativa: los intentos y sesiones se identifican, nunca se suman dos veces. */
 export function combinarEstados(a: EstadoApp, b: EstadoApp): EstadoApp {
   const criterios = elegirCampo(a, b, 'criterios')
+  const blocks = mergeBlocks(a.myqbankBlocks, b.myqbankBlocks)
   const progreso: EstadoApp['progreso'] = {}
   const ids = [...new Set([...Object.keys(a.progreso), ...Object.keys(b.progreso)])].sort()
-  for (const id of ids) progreso[id] = unirProgreso(a.progreso[id] ?? nuevoProgreso(id), b.progreso[id] ?? nuevoProgreso(id), criterios)
+  for (const id of ids) {
+    const withEvidence = (p: ProgresoConcepto) => ({ ...p, intentos: p.intentos.map(i => retainLearningEvidence(i, blocks)) })
+    progreso[id] = unirProgreso(withEvidence(a.progreso[id] ?? nuevoProgreso(id)), withEvidence(b.progreso[id] ?? nuevoProgreso(id)), criterios)
+  }
   const porSesion = new Map<string, RegistroSesion>()
   for (const s of [...a.sesiones, ...b.sesiones]) {
     const anterior = porSesion.get(s.id)
@@ -433,7 +438,7 @@ export function combinarEstados(a: EstadoApp, b: EstadoApp): EstadoApp {
     conceptosVistos[id] = x && y ? unirVista(x, y) : (x ?? y)!
   }
   return { version: 1, corpus_version: CORPUS_VERSION, progreso,
-    ...(a.myqbankBlocks || b.myqbankBlocks ? { myqbankBlocks: mergeBlocks(a.myqbankBlocks, b.myqbankBlocks) } : {}),
+    ...(a.myqbankBlocks || b.myqbankBlocks ? { myqbankBlocks: blocks } : {}),
     sesiones: [...porSesion.values()].sort((x, y) => x.inicio - y.inicio || compararTexto(x.id, y.id)),
     criterios, reanudable: unirReanudable(a, b),
     fieldUpdatedAt: { criterios: Math.max(marca(a, 'criterios'), marca(b, 'criterios')),

@@ -50,7 +50,7 @@ export interface AnnotationContract {
   updatedAt: string
   deletedAt: string | null
 }
-export type Pool = 'unused' | 'incorrect' | 'flagged' | 'skipped'
+export type Pool = 'unused' | 'incorrect' | 'flagged' | 'skipped' | 'learning'
 export interface EligibleItem {
   id: string
   kind: 'nbme' | 'concept'
