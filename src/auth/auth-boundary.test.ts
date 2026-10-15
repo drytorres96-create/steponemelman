@@ -113,6 +113,17 @@ describe('private account boundary', () => {
     expect(host.textContent).toContain('No se pudo conectar')
     expect(host.querySelector('[data-private]')).toBeNull()
   })
+
+  it('does not issue a retry when a transient response arrives after the deadline', async () => {
+    let finish!: (value: unknown) => void
+    mock.getUser.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    vi.useFakeTimers()
+    act(() => mock.callback?.('SIGNED_IN', sessionFor(userA)))
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_001) })
+    await act(async () => { finish({ data: { user: null }, error: { status: 503 } }) })
+    expect(mock.getUser).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('[data-private]')).toBeNull()
+  })
   it('shows login without querying membership when there is no session', async () => {
     await emit('INITIAL_SESSION', null)
     expect(host.textContent).toContain('Vuelve a tu estudio')

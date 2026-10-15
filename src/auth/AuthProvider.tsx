@@ -73,12 +73,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null)
     }
     try {
+      const startedAt = Date.now()
       // getSession's local user is not used as the authority for mounting private data.
       const { data, error } = await withDeadline((async () => {
         const result = await supabase.auth.getUser(candidate.access_token)
         // One retry handles a transient server/network failure, within the same
         // deadline. Never retry a rejection of the token or trust the local user.
-        return result.error && temporaryAuthError(result.error)
+        return result.error && temporaryAuthError(result.error) && Date.now() - startedAt < 20_000
           ? supabase.auth.getUser(candidate.access_token) : result
       })())
       if (error) throw error
