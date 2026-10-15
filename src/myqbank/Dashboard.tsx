@@ -17,18 +17,18 @@ export function Dashboard({ onStart, onResume, dailyGoal, legacyResume, busy, er
   onStart: (items: BankItem[], mode: BlockMode) => Promise<void>; onResume: (block: StudyBlock) => Promise<void>;
   dailyGoal: ReactNode; legacyResume: ReactNode; busy: boolean; error: string | null
 }) {
-  const { estado, indice } = useApp(), nbme = useNbme()
+  const { estado, indice, sincronizacion } = useApp(), nbme = useNbme()
   const [material, setMaterial] = useState<Material>('nbme'), [mode, setMode] = useState<BlockMode>('tutor')
   const [catalog, setCatalog] = useState<{ version: string; items: ConceptMetadata[] } | null>(null), [loadError, setLoadError] = useState(false), [reload, setReload] = useState(0)
   const [selectedSystems, setSystems] = useState<string[] | null>(null), [selectedPools, setPools] = useState<Pool[]>(['unused'])
   const [size, setSize] = useState(5), [sort, setSort] = useState('az'), [form, setForm] = useState('all'), [search, setSearch] = useState('')
   const concepts = catalog?.version === indice?.corpus_version ? catalog?.items ?? null : null
   useEffect(() => {
-    if (material === 'nbme' || concepts || !indice) return
+    if (concepts || !indice) return
     let active = true; setLoadError(false)
     loadConceptCatalog(indice).then(value => { if (active) setCatalog({ version: indice.corpus_version, items: value }) }).catch(() => { if (active) setLoadError(true) })
     return () => { active = false }
-  }, [material, concepts, indice, reload])
+  }, [concepts, indice, reload])
   const now = Date.now()
   const items = useMemo(() => bankItems(concepts ?? [], nbme.catalog, estado, nbme.state), [concepts, nbme.catalog, estado, nbme.state])
   const bank = items.filter(item => material === 'mixed' || item.kind === (material === 'nbme' ? 'nbme' : 'concept'))
@@ -59,8 +59,10 @@ export function Dashboard({ onStart, onResume, dailyGoal, legacyResume, busy, er
   const eligibleNbmeIds = new Set(nbme.catalog?.questions.filter(q => q.status === 'ready').map(q => q.id) ?? [])
   const measured = Object.values(nbme.state.attempts).filter(a => a.durationMs > 0 && eligibleNbmeIds.has(a.questionId))
   const seconds = measured.length ? Math.round(measured.reduce((n, a) => n + a.durationMs, 0) / measured.length / 1000) : null
-  const loading = (material !== 'nbme' && !concepts && !loadError) || nbme.loading
-  const unavailable = material !== 'nbme' && !concepts
+  const needsConcepts = material !== 'nbme', needsNbme = material !== 'concepts'
+  const loading = (needsConcepts && !concepts && !loadError) || (needsNbme && nbme.loading)
+  const unavailable = (needsConcepts && !concepts) || (needsNbme && !nbme.catalog)
+  const waiting = loading || unavailable
   return <main id="mq-main" tabIndex={-1} className="mq-dashboard">
     <Card className="mq-resume"><div><span className="mq-eyebrow">{pending.length ? 'CONTINUE' : 'YOUR NEXT STEP'}</span><h1>{pending[0]?.title ?? 'Make room for one focused block'}</h1><p className="mq-muted">{pending.length ? 'Your answers and place are saved.' : 'Start with five items or follow your daily goal.'}</p></div>
       {pending[0] && <Button variant="primary" disabled={busy} onClick={() => void onResume(pending[0])}><Icon name="play"/>Resume block</Button>}{legacyResume}
@@ -72,22 +74,23 @@ export function Dashboard({ onStart, onResume, dailyGoal, legacyResume, busy, er
       <div className="mq-field"><h3>Material</h3><Segmented label="Material" value={material} onChange={value => { setMaterial(value); setSystems(null) }} options={materials}/></div>
       <div className="mq-suggestion"><strong>Five items. One clear next step.</strong><p>Your daily goal stays in place.</p><Button onClick={() => setSize(5)}>Use this</Button></div>
       <div className="mq-field"><h3>Mode</h3><Segmented label="Mode" value={mode} onChange={setMode} options={[{ value: 'tutor', label: 'Tutor' }, { value: 'test', label: 'Test' }]}/><p className="mq-small mq-muted">{mode === 'tutor' ? 'Explanation after each answer.' : 'Results and help stay hidden until you end the block.'}</p></div>
-      <div className="mq-field"><h3>Questions to draw from</h3><div className="mq-pool-grid">{pools.filter(pool => pool.value !== 'learning' || material !== 'nbme').map(pool => <Chip key={pool.value} selected={selectedPools.includes(pool.value)} onClick={() => setPools(selectedPools.includes(pool.value) ? selectedPools.filter(p => p !== pool.value) : [...selectedPools, pool.value])}>{pool.label}<span>{selectBankItems(items, { ...selection, pools: [pool.value] }, estado, now).length}</span></Chip>)}</div></div>
+      <div className="mq-field"><h3>Questions to draw from</h3><div className="mq-pool-grid">{pools.filter(pool => pool.value !== 'learning' || material !== 'nbme').map(pool => <Chip key={pool.value} selected={selectedPools.includes(pool.value)} onClick={() => setPools(selectedPools.includes(pool.value) ? selectedPools.filter(p => p !== pool.value) : [...selectedPools, pool.value])}>{pool.label}<span>{waiting ? '—' : selectBankItems(items, { ...selection, pools: [pool.value] }, estado, now).length}</span></Chip>)}</div></div>
       {material !== 'nbme' && <p className="mq-small mq-muted">Learning: studied with help, awaiting a correct answer without help.{selectedPools.includes('learning') && ` Practice within ${estado.criterios.separacionHoras} hours of reading counts as assisted.`}</p>}
       <div className="mq-field"><h3>Number of questions</h3><div className="mq-count-row"><div className="mq-stepper"><Button aria-label="Fewer questions" disabled={size <= 5} onClick={() => setSize(n => n - 5)}><Icon name="minus"/></Button><output>{size}</output><Button aria-label="More questions" disabled={size >= 80} onClick={() => setSize(n => n + 5)}><Icon name="plus"/></Button></div>{[5,10,20,40,80].map(n => <Chip key={n} selected={size === n} onClick={() => setSize(n)}>{n}</Chip>)}</div></div>
       <details><summary>More filters</summary><div className="mq-field"><label>Search concepts or ID<input value={search} onChange={e => setSearch(e.target.value)}/></label><label>NBME form<select value={form} onChange={e => setForm(e.target.value)}><option value="all">All forms</option>{['27','28','29'].map(f => <option key={f}>{f}</option>)}</select></label></div></details>
-      <dl className="mq-summary"><div><dt>Block</dt><dd>{count} items · {mode === 'test' ? 'Test' : 'Tutor'}</dd></div><div><dt>Available</dt><dd aria-live="polite">{eligible.length} unique items</dd></div><div><dt>Time</dt><dd>{material === 'nbme' && mode === 'test' ? `${Math.ceil(count * 1.5)} min target` : 'Untimed'}</dd></div></dl>
-      {size > count && <p className="mq-small" role="status">{count ? `Your block will contain the ${count} available items.` : 'Select systems and a pool with available items.'}</p>}
+      <dl className="mq-summary"><div><dt>Block</dt><dd>{waiting ? '—' : count} items · {mode === 'test' ? 'Test' : 'Tutor'}</dd></div><div><dt>Available</dt><dd aria-live="polite">{waiting ? (loading ? 'Loading material…' : 'Material unavailable') : `${eligible.length} unique items`}</dd></div><div><dt>Time</dt><dd>{material === 'nbme' && mode === 'test' ? (waiting ? '—' : `${Math.ceil(count * 1.5)} min target`) : 'Untimed'}</dd></div></dl>
+      {!waiting && size > count && <p className="mq-small" role="status">{count ? `Your block will contain the ${count} available items.` : 'Select systems and a pool with available items.'}</p>}
       {(error || nbme.error) && <p role="alert">{error ?? nbme.error}</p>}
-      </div><Button variant="primary" disabled={!count || unavailable || loading || busy} onClick={() => void onStart(eligible.slice(0, count), mode)}><Icon name="play"/>{busy ? 'Preparing block…' : `Start ${count}-question block`}</Button>
+      </div><Button variant="primary" disabled={!count || waiting || busy} onClick={() => void onStart(eligible.slice(0, count), mode)}><Icon name="play"/>{busy ? 'Preparing block…' : waiting ? (loading ? 'Loading material…' : 'Material unavailable') : `Start ${count}-question block`}</Button>
     </Card>    <Card className="mq-systems"><h2>Performance by system</h2><p className="mq-small mq-muted">NBME accuracy · Mehlman coverage. Fewer than 10 graded answers: limited sample.</p>
       <Segmented label="Sort systems" value={sort} onChange={setSort} options={[{ value: 'az', label: 'A–Z' }, { value: 'weakest', label: 'Weakest' }, { value: 'used', label: 'Most used' }]}/>
       <div className="mq-inline"><Button onClick={() => setSystems(systems)}>Select all</Button><Button onClick={() => setSystems([])}>Clear</Button></div>
       <div className="mq-system-list">{rows.map(row => <label className="mq-system-row" key={row.id}><input type="checkbox" checked={selected.includes(row.id)} onChange={() => setSystems(selected.includes(row.id) ? selected.filter(s => s !== row.id) : [...selected, row.id])}/><span>{row.id}</span><small>{row.seen} / {row.total}</small><Progress value={row.seen} max={row.total} label={`${row.id} coverage`}/><strong className="mq-system-metric" title={`${row.n} graded NBME answers${row.n < 10 ? ' · limited sample' : ''}`}>{material !== 'concepts' && <span>{row.accuracy === null ? '—' : `${row.accuracy}%`}<span className="mq-sr-only"> NBME accuracy</span></span>}{material !== 'nbme' && <span className="mq-coverage">{row.seen}/{row.total}<span> seen</span></span>}</strong></label>)}</div>
-      {loading && <p role="status">Loading available material…</p>}{loadError && <p role="alert">Could not load concepts. <Button onClick={() => setReload(n => n + 1)}>Retry</Button></p>}
+      {loading && <p role="status">Loading available material…</p>}{needsConcepts && loadError && <p role="alert">Could not load concepts. <Button onClick={() => setReload(n => n + 1)}>Retry concepts</Button></p>}{needsNbme && !nbme.catalog && !nbme.loading && <p role="alert">Questions unavailable. <Button onClick={() => void nbme.reloadCatalog()}>Retry questions</Button></p>}
     </Card>
-    <Card className="mq-overall"><h2>Overall progress</h2><Rings used={used} total={bank.length} correct={null}/>
-      <div className="mq-stat-grid">{[['Answered / seen', used], ['NBME accuracy', scored.length ? `${safePercent(correct, scored.length)}%` : '—'], ['Mehlman mastered', mastery.dominioDemostrado], ['Maintenance current', mastery.mantenimientoAlDia]].map(([label, value]) => <div className="mq-stat" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
+    <Card className="mq-overall"><h2>Overall progress</h2>{waiting ? <p role="status">{loading ? 'Loading material…' : 'Material unavailable'}</p> : <Rings used={used} total={bank.length} correct={null}/>}
+      {sincronizacion.ultima === null && sincronizacion.estado !== 'sincronizado' && <p role="status">{sincronizacion.estado === 'error' ? 'Saved progress could not sync. Showing this device’s copy; retry in Settings.' : 'Restoring saved progress. Counts may update when sync finishes.'}</p>}
+      <div className="mq-stat-grid">{[['Answered / seen', waiting ? '—' : used], ['NBME accuracy', !waiting && scored.length ? `${safePercent(correct, scored.length)}%` : '—'], ['Mehlman mastered', mastery.dominioDemostrado], ['Maintenance current', mastery.mantenimientoAlDia]].map(([label, value]) => <div className="mq-stat" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
       <p className="mq-muted mq-small">NBME: first graded answers ({scored.length}). Mehlman: demonstrated mastery.</p>
       <dl className="mq-pace"><div><dt>NBME average time</dt><dd>{seconds === null ? '—' : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`} <span>/ 1:30</span></dd></div>
         <div><dt>Blocks completed</dt><dd>{blocks.filter(b => b.completedAt !== undefined).length}</dd></div><div><dt>Awaiting recall</dt><dd>{awaiting}</dd></div><div><dt>Mehlman seen</dt><dd>{mastery.vistos} / {mastery.total}</dd></div></dl>

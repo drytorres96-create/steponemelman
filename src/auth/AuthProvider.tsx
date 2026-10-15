@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { withDeadline } from '../lib/deadline'
 
 interface AuthContextValue {
   user: User | null
@@ -15,9 +16,17 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
+function temporaryAuthError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const status = 'status' in error ? Number(error.status) : null
+  const message = 'message' in error ? String(error.message) : ''
+  return status === 0 || status !== null && status >= 500 || /fetch|network|load failed|timeout|aborted/i.test(message)
+}
+
 export function authErrorMessage(error: unknown): string {
   const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : ''
-  const message = error instanceof Error ? error.message : ''
+  const message = typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : ''
+  const status = typeof error === 'object' && error !== null && 'status' in error ? Number(error.status) : null
   if (code === 'invalid_credentials') return 'El correo o la contraseña no son correctos.'
   if (code === 'email_not_confirmed') return 'Confirma tu correo con el enlace que recibiste antes de entrar.'
   if (code === 'weak_password') return 'Elige una contraseña más segura, con al menos 8 caracteres.'
@@ -30,7 +39,8 @@ export function authErrorMessage(error: unknown): string {
   if (code === 'otp_expired' || code === 'session_not_found' || code === 'refresh_token_not_found' || code === 'bad_jwt') {
     return 'El enlace o la sesión ha caducado. Vuelve a iniciar sesión o solicita otro enlace.'
   }
-  if (/fetch|network|load failed|timeout/i.test(message)) return 'No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.'
+  if (status === 401) return 'La sesión ha caducado. Vuelve a iniciar sesión.'
+  if (status !== null && status >= 500 || /fetch|network|load failed|timeout|aborted/i.test(message)) return 'No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.'
   return 'No se pudo completar la solicitud. Vuelve a intentarlo en unos momentos.'
 }
 
@@ -63,8 +73,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null)
     }
     try {
+      const startedAt = Date.now()
       // getSession's local user is not used as the authority for mounting private data.
-      const { data, error } = await supabase.auth.getUser(candidate.access_token)
+      const { data, error } = await withDeadline((async () => {
+        const result = await supabase.auth.getUser(candidate.access_token)
+        // One retry handles a transient server/network failure, within the same
+        // deadline. Never retry a rejection of the token or trust the local user.
+        return result.error && temporaryAuthError(result.error) && Date.now() - startedAt < 20_000
+          ? supabase.auth.getUser(candidate.access_token) : result
+      })())
       if (error) throw error
       if (!data.user || data.user.id !== candidate.user.id) throw new Error('Invalid session')
       if (!mounted.current || current !== generation.current) return
@@ -72,6 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data.user)
     } catch (error) {
       if (!mounted.current || current !== generation.current) return
+      // A focus/refresh network failure must not destroy an already verified
+      // study session. Definitive token rejections still close it below.
+      if (verifiedUserId.current === candidate.user.id && temporaryAuthError(error)) return
       verifiedUserId.current = null
       setUser(null)
       setAuthError(authErrorMessage(error))
@@ -82,9 +102,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     mounted.current = true
+    let receivedEvent = false
+    const startupGeneration = generation.current
+    const startup = setTimeout(() => {
+      if (mounted.current && !receivedEvent && generation.current === startupGeneration) {
+        setAuthError(authErrorMessage(new Error('Connection timeout')))
+        setLoading(false)
+      }
+    }, 20_000)
     const timers = new Set<ReturnType<typeof setTimeout>>()
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted.current) return
+      receivedEvent = true
+      clearTimeout(startup)
       if (event === 'PASSWORD_RECOVERY') setRecoveringPassword(true)
       if (event === 'SIGNED_OUT') setRecoveringPassword(false)
       // Leave the synchronous SDK callback before invoking another Auth method.
@@ -96,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     return () => {
       mounted.current = false
+      clearTimeout(startup)
       ++generation.current
       subscription.unsubscribe()
       timers.forEach(clearTimeout)
@@ -106,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setAuthError(null)
     try {
-      const { data, error } = await supabase.auth.getSession()
+      const { data, error } = await withDeadline(supabase.auth.getSession())
       if (error) throw error
       await verifySession(data.session)
     } catch (error) {
@@ -119,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     // Keep other devices signed in and retain this user's separately keyed study cache.
-    const { error } = await supabase.auth.signOut({ scope: 'local' })
+    const { error } = await withDeadline(supabase.auth.signOut({ scope: 'local' }))
     if (error) throw error
   }, [])
 

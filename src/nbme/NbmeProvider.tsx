@@ -393,12 +393,13 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
         desdeCache = !!previo
       }
       setCatalogStale(desdeCache)
-      setLoading(false)
       // El catálogo pesa ~180 KB y se pedía en cada arranque, aunque fuera a estudiar conceptos.
       // Con copia local se refresca al abrir «Preguntas»; sin ella hace falta ahora, pero no
       // bloquea la sincronización del progreso.
-      await syncNow()
-      if (!desdeCache) void reloadCatalog()
+      // A first visit must not queue the catalog behind a full progress download.
+      void syncNow()
+      if (!desdeCache) await reloadCatalog()
+      if (isCurrent()) setLoading(false)
     })().catch(failure => {
       if (isCurrent()) { setError(userError(failure, 'No se pudo preparar tu banco de preguntas.')); setLoading(false) }
     })

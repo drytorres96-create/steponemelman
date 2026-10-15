@@ -28,10 +28,10 @@ function requestedRefs() {
     .flatMap(([, init]) => JSON.parse(String(init?.body)).refs as { id: string; revision: string }[])
 }
 function Harness() { current = useNbme(); return <NbmePlayer onSalir={() => undefined} onEstudiar={() => undefined} /> }
-async function mount() {
+async function mount(waitForCatalog = true) {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
   await act(async () => { root!.render(<NbmeProvider userId="test-owner"><Harness /></NbmeProvider>) })
-  await vi.waitFor(() => expect(current.loading).toBe(false))
+  if (waitForCatalog) await vi.waitFor(() => expect(current.loading).toBe(false))
 }
 async function unmount() { await act(async () => root?.unmount()); root = null; host.remove() }
 beforeEach(() => {
@@ -63,6 +63,16 @@ beforeEach(() => {
   }))
 })
 afterEach(async () => { if (root) await unmount(); vi.unstubAllGlobals() })
+
+it('loads the first catalog while the initial progress request is still pending', async () => {
+  let finish!: (value: { data: null; error: null }) => void
+  const pending = new Promise<{ data: null; error: null }>(resolve => { finish = resolve })
+  memory.from.mockImplementation(() => ({ select: () => ({ eq: () => ({ maybeSingle: () => pending }) }) }))
+  await mount()
+  expect(current.catalog?.total).toBe(questions.length)
+  expect(memory.rpc).not.toHaveBeenCalled()
+  await act(async () => { finish({ data: null, error: null }) })
+})
 
 it('removes a session from the library and across reload while retaining every NBME response', async () => {
   await mount()
@@ -401,7 +411,8 @@ it('waits for the initial catalog before automatically loading an unpaused block
     if (String(args[0]).endsWith('/catalog')) await catalogPending
     return originalFetch(...args)
   })
-  await mount()
+  await mount(false)
+  expect(current.loading).toBe(true)
   expect(current.state.activeSessionId).toBe(id)
   expect(current.state.sessions[id].paused).toBe(false)
   expect(current.catalog).toBeNull()

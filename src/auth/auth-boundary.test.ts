@@ -49,6 +49,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  vi.useRealTimers()
 })
 
 async function emit(event: AuthChangeEvent, session: Session | null) {
@@ -66,6 +67,63 @@ async function refocus() {
 }
 
 describe('private account boundary', () => {
+  it('recovers one transient verification failure without trusting the local session', async () => {
+    mock.getUser.mockResolvedValueOnce({ data: { user: null }, error: { status: 503, message: 'Unavailable' } })
+    await emit('SIGNED_IN', sessionFor(userA))
+    expect(mock.getUser).toHaveBeenCalledTimes(2)
+    expect(host.querySelector('[data-private="user-a"]')).not.toBeNull()
+  })
+
+  it('keeps a verified study session through a transient token recheck but closes it on rejection', async () => {
+    await emit('SIGNED_IN', sessionFor(userA))
+    mock.getUser.mockResolvedValue({ data: { user: null }, error: { status: 503, message: 'Unavailable' } })
+    await emit('TOKEN_REFRESHED', sessionFor(userA))
+    expect(host.querySelector('[data-private="user-a"]')).not.toBeNull()
+    mock.getUser.mockResolvedValue({ data: { user: null }, error: { status: 401, code: 'bad_jwt' } })
+    await emit('TOKEN_REFRESHED', sessionFor(userA))
+    expect(host.querySelector('[data-private]')).toBeNull()
+  })
+  it('offers retry if SDK initialization never emits a session event', async () => {
+    // Remount so the initialization deadline is controlled by this test.
+    act(() => root.unmount())
+    vi.useFakeTimers()
+    root = createRoot(host)
+    act(() => root.render(createElement(AuthProvider, null,
+      createElement(AuthGate, { children: () => createElement('div', { 'data-private': true }) }))))
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000) })
+    expect(host.textContent).toContain('No pudimos abrir tu sesión')
+    expect(host.textContent).toContain('No se pudo conectar')
+    expect(host.querySelector('[data-private]')).toBeNull()
+  })
+
+  it('stops waiting for a stalled verification and ignores its late success', async () => {
+    let resolve!: (value: unknown) => void
+    mock.getUser.mockImplementation(() => new Promise(done => { resolve = done }))
+    vi.useFakeTimers()
+    act(() => mock.callback?.('SIGNED_IN', sessionFor(userA)))
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_001) })
+    expect(host.textContent).toContain('No se pudo conectar')
+    await act(async () => { resolve({ data: { user: userA }, error: null }) })
+    expect(host.querySelector('[data-private]')).toBeNull()
+  })
+
+  it('describes plain SDK network errors instead of hiding them behind a generic error', async () => {
+    mock.getUser.mockResolvedValue({ data: { user: null }, error: { message: 'Failed to fetch', status: 0 } })
+    await emit('SIGNED_IN', sessionFor(userA))
+    expect(host.textContent).toContain('No se pudo conectar')
+    expect(host.querySelector('[data-private]')).toBeNull()
+  })
+
+  it('does not issue a retry when a transient response arrives after the deadline', async () => {
+    let finish!: (value: unknown) => void
+    mock.getUser.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    vi.useFakeTimers()
+    act(() => mock.callback?.('SIGNED_IN', sessionFor(userA)))
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_001) })
+    await act(async () => { finish({ data: { user: null }, error: { status: 503 } }) })
+    expect(mock.getUser).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('[data-private]')).toBeNull()
+  })
   it('shows login without querying membership when there is no session', async () => {
     await emit('INITIAL_SESSION', null)
     expect(host.textContent).toContain('Vuelve a tu estudio')
