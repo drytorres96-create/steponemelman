@@ -61,6 +61,12 @@ describe('transporte gratuito y acotado de IA', () => {
     expect((await calificarConIA({ conceptId: 'QA', answer: 'beta', questionId: 'QA:0', version: 'qa', formatVersion: 3, index: 0, route: 'repaso', retry: false })).estado).toBe('sin_ia')
   })
 
+  it('conserva la procedencia de una respuesta aceptada sin atribuirla a un modelo', async () => {
+    red.mockResolvedValue(Response.json({ veredicto: 'correcta', motivo: 'Aceptada.', origen: 'respuesta_aceptada' }))
+    expect(await calificarConIA({ conceptId: 'QA', answer: 'alpha', questionId: 'QA:0', version: 'qa', formatVersion: 3, index: 0, route: 'repaso', retry: false }))
+      .toEqual({ estado: 'ok', veredicto: 'correcta', motivo: 'Aceptada.', origen: 'respuesta_aceptada' })
+  })
+
   it('conserva el contrato antiguo de calificación cuando el motivo opcional no viene', async () => {
     for (const veredicto of ['correcta', 'parcial', 'incorrecta']) {
       for (const extra of [{}, { motivo: null }]) {

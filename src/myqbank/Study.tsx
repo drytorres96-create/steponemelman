@@ -17,7 +17,9 @@ import { crearUUID } from '../store/model'
 import { nbmePosition } from './selection'
 import { canReveal } from './contracts'
 import { recentLearning } from './learning'
+import { recheckAcceptedAnswer } from './grading'
 import { Explanation } from './Explanation'
+import { ExpectedAnswer } from './ExpectedAnswer'
 import { Highlighter, HighlightText, type HighlightSource } from './HighlightText'
 import { LabReference, useLabReference } from './LabReference'
 import { useAnnotations } from './AnnotationProvider'
@@ -57,6 +59,8 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
   const uncertain = result?.veredicto === 'revision' || questionAttempt?.conflict
   const assisted = !!conceptAttempt && (conceptAttempt.explicacion_previa || conceptAttempt.fuente_consultada || conceptAttempt.pistas_usadas > 0 || !!learning)
   const correct = conceptAttempt ? ['correcta', 'ortografia'].includes(conceptAttempt.resultado ?? '') : questionAttempt?.correct
+  const partial = conceptAttempt?.resultado === 'parcial'
+  const canRecheck = !!concept && !!conceptAttempt && usaTextoLibre(concept) && !!recheckAcceptedAnswer(concept, conceptAttempt, Date.now())
   const source: HighlightSource = { material: entry.kind, sourceId: entry.id, sourceRevision: entry.revision,
     variantId: concept?.variante_id ?? '', editorialVersion: '' }
   const states = block.entries.map((item, position) => {
@@ -66,13 +70,14 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
     if (!canReveal(block.mode, true, closed)) return 'saved'
     if (a?.resultado === 'revision' || n?.conflict) return 'pending'
     if (a && (a.explicacion_previa || a.fuente_consultada || a.pistas_usadas > 0 || block.learning?.[position])) return 'assisted'
+    if (a?.resultado === 'parcial') return 'partial'
     return a ? ['correcta', 'ortografia'].includes(a.resultado ?? '') ? 'correct' : 'incorrect' : n!.correct ? 'correct' : 'incorrect'
   })
   const completed = states.filter(s => !['skipped', 'unanswered'].includes(s)).length
   const studied = block.entries.filter((item, position) => item.kind === 'concept' && block.learning?.[position] && !app.estado.progreso[item.id]?.intentos.some(i => i.session_id === block.id && i.pregunta_id === blockOpportunity(block.id, position))).length
   const answered = completed - studied
   const assistedCount = states.filter(s => s === 'assisted').length
-  const evaluated = states.filter(s => ['correct', 'incorrect'].includes(s)).length
+  const evaluated = states.filter(s => ['correct', 'incorrect', 'partial'].includes(s)).length
   const correctCount = states.filter(s => s === 'correct').length
   const ready = question?.status === 'ready' && !preguntaConLecturasDudosas(question) && nbme.currentSession?.id === block.id
     && nbme.sessionView?.current?.position === qPosition && !!nbme.catalog?.questions.some(q => q.id === entry.id && q.status === 'ready')
@@ -128,7 +133,7 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
     else { save(changed); if (!closed) setEndOpen(true) }
   }
   function pause() { nbme.pauseSession(); save(patchBlock(current.current, { paused: true })); onExit() }
-  const register = (r: Resultado, duration: number, ai: boolean, pending = false) => {
+  const register = (r: Resultado, duration: number, ai: boolean, pending = false, reason?: string) => {
     if (!concept) return
     const existing = latestApp.current.progresoDe(concept.concept_id).intentos.find(i => i.pregunta_id === opportunity && i.session_id === block.id)
     const attempt: Intento = { attempt_id: opportunity, session_id: block.id, ts: existing?.ts ?? Date.now(),
@@ -139,14 +144,14 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
       explicacion_previa: !!existing?.explicacion_previa || !!block.retryOf || !!current.current.learning?.[block.cursor] || !!block.assistedConceptIds?.includes(concept.concept_id) || recentLearning(latestApp.current.estado, concept.concept_id, existing?.ts ?? Date.now()), modo: block.mode === 'test' ? 'examen' : 'repaso',
       tipo_evidencia: concept.interaccion.recomendada === 'caso_clinico' ? 'aplicacion' : r.recuperacionActiva ? 'recuerdo' : 'discriminacion',
       ...(concept.variante_id ? { variante_id: concept.variante_id, primera_presentacion: !app.progresoDe(concept.concept_id).intentos.some(t => t.variante_id === concept.variante_id) } : {}),
-      ...(ai ? { calificado_por_ia: true } : {}), ...(existing && !pending ? { calificacion_actualizada_en: Date.now() } : {}) }
+      ...(ai ? { calificado_por_ia: true, motivo_calificacion_ia: (reason ?? '').slice(0, 200) } : {}), ...(existing && !pending ? { calificacion_actualizada_en: Date.now() } : {}) }
     app.registrarIntento(concept.concept_id, attempt)
   }
   async function submitConcept(r: Resultado) {
     if (!concept || learningOpen || busy || submitLock.current || closed || conceptAttempt && conceptAttempt.resultado !== 'revision') return
     submitLock.current = true; clock.current.activar(false)
     const duration = blockTime(timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()), block.cursor)
-    if (usaTextoLibre(concept) && r.respuestaDada.trim()) {
+    if (usaTextoLibre(concept) && r.respuestaDada.trim() && !['correcta', 'ortografia'].includes(r.veredicto)) {
       // The answer is durable before the optional network grading starts.
       register({ ...r, veredicto: 'revision', tipoError: 'error_por_revisar' }, duration, false, true)
       setGrading(true)
@@ -154,7 +159,7 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
         version: entry.revision, formatVersion: 3, variantId: concept.variante_id, index: block.cursor, route: block.mode === 'test' ? 'examen' : 'repaso', retry: false }, abort.current.signal)
       if (!alive.current) return
       const verdict = grade.estado === 'ok' ? grade.veredicto === 'correcta' && r.veredicto === 'ortografia' ? 'ortografia' : grade.veredicto : r.veredicto
-      register({ ...r, veredicto: verdict, tipoError: verdict === 'correcta' ? 'ninguno' : verdict === 'revision' ? 'error_por_revisar' : verdict === 'incorrecta' && r.tipoError === 'ninguno' ? 'interpretacion_incorrecta' : r.tipoError }, duration, grade.estado === 'ok')
+      register({ ...r, veredicto: verdict, tipoError: verdict === 'correcta' ? 'ninguno' : verdict === 'parcial' ? 'recuerdo_incompleto' : verdict === 'revision' ? 'error_por_revisar' : verdict === 'incorrecta' ? 'confusion_conceptos' : r.tipoError }, duration, grade.estado === 'ok' && grade.origen !== 'respuesta_aceptada', false, grade.motivo)
       setGrading(false); if (grade.estado !== 'ok') setMessage(grade.motivo)
     } else register(r, duration, false)
     save(markBlock(current.current, 'skipped', block.cursor, false))
@@ -207,10 +212,18 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
         <p className="mq-small mq-muted">{annotations.status} <Button onClick={() => void annotations.sync()}>Sync annotations</Button></p>
       </div>
       {labs && !labsLeft && <aside className="mq-labs-pane"><LabReference source={source} view={labView}/></aside>}
-      {reveal && <aside className="mq-explanation-pane" aria-label="Explanation"><div ref={feedback} tabIndex={-1} role="status" className={`mq-result ${learningOpen || assisted && correct ? 'mq-result--assisted' : uncertain ? '' : correct ? 'mq-result--correct' : 'mq-result--incorrect'}`}><Icon name={learningOpen ? 'book' : correct ? 'check' : 'close'}/><strong>{learningOpen ? 'Studied with help' : uncertain ? 'Answer pending review' : correct ? assisted ? 'Correct with help' : 'Correct' : 'Incorrect'}</strong></div>
+      {reveal && <aside className="mq-explanation-pane" aria-label="Explanation"><div ref={feedback} tabIndex={-1} role="status" className={`mq-result ${learningOpen || partial || assisted && correct ? 'mq-result--assisted' : uncertain ? '' : correct ? 'mq-result--correct' : 'mq-result--incorrect'}`}><Icon name={learningOpen || partial ? 'book' : correct ? 'check' : 'close'}/><strong>{learningOpen ? 'Studied with help' : uncertain ? 'Answer pending review' : partial ? 'Partially correct' : correct ? assisted ? 'Correct with help' : 'Correct' : 'Incorrect'}</strong></div>
+        {conceptAttempt?.calificado_por_ia && !conceptAttempt.correccion_manual && <p className="mq-small mq-muted">AI-assisted grading.{conceptAttempt.motivo_calificacion_ia && <> <span lang="es">{conceptAttempt.motivo_calificacion_ia}</span></>}</p>}
+        {conceptAttempt?.correccion_manual && <p className="mq-small mq-muted">Grade corrected. Your original answer and assistance record are preserved.</p>}
+        {canRecheck && <div className="mq-learning-actions"><p>Your answer matches an accepted answer for this concept.</p><Button disabled={grading || busy} onClick={() => {
+          if (!concept || !conceptAttempt) return
+          const corrected = recheckAcceptedAnswer(concept, conceptAttempt, Date.now())
+          if (corrected) app.registrarIntento(concept.concept_id, corrected)
+        }}>Recheck accepted answer</Button></div>}
         {learningOpen && <p className="mq-small mq-muted">Saved as seen, with no grade. Find it later in the Learning pool.</p>}
         {uncertain && conceptAttempt?.respuestas_en_conflicto && <p>Different answers were saved on two devices. This item remains ungraded; use Practice again after ending the block.</p>}
         {uncertain && concept && result && !conceptAttempt?.respuestas_en_conflicto && usaTextoLibre(concept) && <Button disabled={grading} onClick={() => void submitConcept(result)}>Check pending answer</Button>}
+        {concept && (usaTextoLibre(concept) || concept.interaccion.recomendada === 'numerico') && <ExpectedAnswer concept={concept} source={source}/>}
         {(concept || question) && <Explanation source={concept ?? question!} highlightSource={source} figures={figures.figures}/>}
         {question && questionAttempt && !questionAttempt.correct && !questionAttempt.conflict && <><Button aria-expanded={recovery} onClick={() => setRecovery(v => !v)}>Guided recovery</Button>{recovery && <RecuperacionTrasFallo pregunta={question} intento={questionAttempt} onActividad={setRecovering} onSiguiente={next}/>}</>}
         <div className="mq-explanation-actions">{learningOpen && !closed && <Button disabled={busy} onClick={() => teach(false)}><Icon name="retry"/>Hide and recall</Button>}<Button variant="primary" disabled={grading || recovering || busy} onClick={closed && block.cursor === block.entries.length - 1 ? onExit : next}>{block.cursor === block.entries.length - 1 ? closed ? 'Back to dashboard' : 'Finish block' : 'Next question'}<Icon name="arrow"/></Button></div>

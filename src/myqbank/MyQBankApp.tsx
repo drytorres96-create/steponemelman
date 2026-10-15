@@ -15,9 +15,7 @@ import { versionPregunta } from '../screens/sesion'
 import { Hoy, type MaterialNuevo } from '../screens/Hoy'
 import type { ItemCaja } from '../lib/cajas'
 import { construirGuion } from '../semana/guion'
-import type { SesionSemanal } from '../semana/tipos'
 import type { Cola } from '../screens/Reproductor'
-import { fechaISOEstudio, fechaEstudio } from '../lib/calendario-estudio'
 import { Resguardo } from '../components/Resguardo'
 import { Brand, Button, Icon, StateMessage } from './components'
 import { Dashboard } from './Dashboard'
@@ -30,8 +28,6 @@ import './workspace.css'
 const Study = lazy(() => import('./Study').then(m => ({ default: m.Study })))
 const Settings = lazy(() => import('../screens/Ajustes').then(m => ({ default: m.Ajustes })))
 const ProgressDetails = lazy(() => import('../screens/Progreso').then(m => ({ default: m.ResumenProgreso })))
-const SesionCajas = lazy(() => import('../screens/SesionCajas').then(m => ({ default: m.SesionCajas })))
-const SesionMixta = lazy(() => import('../semana/SesionMixta').then(m => ({ default: m.SesionMixta })))
 const Reproductor = lazy(() => import('../screens/Reproductor').then(m => ({ default: m.Reproductor })))
 const NbmePlayer = lazy(() => import('../nbme/NbmePlayer').then(m => ({ default: m.NbmePlayer })))
 
@@ -42,9 +38,8 @@ export default function MyQBankApp() {
 function Workspace() {
   const app = useApp(), nbme = useNbme(), auth = useAuth(), theme = usePielEstudio()
   const annotations = useAnnotations()
-  const [view, setView] = useState<'dashboard' | 'settings' | 'block' | 'cajas' | 'daily' | 'legacy-concepts' | 'legacy-nbme'>(() => location.hash === '#settings' || location.hash === '#ajustes' ? 'settings' : 'dashboard')
+  const [view, setView] = useState<'dashboard' | 'settings' | 'block' | 'legacy-concepts' | 'legacy-nbme'>(() => location.hash === '#settings' || location.hash === '#ajustes' ? 'settings' : 'dashboard')
   const [activeId, setActiveId] = useState<string | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null)
-  const [cajas, setCajas] = useState<{ items: ItemCaja[]; title: string } | null>(null), [daily, setDaily] = useState<SesionSemanal | null>(null)
   const [legacy, setLegacy] = useState<{ cola: Cola; index: number } | null>(null), [details, setDetails] = useState(false)
   const block = activeId ? app.estado.myqbankBlocks?.[activeId] : null
   const studying = !['dashboard', 'settings'].includes(view)
@@ -63,7 +58,7 @@ function Workspace() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not open the block.') }
     finally { setBusy(false) }
   }
-  async function create(items: BankItem[], mode: BlockMode, retryOf?: string, fixedEntries?: BlockEntry[], pausedBlock?: StudyBlock) {
+  async function create(items: Pick<BankItem, 'kind' | 'id' | 'revision'>[], mode: BlockMode, retryOf?: string, fixedEntries?: BlockEntry[], pausedBlock?: StudyBlock) {
     if (busy) return
     setBusy(true); setError(null)
     try {
@@ -94,14 +89,24 @@ function Workspace() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not prepare the block.') }
     finally { setBusy(false) }
   }
-  const newDaily = ({ conceptIds, preguntas, titulo, nbmeSessionId }: MaterialNuevo) => {
-    const guion = construirGuion(conceptIds, preguntas, 3)
-    if (!guion.length) return
-    setDaily({ id: crearUUID(), semana: 'Hoy', semanaInicio: fechaISOEstudio(fechaEstudio(Date.now())), dia: 1, orden: 1, titulo,
-      subtitulo: 'Your existing daily goal', guion, presupuestoMin: 30, estado: 'en_curso', cursor: 0, nbmeSessionId, completadaEn: null })
-    setView('daily')
+  // Keep Hoy's scheduler and exact due-item order; only replace the player.
+  const newDaily = ({ conceptIds, preguntas }: MaterialNuevo) => {
+    const items = construirGuion(conceptIds, preguntas, 3).map(step => step.kind === 'concepto'
+      ? { kind: 'concept' as const, id: step.id, revision: 'prepared-on-start' }
+      : { kind: 'nbme' as const, id: step.id, revision: step.revision })
+    if (items.length) void create(items.slice(0, 80), 'tutor')
   }
-  const openCajas = (items: ItemCaja[], title: string) => { setCajas({ items, title }); setView('cajas') }
+  const openCajas = (items: ItemCaja[]) => {
+    try {
+      const selected = items.filter(item => !item.hecho).map(item => {
+        if (item.tipo === 'concepto') return { kind: 'concept' as const, id: item.id, revision: 'prepared-on-start' }
+        const question = nbme.catalog?.questions.find(q => q.id === item.id && q.status === 'ready')
+        if (!question) throw new Error('A due question is unavailable. Reload the material and retry; your progress is preserved.')
+        return { kind: 'nbme' as const, id: question.id, revision: question.revision }
+      })
+      if (selected.length) void create(selected.slice(0, 80), 'tutor')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not prepare due items.') }
+  }
   const resumeLegacy = async () => {
     setBusy(true); setError(null)
     try {
@@ -144,13 +149,11 @@ function Workspace() {
     <Suspense fallback={<StateMessage state="loading" title="Opening your workspace">Your progress remains saved.</StateMessage>}>
       {view === 'dashboard' && <><Dashboard busy={busy} error={error} onStart={create} onResume={open}
         legacyResume={legacyPending ? <Button disabled={busy} onClick={() => void resumeLegacy()}>Resume earlier session</Button> : null}
-        dailyGoal={pendingTest ? <p>Finish your Test block to update the daily goal.</p> : <Hoy compact onNuevo={newDaily} onCajas={openCajas} onRetomar={resumeLegacy} onBiblioteca={() => {}}/>}/>
+        dailyGoal={pendingTest ? <p>Finish your Test block to update the daily goal.</p> : <Hoy compact busy={busy} onNuevo={newDaily} onCajas={openCajas} onRetomar={resumeLegacy} onBiblioteca={() => {}}/>}/>
         <details className="mq-progress-details" onToggle={e => setDetails(e.currentTarget.open)}><summary>Detailed progress and study plan</summary>{details && (pendingTest ? <p>End your Test block to see updated results.</p> : <ProgressDetails onNuevo={newDaily} onCajas={openCajas} onRetomar={resumeLegacy}/>)}</details></>}
       {view === 'block' && error && <p role="alert">{error}</p>}
       {view === 'block' && block && <Study block={block} busy={busy} onModeChange={(b, mode) => create([], mode, undefined, b.entries, b)} onExit={dashboard} onRetry={b => create([], 'tutor', b.id, b.entries)}/>}
       {view === 'settings' && <main id="mq-main" tabIndex={-1} className="mq-settings"><h1>Settings</h1><div className="mq-inline"><Button onClick={() => void Promise.all([app.sincronizarAhora(), nbme.syncNow(), annotations.sync()])}>Sync now</Button><Button onClick={async () => { const saved = await Promise.all([app.sincronizarAhora(), nbme.syncNow()]); await annotations.sync(); if (saved.every(Boolean) && !annotations.rows.some(r => r.dirty) || confirm('Some changes are pending. Keep a local backup and sign out?')) await auth.signOut() }}>Sign out</Button></div><Settings english extraBackup={{ myqbankAnnotations: { userId: auth.user!.id, rows: annotations.rows } }} restoreExtra={backup => annotations.restore(backup.myqbankAnnotations)}/></main>}
-      {view === 'cajas' && cajas && <main id="mq-main" tabIndex={-1} className="mq-legacy-study"><SesionCajas items={cajas.items} titulo={cajas.title} onSalir={dashboard}/></main>}
-      {view === 'daily' && daily && <main id="mq-main" tabIndex={-1} className="mq-legacy-study"><SesionMixta sesion={daily} efimera onSalir={dashboard} etiquetaSalida="Dashboard"/></main>}
       {view === 'legacy-concepts' && legacy && <main id="mq-main" tabIndex={-1} className="mq-legacy-study"><Reproductor cola={legacy.cola} indiceInicial={legacy.index} onSalir={dashboard} etiquetaSalida="Dashboard"/></main>}
       {view === 'legacy-nbme' && <main id="mq-main" tabIndex={-1} className="mq-legacy-study"><NbmePlayer recuperarErrores onSalir={dashboard} etiquetaSalida="Dashboard"/></main>}
     </Suspense></Resguardo>

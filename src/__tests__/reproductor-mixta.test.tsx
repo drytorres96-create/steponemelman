@@ -167,7 +167,7 @@ describe('neurocognición: tramo mixto finito', () => {
     await responder('alfa')
     expect(mock.registrados).toHaveLength(1)
     expect(mock.registrados[0]).toMatchObject({ interaccion: 'recuperacion_libre', recuperacion_activa: true,
-      tipo_evidencia: 'recuerdo', resultado: 'correcta', fuente_consultada: false, explicacion_previa: false, evaluador_version: '2.4.0' })
+      tipo_evidencia: 'recuerdo', resultado: 'correcta', fuente_consultada: false, explicacion_previa: false, evaluador_version: '2.5.0' })
     expect(evaluarDominio(mock.estado!.progreso[c.concept_id], mock.estado!.criterios).cumple).toBe(true)
     const preguntaVersion = mock.registrados[0].pregunta_version
     const guardado = leerEstadoDesconocido(JSON.parse(JSON.stringify(mock.estado)))!
@@ -290,7 +290,7 @@ describe('neurocognición: confianza previa y contexto visible', () => {
     mock.calificarConIA.mockImplementation(() => new Promise<ResultadoCalificacion>(r => { resolver = r }))
     await pintar()
     await act(async () => { boton('Media').click(); boton('Necesito una pista').click() })
-    await responder('alfa')
+    await responder('el primer elemento')
     expect(mock.registrados).toHaveLength(0)
     expect(host.textContent).toContain('Comprobando tu respuesta con la IA')
     for (const texto of ['Poca', 'Media', 'Mucha', 'Necesito aprenderlo', 'Otra pista (1/3)', 'Ver la fuente'])

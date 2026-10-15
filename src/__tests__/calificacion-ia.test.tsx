@@ -87,7 +87,7 @@ describe('la IA corrige las respuestas breves', () => {
   it('la recuperación guiada registra práctica en el mismo concepto sin acreditar una respuesta independiente', async () => {
     mock.calificar.mockResolvedValue({ estado: 'ok', veredicto: 'correcta', motivo: 'Es el mismo concepto.' } satisfies ResultadoCalificacion)
     await responder('alfa', { apoyoPrevio: true })
-    expect(ultimo()).toMatchObject({ resultado: 'correcta', explicacion_previa: true, tipo_error: 'correcta_con_pistas', evaluador_version: '2.4.0' })
+    expect(ultimo()).toMatchObject({ resultado: 'correcta', explicacion_previa: true, tipo_error: 'correcta_con_pistas', evaluador_version: '2.5.0' })
     expect(evidenciaIndependiente(ultimo())).toBe(false)
     expect(mock.vista).toHaveBeenCalledWith('QA-1', expect.any(String))
   })
@@ -103,6 +103,14 @@ describe('la IA corrige las respuestas breves', () => {
     expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, fallo.ts).cumple).toBe(false)
     expect(evaluarDominio(p, CRITERIOS_POR_DEFECTO, fallo.ts).detalle.find(d => d.clave === 'confusion')?.cumplido).toBe(false)
   })
+  it('una respuesta aceptada no permite que la IA la invalide', async () => {
+    mock.calificar.mockResolvedValue({ estado: 'ok', veredicto: 'incorrecta', motivo: 'Respuesta errónea del modelo.' })
+    await responder('alfa')
+    expect(mock.calificar).not.toHaveBeenCalled()
+    expect(ultimo()).toMatchObject({ resultado: 'correcta', evaluador_version: '2.5.0' })
+    expect(ultimo().calificado_por_ia).toBeUndefined()
+  })
+
   it('un sinónimo que el corrector propio no conoce cuenta como acierto y queda marcado', async () => {
     mock.calificar.mockResolvedValue({ estado: 'ok', veredicto: 'correcta', motivo: 'Es el mismo concepto.' } satisfies ResultadoCalificacion)
     await responder('el primer elemento')
@@ -126,7 +134,7 @@ describe('la IA corrige las respuestas breves', () => {
 
   it('rectificar el veredicto reescribe el mismo intento y manda sobre la IA', async () => {
     mock.calificar.mockResolvedValue({ estado: 'ok', veredicto: 'incorrecta', motivo: 'Nombra otro concepto.' } satisfies ResultadoCalificacion)
-    await responder('alfa')
+    await responder('el primer elemento')
     expect(ultimo()).toMatchObject({ resultado: 'incorrecta', calificado_por_ia: true })
     const registrado = ultimo().attempt_id
 
@@ -181,7 +189,7 @@ describe('la IA corrige las respuestas breves', () => {
     await act(async () => root.render(<Envoltura conceptos={[concepto]} />))
     const input = host.querySelector('input')!
     await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'alfa')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'el primer elemento')
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
     await act(async () => boton('Comprobar')!.click())
