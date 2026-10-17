@@ -3,7 +3,13 @@ import type { NbmeQuestionMeta, NbmeQuestionRef, NbmeState } from '../nbme/types
 import type { Modulo } from '../schema/concept'
 import { inicioDelDia, materialNuevo, type EntradaDia } from './dia'
 import { fechaEstudio } from './calendario-estudio'
-export interface MaterialNuevo { conceptIds: string[]; preguntas: NbmeQuestionRef[]; titulo: string; nbmeSessionId: string | null }
+export interface MaterialNuevo {
+  conceptIds: string[]; preguntas: NbmeQuestionRef[]; titulo: string; nbmeSessionId: string | null
+  /** Otra descripción para sesiones armadas al vuelo que no son «lo nuevo de hoy». */
+  subtitulo?: string
+  /** Cada cuántos conceptos entra una pregunta; por defecto tres. */
+  cada?: number
+}
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 /**
  * La semana decide la prioridad, pero su ausencia no reduce el día a lo ya hecho.

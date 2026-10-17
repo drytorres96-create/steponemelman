@@ -26,6 +26,8 @@ import { estimarBloque } from '../lib/ritmo'
 import { hitoSemanalAprendizaje } from '../lib/progreso-aprendizaje'
 import { completarEntradaDeHoy, prepararNuevoDeHoy, tituloDeHoy, type MaterialNuevo } from '../lib/nuevo-hoy'
 import { hayConceptosPendientes } from '../lib/conceptos-pendientes'
+import { sugerirRecuperar } from '../lib/inventario'
+import { SugerenciaRecuperar } from './SugerenciaRecuperar'
 import type { AccionesRecuperacion } from './RecuperarMeta'
 
 const ResumenProgreso = lazy(() => import('./Progreso').then(m => ({ default: m.ResumenProgreso })))
@@ -223,6 +225,12 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar, compact = false
   const esperandoCuenta = (sincronizacion?.estado === 'inicializando' || sincronizacion?.estado === 'sincronizando') && !sincronizacion?.ultima
   const esperandoBanco = (nbme.syncStatus?.state === 'initializing' || nbme.syncStatus?.state === 'syncing') && !nbme.syncStatus?.lastSyncedAt
   if (completo && (esperandoCuenta || esperandoBanco)) return <div className="vacio" role="status">Preparando tu día…</div>
+  // Lo frágil que no está ya en las cajas de hoy ni se tocó hoy; la tarjeta decide si toca mostrarlo (una vez al día, máx. 5).
+  const candidatasRecuperar = sugerirRecuperar({
+    progreso: estado.progreso, nbme: nbme.state, ahora,
+    conceptoDisponible: id => publicados.has(id), revisionDePregunta: id => listas.get(id)?.revision ?? null,
+    enCajasHoy: new Set(cajas.items.map(i => `${i.tipo}:${i.id}`)),
+  }, Infinity)
   const fecha = new Date(inicioDelDia(ahora)).toLocaleDateString('es', { timeZone: ZONA_ESTUDIO, weekday: 'long', day: 'numeric', month: 'long' })
   // El título identifica la sesión NBME de hoy en cualquier dispositivo: no depende del idioma del navegador.
   const tituloCajas = tituloDeHoy('Cajas', ahora)
@@ -325,6 +333,8 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar, compact = false
       <span className="rotulo">Plan de hoy terminado</span><h2 id="dia-terminado">Puedes cerrar por hoy.</h2>
       <p>{viernes ? 'Hoy es tu día libre.' : `Completaste ${interior.valor} pasos de tu plan.`}</p>
     </section>}
+    {!completo && !viernes && <SugerenciaRecuperar usuario={session?.user?.id ?? ''} ahora={ahora} candidatas={candidatasRecuperar}
+      listo={!esperandoCuenta && !esperandoBanco} modulos={indice?.modulos ?? []} listas={listas} onRecuperar={onNuevo} />}
     {hito.conceptos > 0 && <p className="learning-milestone" role="note">
       Esta semana confirmaste {hito.conceptos} {hito.conceptos === 1 ? 'concepto' : 'conceptos'} sin ayuda después de al menos 24 h.
       {hito.nuevosDominios > 0 && ` ${hito.nuevosDominios} con dominio demostrado y un hito registrado esta semana.`}
