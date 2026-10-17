@@ -12,11 +12,13 @@
 - Mejorar lo existente; no reconstruir. Melman consolida; AMBOSS y simulacros miden.
 - React 18, Vite 6, TypeScript; Workers Static Assets y API en `src/server/worker.ts`.
 - Worker incluye NBME, explicación y proxy del plan; revisar rutas reales.
-- `AI`, `COACH` (StudyCoach) y `AI_FREE_ENABLED`: conservar la validación literal
-  de la fuente y el presupuesto gratuito. El usuario autorizó el 7-oct-2026 ampliar
-  la capacidad de recuperación y valorar modelos mejores dentro de ese presupuesto.
-  Recuperación puede usar el 85 % de los 8500 útiles; explicación mantiene el 70 %.
-  Conservar el contador v=2, reserva del 15 %, tope individual y ausencia de pago.
+- IA: el tutor «Claude» (chat + recuperación activa) y `/api/calificar` usan la API de
+  Anthropic desde el Worker (`src/server/claude.ts`, `ia-chat.ts`); el cliente nunca ve la
+  clave. Secreto `ANTHROPIC_API_KEY` (lo añade Yoel en Cloudflare, nunca en el repo) y tope
+  mensual en dólares `CLAUDE_PRESUPUESTO_USD` (90 por defecto) que lleva `COACH` (StudyCoach).
+  El Worker construye el material de cada petición él mismo (corpus y NBME con la política
+  de fuente segura, que falla cerrada); el cliente solo envía identificadores y su mensaje.
+  Los ejercicios de recuperación activa no cuentan como intento, dominio ni repetición espaciada.
 - Supabase vigente: `rcwvwxchpukjbtqsrxfi`, compartido con step1-lessons.
 - Material privado: `corpus_assets`, `nbme_assets`; nunca copiarlo al repo/public.
 - Progreso: `study_state`, `nbme_state` con CHECK, revision y generation;

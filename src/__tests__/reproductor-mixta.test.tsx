@@ -51,10 +51,6 @@ vi.mock('../store/estado', async () => {
 vi.mock('../data/corpus', () => ({ cargarConceptos: mock.cargarConceptos }))
 vi.mock('../semana/api', () => ({ guardarAvance: mock.guardarAvance }))
 vi.mock('../lib/calificacion-ia', () => ({ calificarConIA: mock.calificarConIA }))
-vi.mock('../components/ConfusionIA', () => ({ ConfusionIA: () => null }))
-vi.mock('../components/AyudaIA', () => ({ AyudaIA: () => null }))
-vi.mock('../components/ExamenIA', () => ({ ExamenIA: () => null }))
-vi.mock('../components/ChatConcepto', () => ({ ChatConcepto: () => null }))
 vi.mock('../nbme/NbmePlayer', () => ({ NbmePlayer: () => <p>Pregunta NBME siguiente</p> }))
 vi.mock('../nbme/NbmeProvider', () => ({ useNbme: () => ({ state: mock.nbmeState!, loading: false, busy: false,
   resumeSession: mock.resumeSession, startSession: mock.startSession, nextQuestion: mock.nextQuestion }) }))

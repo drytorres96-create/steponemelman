@@ -29,3 +29,8 @@ export function sugerenciasDePregunta(c: Concepto, maximo = 5): string[] {
   const vistas = new Set<string>()
   return sugerencias.filter(s => s.length <= 120 && !vistas.has(s) && vistas.add(s)).slice(0, maximo)
 }
+
+const CASO_CLINICO = /\b\d{1,3}\s*-?\s*(?:años?|year|yo|meses?|semanas?|days?)\b|\b(?:paciente|mujer|hombre|varón|niñ[oa]|lactante|recién nacido|gestante|embarazada|patient|woman|man|boy|girl|infant|newborn)\b/i
+
+/** Un stem killer solo existe en un enunciado clínico: sin caso, la sugerencia sobra. */
+export const pareceCasoClinico = (c: Concepto): boolean => CASO_CLINICO.test(`${c.evaluacion.pregunta} ${c.contexto ?? ''}`)

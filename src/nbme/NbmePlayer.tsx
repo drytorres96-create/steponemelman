@@ -4,7 +4,7 @@ import { FigureViewer } from './FigureViewer'
 import { useNbme } from './NbmeProvider'
 import { analizarColumnasOpciones, analizarEnunciado, normalizarTexto, preguntaConLecturasDudosas } from './texto'
 import type { NbmeQuestion } from './types'
-import { CorreccionErrorIA } from '../components/CorreccionErrorIA'
+import { TutorClaude } from '../components/tutor/TutorClaude'
 import { RecuperacionTrasFallo } from './RecuperacionTrasFallo'
 import { myqbankEnabled } from '../myqbank/activation'
 import { HighlightText } from '../myqbank/HighlightText'
@@ -321,13 +321,15 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
                 {!recuperarErrores && conceptIds.length > 0 && onEstudiar && <button className="btn fantasma" onClick={() => { pauseSession(); onEstudiar(conceptIds) }}>{suggestedLinks ? 'Explorar conceptos relacionados' : 'Repasar fundamento'}</button>}
                 {!recuperarErrores && conceptIds.length === 0 && onBuscar && <button className="btn fantasma" onClick={() => { pauseSession(); onBuscar(currentQuestion) }}>Explorar fundamentos</button>}
               </div>
-              {!recuperarErrores && !feedback.correct && !feedback.conflict && <CorreccionErrorIA key={`${feedback.id}:${feedback.optionId}`}
-                peticion={{ tipo: 'nbme', questionId: currentQuestion.id, revision: currentQuestion.revision, optionId: feedback.optionId }} />}
+              {/* Acierto o fallo: el tutor no espera a que falles. Con la pregunta y la revisión que acabas de responder. */}
+              {!feedback.conflict && <TutorClaude key={`${feedback.id}:${feedback.optionId}`} semilla={`${currentQuestion.id}:${currentQuestion.revision}`}
+                numero={modoPaso ? undefined : (sessionView.current?.position ?? 0) + 1} estado={feedback.correct ? 'correcta' : 'incorrecta'}
+                onVerPregunta={() => titleRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })}
+                origen={{ tipo: 'nbme', questionId: currentQuestion.id, revision: currentQuestion.revision, optionId: feedback.optionId }} />}
             </section>}
           </>}
     {recuperarErrores && feedback && !feedback.conflict && preguntaRecuperacion && <RecuperacionTrasFallo
       key={`${feedback.id}:${preguntaRecuperacion.revision}`} pregunta={preguntaRecuperacion} intento={feedback}
-      figures={figures.figures}
       onActividad={activa => { setRecuperando(activa); onRecuperacion?.(activa) }} onSiguiente={modoPaso && onPasoCompleto ? onPasoCompleto : nextQuestion} />}
     <div className="nbme-status" role="status"><span>{syncText}</span>
       {(syncStatus.state === 'error' || syncStatus.state === 'offline') && <button className="btn pequeno fantasma" disabled={busy} style={{ marginLeft: 8 }} onClick={() => void syncNow()}>Reintentar</button>}

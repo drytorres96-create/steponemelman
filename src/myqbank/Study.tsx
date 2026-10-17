@@ -11,6 +11,8 @@ import { analizarColumnasOpciones, normalizarTexto, preguntaConLecturasDudosas }
 import { FigureViewer } from '../nbme/FigureViewer'
 import { Modal } from '../components/comunes'
 import { RecuperacionTrasFallo } from '../nbme/RecuperacionTrasFallo'
+import { TutorClaude } from '../components/tutor/TutorClaude'
+import { pareceCasoClinico, sugerenciasDePregunta } from '../lib/sugerencias-chat'
 import { Button, Card, Icon, Rings, Segmented, StateMessage } from './components'
 import { blockOpportunity, blockTime, timeBlock, learnConcept, draftBlock, markBlock, patchBlock, type StudyBlock } from './blocks'
 import { crearUUID } from '../store/model'
@@ -225,7 +227,18 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
         {uncertain && concept && result && !conceptAttempt?.respuestas_en_conflicto && usaTextoLibre(concept) && <Button disabled={grading} onClick={() => void submitConcept(result)}>Check pending answer</Button>}
         {concept && (usaTextoLibre(concept) || concept.interaccion.recomendada === 'numerico') && <ExpectedAnswer concept={concept} source={source}/>}
         {(concept || question) && <Explanation source={concept ?? question!} highlightSource={source} figures={figures.figures}/>}
-        {question && questionAttempt && !questionAttempt.correct && !questionAttempt.conflict && <><Button aria-expanded={recovery} onClick={() => setRecovery(v => !v)}>Guided recovery</Button>{recovery && <RecuperacionTrasFallo pregunta={question} intento={questionAttempt} figures={figures.figures} onActividad={setRecovering} onSiguiente={next}/>}</>}
+        {/* Con cualquier resultado: el tutor no espera a que falles. El chat está en español; la interfaz que lo rodea sigue en inglés. */}
+        {concept && conceptAttempt && !conceptAttempt.respuestas_en_conflicto && <TutorClaude key={`${opportunity}:${conceptAttempt.respuesta_dada ?? ''}`} semilla={opportunity}
+          numero={block.cursor + 1} estado={conceptAttempt.resultado ?? 'revision'} stemKiller={pareceCasoClinico(concept)} sugerencias={sugerenciasDePregunta(concept, 2)}
+          onVerPregunta={() => heading.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })}
+          origen={{ tipo: 'concepto', resultado: conceptAttempt.resultado ?? 'revision', presentacion: { conceptId: concept.concept_id,
+            answer: (conceptAttempt.respuesta_dada ?? '').slice(0, 500), questionId: opportunity, version: entry.revision, formatVersion: 3,
+            variantId: concept.variante_id, index: block.cursor, route: block.mode === 'test' ? 'examen' : 'repaso', retry: false } }} />}
+        {question && questionAttempt && !questionAttempt.conflict && <TutorClaude key={`${block.id}:${qPosition}:${questionAttempt.optionId}`} semilla={`${question.id}:${question.revision}`}
+          numero={block.cursor + 1} estado={questionAttempt.correct ? 'correcta' : 'incorrecta'}
+          onVerPregunta={() => heading.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })}
+          origen={{ tipo: 'nbme', questionId: question.id, revision: question.revision, optionId: questionAttempt.optionId }} />}
+        {question && questionAttempt && !questionAttempt.correct && !questionAttempt.conflict && <><Button aria-expanded={recovery} onClick={() => setRecovery(v => !v)}>Guided recovery</Button>{recovery && <RecuperacionTrasFallo pregunta={question} intento={questionAttempt} onActividad={setRecovering} onSiguiente={next}/>}</>}
         <div className="mq-explanation-actions">{learningOpen && !closed && <Button disabled={busy} onClick={() => teach(false)}><Icon name="retry"/>Hide and recall</Button>}<Button variant="primary" disabled={grading || recovering || busy} onClick={closed && block.cursor === block.entries.length - 1 ? onExit : next}>{block.cursor === block.entries.length - 1 ? closed ? 'Back to dashboard' : 'Finish block' : 'Next question'}<Icon name="arrow"/></Button></div>
       </aside>}
     </main>

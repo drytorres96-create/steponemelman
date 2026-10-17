@@ -8,6 +8,7 @@
  */
 const CREDENCIALES = [
   /sb_[A-Za-z0-9_-]{8,}/g,
+  /sk-ant-[A-Za-z0-9_-]{8,}/g,
   /Bearer\s+[A-Za-z0-9._-]{8,}/gi,
   /eyJ[A-Za-z0-9._-]{20,}/g,
 ]

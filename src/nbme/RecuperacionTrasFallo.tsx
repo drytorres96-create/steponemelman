@@ -6,7 +6,6 @@ import { alternarFormatos, VERSION_FORMATO_ACTUAL } from '../lib/formatos'
 import type { Concepto } from '../schema/concept'
 import { type Reanudable } from '../store/model'
 import { Reproductor, type Cola } from '../screens/Reproductor'
-import { RecuperacionNbme } from './RecuperacionNbme'
 import { recomendarConceptosNbme } from './relacionados'
 import { guardarRepasoRelacionado, leerRepasoRelacionado, type OrigenRepasoNbme, type RepasoRelacionadoGuardado } from './repaso-relacionado-modelo'
 import { useNbme } from './NbmeProvider'
@@ -17,7 +16,6 @@ import './recuperacion-flujo.css'
 
 interface Props {
   pregunta: NbmeQuestion; intento: NbmeAttempt
-  figures?: { assetId: string; sha256?: string }[]
   onActividad: (activa: boolean) => void; onSiguiente: () => void
 }
 /** Montado dentro del jugador: salir del repaso devuelve la misma pregunta y su orquestador. */
@@ -27,7 +25,7 @@ export function RecuperacionTrasFallo(props: Props) {
   return user ? <Flujo key={key} {...props} ownerId={user.id} /> : null
 }
 
-function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId, figures }: Props & { ownerId: string }) {
+function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId }: Props & { ownerId: string }) {
   const { indice, estado, iniciarSesion } = useApp()
   const nbme = useNbme()
   const origen: OrigenRepasoNbme = { sessionId: intento.sessionId, attemptId: intento.id,
@@ -38,7 +36,6 @@ function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId, figures }
   const [expandido, setExpandido] = useState(false)
   const [elegidos, setElegidos] = useState<string[] | null>(null)
   const [guardada, setGuardada] = useState(() => leerRepasoRelacionado(ownerId, origen))
-  const [iaActiva, setIaActiva] = useState(false)
   const [modo, setModo] = useState<'lista' | 'repaso' | 'terminado'>('lista')
   const [guardado, setGuardado] = useState(true)
   const [volviendo, setVolviendo] = useState(false)
@@ -113,19 +110,13 @@ function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId, figures }
     if (!vigente()) {
       setError('No se pudo retomar el bloque original. Conservas el repaso; vuelve a intentarlo.'); return
     }
-    setModo('lista'); setIaActiva(false); onActividad(false)
+    setModo('lista'); onActividad(false)
     if (destino === 'siguiente') onSiguiente()
     else requestAnimationFrame(() => { if (vivo.current && vigente()) document.getElementById('nbme-feedback-title')?.focus() })
     // Espera al contexto comprometido, conservando sesión, revisión e intento.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [devolucion, nbme.busy, nbme.questionLoading, nbme.currentSession?.id, nbme.sessionView?.phase,
     nbme.sessionView?.current?.position, nbme.currentQuestion?.id, nbme.currentQuestion?.revision, nbme.currentFeedback?.id])
-  const actividadIA = (activa: boolean) => {
-    if (volviendoRef.current || !vigente()) return
-    setIaActiva(activa)
-    if (activa) { onActividad(true); actual.current.pauseSession() }
-    else void volver('original')
-  }
   const abrirRepaso = (retomar: boolean) => {
     if (volviendoRef.current || !vigente()) return
     setError('')
@@ -164,7 +155,7 @@ function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId, figures }
         <div className="recuperacion-acciones"><button className="btn principal" disabled={volviendo} onClick={() => void volver('original')}>Volver a la pregunta original</button>
           <button className="btn" disabled={volviendo} onClick={() => void volver('siguiente')}>Ir a la siguiente pregunta</button></div>
       </div> : <>
-        <div className="pila" hidden={iaActiva} style={iaActiva ? { display: 'none' } : undefined}>
+        <div className="pila">
         <div><h3>Conceptos para recuperar esta pregunta</h3><p className="mini">Elige el fundamento y sus conceptos relacionados. Al terminar vuelves a este bloque NBME.</p></div>
         {cargando ? <p role="status">Buscando conceptos relacionados…</p> : recomendaciones.length ? <>
           <fieldset className="recuperacion-conceptos"><legend>Conceptos de Melman</legend>
@@ -179,9 +170,6 @@ function Flujo({ pregunta, intento, onActividad, onSiguiente, ownerId, figures }
         </> : <p className="mini">No hay conceptos suficientemente relacionados en el material disponible. Puedes usar el fundamento de esta pregunta y continuar el bloque.</p>}
         {guardada && !guardada.terminado && <button className="btn" disabled={cargando || volviendo} onClick={() => abrirRepaso(true)}>Retomar repaso guardado</button>}
         </div>
-        {!intento.correct && <RecuperacionNbme ownerId={ownerId} pregunta={pregunta} figures={figures}
-          origen={{ qid: pregunta.id, revision: pregunta.revision, optionId: intento.optionId, attemptId: intento.id }}
-          onActividad={actividadIA} onTerminar={destino => void volver(destino)} />}
       </>}
     </div>
   </section>

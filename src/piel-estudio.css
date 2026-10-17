@@ -282,12 +282,6 @@
   color: var(--piel-texto-2); border-color: var(--piel-linea);
   background: var(--piel-superficie-2); border-radius: var(--piel-radio-s);
 }
-:root[data-piel-estudio] .chat-burbuja {
-  border-color: var(--piel-linea); background: var(--piel-superficie-2); border-radius: var(--piel-radio-s);
-}
-:root[data-piel-estudio] .chat-chip {
-  color: var(--piel-texto-2); border-color: var(--piel-linea); background: var(--piel-superficie-2);
-}
 :root[data-piel-estudio] .veredicto-ia { border-color: var(--piel-linea-fuerte); }
 
 /* Avance de la sesión y cronómetro: verde lo cerrado, acento lo que toca ahora. */

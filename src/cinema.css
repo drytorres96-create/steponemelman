@@ -192,18 +192,6 @@ a:hover { color: var(--calido); }
   inset: calc(100% + 10px) 0 auto auto; width: 240px; padding: 10px; border-radius: 22px;
   border: 1px solid var(--linea-fuerte); background: #071b1ef7; box-shadow: 0 40px 80px -40px rgba(0, 0, 0, .96);
 }
-/* El medidor se tumba: en la píldora solo cabe el número. */
-.medidor-ia {
-  --medidor: var(--acento); --medidor-pista: rgba(214, 244, 238, .16);
-  flex-direction: row; gap: 9px; padding: 4px 14px 4px 5px; border-radius: 99px;
-  border: 1px solid var(--linea); background: var(--relleno-suave); box-shadow: none;
-}
-.medidor-ia .medidor-titulo, .medidor-ia .medidor-detalle { display: none; }
-.medidor-anillo, .medidor-anillo svg { width: 36px; height: 36px; }
-.medidor-valor { font-size: .88rem; font-weight: 500; }
-.medidor-valor i { font-size: .52rem; }
-.medidor-ia::after { content: 'IA'; font-size: 11px; letter-spacing: .12em; color: var(--texto-3); }
-.medidor-ia.medidor-bajo { --medidor: var(--calido); }
 .saltar-contenido { border: 2px solid var(--acento); border-radius: 99px; background: #071b1e; color: var(--texto); }
 
 /* ---------- la rejilla: contenido y paisaje ---------- */
@@ -508,8 +496,6 @@ progress::-moz-progress-bar { background: linear-gradient(90deg, var(--acento), 
 .reproductor .avance i.hecho { background: var(--acento); }
 .reproductor .avance i.actual { background: var(--calido); box-shadow: none; }
 .cronometro-avance { stroke: var(--acento); }
-.chat-burbuja { border-radius: 24px; border-color: var(--linea); background: rgba(255, 255, 255, .04); }
-.chat-chip { border-radius: 99px; border-color: var(--linea-fuerte); background: var(--relleno-suave); color: var(--texto-2); }
 
 /* ---------- acceso ---------- */
 .auth-page { background: radial-gradient(ellipse at 88% 18%, rgba(18, 51, 58, .55), transparent 64%); }
@@ -553,8 +539,6 @@ progress::-moz-progress-bar { background: linear-gradient(90deg, var(--acento), 
   .editorial-app:not(.study-focus) .barra-fin { grid-column: 2; grid-row: 1; gap: 9px; }
   .editorial-app .editorial-brand { min-width: 0; gap: 9px; overflow: hidden; }
   .brand-wordmark { font-size: 16px; }
-  .medidor-ia { padding: 3px 11px 3px 4px; }
-  .medidor-anillo, .medidor-anillo svg { width: 30px; height: 30px; }
   .menu-cuenta > summary { padding: 8px 13px; font-size: 13px; }
   .screen-heading, .semana-encabezado, .editorial-hero { padding: 26px 24px; border-radius: 34px; }
   .screen-heading h1, .semana-encabezado h1, .editorial-hero h1 { font-size: clamp(32px, 9vw, 42px); }

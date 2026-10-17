@@ -9,7 +9,6 @@ import type { Intento } from '../srs/tipos'
 
 const mock = vi.hoisted(() => ({ app: vi.fn(), vista: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
-vi.mock('../components/AyudaIA', () => ({ AyudaIA: () => null }))
 
 import { Reproductor } from '../screens/Reproductor'
 
