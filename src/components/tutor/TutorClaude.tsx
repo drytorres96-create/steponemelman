@@ -225,9 +225,9 @@ export function TutorClaude({ origen, estado, numero, sugerencias = [], stemKill
 
 const reducirMovimiento = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches } catch { return false } }
 
-function Avatar() { return <span className="tutor-mini-avatar" aria-hidden="true"><IconoCerebro tamano={15} /></span> }
+export function Avatar() { return <span className="tutor-mini-avatar" aria-hidden="true"><IconoCerebro tamano={15} /></span> }
 
-function Turno({ rol, texto, markdown = false, fuente }: { rol: 'yo' | 'ia'; texto: string; markdown?: boolean; fuente?: FuenteChat }) {
+export function Turno({ rol, texto, markdown = false, fuente }: { rol: 'yo' | 'ia'; texto: string; markdown?: boolean; fuente?: FuenteChat }) {
   return <div className={`tutor-turno tutor-turno--${rol}`}>
     {rol === 'ia' && <Avatar />}
     <div className="tutor-burbuja">

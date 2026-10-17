@@ -8,7 +8,7 @@ import { versionPregunta } from '../screens/sesion'
 import { aplicarVariante } from '../lib/variantes'
 import { PresentacionIAZ } from '../lib/contexto-ia'
 import { PeticionChatZ } from '../lib/contexto-chat'
-import { PeticionSesionZ } from '../lib/contexto-sesion'
+import { MAX_PREGUNTAS_SEGUIMIENTO, PeticionSesionZ } from '../lib/contexto-sesion'
 import { extraerJSON, validarEjercicios } from '../lib/practica-activa'
 import type { NbmeQuestion } from '../nbme/types'
 import { NBME_SOURCE_SAFETY_PATH, readNbmeSourceSafety, originalRecoveryAllowed, type NbmeSourceSafety } from '../nbme/source-safety'
@@ -17,7 +17,7 @@ import { handleNbme } from './nbme'
 import { handlePlan, type PlanEnv } from './plan'
 import { ErrorClaude, costeDeError, costeReservaUSD, llamarClaude, type CodigoClaude, type SolicitudClaude } from './claude'
 import { MAX_MATERIAL, VERSION_CHAT, materialChatConcepto, materialChatNbme, solicitudCalificar, solicitudChat, solicitudPractica, type MaterialChat } from './ia-chat'
-import { VERSION_SESION, solicitudHilo, validarHilo } from './ia-sesion'
+import { VERSION_CONSTRUCTOR, VERSION_SESION, solicitudEntender, solicitudHilo, solicitudRevisar, validarEntenderSalida, validarHilo, validarRevision } from './ia-sesion'
 
 const DAY = 86400000
 
@@ -41,8 +41,10 @@ interface Env extends PlanEnv {
   ASSETS: { fetch(request: Request): Promise<Response> }
 }
 
-type ModoClaude = 'calificar' | 'chat' | 'practica' | 'hilo'
-type CoachInput = { user: string; key: string; mode: ModoClaude; solicitud: SolicitudClaude; source?: { title: string; page: number } }
+type ModoClaude = 'calificar' | 'chat' | 'practica' | 'hilo' | 'entender' | 'revisar'
+/** Lo que el validador necesita saber de la petición: los ids que se pueden devolver y cuántas preguntas de seguimiento quedan. */
+export type ContextoValidacion = { permitidos?: string[]; preguntas?: number }
+type CoachInput = { user: string; key: string; mode: ModoClaude; solicitud: SolicitudClaude; source?: { title: string; page: number }; contexto?: ContextoValidacion }
 export type CoachVeredicto = { veredicto: 'correcta' | 'parcial' | 'incorrecta'; motivo: string }
 
 /** Gasto mensual que el Worker contabiliza si no se configura otro, en USD. Deja margen bajo los 100 USD del plan. */
@@ -54,7 +56,7 @@ export const LLAMADAS_POR_DIA = 500
  * veredicto que se guarda en el historial, así que llega hasta el final; el chat y los
  * ejercicios son prescindibles y se quedan fuera los primeros.
  */
-export const TECHO_POR_MODO: Record<ModoClaude, number> = { calificar: 1, chat: 0.9, practica: 0.9, hilo: 0.8 }
+export const TECHO_POR_MODO: Record<ModoClaude, number> = { calificar: 1, chat: 0.9, practica: 0.9, entender: 0.85, revisar: 0.85, hilo: 0.8 }
 
 export const presupuestoMensualUSD = (env: Pick<Env, 'CLAUDE_PRESUPUESTO_USD'>): number => {
   const n = Number(env.CLAUDE_PRESUPUESTO_USD)
@@ -105,11 +107,13 @@ export function validarCalificacion(salida: string): CoachVeredicto | null {
 }
 
 /** Lo que se guarda y se devuelve según el uso; null si la salida del modelo no es utilizable. */
-export function validarSalida(modo: ModoClaude, salida: string, parada?: string): Record<string, unknown> | null {
+export function validarSalida(modo: ModoClaude, salida: string, parada?: string, contexto: ContextoValidacion = {}): Record<string, unknown> | null {
   // Una respuesta cortada por el tope de tokens nunca es utilizable: ni se muestra como completa ni se guarda en caché.
   if (parada === 'max_tokens') return null
   if (modo === 'calificar') return validarCalificacion(salida)
   if (modo === 'hilo') return validarHilo(salida)
+  if (modo === 'entender') return validarEntenderSalida(salida, contexto.preguntas ?? 0)
+  if (modo === 'revisar') return validarRevision(salida, contexto.permitidos ?? [])
   if (modo === 'chat') {
     const respuesta = salida.trim()
     return respuesta.length >= 20 ? { respuesta: respuesta.slice(0, 8000) } : null
@@ -146,7 +150,7 @@ export class StudyCoach {
     try {
       const r = await llamarClaude(this.env.ANTHROPIC_API_KEY, input.solicitud)
       real = r.costeUSD
-      const cuerpo = validarSalida(input.mode, r.texto, r.parada)
+      const cuerpo = validarSalida(input.mode, r.texto, r.parada, input.contexto)
       if (!cuerpo) {
         registrar('coach/salida-invalida', input.mode, { parada: r.parada })
         return unavailable('respuesta')
@@ -211,7 +215,11 @@ export class StudyCoach {
 }
 
 
-async function boundedBody(request: Request): Promise<string | null> {
+/** Tope del cuerpo de una petición de IA. Revisar una lista de candidatos necesita más que una pregunta suelta. */
+const LIMITE_CUERPO = 6000
+const LIMITE_CUERPO_SESION = 24_000
+
+async function boundedBody(request: Request, limite = LIMITE_CUERPO): Promise<string | null> {
   const reader = request.body?.getReader()
   if (!reader) return ''
   const chunks: Uint8Array[] = []; let size = 0
@@ -219,7 +227,7 @@ async function boundedBody(request: Request): Promise<string | null> {
     const part = await reader.read()
     if (part.done) break
     size += part.value.byteLength
-    if (size > 6000) { await reader.cancel(); return null }
+    if (size > limite) { await reader.cancel(); return null }
     chunks.push(part.value)
   }
   const bytes = new Uint8Array(size); let offset = 0
@@ -228,11 +236,11 @@ async function boundedBody(request: Request): Promise<string | null> {
 }
 
 /** Puerta común: método, origen, sesión y tamaño, en ese orden y con esos mensajes. */
-function preflight(request: Request, url: URL, metodo: 'GET' | 'POST'): Response | null {
+function preflight(request: Request, url: URL, metodo: 'GET' | 'POST', limite = LIMITE_CUERPO): Response | null {
   if (request.method !== metodo) return json({ error: 'Método no permitido' }, 405)
   if (request.headers.get('origin') && request.headers.get('origin') !== url.origin) return json({ error: 'Origen no permitido' }, 403)
   if (!/^Bearer [^\s]{20,8192}$/.test(request.headers.get('authorization') ?? '')) return json({ error: 'Inicia sesión para usar la ayuda.' }, 401)
-  if (Number(request.headers.get('content-length') ?? 0) > 6000) return json({ error: 'Solicitud demasiado larga.' }, 413)
+  if (Number(request.headers.get('content-length') ?? 0) > limite) return json({ error: 'Solicitud demasiado larga.' }, 413)
   return null
 }
 
@@ -371,17 +379,24 @@ async function handleChat(request: Request, url: URL, env: Env): Promise<Respons
 /** Etiqueta de una pregunta NBME en lo que sale hacia la IA: sin política que la autorice, sólo «Pregunta NBME». */
 const ETIQUETA_NBME_RESERVADA = 'Pregunta NBME'
 
+/** Una pregunta NBME sólo lleva su etiqueta a la IA si su forma es la de una pregunta real y la política vigente la autoriza. */
+const nbmeAutorizada = (id: string, politica: NbmeSourceSafety | null) => /^NBME(?:27|28|29)-P\d{4}$/.test(id) && originalRecoveryAllowed(politica, id)
+const limpiarEtiqueta = (t: string) => t.replace(/\s+/g, ' ').trim().normalize('NFC')
+
 /**
- * Ayudas de organización del estudio (no explican una pregunta): hoy, la frase con el hilo común
- * de las sugeridas del día. El navegador manda identificadores y etiquetas cortas; la plataforma ya
- * decidió qué es frágil, y aquí Claude sólo redacta. Las preguntas NBME pasan por la política de
- * fuentes antes de que su etiqueta llegue a la IA.
+ * Ayudas de organización del estudio (no explican una pregunta):
+ * - `hilo`: la frase con el hilo común de las sugeridas del día.
+ * - `entender`: traduce lo que la persona pide al vocabulario cerrado de la plataforma, o hace una pregunta de seguimiento.
+ * - `revisar`: de una lista que la plataforma ya filtró, deja los ítems que encajan con lo pedido.
+ * El navegador manda identificadores, etiquetas cortas y lo que la persona escribe; la plataforma ya
+ * decidió qué es frágil o fallado, y aquí Claude sólo redacta o interpreta. Las preguntas NBME pasan
+ * por la política de fuentes antes de que su etiqueta llegue a la IA.
  */
 async function handleSesion(request: Request, url: URL, env: Env): Promise<Response> {
-  const parado = preflight(request, url, 'POST')
+  const parado = preflight(request, url, 'POST', LIMITE_CUERPO_SESION)
   if (parado) return parado
   try {
-    const body = await boundedBody(request)
+    const body = await boundedBody(request, LIMITE_CUERPO_SESION)
     if (body === null) return json({ error: 'Solicitud demasiado larga.' }, 413)
     let parsed: unknown
     try { parsed = JSON.parse(body) } catch { return json({ error: 'Solicitud no válida.' }, 400) }
@@ -391,12 +406,36 @@ async function handleSesion(request: Request, url: URL, env: Env): Promise<Respo
     const quien = await identificar(request)
     if (quien instanceof Response) return quien
     if (!env.ANTHROPIC_API_KEY) return unavailable('sin_clave')
-    // fase === 'hilo'
+
+    if (input.fase === 'entender') {
+      const restantes = Math.max(0, MAX_PREGUNTAS_SEGUIMIENTO - input.preguntasHechas)
+      const solicitud = solicitudEntender(input.mensajes, restantes)
+      const trusted: CoachInput = { user: quien.userId, mode: 'entender', solicitud, contexto: { preguntas: restantes },
+        key: await digest(JSON.stringify([quien.userId, 'entender', input.mensajes, restantes, solicitud.modelo, VERSION_CONSTRUCTOR])) }
+      return await alCoach(env, 'entender', trusted)
+    }
+
     const hayNbme = input.items.some(i => i.tipo === 'pregunta')
     const politica = hayNbme ? await politicaNbme(quien.get) : null
+
+    if (input.fase === 'revisar') {
+      // Lo que no se puede mostrar a la IA tampoco se puede juzgar con ella: no se manda y se cuenta aparte.
+      const revisables = input.items.filter(i => i.tipo === 'concepto' || nbmeAutorizada(i.id, politica))
+        .map(i => ({ id: i.id, etiqueta: limpiarEtiqueta(i.etiqueta) }))
+      const sinRevisar = input.items.length - revisables.length
+      if (!revisables.length) return json({ ids: [], sinRevisar, cached: false })
+      const pedido = limpiarEtiqueta(input.pedido)
+      const solicitud = solicitudRevisar(pedido, input.consulta, revisables)
+      const trusted: CoachInput = { user: quien.userId, mode: 'revisar', solicitud, contexto: { permitidos: revisables.map(i => i.id) },
+        key: await digest(JSON.stringify([quien.userId, 'revisar', pedido, input.consulta, revisables, solicitud.modelo, VERSION_CONSTRUCTOR])) }
+      const respuesta = await alCoach(env, 'revisar', trusted)
+      if (!respuesta.ok) return respuesta
+      return json({ ...await respuesta.json() as Record<string, unknown>, sinRevisar })
+    }
+
+    // fase === 'hilo'
     const items = input.items.map(i => ({
-      etiqueta: (i.tipo === 'pregunta' && !(/^NBME(?:27|28|29)-P\d{4}$/.test(i.id) && originalRecoveryAllowed(politica, i.id))
-        ? ETIQUETA_NBME_RESERVADA : i.etiqueta).replace(/\s+/g, ' ').trim().normalize('NFC'),
+      etiqueta: limpiarEtiqueta(i.tipo === 'pregunta' && !nbmeAutorizada(i.id, politica) ? ETIQUETA_NBME_RESERVADA : i.etiqueta),
       senales: i.senales }))
     const solicitud = solicitudHilo(items)
     const trusted: CoachInput = { user: quien.userId, mode: 'hilo', solicitud,

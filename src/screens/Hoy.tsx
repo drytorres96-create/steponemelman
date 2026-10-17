@@ -28,6 +28,7 @@ import { completarEntradaDeHoy, prepararNuevoDeHoy, tituloDeHoy, type MaterialNu
 import { hayConceptosPendientes } from '../lib/conceptos-pendientes'
 import { sugerirRecuperar } from '../lib/inventario'
 import { SugerenciaRecuperar } from './SugerenciaRecuperar'
+import { ChatSesion } from './ChatSesion'
 import type { AccionesRecuperacion } from './RecuperarMeta'
 
 const ResumenProgreso = lazy(() => import('./Progreso').then(m => ({ default: m.ResumenProgreso })))
@@ -231,6 +232,8 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar, compact = false
     conceptoDisponible: id => publicados.has(id), revisionDePregunta: id => listas.get(id)?.revision ?? null,
     enCajasHoy: new Set(cajas.items.map(i => `${i.tipo}:${i.id}`)),
   }, Infinity)
+  // Para «por repasar» en el chat de sesiones: lo que hoy sigue pendiente en las cajas (lo ya hecho hoy no cuenta).
+  const pendientesEnCajas = new Set(cajas.items.filter(i => !i.hecho).map(i => `${i.tipo}:${i.id}`))
   const fecha = new Date(inicioDelDia(ahora)).toLocaleDateString('es', { timeZone: ZONA_ESTUDIO, weekday: 'long', day: 'numeric', month: 'long' })
   // El título identifica la sesión NBME de hoy en cualquier dispositivo: no depende del idioma del navegador.
   const tituloCajas = tituloDeHoy('Cajas', ahora)
@@ -335,6 +338,8 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar, compact = false
     </section>}
     {!completo && !viernes && <SugerenciaRecuperar usuario={session?.user?.id ?? ''} ahora={ahora} candidatas={candidatasRecuperar}
       listo={!esperandoCuenta && !esperandoBanco} modulos={indice?.modulos ?? []} listas={listas} onRecuperar={onNuevo} />}
+    {!completo && !viernes && <ChatSesion progreso={estado.progreso} criterios={estado.criterios} nbme={nbme.state} listas={listas} publicados={publicados}
+      modulos={indice?.modulos ?? []} enCajasHoy={pendientesEnCajas} onNuevo={onNuevo} ocupado={busy} />}
     {hito.conceptos > 0 && <p className="learning-milestone" role="note">
       Esta semana confirmaste {hito.conceptos} {hito.conceptos === 1 ? 'concepto' : 'conceptos'} sin ayuda después de al menos 24 h.
       {hito.nuevosDominios > 0 && ` ${hito.nuevosDominios} con dominio demostrado y un hito registrado esta semana.`}

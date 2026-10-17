@@ -194,8 +194,9 @@ describe('portada Hoy', () => {
     const onNuevo = vi.fn(), onCajas = vi.fn()
     await pintar({ onNuevo, onCajas })
 
-    // Por rol, no por texto: ni un botón, ni uno gris, ni un «seguir de todas formas».
+    // Por rol, no por texto: ni un botón, ni uno gris, ni un «seguir de todas formas». Tampoco el chat opcional de sesiones.
     expect(botones()).toHaveLength(0)
+    expect(host.querySelector('.chat-sesion-cerrada')).toBeNull()
     expect(host.querySelector('a[href="#modulos"]')).toBeNull()
     expect(anillo().classList.contains('cerrado')).toBe(true)
     expect(host.textContent).toContain('Hoy ya está: 10 conceptos nuevos y 5 preguntas.')
@@ -298,6 +299,7 @@ describe('portada Hoy', () => {
     await pintar({ onNuevo, onCajas })
 
     expect(botones()).toHaveLength(0)
+    expect(host.querySelector('.chat-sesion-cerrada')).toBeNull()
     expect(anillo().classList.contains('cerrado')).toBe(true)
     expect(host.querySelector('.hoy-ahora')?.textContent).toBe('Viernes: hoy no toca nada, a propósito. Lo que venza hoy entra el sábado.')
     // Sin cuentas: ni en la línea de lo que toca ni en los bloques, aunque venzan cajas.
@@ -442,8 +444,11 @@ describe('portada Hoy', () => {
     const onNuevo = vi.fn(), onCajas = vi.fn()
     await pintar({ onNuevo, onCajas })
 
-    const [cajas, nuevo] = botones()
-    expect(botones()).toHaveLength(2)
+    // La tarjeta opcional «Pídele a Claude una sesión» no es un paso del día: los pasos son sólo estos dos.
+    const pasos = botones().filter(b => !b.closest('.chat-sesion-cerrada'))
+    const [cajas, nuevo] = pasos
+    expect(pasos).toHaveLength(2)
+    expect(host.querySelector('.chat-sesion-cerrada')).not.toBeNull()
     expect(cajas.textContent).toBe('Empezar las cajas')
     expect(cajas.classList.contains('principal')).toBe(true)
     expect(nuevo.textContent).toBe('Seguir con lo nuevo')
@@ -477,7 +482,7 @@ describe('portada Hoy', () => {
     })
     mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, semana)])
     await pintar()
-    expect(botones().map(b => b.textContent)).toEqual(['Empezar las cajas'])
+    expect(botones().filter(b => !b.closest('.chat-sesion-cerrada')).map(b => b.textContent)).toEqual(['Empezar las cajas'])
     expect(host.textContent).toContain('✓Nuevo · 5 / 5 conceptos')
     expect(anillo().classList.contains('cerrado')).toBe(false)
   })
