@@ -1,4 +1,7 @@
-import { MAX_ETIQUETA, type ItemHilo } from './contexto-sesion'
+import {
+  ConsultaSesionZ, MAX_ETIQUETA, MAX_ITEMS_REVISION, MAX_PEDIDO, validarEntender,
+  type ConsultaSesion, type ItemHilo, type ItemRevision, type SalidaEntender, type TurnoSesion,
+} from './contexto-sesion'
 import { solicitarIA } from './peticion-ia'
 
 /**
@@ -21,4 +24,43 @@ export async function pedirHilo(items: ItemHilo[], signal?: AbortSignal): Promis
   // El navegador tampoco se fía: una frase corta, sin formato.
   if (hilo.length < 12 || hilo.length > 240 || /[*_`#]/.test(hilo)) return { estado: 'sin_ia', motivo: 'Claude no devolvió una frase utilizable.' }
   return { estado: 'ok', hilo }
+}
+
+/** Interpretar el pedido es rápido; revisar una lista larga tarda más. */
+export const LIMITE_ENTENDER_MS = 30_000
+export const LIMITE_REVISAR_MS = 55_000
+/** El Worker acepta más cuerpo en esta ruta que en las demás: ciento cincuenta etiquetas caben. */
+export const LIMITE_BYTES_REVISAR = 24_000
+
+export type RespuestaEntender = ({ estado: 'ok' } & SalidaEntender) | { estado: 'sin_ia'; motivo: string }
+
+/**
+ * Le dice a Claude lo que la persona pidió (y lo que fue eligiendo) y recibe la consulta ya
+ * traducida al vocabulario de la plataforma, o una pregunta de seguimiento con sus opciones.
+ * El navegador vuelve a validar lo que llega: lo del servidor tampoco se da por bueno.
+ */
+export async function pedirEntender(mensajes: TurnoSesion[], preguntasHechas: number, signal?: AbortSignal,
+  restantes = Math.max(0, 2 - preguntasHechas)): Promise<RespuestaEntender> {
+  if (!mensajes.length) return { estado: 'sin_ia', motivo: 'No hay nada que interpretar.' }
+  const r = await solicitarIA<unknown>('/api/ia/sesion', { fase: 'entender', mensajes: mensajes.slice(-7), preguntasHechas }, LIMITE_ENTENDER_MS, signal)
+  if (r.estado === 'sin_ia') return r
+  const entendido = validarEntender(r.data, restantes)
+  return entendido ? { estado: 'ok', ...entendido } : { estado: 'sin_ia', motivo: 'Claude no devolvió una respuesta que pueda usar. Vuelve a intentarlo.' }
+}
+
+export type RespuestaRevision = { estado: 'ok'; ids: string[]; sinRevisar: number } | { estado: 'sin_ia'; motivo: string }
+
+/** Pide a Claude que deje, de una lista ya filtrada, lo que encaja con lo pedido. Sólo viajan ids y etiquetas. */
+export async function pedirRevision(pedido: string, consulta: ConsultaSesion, items: ItemRevision[], signal?: AbortSignal): Promise<RespuestaRevision> {
+  if (!items.length) return { estado: 'ok', ids: [], sinRevisar: 0 }
+  const enviados = items.slice(0, MAX_ITEMS_REVISION)
+  const r = await solicitarIA<{ ids?: unknown; sinRevisar?: unknown }>('/api/ia/sesion',
+    { fase: 'revisar', pedido: pedido.slice(0, MAX_PEDIDO), consulta: ConsultaSesionZ.parse(consulta), items: enviados },
+    LIMITE_REVISAR_MS, signal, LIMITE_BYTES_REVISAR)
+  if (r.estado === 'sin_ia') return r
+  const ids = r.data?.ids
+  if (!Array.isArray(ids)) return { estado: 'sin_ia', motivo: 'Claude no devolvió una respuesta que pueda usar. Vuelve a intentarlo.' }
+  const permitidos = new Set(enviados.map(i => i.id))
+  const sinRevisar = typeof r.data.sinRevisar === 'number' && Number.isInteger(r.data.sinRevisar) && r.data.sinRevisar >= 0 ? r.data.sinRevisar : 0
+  return { estado: 'ok', ids: [...new Set(ids.filter((id): id is string => typeof id === 'string' && permitidos.has(id)))], sinRevisar }
 }

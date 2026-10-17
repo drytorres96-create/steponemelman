@@ -3,7 +3,10 @@ import { supabase } from './supabase'
 export type RespuestaIA<T> = { estado: 'ok'; data: T } | { estado: 'sin_ia'; motivo: string }
 
 /** Un transporte acotado para todas las ayudas de IA: sin reintentos ni proveedor alternativo. */
-export async function solicitarIA<T>(ruta: string, cuerpo: unknown, limiteMs: number, signal?: AbortSignal): Promise<RespuestaIA<T>> {
+/** Tope de bytes de una petición normal; las rutas que revisan listas piden más y lo dicen. */
+export const LIMITE_BYTES_IA = 6000
+
+export async function solicitarIA<T>(ruta: string, cuerpo: unknown, limiteMs: number, signal?: AbortSignal, limiteBytes = LIMITE_BYTES_IA): Promise<RespuestaIA<T>> {
   const control = new AbortController()
   let agotado = false
   const cancelar = () => control.abort()
@@ -18,7 +21,7 @@ export async function solicitarIA<T>(ruta: string, cuerpo: unknown, limiteMs: nu
   try {
     if (control.signal.aborted) return { estado: 'sin_ia', motivo: 'Cancelado.' }
     const body = JSON.stringify(cuerpo)
-    if (new TextEncoder().encode(body).byteLength > 6000) return { estado: 'sin_ia', motivo: 'La consulta es demasiado larga. Acorta tu pregunta.' }
+    if (new TextEncoder().encode(body).byteLength > limiteBytes) return { estado: 'sin_ia', motivo: 'La consulta es demasiado larga. Acorta tu pregunta.' }
     const { data: { session } } = await Promise.race([supabase.auth.getSession(), cancelada])
     if (!session) return { estado: 'sin_ia', motivo: 'Sin sesión iniciada.' }
     if (control.signal.aborted) return { estado: 'sin_ia', motivo: 'Cancelado.' }

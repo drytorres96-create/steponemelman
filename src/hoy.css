@@ -38,6 +38,20 @@
   .sugerencia-senal { white-space:normal; }
   .sugerencia-recuperar .fila .btn { flex:1 1 100%; }
 }
+/* «Pídele a Claude una sesión»: cerrada es una tarjeta discreta; abierta, el panel del tutor de Claude con sus propias variables. */
+.chat-sesion-cerrada { display:grid; gap:10px; padding:18px 22px; border-radius:18px; }
+.chat-sesion-cerrada h2 { margin:0; font-size:21px; font-weight:500; }
+.chat-sesion-cerrada > .mini { margin:0; }
+.chat-sesion-cerrada .fila { display:flex; flex-wrap:wrap; gap:10px; }
+.tutor.chat-sesion { margin:0; }
+.chat-sesion .tutor-hilo { min-height:0; }
+.chat-sesion-resultado { display:grid; gap:8px; justify-items:start; min-width:0; }
+.chat-sesion-resultado p { margin:0; overflow-wrap:anywhere; }
+.chat-sesion-nota { color:var(--tt-suave); font-size:.84rem; }
+@media(max-width:650px) {
+  .chat-sesion-cerrada { padding:16px; }
+  .chat-sesion-cerrada .fila .btn { flex:1 1 100%; }
+}
 /* Los tres desplegables van debajo, cerrados y discretos: una barra de cristal con su título.
    Abiertos, lo de dentro conserva sus propias tarjetas; el desplegable no añade otra capa encima. */
 .hoy-desplegable { border:1px solid var(--linea); border-radius:14px; background:var(--vidrio-barra); }

@@ -19,3 +19,14 @@ export function estimarBloque(progreso: Record<string, ProgresoConcepto>, pregun
   const minimo = Math.max(1, Math.floor(minutos * 0.8)), maximo = Math.max(minimo + 1, Math.ceil(minutos * 1.3))
   return `≈ ${minimo}–${maximo} min para responder, según tu práctica; las explicaciones pueden añadir tiempo.`
 }
+
+/**
+ * Cuánto tarda de verdad en responder, en milisegundos: la mediana de sus intentos de conceptos y de
+ * preguntas. `null` mientras no haya muestra suficiente; quien lo use pone un valor por defecto.
+ */
+export function mediasDeRitmo(progreso: Record<string, ProgresoConcepto>, preguntas: NbmeAttempt[]): { conceptoMs: number | null; preguntaMs: number | null } {
+  return {
+    conceptoMs: medianaValida(Object.values(progreso).flatMap(p => p.intentos).filter(i => i.resultado && i.resultado !== 'revision').map(i => i.ms), 600_000),
+    preguntaMs: medianaValida(preguntas.map(i => i.durationMs), 900_000),
+  }
+}
