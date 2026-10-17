@@ -163,7 +163,8 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, ...datos }: Pro
       <h2 id="chat-sesion-titulo">Pídele a Claude una sesión</h2>
       <p className="mini">Un tema, lo que has fallado, lo que tienes por repasar… Claude lo entiende, revisa tu material y te deja la sesión lista para empezar.</p>
       <div className="fila">
-        <button type="button" className="btn principal" onClick={() => setAbierto(true)}>{mensajes.length ? 'Seguir con el chat' : 'Pedir una sesión'}</button>
+        {/* Neutro a propósito: en Hoy solo hay una acción principal, la del paso del día. */}
+        <button type="button" className="btn" onClick={() => setAbierto(true)}>{mensajes.length ? 'Seguir con el chat' : 'Pedir una sesión'}</button>
       </div>
     </section>
   }

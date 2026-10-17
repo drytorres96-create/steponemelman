@@ -86,6 +86,8 @@ describe('«Pídele a Claude una sesión»: abrir y escribir', () => {
     await montar()
     expect(contenedor.textContent).toContain('Pídele a Claude una sesión')
     expect(contenedor.querySelector('input')).toBeNull()
+    // Hoy tiene una sola acción principal (el paso del día): la tarjeta opcional no compite con ella.
+    expect(contenedor.querySelector('.principal')).toBeNull()
     expect(mock.pedirEntender).not.toHaveBeenCalled()
     expect(mock.cargarTodo).not.toHaveBeenCalled()
     await abrir()
