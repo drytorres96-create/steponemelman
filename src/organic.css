@@ -69,13 +69,6 @@ summary::marker { color: var(--texto-2); }
 .menu-cuenta-opciones { padding: 8px; background: #0b2449; border-color: #9ca2a86b; border-radius: 13px; box-shadow: 0 20px 60px #000b; }
 .editorial-app:not(.study-focus) .menu-cuenta-opciones { left: 0; width: 225px; }
 .menu-cuenta-opciones .btn { justify-content: flex-start; }
-.medidor-ia { --medidor: #bcc0c5; --medidor-pista: #434a50; background: #ced2d706; padding: 12px 8px; border-color: #c4c8cd20; box-shadow: none; }
-.medidor-anillo, .medidor-anillo svg { width: 59px; height: 59px; }
-.medidor-pista, .medidor-arco { stroke-width: 3; }
-.medidor-valor { font-size: 1.25rem; font-weight: 500; }
-.medidor-ia.medidor-bajo { --medidor: #e6c28c; --medidor-pista: #554d3c; }
-.medidor-ia.medidor-bajo.medidor-cero { --medidor: var(--rojo); }
-.medidor-ia.medidor-apagado { --medidor: #adb0b4; }
 
 /* Three materials: quiet panels, a reflective work plane, opaque reading. */
 .tarjeta, .home-path, .home-review { padding: 27px; background: var(--glass); border: 1px solid #b7c5d42b; border-top-color: #d9e2ea45; border-radius: var(--radio); box-shadow: var(--sombra); }
@@ -276,7 +269,6 @@ progress::-moz-progress-bar { background: #b7bcc2; border-radius: 99px; }
 .reproductor .avance i.actual { background: #c8ccd1; box-shadow: none; }
 .cronometro-avance { stroke: #c2c6cb; }
 .cronometro.excedido .cronometro-anillo { animation: none; filter: none; }
-.chat-mio .chat-burbuja { border-color: #9ca3aa4d; }
 .modal-fondo { background: #030e25d9; }
 .modal, .modal-cab { background: #102b50; }
 
@@ -383,13 +375,6 @@ html[data-depth-paused] .access-scene img, .auth-page:focus-within .access-scene
   .menu-cuenta > summary { min-height: 34px; padding: 0; font-size: .67rem; }
   .menu-cuenta > summary::after { display: none; }
   .editorial-app:not(.study-focus) .menu-cuenta-opciones { left: auto; right: 0; top: 100%; bottom: auto; }
-  .medidor-ia { padding: 3px; gap: 0; }
-  .medidor-ia::after { content: 'IA'; display: block; margin-left: 4px; font-size: .6rem; }
-  .medidor-anillo, .medidor-anillo svg { width: 28px; height: 28px; }
-  .medidor-valor { font-size: .69rem; }
-  .medidor-valor i { font-size: .42rem; }
-  .medidor-ia .medidor-titulo { display: none; }
-  .medidor-ia .medidor-detalle { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .workspace-topline { min-height: 48px; font-size: .63rem; }
   .workspace-edition { display: none; }
   .pila, .section-workspace { gap: 22px; }
@@ -516,7 +501,6 @@ body { background: radial-gradient(ellipse at 95% 0, #144ca378, transparent 62%)
 input:focus, select:focus, textarea:focus { outline-color: #72ecff; border-color: #69cfff; }
 input[type='checkbox'], input[type='radio'], progress { accent-color: #68d9ff; }
 .etq.violeta { color: #99e7ff; border-color: #53bcff6b; background: #288dff24; }
-.medidor-ia { --medidor: #72ddff; --medidor-pista: #284f7b; }
 .plan-dia.abierto .plan-dia-titulo { border-color: #63c8ff80; background: linear-gradient(130deg, #2468b760, #184e8340); }
 .plan-dia.abierto .plan-dia-numero { color: #91eaff; }
 .barra-prog > span, progress::-webkit-progress-value { background: linear-gradient(90deg, #468bff, #71ecff); }

@@ -12,9 +12,6 @@ vi.mock('./NbmeProvider', () => ({ useNbme: mock.nbme }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ user: { id: 'owner' } }) }))
 vi.mock('../data/corpus', () => ({ cargarTodo: mock.load }))
-vi.mock('./RecuperacionNbme', () => ({ RecuperacionNbme: ({ onTerminar, onActividad }: any) => <>
-  <button onClick={() => onActividad(true)}>IA sintética</button><button onClick={() => onTerminar('siguiente')}>IA siguiente</button>
-</> }))
 vi.mock('../screens/Reproductor', () => ({ Reproductor: ({ onSalir, onTramoCompleto, continuacion, cola }: any) => {
   mock.colas(cola.conceptos)
   return <>
@@ -131,8 +128,8 @@ describe('regreso al bloque original tras recuperar un error', () => {
   it('no avanza otra pregunta si cambia el bloque mientras se reanuda', async () => {
     let resolver!: (v: boolean) => void
     context.resumeSession.mockReturnValue(new Promise<boolean>(resolve => { resolver = resolve }))
-    await click('IA sintética')
-    await click('IA siguiente')
+    await click('Practicar conceptos seleccionados'); await click('Terminar repaso sintético')
+    await click('Ir a la siguiente pregunta')
     context = { ...context, currentSession: { id: 'other-block' } }
     await act(async () => { root.render(<RecuperacionTrasFallo pregunta={pregunta} intento={intento} onActividad={mock.activity} onSiguiente={mock.next} />) })
     await act(async () => resolver(true))
@@ -142,7 +139,8 @@ describe('regreso al bloque original tras recuperar un error', () => {
   it('espera al contexto comprometido antes de devolver el control tras una carga histórica', async () => {
     let resolver!: (v: boolean) => void
     context.resumeSession.mockReturnValue(new Promise<boolean>(resolve => { resolver = resolve }))
-    await click('IA siguiente')
+    await click('Practicar conceptos seleccionados'); await click('Terminar repaso sintético')
+    await click('Ir a la siguiente pregunta')
     context = { ...context, busy: true, questionLoading: true, currentQuestion: null }
     await act(async () => root.render(<RecuperacionTrasFallo pregunta={pregunta} intento={intento} onActividad={mock.activity} onSiguiente={mock.next} />))
     await act(async () => resolver(true))

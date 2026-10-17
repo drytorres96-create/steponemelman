@@ -12,6 +12,11 @@ describe('registro del Worker', () => {
     expect(texto).not.toMatch(/eyJhbGciOi/)
     expect(texto).toContain('[oculto]')
   })
+  it('tampoco deja pasar la clave de la API de Claude', () => {
+    const texto = mensajeSeguro(new Error('request failed x-api-key: sk-ant-api03-AbCdEf0123456789_-xyz'))
+    expect(texto).not.toMatch(/sk-ant/)
+    expect(texto).toContain('[oculto]')
+  })
   it('recorta mensajes desmesurados', () => {
     expect(mensajeSeguro(new Error('x'.repeat(5000))).length).toBeLessThanOrEqual(300)
   })

@@ -8,3 +8,5 @@
 .recuperacion-conceptos small { display: block; color: var(--tinta-suave); margin-top: 4px; }
 .recuperacion-conceptos label:focus-within { outline: 2px solid var(--violeta); outline-offset: 2px; }
 .nbme-player.recuperando > :not(.recuperacion-flujo) { display: none; }
+.recuperacion-acciones { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 480px) { .recuperacion-acciones > .btn { flex: 1 1 180px; } }

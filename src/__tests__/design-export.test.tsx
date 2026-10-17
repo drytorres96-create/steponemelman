@@ -26,7 +26,6 @@ vi.mock('../plan/api', () => ({ cargarTopics: async () => [], cargarPlanSemana: 
   { eventoId: 'DEMO-S1', titulo: 'S1 · Demostración', hechas: 12, tareas: 15 },
   { eventoId: 'DEMO-S2', titulo: 'S2 · Demostración', hechas: 7, tareas: 15 },
 ], marcarCheckpoint: vi.fn(), PlanEscrituraError: class extends Error {} }))
-vi.mock('../lib/cuota-ia', () => ({ useCuotaIA: () => ({ presupuesto: 100, restantes: 82, gastadas: 18, llamadas: 0, activa: true }), porcentajeRestante: () => 82, notificarUsoIA: vi.fn(), refrescarCuota: vi.fn() }))
 
 import App from '../App'
 import { AuthGate } from '../auth/AuthGate'

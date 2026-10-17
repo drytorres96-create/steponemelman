@@ -14,9 +14,7 @@ import { reconstruirProgreso } from '../store/model'
 
 const mock = vi.hoisted(() => ({ app: vi.fn(), calificar: vi.fn(), vista: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
-vi.mock('../components/AyudaIA', () => ({ AyudaIA: () => <div>ayuda</div> }))
 vi.mock('../lib/calificacion-ia', () => ({ calificarConIA: mock.calificar }))
-vi.mock('../lib/confusion-ia', () => ({ conQueSeConfundio: async () => null, ORIGEN_PARECIDO: {} }))
 
 import { Reproductor } from '../screens/Reproductor'
 

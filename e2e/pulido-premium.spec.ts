@@ -77,11 +77,11 @@ for (const width of [390, 1280]) {
         expect(await colores(opcion)).toEqual(antes)
       }
 
-      await page.getByText('Así lo razoné · opcional', { exact: true }).click()
-      const razonamiento = page.getByLabel('¿Qué dato te llevó a elegir esa opción?')
-      await razonamiento.focus()
-      expect(await razonamiento.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
-      await expect(razonamiento).toBeFocused()
+      // El campo de texto del tutor no debe provocar el zoom automático de iOS (16 px mínimo).
+      const pregunta = page.getByRole('textbox', { name: 'Tu pregunta para Claude', exact: true })
+      await pregunta.focus()
+      expect(await pregunta.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+      await expect(pregunta).toBeFocused()
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     })
 

@@ -1,12 +1,11 @@
 import { supabase } from './supabase'
-import { notificarUsoIA } from './cuota-ia'
 
 export type RespuestaIA<T> = { estado: 'ok'; data: T } | { estado: 'sin_ia'; motivo: string }
 
-/** Un transporte acotado para todas las ayudas: sin reintentos ni proveedor alternativo. */
+/** Un transporte acotado para todas las ayudas de IA: sin reintentos ni proveedor alternativo. */
 export async function solicitarIA<T>(ruta: string, cuerpo: unknown, limiteMs: number, signal?: AbortSignal): Promise<RespuestaIA<T>> {
   const control = new AbortController()
-  let agotado = false, enviada = false
+  let agotado = false
   const cancelar = () => control.abort()
   signal?.addEventListener('abort', cancelar, { once: true })
   if (signal?.aborted) control.abort()
@@ -23,7 +22,6 @@ export async function solicitarIA<T>(ruta: string, cuerpo: unknown, limiteMs: nu
     const { data: { session } } = await Promise.race([supabase.auth.getSession(), cancelada])
     if (!session) return { estado: 'sin_ia', motivo: 'Sin sesión iniciada.' }
     if (control.signal.aborted) return { estado: 'sin_ia', motivo: 'Cancelado.' }
-    enviada = true
     const response = await fetch(ruta, { method: 'POST', signal: control.signal,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` }, body })
     if (!response.headers.get('content-type')?.includes('application/json')) return { estado: 'sin_ia', motivo: 'La ayuda de IA no está disponible en este entorno.' }
@@ -40,7 +38,5 @@ export async function solicitarIA<T>(ruta: string, cuerpo: unknown, limiteMs: nu
     clearTimeout(timer)
     signal?.removeEventListener('abort', cancelar)
     if (rechazar) control.signal.removeEventListener('abort', rechazar)
-    // También al cancelar o perder la conexión: el servidor puede haber reservado ya.
-    if (enviada) notificarUsoIA()
   }
 }

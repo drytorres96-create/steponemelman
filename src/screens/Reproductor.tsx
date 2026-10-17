@@ -12,11 +12,9 @@ import { cercaniaDominio } from '../srs/cercania'
 import { crearUUID, type Reanudable } from '../store/model'
 import { EVALUADOR_VERSION } from '../lib/normalize'
 import { prepararConcepto, VERSION_FORMATO_ACTUAL, type VersionFormato } from '../lib/formatos'
-import { AyudaIA } from '../components/AyudaIA'
-import { ExamenIA } from '../components/ExamenIA'
-import { CorreccionErrorIA } from '../components/CorreccionErrorIA'
-import { ChatConcepto } from '../components/ChatConcepto'
 import type { PresentacionIA } from '../lib/contexto-ia'
+import { TutorClaude } from '../components/tutor/TutorClaude'
+import { pareceCasoClinico, sugerenciasDePregunta } from '../lib/sugerencias-chat'
 import { Cronometro } from '../components/Cronometro'
 import { BotonPiel, usePielEstudio } from '../components/PielEstudio'
 import { tiempoLegible } from '../lib/tiempo'
@@ -622,11 +620,6 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
             <button className="btn principal" onClick={() => autocalificar(false)}>No la sabía</button>
           </div>
           : <button ref={siguienteRef} className="btn principal" onClick={avanzar}>{tx('Siguiente pregunta', 'Next question')}</button>}
-        {!presentacionCambio && ['incorrecta', 'parcial', 'ortografia'].includes(res.veredicto) && <CorreccionErrorIA
-          key={`${preguntaId}:${res.respuestaDada}`} peticion={{ tipo: 'concepto', resultado: res.veredicto as 'incorrecta' | 'parcial' | 'ortografia',
-            presentacion: { conceptId: c.concept_id, answer: res.respuestaDada.slice(0, 500), questionId: preguntaId,
-              version: versionPregunta(c), formatVersion: versionFormato, variantId: c.variante_id, index: i,
-              route: cola.ruta as PresentacionIA['route'], retry: reintento } }} />}
         {/* Una respuesta escrita que nadie juzga no acredita nada: la IA puede decidirla si lo prefieres. */}
         {res.veredicto === 'revision' && res.respuestaDada.trim() && usaTextoLibre(c) && !presentacionCambio
           && <div><button className="btn pequeno fantasma" disabled={juzgandoIA} onClick={() => void juzgarConIA()}>
@@ -635,7 +628,6 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
         {/* Lo demás espera plegado en un solo sitio: está cuando se busca y no compite con seguir. */}
         <details className="retro-mas"><summary>Más sobre esta pregunta</summary>
           <div className="pila">
-            {res.veredicto !== 'correcta' && !presentacionCambio && <details><summary>Sigo sin entender</summary><AyudaIA key={preguntaId} concepto={c} respuesta={res.respuestaDada} preguntaId={preguntaId} indice={i} ruta={cola.ruta} reintento={reintento} versionFormato={versionFormato} /></details>}
             <details><summary>Profundizar</summary>
               {c.contexto && <p>{c.contexto}</p>}
               {c.evaluacion.opciones?.filter(o => !o.correcta && o.texto !== res.respuestaDada && o.por_que).map(o => <p className="mini" key={o.texto}><b>{o.texto}:</b> {o.por_que}</p>)}
@@ -648,13 +640,6 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
 </p>
                 : dominio.pendientes.length > 0 && <ul className="mini">{dominio.pendientes.map(criterio => <li key={criterio}>{criterio}</li>)}</ul>}
             </details>
-            {/* A diferencia de la ayuda, esto no espera a que falles: sirve igual cuando aciertas. */}
-            {!presentacionCambio && <details><summary>Cómo caería en el examen</summary><ExamenIA key={c.concept_id} concepto={c} /></details>}
-            {/* Solo después de responder: preguntar antes sería pedirle la respuesta. */}
-            {!presentacionCambio && <details><summary>Preguntar sobre esta pregunta</summary><ChatConcepto key={preguntaId} concepto={c}
-              presentacion={{ conceptId: c.concept_id, answer: res.respuestaDada.slice(0, 500), questionId: preguntaId,
-                version: versionPregunta(c), formatVersion: versionFormato, variantId: c.variante_id, index: i,
-                route: cola.ruta as PresentacionIA['route'], retry: reintento }} /></details>}
             {res.veredicto !== 'revision' && <details><summary>Ajustar dificultad (opcional)</summary><p className="mini">El resultado ya programó tu repaso. Puedes ajustar cómo te resultó y avanzar.</p>
               <div className="escalera">{(res.veredicto === 'incorrecta' ? [[1, 'Volver a practicar']] as const
                 : res.veredicto === 'parcial' || res.veredicto === 'ortografia' ? [[1, 'Volver a practicar'], [2, 'Difícil']] as const
@@ -664,6 +649,14 @@ export function Reproductor({ cola, onSalir, indiceInicial = 0, onTramoCompleto,
           </div>
         </details>
       </div>}
+      {/* Sea cual sea el resultado: el tutor no espera a que falles. Va fuera del bloque de resultado (que es una región viva)
+          y solo con la presentación vigente, para que el material sea el que viste. */}
+      {fase === 'retro' && res && !examenSinAyuda && !presentacionCambio && <TutorClaude key={`${preguntaId}:${res.respuestaDada}`} semilla={preguntaId} numero={i + 1} estado={res.veredicto}
+        stemKiller={pareceCasoClinico(c)} sugerencias={sugerenciasDePregunta(c, 2)}
+        onVerPregunta={() => enunciadoRef.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })}
+        origen={{ tipo: 'concepto', resultado: res.veredicto, presentacion: { conceptId: c.concept_id, answer: res.respuestaDada.slice(0, 500), questionId: preguntaId,
+          version: versionPregunta(c), formatVersion: versionFormato, variantId: c.variante_id, index: i,
+          route: cola.ruta as PresentacionIA['route'], retry: reintento } }} />}
       {fase === 'ortografia' && c.escritura_correctiva.termino && <div className="pila"><EscrituraCorrectiva termino={c.escritura_correctiva.termino} onHecho={avanzar} /><button className="btn" onClick={avanzar}>Continuar sin practicar escritura</button></div>}
     </div>
     {verFuente && !examenSinAyuda && <Modal titulo="Fuente del concepto" onCerrar={() => setVerFuente(false)}><PanelFuente c={c} /></Modal>}

@@ -14,7 +14,6 @@ import type { Intento } from '../srs/tipos'
  */
 const mock = vi.hoisted(() => ({ app: vi.fn(), vista: vi.fn(), intentos: [] as Intento[], reanudables: [] as unknown[] }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
-vi.mock('../components/AyudaIA', () => ({ AyudaIA: () => <div>ayuda</div> }))
 vi.mock('../lib/calificacion-ia', () => ({ calificarConIA: async () => ({ estado: 'sin_ia', motivo: 'Sin IA en pruebas.' }) }))
 
 import { Reproductor, type ModoCaja } from '../screens/Reproductor'
@@ -52,7 +51,7 @@ beforeEach(() => {
     guardarReanudable: (r: unknown) => { mock.reanudables.push(r); estado = { ...estado, reanudable: r } },
   }))
 })
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks() })
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 const pintar = async (modoCaja: ModoCaja, onTramoCompleto = vi.fn(), onSalir = vi.fn()) => {
   const cola = { titulo: 'Cajas', subtitulo: '', ruta: 'repaso', modulo: 'hoy:cajas:3', conceptos: [concepto], sessionId: 'caja-1:3' }
@@ -132,6 +131,7 @@ describe('reproductor en una caja', () => {
   })
 
   it('tras responder hay una acción principal y lo demás espera plegado en «Más sobre esta pregunta»', async () => {
+    const red = vi.fn(); vi.stubGlobal('fetch', red)
     await pintar({ reintento: false, avisoFallo: 'Vuelve dentro de unos pasos.' })
     await responder('beta')
     // A la vista: lo que no está dentro de un desplegable cerrado.
@@ -140,8 +140,14 @@ describe('reproductor en una caja', () => {
     const mas = [...host.querySelectorAll('details.retro-mas')]
     expect(mas).toHaveLength(1)
     const dentro = [...mas[0].querySelectorAll('summary')].map(x => x.textContent)
-    expect(dentro).toEqual(['Más sobre esta pregunta', 'Sigo sin entender', 'Profundizar', 'Cómo caería en el examen',
-      'Preguntar sobre esta pregunta', 'Ajustar dificultad (opcional)'])
+    expect(dentro).toEqual(['Más sobre esta pregunta', 'Profundizar', 'Ajustar dificultad (opcional)'])
+    // El tutor de Claude está a la vista, fuera del desplegable, sin haber consultado nada.
+    const tutor = host.querySelector('.tutor')
+    expect(tutor).not.toBeNull()
+    expect(tutor!.closest('details')).toBeNull()
+    expect(tutor!.textContent).toContain('Tu tutor de esta pregunta')
+    expect(tutor!.textContent).toContain('Mecanismo paso a paso')
+    expect(red).not.toHaveBeenCalled()
     expect(mas[0].textContent).toContain('Abrir la fuente')
     // En un recorrido sobran el formato y el estado del concepto.
     expect(host.textContent).not.toContain('Recuperación libre')

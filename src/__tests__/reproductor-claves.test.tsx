@@ -9,7 +9,6 @@ import { ConceptoZ, type Concepto } from '../schema/concept'
 
 const mock = vi.hoisted(() => ({ app: vi.fn(), vista: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
-vi.mock('../components/AyudaIA', () => ({ AyudaIA: () => <div>ayuda</div> }))
 
 import { Reproductor } from '../screens/Reproductor'
 

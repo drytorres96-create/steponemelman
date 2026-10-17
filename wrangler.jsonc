@@ -3,10 +3,9 @@
   "compatibility_date": "2026-09-09",
   "workers_dev": true,
   "main": "src/server/worker.ts",
-  "ai": { "binding": "AI" },
   "durable_objects": { "bindings": [{ "name": "COACH", "class_name": "StudyCoach" }] },
   "migrations": [{ "tag": "coach-v1", "new_sqlite_classes": ["StudyCoach"] }],
-  "vars": { "AI_FREE_ENABLED": "true" },
+  "vars": { "CLAUDE_PRESUPUESTO_USD": "90" },
   "assets": {
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"],

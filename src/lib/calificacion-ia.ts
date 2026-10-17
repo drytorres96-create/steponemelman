@@ -13,9 +13,12 @@ export interface PeticionCalificacion {
   variantId?: string; index: number; route: string; retry: boolean
 }
 
+/** Plazo del navegador para toda la operación; el Worker debe terminar su llamada a Claude con margen antes. */
+export const PLAZO_CALIFICACION_MS = 15_000
+
 /** Conserva el veredicto existente; sin IA, quien llama usa el corrector propio. */
 export async function calificarConIA(peticion: PeticionCalificacion, signal?: AbortSignal): Promise<ResultadoCalificacion> {
-  const r = await solicitarIA<Partial<CoachVeredicto> & { origen?: unknown }>('/api/calificar', { ...peticion, answer: peticion.answer.slice(0, 500) }, 15_000, signal)
+  const r = await solicitarIA<Partial<CoachVeredicto> & { origen?: unknown }>('/api/calificar', { ...peticion, answer: peticion.answer.slice(0, 500) }, PLAZO_CALIFICACION_MS, signal)
   if (r.estado === 'sin_ia') return r
   const data = r.data
   if (!data || !['correcta', 'parcial', 'incorrecta'].includes(data.veredicto ?? '') || (data.motivo != null && typeof data.motivo !== 'string')) {

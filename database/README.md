@@ -39,7 +39,7 @@ La base valida la estructura superior de `EstadoApp`, versión `1`, tamaño máx
 
 ## Viñetas de mecanismo (piloto)
 
-El piloto de Viñetas se retiró de la aplicación en 1.31.0. `vinetas-schema.sql` y la tabla histórica `ai_vignettes` se conservan para trazabilidad; no tienen pantalla ni lectura cliente activa y sus registros no se eliminan. La ayuda «Cómo caería en el examen» de Melman es una función independiente y sigue disponible. La revisión privada del corpus se documenta en [Material para agentes](../docs/material-privado-agentes.md).
+El piloto de Viñetas se retiró de la aplicación en 1.31.0. `vinetas-schema.sql` y la tabla histórica `ai_vignettes` se conservan para trazabilidad; no tienen pantalla ni lectura cliente activa y sus registros no se eliminan. «Cómo caería en el examen» y el resto de ayudas de IA sueltas se retiraron en 1.33.0 a favor del tutor Claude de cada pregunta (ver [cambios 1.33.0](../docs/cambios-1.33.0.md)). La revisión privada del corpus se documenta en [Material para agentes](../docs/material-privado-agentes.md).
 
 ## Verificación
 
