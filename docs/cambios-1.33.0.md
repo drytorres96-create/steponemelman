@@ -35,6 +35,15 @@ de Workers AI. La ruta `/api/ia/chat` sustituye a las siete rutas anteriores.
 - El Worker **no se fía del navegador**: recibe identificadores y tu mensaje, y arma el material
   él mismo (corpus publicado; NBME con la política de fuente segura, que falla cerrada). Se
   vuelve a comprobar sesión y pertenencia al banco en cada llamada.
+- Una pregunta NBME cuya explicación y objetivo clasifican distinto al mismo agente
+  (`fuente-recuperacion-confiable.ts`) no se envía a la IA: el chat y la práctica se cierran con
+  «fuente_inconsistente», sin elegir cuál de los dos textos manda ni tocar el banco.
+- Lo que escribes como respuesta viaja en tu propio turno (`<RESPUESTA_DEL_ESTUDIANTE>`), nunca
+  dentro de las instrucciones: no puede cerrar el bloque `MATERIAL` ni hablar con prioridad de sistema.
+- Una respuesta que Claude deja cortada por el tope de tokens no se muestra como completa ni se
+  guarda en la caché de siete días: se pide de nuevo.
+- Corregir una respuesta escrita (`/api/calificar`) corta su llamada a Claude a los 10 s; el
+  navegador espera 15 s en total, así que el veredicto no puede llegar tarde y perderse.
 - Límites: cuerpo ≤ 6000 bytes, mensaje ≤ 400 caracteres, historial ≤ 8 turnos.
 - Cada ejercicio que escribe Claude se **valida antes de mostrarse**: clave dentro de las
   opciones, sin opciones repetidas, un solo hueco, palabra clave que no está ya escrita en el

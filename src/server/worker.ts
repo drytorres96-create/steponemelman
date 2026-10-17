@@ -11,6 +11,7 @@ import { PeticionChatZ } from '../lib/contexto-chat'
 import { extraerJSON, validarEjercicios } from '../lib/practica-activa'
 import type { NbmeQuestion } from '../nbme/types'
 import { NBME_SOURCE_SAFETY_PATH, readNbmeSourceSafety, originalRecoveryAllowed } from '../nbme/source-safety'
+import { tieneClasificacionContradictoria } from './fuente-recuperacion-confiable'
 import { handleNbme } from './nbme'
 import { handlePlan, type PlanEnv } from './plan'
 import { ErrorClaude, costeDeError, costeReservaUSD, llamarClaude, type CodigoClaude, type SolicitudClaude } from './claude'
@@ -78,6 +79,7 @@ export const MOTIVOS = {
   concepto_largo: 'Esta pregunta es demasiado extensa para el chat. Su explicación sigue disponible.',
   no_verificable: 'No se pudo preparar el material de esta pregunta para el chat.',
   fuente_en_revision: 'Esta pregunta NBME está en revisión de fuente y no se envía a la IA. Usa su explicación y la práctica revisada disponible.',
+  fuente_inconsistente: 'En esta pregunta NBME la explicación y el objetivo se contradicen, así que no se envía a la IA hasta revisar la fuente. Usa su explicación publicada.',
   interno: 'Algo falló en el servidor al preparar la ayuda. La explicación de la pregunta sigue disponible.',
 } as const
 export type Motivo = keyof typeof MOTIVOS
@@ -101,7 +103,9 @@ export function validarCalificacion(salida: string): CoachVeredicto | null {
 }
 
 /** Lo que se guarda y se devuelve según el uso; null si la salida del modelo no es utilizable. */
-export function validarSalida(modo: ModoClaude, salida: string): Record<string, unknown> | null {
+export function validarSalida(modo: ModoClaude, salida: string, parada?: string): Record<string, unknown> | null {
+  // Una respuesta cortada por el tope de tokens nunca es utilizable: ni se muestra como completa ni se guarda en caché.
+  if (parada === 'max_tokens') return null
   if (modo === 'calificar') return validarCalificacion(salida)
   if (modo === 'chat') {
     const respuesta = salida.trim()
@@ -139,7 +143,7 @@ export class StudyCoach {
     try {
       const r = await llamarClaude(this.env.ANTHROPIC_API_KEY, input.solicitud)
       real = r.costeUSD
-      const cuerpo = validarSalida(input.mode, r.texto)
+      const cuerpo = validarSalida(input.mode, r.texto, r.parada)
       if (!cuerpo) {
         registrar('coach/salida-invalida', input.mode, { parada: r.parada })
         return unavailable('respuesta')
@@ -336,6 +340,8 @@ async function handleChat(request: Request, url: URL, env: Env): Promise<Respons
       const filas: unknown = respuestaPolitica.ok ? await respuestaPolitica.json() : null
       const politica = Array.isArray(filas) && filas.length === 1 ? readNbmeSourceSafety(filas[0]?.payload) : null
       if (!originalRecoveryAllowed(politica, q.id)) return unavailable('fuente_en_revision')
+      // Una cita literal puede seguir siendo médicamente contradictoria: sin elegir un ganador ni tocar el banco, se cierra.
+      if (tieneClasificacionContradictoria(q.explanation ?? '', q.objective)) return unavailable('fuente_inconsistente')
       material = materialChatNbme(q, input.optionId)
       identidad = [input.questionId, input.revision, input.optionId]
     }
@@ -343,10 +349,11 @@ async function handleChat(request: Request, url: URL, env: Env): Promise<Respons
     if (material.reference.length > MAX_MATERIAL) return unavailable('concepto_largo')
     const mensaje = (input.mensaje ?? '').trim().normalize('NFC')
     const practica = input.accion === 'practica'
-    const solicitud = practica ? solicitudPractica(material.reference, input.evitar) : solicitudChat(material.reference, input.historial, mensaje)
+    const solicitud = practica ? solicitudPractica(material.reference, input.evitar, material.estudiante)
+      : solicitudChat(material.reference, input.historial, mensaje, material.estudiante)
     const trusted: CoachInput = { user: quien.userId, mode: practica ? 'practica' : 'chat', solicitud, source: material.fuente,
-      key: await digest(JSON.stringify([quien.userId, identidad, material.reference, input.accion, mensaje, input.historial,
-        input.evitar, solicitud.modelo, VERSION_CHAT])) }
+      key: await digest(JSON.stringify([quien.userId, identidad, material.reference, material.estudiante ?? '', input.accion, mensaje,
+        input.historial, input.evitar, solicitud.modelo, VERSION_CHAT])) }
     return await alCoach(env, trusted.mode, trusted)
   } catch (causa) {
     registrar('ia/chat', causa)
