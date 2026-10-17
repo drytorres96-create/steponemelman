@@ -139,13 +139,13 @@ export default function App() {
    * desde lo que falta y no se guarda como sesión de la semana; lo estudiado se
    * registra igual, y eso es lo que cierra la vía.
    */
-  const abrirNuevo = useCallback(({ conceptIds, preguntas, titulo, nbmeSessionId }: MaterialNuevo) => {
-    const guion = construirGuion(conceptIds, preguntas, 3)
+  const abrirNuevo = useCallback(({ conceptIds, preguntas, titulo, nbmeSessionId, subtitulo, cada }: MaterialNuevo) => {
+    const guion = construirGuion(conceptIds, preguntas, cada ?? 3)
     if (!guion.length) return
     setCola(null); setError(null)
     setSesionSemanal({
       id: crearUUID(), semana: 'Hoy', semanaInicio: fechaISO(new Date()), dia: 1, orden: 1, titulo,
-      subtitulo: 'Lo nuevo de hoy: tres conceptos y una pregunta.',
+      subtitulo: subtitulo ?? 'Lo nuevo de hoy: tres conceptos y una pregunta.',
       guion, presupuestoMin: 30, estado: 'en_curso', cursor: 0, nbmeSessionId, completadaEn: null,
     })
     setVista('sesion'); location.hash = 'sesion'

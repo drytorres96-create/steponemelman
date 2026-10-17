@@ -62,6 +62,7 @@ if (escena === 'mantenimiento') {
   // Acreditado hace meses: sigue demostrado, pero su fecha FSRS ya venció.
   progreso.C12 = reconstruirProgreso('C12', [intento(haceDias(100)), intento(haceDias(98)), intento(haceDias(96))], CRITERIOS_POR_DEFECTO)
 }
+export const conceptosFragiles = escena === 'fragil' ? Array.from({ length: 27 }, (_, i) => `G${i + 1}`) : []
 export const conceptosMuchas = escena === 'muchas' ? Array.from({ length: 25 }, (_, i) => `K${i}`) : []
 if (escena === 'huerfanos') {
   // Only the second ID is published. The first remains in the saved history.
@@ -75,7 +76,11 @@ if (conAplicacion) {
       variante_id: 'QA-APLICACION-caso-1', resultado: 'incorrecta', tipo_error: 'interpretacion_incorrecta', calificacion: 1 }),
   ], CRITERIOS_POR_DEFECTO)
 }
-export const conceptos = conAplicacion ? IDS_APLICACION : escena === 'huerfanos' ? ['QA-VALIDO'] : [...semana, 'X1', 'X2', 'X3', ...conceptosMeta, ...conceptosMuchas]
+if (escena === 'fragil') {
+  // Veintisiete conceptos fallados hace dos días: llenan el techo de cajas de un día entre semana y el resto queda fuera.
+  for (const id of conceptosFragiles) progreso[id] = reconstruirProgreso(id, [fallo(haceDias(2, 8 + (Number(id.slice(1)) % 10)))], CRITERIOS_POR_DEFECTO)
+}
+export const conceptos = conAplicacion ? IDS_APLICACION : escena === 'huerfanos' ? ['QA-VALIDO'] : [...semana, 'X1', 'X2', 'X3', ...conceptosMeta, ...conceptosMuchas, ...conceptosFragiles]
 const preguntas = ids('Q', 5)
 export const respuestasBase = escena === 'cerrado'
   ? preguntas.map((q, i) => ({ id: `n${i}:0`, sessionId: `n${i}`, position: 0, questionId: q, revision: 'r1', optionId: 'A', correct: i !== 1, submittedAt: hoy(40 + i), reviewedAt: hoy(40 + i), durationMs: 1000 }))

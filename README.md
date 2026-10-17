@@ -2,7 +2,7 @@
 
 Plataforma de estudio para USMLE Step 1 con sesiones, repaso espaciado y progreso asociado a una cuenta. El sitio existente está en [steponemelman.yoeltorres.workers.dev](https://steponemelman.yoeltorres.workers.dev/). Este repositorio contiene la aplicación React/Vite y el contrato de base de datos; Supabase conserva el material privado y el progreso.
 
-La versión **1.33.0** sustituye la IA gratuita de Cloudflare por Claude (API de Anthropic, presupuesto mensual en dólares) y concentra todo en un tutor por pregunta: tras responder aparece un chat con sugerencias y una recuperación activa en español. Se retiran las ayudas de IA que casi no se usaban. Consulta [Cambios y validación](docs/cambios-1.33.0.md).
+La versión **1.34.0** añade «Para reforzar hoy»: una vez al día, como mucho cinco conceptos o preguntas de tu historial que aún están frágiles (fallos de esta semana, fallos repetidos o aciertos con ayuda), sin acumularse si no las usas. Consulta [Cambios y validación](docs/cambios-1.34.0.md).
 
 La **1.32.0** reinicia la meta el 12-oct-2026 (43 días, hasta el 23-nov: 180 conceptos y 44 preguntas NBME) y convierte Hoy en un arranque diario más corto. Consulta [Cambios y validación](docs/cambios-1.32.0.md).
 

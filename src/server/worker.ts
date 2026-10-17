@@ -8,14 +8,16 @@ import { versionPregunta } from '../screens/sesion'
 import { aplicarVariante } from '../lib/variantes'
 import { PresentacionIAZ } from '../lib/contexto-ia'
 import { PeticionChatZ } from '../lib/contexto-chat'
+import { PeticionSesionZ } from '../lib/contexto-sesion'
 import { extraerJSON, validarEjercicios } from '../lib/practica-activa'
 import type { NbmeQuestion } from '../nbme/types'
-import { NBME_SOURCE_SAFETY_PATH, readNbmeSourceSafety, originalRecoveryAllowed } from '../nbme/source-safety'
+import { NBME_SOURCE_SAFETY_PATH, readNbmeSourceSafety, originalRecoveryAllowed, type NbmeSourceSafety } from '../nbme/source-safety'
 import { tieneClasificacionContradictoria } from './fuente-recuperacion-confiable'
 import { handleNbme } from './nbme'
 import { handlePlan, type PlanEnv } from './plan'
 import { ErrorClaude, costeDeError, costeReservaUSD, llamarClaude, type CodigoClaude, type SolicitudClaude } from './claude'
 import { MAX_MATERIAL, VERSION_CHAT, materialChatConcepto, materialChatNbme, solicitudCalificar, solicitudChat, solicitudPractica, type MaterialChat } from './ia-chat'
+import { VERSION_SESION, solicitudHilo, validarHilo } from './ia-sesion'
 
 const DAY = 86400000
 
@@ -39,7 +41,7 @@ interface Env extends PlanEnv {
   ASSETS: { fetch(request: Request): Promise<Response> }
 }
 
-type ModoClaude = 'calificar' | 'chat' | 'practica'
+type ModoClaude = 'calificar' | 'chat' | 'practica' | 'hilo'
 type CoachInput = { user: string; key: string; mode: ModoClaude; solicitud: SolicitudClaude; source?: { title: string; page: number } }
 export type CoachVeredicto = { veredicto: 'correcta' | 'parcial' | 'incorrecta'; motivo: string }
 
@@ -52,7 +54,7 @@ export const LLAMADAS_POR_DIA = 500
  * veredicto que se guarda en el historial, así que llega hasta el final; el chat y los
  * ejercicios son prescindibles y se quedan fuera los primeros.
  */
-export const TECHO_POR_MODO: Record<ModoClaude, number> = { calificar: 1, chat: 0.9, practica: 0.9 }
+export const TECHO_POR_MODO: Record<ModoClaude, number> = { calificar: 1, chat: 0.9, practica: 0.9, hilo: 0.8 }
 
 export const presupuestoMensualUSD = (env: Pick<Env, 'CLAUDE_PRESUPUESTO_USD'>): number => {
   const n = Number(env.CLAUDE_PRESUPUESTO_USD)
@@ -107,6 +109,7 @@ export function validarSalida(modo: ModoClaude, salida: string, parada?: string)
   // Una respuesta cortada por el tope de tokens nunca es utilizable: ni se muestra como completa ni se guarda en caché.
   if (parada === 'max_tokens') return null
   if (modo === 'calificar') return validarCalificacion(salida)
+  if (modo === 'hilo') return validarHilo(salida)
   if (modo === 'chat') {
     const respuesta = salida.trim()
     return respuesta.length >= 20 ? { respuesta: respuesta.slice(0, 8000) } : null
@@ -302,6 +305,13 @@ async function preguntaNbme(request: Request, url: URL, questionId: string, revi
   return data.questions[0] ?? json({ error: 'Pregunta no disponible.' }, 404)
 }
 
+/** La política de fuentes NBME vigente, o null si no se puede leer: sin ella ninguna pregunta sale hacia la IA. */
+async function politicaNbme(get: Lector): Promise<NbmeSourceSafety | null> {
+  const respuesta = await get(`/rest/v1/nbme_assets?select=payload&path=eq.${encodeURIComponent(NBME_SOURCE_SAFETY_PATH)}`)
+  const filas: unknown = respuesta.ok ? await respuesta.json() : null
+  return Array.isArray(filas) && filas.length === 1 ? readNbmeSourceSafety(filas[0]?.payload) : null
+}
+
 /**
  * Chat de la pregunta que acabas de responder, y su ronda de recuperación activa.
  *
@@ -336,10 +346,7 @@ async function handleChat(request: Request, url: URL, env: Env): Promise<Respons
       const q = await preguntaNbme(request, url, input.questionId, input.revision)
       if (q instanceof Response) return q
       // La política de fuentes vigente manda sobre cualquier cliente: una pregunta en revisión no sale hacia la IA.
-      const respuestaPolitica = await quien.get(`/rest/v1/nbme_assets?select=payload&path=eq.${encodeURIComponent(NBME_SOURCE_SAFETY_PATH)}`)
-      const filas: unknown = respuestaPolitica.ok ? await respuestaPolitica.json() : null
-      const politica = Array.isArray(filas) && filas.length === 1 ? readNbmeSourceSafety(filas[0]?.payload) : null
-      if (!originalRecoveryAllowed(politica, q.id)) return unavailable('fuente_en_revision')
+      if (!originalRecoveryAllowed(await politicaNbme(quien.get), q.id)) return unavailable('fuente_en_revision')
       // Una cita literal puede seguir siendo médicamente contradictoria: sin elegir un ganador ni tocar el banco, se cierra.
       if (tieneClasificacionContradictoria(q.explanation ?? '', q.objective)) return unavailable('fuente_inconsistente')
       material = materialChatNbme(q, input.optionId)
@@ -361,6 +368,46 @@ async function handleChat(request: Request, url: URL, env: Env): Promise<Respons
   }
 }
 
+/** Etiqueta de una pregunta NBME en lo que sale hacia la IA: sin política que la autorice, sólo «Pregunta NBME». */
+const ETIQUETA_NBME_RESERVADA = 'Pregunta NBME'
+
+/**
+ * Ayudas de organización del estudio (no explican una pregunta): hoy, la frase con el hilo común
+ * de las sugeridas del día. El navegador manda identificadores y etiquetas cortas; la plataforma ya
+ * decidió qué es frágil, y aquí Claude sólo redacta. Las preguntas NBME pasan por la política de
+ * fuentes antes de que su etiqueta llegue a la IA.
+ */
+async function handleSesion(request: Request, url: URL, env: Env): Promise<Response> {
+  const parado = preflight(request, url, 'POST')
+  if (parado) return parado
+  try {
+    const body = await boundedBody(request)
+    if (body === null) return json({ error: 'Solicitud demasiado larga.' }, 413)
+    let parsed: unknown
+    try { parsed = JSON.parse(body) } catch { return json({ error: 'Solicitud no válida.' }, 400) }
+    const leido = PeticionSesionZ.safeParse(parsed)
+    if (!leido.success) return json({ error: 'Solicitud no válida.' }, 400)
+    const input = leido.data
+    const quien = await identificar(request)
+    if (quien instanceof Response) return quien
+    if (!env.ANTHROPIC_API_KEY) return unavailable('sin_clave')
+    // fase === 'hilo'
+    const hayNbme = input.items.some(i => i.tipo === 'pregunta')
+    const politica = hayNbme ? await politicaNbme(quien.get) : null
+    const items = input.items.map(i => ({
+      etiqueta: (i.tipo === 'pregunta' && !(/^NBME(?:27|28|29)-P\d{4}$/.test(i.id) && originalRecoveryAllowed(politica, i.id))
+        ? ETIQUETA_NBME_RESERVADA : i.etiqueta).replace(/\s+/g, ' ').trim().normalize('NFC'),
+      senales: i.senales }))
+    const solicitud = solicitudHilo(items)
+    const trusted: CoachInput = { user: quien.userId, mode: 'hilo', solicitud,
+      key: await digest(JSON.stringify([quien.userId, 'hilo', items, solicitud.modelo, VERSION_SESION])) }
+    return await alCoach(env, 'hilo', trusted)
+  } catch (causa) {
+    registrar('ia/sesion', causa)
+    return unavailable('interno')
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -368,6 +415,7 @@ export default {
     if (url.pathname.startsWith('/api/nbme/')) return handleNbme(request)
     if (url.pathname.startsWith('/api/plan/')) return handlePlan(request, env)
     if (url.pathname === '/api/ia/chat') return handleChat(request, url, env)
+    if (url.pathname === '/api/ia/sesion') return handleSesion(request, url, env)
     if (url.pathname !== '/api/calificar') return json({ error: 'No encontrado' }, 404)
     const parado = preflight(request, url, 'POST')
     if (parado) return parado

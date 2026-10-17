@@ -20,6 +20,24 @@
 .anillo-doble .centro b { display:block; font-size:30px; font-weight:400; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
 .anillo-doble .centro b span { font-size:16px; color:var(--texto-3); }
 .anillo-doble.cerrado .centro b { font-size:24px; }
+/* «Para reforzar hoy»: opcional y discreta. Una lista corta y dos botones; sin cuentas de deuda. */
+.sugerencia-recuperar { display:grid; gap:10px; padding:18px 22px; border-radius:18px; }
+.sugerencia-recuperar h2 { margin:0; font-size:21px; font-weight:500; }
+.sugerencia-hilo { margin:0; color:var(--texto-2); line-height:1.5; text-wrap:pretty; }
+.sugerencia-lista { display:grid; gap:8px; margin:4px 0 2px; padding:0; list-style:none; }
+.sugerencia-lista li { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid var(--linea); border-radius:12px; background:var(--vidrio-barra); }
+.sugerencia-texto { display:grid; gap:2px; min-width:0; }
+.sugerencia-texto strong { font-weight:500; overflow-wrap:anywhere; }
+.sugerencia-texto .mini { margin:0; overflow-wrap:anywhere; }
+.sugerencia-senal { flex:none; font-size:.78rem; color:var(--texto-2); padding:3px 9px; border:1px solid var(--linea); border-radius:999px; white-space:nowrap; }
+.sugerencia-recuperar .fila { display:flex; flex-wrap:wrap; gap:10px; }
+.sugerencia-recuperar > .mini { margin:0; }
+@media(max-width:650px) {
+  .sugerencia-recuperar { padding:16px; }
+  .sugerencia-lista li { flex-direction:column; gap:6px; }
+  .sugerencia-senal { white-space:normal; }
+  .sugerencia-recuperar .fila .btn { flex:1 1 100%; }
+}
 /* Los tres desplegables van debajo, cerrados y discretos: una barra de cristal con su título.
    Abiertos, lo de dentro conserva sus propias tarjetas; el desplegable no añade otra capa encima. */
 .hoy-desplegable { border:1px solid var(--linea); border-radius:14px; background:var(--vidrio-barra); }
