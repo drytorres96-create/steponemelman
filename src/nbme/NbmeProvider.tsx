@@ -57,7 +57,7 @@ interface NbmeContextValue {
   /** Salida siempre disponible para un bloque que ya no puede terminarse. */
   discardSession(id: string): boolean
   /** Quita el bloque de la biblioteca; conserva todas sus respuestas y progreso. */
-  archiveSession(id: string): boolean
+  archiveSession(id: string, options?: { complete?: boolean }): boolean
   /** Lectura de los errores originales: no activa ni crea una sesión. */
   reviewSessionFailures(id: string, signal?: AbortSignal): Promise<NbmeFailedReview[]>
   attemptsInSession(id: string): number
@@ -663,12 +663,14 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
     return true
   }, [edit, shownSessionId])
   const attemptsInSession = useCallback((id: string) => countNbmeSessionAttempts(actual.current, id), [])
-  const archiveSession = useCallback((id: string): boolean => {
-    if (!engineRef.current || !actual.current.sessions[id] || isNbmeSessionArchived(actual.current, id)) return false
+  const archiveSession = useCallback((id: string, options?: { complete?: boolean }): boolean => {
+    const session = actual.current.sessions[id]
+    if (!engineRef.current || !session) return false
+    if (isNbmeSessionArchived(actual.current, id) && (!options?.complete || session.completedAt !== undefined)) return false
     flushTime()
     if (shownSessionId === id) setShownSessionId(null)
     if (engagedSession.current === id) engagedSession.current = null
-    edit(previous => archiveNbmeSession(previous, id))
+    edit(previous => archiveNbmeSession(options?.complete ? completeNbmeSession(previous, id) : previous, id))
     setError(null)
     return true
   }, [edit, shownSessionId, flushTime])

@@ -10,11 +10,13 @@ import { fechaEstudio, fechaISOEstudio, desplazarFechaEstudio } from '../lib/cal
 import { bankItems, selectBankItems, type BankItem } from './selection'
 import type { StudyBlock } from './blocks'
 import { awaitingRecall, learningExposures } from './learning'
+import { SavedBlocks } from './SavedBlocks'
 
 const materials = [{ value: 'nbme', label: 'NBME' }, { value: 'concepts', label: 'Mehlman Concepts' }, { value: 'mixed', label: 'Mixed' }] as const
 const pools = [{ value: 'unused', label: 'Unused' }, { value: 'incorrect', label: 'Incorrect' }, { value: 'flagged', label: 'Flagged' }, { value: 'skipped', label: 'Skipped' }, { value: 'learning', label: 'Learning' }] as const
-export function Dashboard({ onStart, onResume, dailyGoal, legacyResume, assistant, busy, error }: {
+export function Dashboard({ onStart, onResume, onRemove, dailyGoal, legacyResume, assistant, busy, error }: {
   onStart: (items: BankItem[], mode: BlockMode) => Promise<void>; onResume: (block: StudyBlock) => Promise<void>;
+  onRemove: (id: string) => boolean;
   dailyGoal: ReactNode; legacyResume: ReactNode; busy: boolean; error: string | null
   /** Lo que Claude aporta, justo bajo «Your next step» (sugerencia del día y chat de sesiones). */
   assistant?: ReactNode
@@ -95,8 +97,8 @@ export function Dashboard({ onStart, onResume, dailyGoal, legacyResume, assistan
       <div className="mq-stat-grid">{[['Answered / seen', waiting ? '—' : used], ['NBME accuracy', !waiting && scored.length ? `${safePercent(correct, scored.length)}%` : '—'], ['Mehlman mastered', mastery.dominioDemostrado], ['Maintenance current', mastery.mantenimientoAlDia]].map(([label, value]) => <div className="mq-stat" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
       <p className="mq-muted mq-small">NBME: first graded answers ({scored.length}). Mehlman: demonstrated mastery.</p>
       <dl className="mq-pace"><div><dt>NBME average time</dt><dd>{seconds === null ? '—' : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`} <span>/ 1:30</span></dd></div>
-        <div><dt>Blocks completed</dt><dd>{blocks.filter(b => b.completedAt !== undefined).length}</dd></div><div><dt>Awaiting recall</dt><dd>{awaiting}</dd></div><div><dt>Mehlman seen</dt><dd>{mastery.vistos} / {mastery.total}</dd></div></dl>
-      <details><summary>Saved blocks</summary><div className="mq-block-history">{blocks.map(b => <Button key={b.id} disabled={busy} onClick={() => void onResume(b)}>{b.title} · {b.completedAt === undefined ? 'Resume' : 'Review'}</Button>)}{!blocks.length && <p>No blocks yet.</p>}</div></details>
+        <div><dt>Blocks completed</dt><dd>{Object.values(estado.myqbankBlocks ?? {}).filter(b => b.completedAt !== undefined).length}</dd></div><div><dt>Awaiting recall</dt><dd>{awaiting}</dd></div><div><dt>Mehlman seen</dt><dd>{mastery.vistos} / {mastery.total}</dd></div></dl>
+      <SavedBlocks blocks={blocks} busy={busy} onResume={onResume} onRemove={onRemove}/>
     </Card>
 
   </main>

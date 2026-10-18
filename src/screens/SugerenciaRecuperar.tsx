@@ -4,7 +4,7 @@ import type { Concepto, Modulo } from '../schema/concept'
 import type { NbmeQuestionMeta } from '../nbme/types'
 import type { MaterialNuevo } from '../lib/nuevo-hoy'
 import { NOMBRE_SENAL, NOMBRE_SENAL_EN, PESO_SENAL, type FichaInventario, type Senal } from '../lib/inventario'
-import { decidirSugerencia, guardarSugerencia, leerSugerencia, type ItemSugerido, type SugerenciaDelDia } from '../lib/sugerencia-diaria'
+import { decidirSugerencia, diaDeEstudio, guardarSugerencia, leerSugerencia, type ItemSugerido, type SugerenciaDelDia } from '../lib/sugerencia-diaria'
 import { etiquetaCorta, pedirHilo } from '../lib/sesion-claude'
 
 /**
@@ -96,7 +96,18 @@ export function SugerenciaRecuperar({ usuario, ahora, candidatas, listo, modulos
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mostrar?.dia, !!conceptos, mostrar?.hiloIntentado])
 
-  if (!mostrar || !conceptos) return null
+  if (!mostrar || !conceptos) {
+    if (!english) return null
+    const estadoHoy = guardada?.dia === diaDeEstudio(ahora) ? guardada.estado : null
+    const mensaje = estadoHoy === 'usada' ? 'Today’s optional review has already been opened.'
+      : estadoHoy === 'descartada' ? 'Skipped for today. You can still ask Claude for a session.'
+      : !listo || mostrar ? 'Preparing your optional review…'
+      : 'No extra review suggested right now. You can still ask Claude for a session.'
+    return <section className="tarjeta sugerencia-recuperar sugerencia-mq" aria-labelledby="sugerencia-recuperar-titulo" lang="en">
+      <div><p className="rotulo">Optional · once a day</p><h2 id="sugerencia-recuperar-titulo">Reinforce today</h2></div>
+      <p className="mini" role="status">{mensaje}</p>
+    </section>
+  }
 
   const cambiarEstado = (estado: 'usada' | 'descartada') => {
     const base = leerSugerencia(usuario) ?? guardada

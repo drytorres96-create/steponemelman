@@ -8,7 +8,7 @@ import type { NbmeQuestionMeta } from '../nbme/types'
 import { CRITERIOS_POR_DEFECTO } from '../srs/mastery'
 import type { Intento } from '../srs/tipos'
 import { reconstruirProgreso } from '../store/model'
-import type { DatosAsistente } from '../screens/Hoy'
+import type { DatosAsistente } from '../myqbank/AsistenteDashboard'
 
 /**
  * El dashboard de MyQBank enseña dos cosas bajo «Your next step»: la sugerencia del día y un botón que abre
@@ -98,16 +98,17 @@ afterEach(() => {
 describe('la tarjeta «Ask Claude for a session»', () => {
   it('es una entrada discreta en inglés: el diálogo está montado pero oculto y no llama a nadie', async () => {
     await montar()
-    expect(contenedor.querySelector('h2')!.textContent).toBe('Ask Claude for a session')
+    expect(contenedor.querySelector('#mq-claude-titulo')!.textContent).toBe('Ask Claude for a session')
     expect(boton('Open chat')!.getAttribute('aria-haspopup')).toBe('dialog')
     expect(fondo().hidden).toBe(true)
     expect(document.documentElement.style.overflow).toBe('')
     expect(mock.pedirEntender).not.toHaveBeenCalled()
     expect(mock.cargarTodo).not.toHaveBeenCalled()
   })
-  it('sin lo frágil de hoy sólo está la entrada al chat; con ello también «Reinforce today»', async () => {
+  it('sin lo frágil mantiene ambas entradas y explica que no hay refuerzo; con ello ofrece la lista', async () => {
     await montar()
-    expect(contenedor.textContent).not.toContain('Reinforce today')
+    expect(contenedor.textContent).toContain('Reinforce today')
+    expect(contenedor.textContent).toContain('No extra review suggested right now.')
     await montar({ candidatas: [ficha('C-ENDO-1'), ficha('C-ENDO-2')] })
     expect(contenedor.textContent).toContain('Reinforce today')
     expect(contenedor.textContent).toContain('Hormonas de la suprarrenal.')
@@ -214,6 +215,16 @@ describe('el diálogo del chat', () => {
     expect(onNuevo.mock.calls[0][0]).toMatchObject({ conceptIds: ['C-ENDO-1'], preguntas: [], titulo: 'Endocrino · falladas', nbmeSessionId: null })
     expect(fondo().hidden).toBe(true)
     expect(document.documentElement.style.overflow).toBe('')
+  })
+  it('un catálogo pendiente no se presenta como banco vacío y permite reintentar cuando llega', async () => {
+    await montar({ progreso: FALLADO, bancoDisponible: false }); await abrirComoPersona()
+    await decir('endocrino que he fallado')
+    expect(dialogo().textContent).toContain('El banco de preguntas aún no está disponible')
+    expect(boton('Empezar la sesión')).toBeUndefined()
+    await montar({ progreso: FALLADO, bancoDisponible: true })
+    await clic('Reintentar')
+    expect(boton('Empezar la sesión')).toBeDefined()
+    expect(mock.pedirEntender).toHaveBeenCalledTimes(1)
   })
   it('si el dashboard se desmonta con el diálogo abierto, el desplazamiento de la página se devuelve', async () => {
     document.documentElement.style.overflow = 'scroll'

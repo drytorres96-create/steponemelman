@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { createBlock } from '../src/myqbank/blocks'
 import { ESTADO_INICIAL, reconstruirProgreso } from '../src/store/model'
 import type { Intento } from '../src/srs/tipos'
+import { myqbankConcepts } from './arnes/myqbank-fixture'
 import { ordenDeProduccion } from './arnes/orden-produccion'
 
 /**
@@ -102,7 +103,7 @@ for (const width of [390, 1280]) test.describe(`Claude en el dashboard de MyQBan
     await sinSolapes(page)
   })
 
-  test('«Review these 5» abre un bloque Tutor con lo sugerido, con su nombre, y la sugerencia no vuelve', async ({ page }) => {
+  test('«Review these 5» abre un bloque Tutor con lo sugerido, con su nombre, y no vuelve a ofrecer el mismo refuerzo', async ({ page }) => {
     await preparar(page)
     await page.goto(url)
     await expect(sugerencia(page)).toBeVisible()
@@ -117,20 +118,20 @@ for (const width of [390, 1280]) test.describe(`Claude en el dashboard de MyQBan
     // Al pausar vuelve al dashboard: el bloque se llama como la sugerencia y ella ya no sale.
     await page.getByRole('button', { name: 'Pause', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Para reforzar · hoy', level: 1 })).toBeVisible()
-    await expect(sugerencia(page)).toHaveCount(0)
+    await expect(sugerencia(page).getByRole('button', { name: /Review/ })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Ask Claude for a session' })).toBeVisible()
   })
 
-  test('«Not today» la quita por hoy y no abre nada', async ({ page }) => {
+  test('«Not today» conserva la tarjeta con su estado y no abre nada', async ({ page }) => {
     await preparar(page)
     await page.goto(url)
     await sugerencia(page).getByRole('button', { name: 'Not today', exact: true }).click()
-    await expect(sugerencia(page)).toHaveCount(0)
+    await expect(sugerencia(page).getByRole('button', { name: /Review/ })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Ask Claude for a session' })).toBeVisible()
     expect(await bloques(page)).toHaveLength(0)
     await page.reload()
     await expect(page.getByRole('heading', { name: 'Build a block' })).toBeVisible()
-    await expect(sugerencia(page)).toHaveCount(0)
+    await expect(sugerencia(page).getByRole('button', { name: /Review/ })).toHaveCount(0)
   })
 
   test('el chat abre como diálogo, se cierra con Escape devolviendo el foco, y la página de detrás no se mueve', async ({ page }) => {
@@ -187,23 +188,94 @@ for (const width of [390, 1280]) test.describe(`Claude en el dashboard de MyQBan
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).not.toBe('hidden')
   })
 
-  test('el viernes no sale ninguna de las dos tarjetas, y el dashboard sigue entero', async ({ page }) => {
+  test('el viernes conserva el chat y explica que no hay refuerzo opcional', async ({ page }) => {
     await preparar(page, { ahora: VIERNES })
     await page.goto(url)
     await expect(page.getByRole('heading', { name: 'Build a block' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Ask Claude for a session' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Open chat', exact: true })).toHaveCount(0)
-    await expect(sugerencia(page)).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Ask Claude for a session' })).toBeVisible()
+    await page.getByRole('button', { name: 'Open chat', exact: true }).click()
+    await expect(dialogo(page)).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(sugerencia(page).getByRole('button', { name: /Review/ })).toHaveCount(0)
     expect(await sinDesborde(page)).toBe(true)
   })
 
-  test('con un Test sin terminar no sale nada que se derive de las respuestas', async ({ page }) => {
+  test('con un Test sin terminar puede pedir y abrir otra sesión sin cerrar el Test', async ({ page }) => {
     const test_ = createBlock('t1', [{ kind: 'nbme', id: 'QA-NBME-1', revision: 'r1' }, { kind: 'nbme', id: 'QA-NBME-2', revision: 'r1' }], 'test', MIERCOLES)
     await preparar(page, { bloques: { t1: test_ } })
     await page.goto(url)
     await expect(page.getByText('Finish your Test block to update the daily goal.')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Ask Claude for a session' })).toHaveCount(0)
-    await expect(sugerencia(page)).toHaveCount(0)
+    if (process.env.CLAUDE_CAPTURE_DIR) {
+      await page.getByText('Saved blocks', { exact: true }).click()
+      await ordenDeProduccion(page)
+      await page.screenshot({ path: `${process.env.CLAUDE_CAPTURE_DIR}/after-${width}.png`, fullPage: true })
+    }
+    await expect(page.getByRole('heading', { name: 'Ask Claude for a session' })).toBeVisible()
+    await expect(sugerencia(page)).toBeVisible()
+    await page.getByRole('button', { name: 'Open chat', exact: true }).click()
+    await dialogo(page).getByLabel('Lo que quieres estudiar', { exact: true }).fill('renal que he fallado')
+    await dialogo(page).getByRole('button', { name: 'Enviar', exact: true }).click()
+    await dialogo(page).getByRole('button', { name: 'Empezar la sesión', exact: true }).click()
+    await expect(page.locator('.mq-study')).toBeVisible()
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('qa-myqbank-state')!).myqbankBlocks)
+    expect(saved.t1).toEqual(test_)
+    expect(Object.values(saved)).toHaveLength(2)
+  })
+
+  test('con el día completo conserva ambas tarjetas y puede abrir el chat', async ({ page }) => {
+    await preparar(page)
+    await page.goto(url)
+    await expect(page.locator('.mq-goal')).toBeVisible()
+    // Resolve every synthetic concept today; no real account or corpus is touched.
+    const ids = [...myqbankConcepts.map(c => c.concept_id), ...Array.from({ length: 27 }, (_, i) => `G${String(i + 1).padStart(2, '0')}`)]
+    const progreso = Object.fromEntries(ids.map((id, i) => [id, reconstruirProgreso(id, [{ ...fallo(id, i), ts: MIERCOLES - 1000, resultado: 'correcta', calificacion: 3 }], ESTADO_INICIAL.criterios)]))
+    await page.evaluate(progreso => { const s = JSON.parse(localStorage.getItem('qa-myqbank-state')!); localStorage.setItem('qa-myqbank-state', JSON.stringify({ ...s, progreso })) }, progreso)
+    await page.reload()
+    await expect(page.getByText('Daily goal complete. You can stop here.')).toBeVisible()
+    await expect(sugerencia(page)).toBeVisible()
+    await page.getByRole('button', { name: 'Open chat', exact: true }).click()
+    await expect(dialogo(page)).toBeVisible()
+  })
+
+  test('elimina bloques pendientes y completos, conserva respuestas y no vuelven al recargar', async ({ page }) => {
+    const entry = { kind: 'concept' as const, id: myqbankConcepts[1].concept_id, revision: 'r1', concept: myqbankConcepts[1] }
+    const older = createBlock('older', [entry], 'test', MIERCOLES - 1000)
+    const newer = createBlock('newer', [entry], 'tutor', MIERCOLES)
+    const completed = { ...createBlock('completed', [entry], 'tutor', MIERCOLES - 2000), completedAt: MIERCOLES - 1500 }
+    await preparar(page, { bloques: { older, newer, completed } })
+    await page.goto(url)
+    await expect(page.getByRole('heading', { name: 'Ask Claude for a session' })).toBeVisible()
+    await ordenDeProduccion(page)
+    await page.getByText('Saved blocks', { exact: true }).click()
+    const before = await page.evaluate(() => JSON.parse(localStorage.getItem('qa-myqbank-state')!).progreso)
+    const remove = page.getByRole('button', { name: 'Remove 1-item Test block', exact: true })
+    await remove.click()
+    const confirmation = page.getByRole('dialog', { name: 'Remove saved block?' })
+    await expect(confirmation).toBeVisible()
+    if (process.env.CLAUDE_CAPTURE_DIR) await page.screenshot({ path: `${process.env.CLAUDE_CAPTURE_DIR}/remove-${width}.png`, fullPage: true })
+    await expect(confirmation.getByRole('button', { name: 'Keep block' })).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(confirmation).not.toBeVisible()
+    await expect(remove).toBeFocused()
+    await remove.click()
+    await confirmation.getByRole('button', { name: 'Remove block', exact: true }).click()
+    await expect(remove).toHaveCount(0)
+    await expect(page.getByText('Saved blocks', { exact: true })).toBeFocused()
+    await expect(page.getByRole('heading', { name: '1-item Tutor block', exact: true })).toBeVisible()
+    await expect(page.getByText('Finish your Test block to update the daily goal.')).toHaveCount(0)
+    const completeRow = page.locator('.mq-block-row').filter({ has: page.getByRole('button', { name: '1-item Tutor block · Review', exact: true }) })
+    await completeRow.getByRole('button', { name: 'Remove 1-item Tutor block', exact: true }).click()
+    await confirmation.getByRole('button', { name: 'Remove block', exact: true }).click()
+    const after = await page.evaluate(() => JSON.parse(localStorage.getItem('qa-myqbank-state')!))
+    expect(after.progreso).toEqual(before)
+    expect(after.myqbankBlocks.older).toMatchObject({ ...older, archivedAt: MIERCOLES, completedAt: MIERCOLES, paused: true, changedAt: MIERCOLES })
+    expect(after.myqbankBlocks.completed.completedAt).toBe(completed.completedAt)
+    expect(after.myqbankBlocks.newer).toEqual(newer)
+    expect(await sinDesborde(page)).toBe(true)
+    await page.reload()
+    await page.getByText('Saved blocks', { exact: true }).click()
+    await expect(page.locator('.mq-block-row')).toHaveCount(1)
+    await expect(page.getByRole('heading', { name: 'Ask Claude for a session' })).toBeVisible()
   })
 })
 
@@ -227,4 +299,19 @@ test.describe('escritorio estrecho', () => {
     await page.mouse.wheel(0, 3000)
     await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0)
   })
+})
+
+
+test('el chat permanece accesible mientras carga el catálogo NBME', async ({ page }) => {
+  await preparar(page)
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/api/nbme/catalog', async route => { await held; await route.fulfill({ json: { schemaVersion: 1, bankVersion: 'qa', total: 0, questions: [] } }) })
+  await page.goto(url)
+  await page.getByRole('button', { name: 'Open chat', exact: true }).click()
+  await expect(dialogo(page)).toBeVisible()
+  await expect(sugerencia(page)).toBeAttached()
+  release()
+  await expect(page.locator('.mq-goal')).toBeVisible()
+  await expect(dialogo(page)).toBeVisible()
 })
