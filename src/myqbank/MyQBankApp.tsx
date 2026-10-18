@@ -13,6 +13,7 @@ import { prepararConcepto } from '../lib/formatos'
 import { aplicarVariante } from '../lib/variantes'
 import { versionPregunta } from '../screens/sesion'
 import { Hoy, type MaterialNuevo } from '../screens/Hoy'
+import { ClaudeEnDashboard } from './ClaudeEnDashboard'
 import type { ItemCaja } from '../lib/cajas'
 import { construirGuion } from '../semana/guion'
 import type { Cola } from '../screens/Reproductor'
@@ -58,7 +59,7 @@ function Workspace() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not open the block.') }
     finally { setBusy(false) }
   }
-  async function create(items: Pick<BankItem, 'kind' | 'id' | 'revision'>[], mode: BlockMode, retryOf?: string, fixedEntries?: BlockEntry[], pausedBlock?: StudyBlock) {
+  async function create(items: Pick<BankItem, 'kind' | 'id' | 'revision'>[], mode: BlockMode, retryOf?: string, fixedEntries?: BlockEntry[], pausedBlock?: StudyBlock, title?: string) {
     if (busy) return
     setBusy(true); setError(null)
     try {
@@ -79,7 +80,7 @@ function Workspace() {
         const concept = prepararConcepto(original, { semilla: blockOpportunity(id, index), indice: index, ruta: mode === 'test' ? 'examen' : 'repaso', version: 3 })
         return { kind: 'concept', id: item.id, revision: versionPregunta(concept), concept }
       })
-      const block = { ...createBlock(id, entries, mode, Date.now(), retryOf), ...(pausedBlock ? modeChangeEvidence(pausedBlock,
+      const block = { ...createBlock(id, entries, mode, Date.now(), retryOf, title), ...(pausedBlock ? modeChangeEvidence(pausedBlock,
         pausedBlock.entries.filter((entry, position) => entry.kind === 'concept' && app.estado.progreso[entry.id]?.intentos.some(attempt => attempt.session_id === pausedBlock.id && attempt.pregunta_id === blockOpportunity(pausedBlock.id, position))).map(entry => entry.id)) : {}) }
       if (new Blob([JSON.stringify({ ...app.estado, myqbankBlocks: { ...app.estado.myqbankBlocks, [id]: block } })]).size > 12 * 1024 * 1024) throw new Error('Your saved study history is approaching the storage limit. Export a backup in Settings before starting more blocks. Existing blocks remain available.')
       const refs = entries.filter(e => e.kind === 'nbme')
@@ -90,11 +91,17 @@ function Workspace() {
     finally { setBusy(false) }
   }
   // Keep Hoy's scheduler and exact due-item order; only replace the player.
-  const newDaily = ({ conceptIds, preguntas }: MaterialNuevo) => {
-    const items = construirGuion(conceptIds, preguntas, 3).map(step => step.kind === 'concepto'
-      ? { kind: 'concept' as const, id: step.id, revision: 'prepared-on-start' }
-      : { kind: 'nbme' as const, id: step.id, revision: step.revision })
+  const blockItems = ({ conceptIds, preguntas, cada }: MaterialNuevo) => construirGuion(conceptIds, preguntas, cada ?? 3).map(step => step.kind === 'concepto'
+    ? { kind: 'concept' as const, id: step.id, revision: 'prepared-on-start' }
+    : { kind: 'nbme' as const, id: step.id, revision: step.revision })
+  const newDaily = (material: MaterialNuevo) => {
+    const items = blockItems({ ...material, cada: 3 })
     if (items.length) void create(items.slice(0, 80), 'tutor')
+  }
+  // «Para reforzar hoy» y el chat de sesiones: el bloque lleva su título y respeta la proporción de cada petición.
+  const newClaude = (material: MaterialNuevo) => {
+    const items = blockItems(material)
+    if (items.length) void create(items.slice(0, 80), 'tutor', undefined, undefined, undefined, material.titulo)
   }
   const openCajas = (items: ItemCaja[]) => {
     try {
@@ -149,7 +156,9 @@ function Workspace() {
     <Suspense fallback={<StateMessage state="loading" title="Opening your workspace">Your progress remains saved.</StateMessage>}>
       {view === 'dashboard' && <><Dashboard busy={busy} error={error} onStart={create} onResume={open}
         legacyResume={legacyPending ? <Button disabled={busy} onClick={() => void resumeLegacy()}>Resume earlier session</Button> : null}
-        dailyGoal={pendingTest ? <p>Finish your Test block to update the daily goal.</p> : <Hoy compact busy={busy} onNuevo={newDaily} onCajas={openCajas} onRetomar={resumeLegacy} onBiblioteca={() => {}}/>}/>
+        dailyGoal={pendingTest ? <p>Finish your Test block to update the daily goal.</p> : <Hoy compact busy={busy} onNuevo={newDaily} onCajas={openCajas} onRetomar={resumeLegacy} onBiblioteca={() => {}}/>}
+        // Con un Test abierto no se muestra nada que dependa de las respuestas: lo contestado no cuenta hasta cerrarlo.
+        assistant={pendingTest ? null : <Hoy busy={busy} onNuevo={newClaude} onCajas={openCajas} onBiblioteca={() => {}} renderAsistente={datos => <ClaudeEnDashboard {...datos}/>}/>}/>
         <details className="mq-progress-details" onToggle={e => setDetails(e.currentTarget.open)}><summary>Detailed progress and study plan</summary>{details && (pendingTest ? <p>End your Test block to see updated results.</p> : <ProgressDetails onNuevo={newDaily} onCajas={openCajas} onRetomar={resumeLegacy}/>)}</details></>}
       {view === 'block' && error && <p role="alert">{error}</p>}
       {view === 'block' && block && <Study block={block} busy={busy} onModeChange={(b, mode) => create([], mode, undefined, b.entries, b)} onExit={dashboard} onRetry={b => create([], 'tutor', b.id, b.entries)}/>}

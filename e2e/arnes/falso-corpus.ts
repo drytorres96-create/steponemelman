@@ -1,5 +1,5 @@
 import { ConceptoZ, type Concepto } from '@app/schema/concept'
-import { conceptos as ids } from './escena'
+import { conceptos as ids, conceptosFragiles } from './escena'
 import { conceptoAplicacionSintetico, IDS_APLICACION } from './aplicacion-fixture'
 import { myqbankConcepts } from './myqbank-fixture'
 // Se valida una plantilla con un id largo y luego se le pone el id corto de la escena: así trae todos los valores por defecto.
@@ -14,7 +14,7 @@ const conceptos = ids.map((id, i) => IDS_APLICACION.includes(id) ? conceptoAplic
 declare global { interface Window { __cargasCorpusSintetico: number; __conceptosSolicitados: string[][] } }
 window.__cargasCorpusSintetico = 0
 window.__conceptosSolicitados = []
-export const cargarTodo = async () => { window.__cargasCorpusSintetico++; return new URLSearchParams(location.search).get('workspace') === 'myqbank' ? myqbankConcepts : conceptos }
+export const cargarTodo = async () => { window.__cargasCorpusSintetico++; return new URLSearchParams(location.search).get('workspace') === 'myqbank' ? [...myqbankConcepts, ...conceptos.filter(c => conceptosFragiles.includes(c.concept_id))] : conceptos }
 let cargas = 0
 export const cargarConceptos = async (lista: string[]) => {
   window.__conceptosSolicitados.push(lista)

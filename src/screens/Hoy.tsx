@@ -26,9 +26,10 @@ import { estimarBloque } from '../lib/ritmo'
 import { hitoSemanalAprendizaje } from '../lib/progreso-aprendizaje'
 import { completarEntradaDeHoy, prepararNuevoDeHoy, tituloDeHoy, type MaterialNuevo } from '../lib/nuevo-hoy'
 import { hayConceptosPendientes } from '../lib/conceptos-pendientes'
-import { sugerirRecuperar } from '../lib/inventario'
+import { sugerirRecuperar, type FichaInventario } from '../lib/inventario'
 import { SugerenciaRecuperar } from './SugerenciaRecuperar'
 import { ChatSesion } from './ChatSesion'
+import type { DatosSesion } from './chat-sesion-flujo'
 import type { AccionesRecuperacion } from './RecuperarMeta'
 
 const ResumenProgreso = lazy(() => import('./Progreso').then(m => ({ default: m.ResumenProgreso })))
@@ -144,13 +145,33 @@ function useTic(cada = 60_000): void {
  * Ningún número de deuda fuera de los desplegables: los techos ya dicen lo que hay
  * que hacer.
  */
-export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar, compact = false, busy = false }: {
+/**
+ * Lo que Hoy ya calculó para «Para reforzar hoy» y el chat de sesiones, entregado tal cual a quien
+ * quiera pintarlos en otro sitio (el dashboard de MyQBank). La lógica del día sigue en un solo lugar.
+ */
+export interface DatosAsistente extends DatosSesion {
+  usuario: string
+  ahora: number
+  /** El progreso de la cuenta y el banco ya llegaron: antes no se congela la sugerencia del día. */
+  listo: boolean
+  /** Lo frágil que hoy podría sugerirse, ya sin lo que está en las cajas ni lo tocado hoy. */
+  candidatas: FichaInventario[]
+  onNuevo: (material: MaterialNuevo) => void
+  ocupado: boolean
+}
+
+export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar, compact = false, busy = false, renderAsistente }: {
   onNuevo: (material: MaterialNuevo) => void
   onCajas: (items: ItemCaja[], titulo: string) => void
   onBiblioteca: (tipo: 'conceptos' | 'preguntas') => void
   onRetomar?: AccionesRecuperacion['onRetomar']
   busy?: boolean
   compact?: boolean
+  /**
+   * Si se da, Hoy no pinta su pantalla ni su meta: entrega `DatosAsistente` a esta función y pinta lo que
+   * devuelva. Con el viernes, el día cerrado o mientras carga, no pinta nada: esas tarjetas no existen.
+   */
+  renderAsistente?: (datos: DatosAsistente) => ReactNode
 }) {
   const { indice, estado, sincronizacion } = useApp()
   const { session } = useAuth()
@@ -212,7 +233,7 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar, compact = false
 
   // Sin el banco de preguntas no se sabe qué entra hoy; sin él tras un fallo, el día sigue sin preguntas.
   const bancoListo = !!nbme.catalog || (!nbme.loading && !!nbme.error)
-  if (!bancoListo || (!sesiones && !fallo)) return <div className="vacio" role="status">Preparando tu día…</div>
+  if (!bancoListo || (!sesiones && !fallo)) return renderAsistente ? null : <div className="vacio" role="status">Preparando tu día…</div>
 
   // El viernes va vacío a propósito: sale cerrado desde que amanece, sin botones ni cuentas,
   // y lo que venza entra en el techo del sábado. No depende de nada que tenga que cargar.
@@ -225,7 +246,7 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar, compact = false
   // un cierre calculado sobre una copia local a medias mandaría a cerrar el portátil con trabajo pendiente.
   const esperandoCuenta = (sincronizacion?.estado === 'inicializando' || sincronizacion?.estado === 'sincronizando') && !sincronizacion?.ultima
   const esperandoBanco = (nbme.syncStatus?.state === 'initializing' || nbme.syncStatus?.state === 'syncing') && !nbme.syncStatus?.lastSyncedAt
-  if (completo && (esperandoCuenta || esperandoBanco)) return <div className="vacio" role="status">Preparando tu día…</div>
+  if (completo && (esperandoCuenta || esperandoBanco)) return renderAsistente ? null : <div className="vacio" role="status">Preparando tu día…</div>
   // Lo frágil que no está ya en las cajas de hoy ni se tocó hoy; la tarjeta decide si toca mostrarlo (una vez al día, máx. 5).
   const candidatasRecuperar = sugerirRecuperar({
     progreso: estado.progreso, nbme: nbme.state, ahora,
@@ -283,6 +304,14 @@ export function Hoy({ onNuevo, onCajas, onBiblioteca, onRetomar, compact = false
       bloqueoRetomar.current = false
       if (montado.current) setRetomando(false)
     }
+  }
+
+  if (renderAsistente) {
+    return viernes || completo ? null : <>{renderAsistente({
+      usuario: session?.user?.id ?? '', ahora, listo: !esperandoCuenta && !esperandoBanco, candidatas: candidatasRecuperar,
+      progreso: estado.progreso, criterios: estado.criterios, nbme: nbme.state, listas, publicados,
+      modulos: indice?.modulos ?? [], enCajasHoy: pendientesEnCajas, onNuevo, ocupado: busy,
+    })}</>
   }
 
   if (compact) return <div className="mq-goal">

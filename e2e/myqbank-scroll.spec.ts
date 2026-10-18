@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { preguntaNbmeReal } from './arnes/nbme-real-fixture'
+import { ordenDeProduccion } from './arnes/orden-produccion'
 
 /**
  * En escritorio la página de MyQBank tiene que poder bajar: el dashboard tiene el progreso
@@ -21,22 +22,6 @@ async function red(page: Page) {
     }
     return route.fulfill({ status: 503, json: { disponible: false, error: 'Synthetic backend unavailable.' } })
   })
-}
-
-/**
- * En el build, la hoja de entrada (con workspace.css, por AuthFrame) carga antes que la del chunk
- * de MyQBank (con layout.css); el servidor de desarrollo las inyecta al revés. Se reproduce el
- * orden de producción para que la prueba no dependa de cómo las ordene cada herramienta.
- */
-async function ordenDeProduccion(page: Page) {
-  const movida = await page.evaluate(() => {
-    const hoja = [...document.querySelectorAll('style[data-vite-dev-id]')]
-      .find(s => (s.getAttribute('data-vite-dev-id') ?? '').endsWith('/myqbank/layout.css'))
-    if (!hoja) return false
-    document.head.appendChild(hoja)
-    return true
-  })
-  expect(movida, 'layout.css debe estar inyectada para reproducir el orden del build').toBe(true)
 }
 
 async function sePuedeBajar(page: Page) {

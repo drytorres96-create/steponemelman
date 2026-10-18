@@ -13,9 +13,11 @@ import { awaitingRecall, learningExposures } from './learning'
 
 const materials = [{ value: 'nbme', label: 'NBME' }, { value: 'concepts', label: 'Mehlman Concepts' }, { value: 'mixed', label: 'Mixed' }] as const
 const pools = [{ value: 'unused', label: 'Unused' }, { value: 'incorrect', label: 'Incorrect' }, { value: 'flagged', label: 'Flagged' }, { value: 'skipped', label: 'Skipped' }, { value: 'learning', label: 'Learning' }] as const
-export function Dashboard({ onStart, onResume, dailyGoal, legacyResume, busy, error }: {
+export function Dashboard({ onStart, onResume, dailyGoal, legacyResume, assistant, busy, error }: {
   onStart: (items: BankItem[], mode: BlockMode) => Promise<void>; onResume: (block: StudyBlock) => Promise<void>;
   dailyGoal: ReactNode; legacyResume: ReactNode; busy: boolean; error: string | null
+  /** Lo que Claude aporta, justo bajo «Your next step» (sugerencia del día y chat de sesiones). */
+  assistant?: ReactNode
 }) {
   const { estado, indice, sincronizacion } = useApp(), nbme = useNbme()
   const [material, setMaterial] = useState<Material>('nbme'), [mode, setMode] = useState<BlockMode>('tutor')
@@ -64,9 +66,9 @@ export function Dashboard({ onStart, onResume, dailyGoal, legacyResume, busy, er
   const unavailable = (needsConcepts && !concepts) || (needsNbme && !nbme.catalog)
   const waiting = loading || unavailable
   return <main id="mq-main" tabIndex={-1} className="mq-dashboard">
-    <Card className="mq-resume"><div><span className="mq-eyebrow">{pending.length ? 'CONTINUE' : 'YOUR NEXT STEP'}</span><h1>{pending[0]?.title ?? 'Make room for one focused block'}</h1><p className="mq-muted">{pending.length ? 'Your answers and place are saved.' : 'Start with five items or follow your daily goal.'}</p></div>
+    <div className="mq-top"><Card className="mq-resume"><div><span className="mq-eyebrow">{pending.length ? 'CONTINUE' : 'YOUR NEXT STEP'}</span><h1>{pending[0]?.title ?? 'Make room for one focused block'}</h1><p className="mq-muted">{pending.length ? 'Your answers and place are saved.' : 'Start with five items or follow your daily goal.'}</p></div>
       {pending[0] && <Button variant="primary" disabled={busy} onClick={() => void onResume(pending[0])}><Icon name="play"/>Resume block</Button>}{legacyResume}
-    </Card>
+    </Card>{assistant}</div>
     <Card className="mq-activity"><div className="mq-heading"><h2>Last 7 days</h2><span>{week.reduce((n, d) => n + d.n, 0)} answers</span></div>
       <div className="mq-week" role="img" aria-label={week.map(d => `${d.day}: ${d.n} answers`).join(', ')}>{week.map(d => <div key={d.day} title={`${d.day}: ${d.n}`}><span style={{ height: `${d.n / Math.max(1, ...week.map(x => x.n)) * 70}px` }}/><small>{d.label}</small></div>)}</div>{dailyGoal}
     </Card>
