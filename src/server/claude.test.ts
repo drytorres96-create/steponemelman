@@ -14,12 +14,21 @@ beforeEach(() => { vi.spyOn(console, 'error').mockImplementation(() => {}) })
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers() })
 
 describe('contabilidad', () => {
+  it('Haiku cambia de tarifa al superar 100 mil tokens de entrada, incluida la caché', () => {
+    const uso = { entrada: 100_000, salida: 1000, cacheEscritura: 0, cacheLectura: 0 }
+    expect(costeUSD('claude-haiku-5-5', uso)).toBeCloseTo(.0105, 8)
+    expect(costeUSD('claude-haiku-5-5', { ...uso, entrada: 100_001 })).toBeCloseTo(.0525005, 8)
+    expect(costeUSD('claude-haiku-5-5', { ...uso, cacheLectura: 1 })).toBeCloseTo(.05250005, 8)
+    expect(costeUSD('claude-haiku-5-5', { ...uso, cacheEscritura: 1 })).toBeCloseTo(.052501, 8)
+    expect(costeReservaUSD(solicitud({ modelo: 'claude-haiku-5-5', sistema: 'x'.repeat(300_003), mensajes: [], maxTokens: 1000 })))
+      .toBeCloseTo(.0525005, 8)
+  })
   it('Sonnet 5.5 cuesta 2 USD por millón de entrada y 10 de salida', () => {
     expect(costeUSD('claude-sonnet-5-5', { entrada: 1_000_000, salida: 1_000_000, cacheEscritura: 0, cacheLectura: 0 })).toBeCloseTo(12, 6)
   })
-  it('la escritura en caché pesa el doble y la lectura una décima parte de la entrada', () => {
+  it('la escritura en caché pesa el doble y la lectura de Sonnet un veinteavo de la entrada', () => {
     expect(costeUSD('claude-sonnet-5-5', { entrada: 0, salida: 0, cacheEscritura: 1_000_000, cacheLectura: 0 })).toBeCloseTo(4, 6)
-    expect(costeUSD('claude-sonnet-5-5', { entrada: 0, salida: 0, cacheEscritura: 0, cacheLectura: 1_000_000 })).toBeCloseTo(0.2, 6)
+    expect(costeUSD('claude-sonnet-5-5', { entrada: 0, salida: 0, cacheEscritura: 0, cacheLectura: 1_000_000 })).toBeCloseTo(0.1, 6)
   })
   it('un modelo desconocido se cobra a la tarifa más cara, nunca a cero', () => {
     const uso = { entrada: 1_000_000, salida: 0, cacheEscritura: 0, cacheLectura: 0 }
@@ -33,6 +42,16 @@ describe('contabilidad', () => {
 })
 
 describe('llamarClaude', () => {
+  it.each([
+    ['sin_pensar', 'low', 'disabled'], ['adaptativo', 'medium', 'adaptive'], ['adaptativo', 'low', 'adaptive'],
+  ] as const)('Haiku respeta %s con esfuerzo %s incluso al reintentar', async (pensamiento, esfuerzo, tipo) => {
+    const red = vi.fn().mockResolvedValueOnce(fallo(529)).mockResolvedValueOnce(ok(texto('Respuesta de prueba utilizable.')))
+    await llamarClaude(CLAVE, solicitud({ modelo: 'claude-haiku-5-5', pensamiento, esfuerzo }), { fetch: red, esperaReintentoMs: 0 })
+    expect(red).toHaveBeenCalledTimes(2)
+    for (const [, init] of red.mock.calls) expect(JSON.parse(init.body)).toMatchObject({
+      model: 'claude-haiku-5-5', thinking: { type: tipo }, output_config: { effort: esfuerzo }, max_tokens: 500,
+    })
+  })
   it('sin clave falla antes de tocar la red', async () => {
     const red = vi.fn()
     await expect(llamarClaude(undefined, solicitud(), { fetch: red })).rejects.toMatchObject({ codigo: 'sin_clave' })
@@ -53,7 +72,7 @@ describe('llamarClaude', () => {
     expect(JSON.stringify(cuerpo)).not.toContain(CLAVE)
     expect(cuerpo).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 500, system: 'Eres un tutor.', output_config: { effort: 'low' } })
     expect(cuerpo).not.toHaveProperty('temperature')
-    expect(cuerpo).not.toHaveProperty('thinking')
+    expect(cuerpo.thinking).toEqual({ type: 'adaptive' })
     expect(cuerpo.messages.at(-1).role).toBe('user')
   })
 
@@ -106,15 +125,11 @@ describe('llamarClaude', () => {
     expect(red).toHaveBeenCalledTimes(2)
   })
 
-  it('si la API rechaza esfuerzo o pensamiento, repite sin ellos', async () => {
-    const red = vi.fn()
-      .mockResolvedValueOnce(fallo(400, { type: 'invalid_request_error', message: 'thinking.type: between_tools is not supported' }))
-      .mockResolvedValueOnce(ok(texto('Respondido sin parámetros opcionales.')))
-    const r = await llamarClaude(CLAVE, solicitud({ pensamiento: 'sin_pensar' }), { fetch: red as never, esperaReintentoMs: 0 })
-    expect(r.texto).toContain('sin parámetros')
-    const segundo = JSON.parse((red.mock.calls[1] as unknown as [string, RequestInit])[1].body as string)
-    expect(segundo).not.toHaveProperty('thinking')
-    expect(segundo).not.toHaveProperty('output_config')
+  it('si la API rechaza esfuerzo o pensamiento, no retira los límites ni sube de modelo', async () => {
+    const red = vi.fn().mockResolvedValue(fallo(400, { type: 'invalid_request_error', message: 'thinking.type: unsupported' }))
+    await expect(llamarClaude(CLAVE, solicitud({ modelo: 'claude-haiku-5-5', pensamiento: 'sin_pensar' }), { fetch: red, esperaReintentoMs: 0 }))
+      .rejects.toMatchObject({ codigo: 'proveedor', estado: 400 })
+    expect(red).toHaveBeenCalledTimes(1)
   })
 
   it('sin conexión es un fallo del proveedor y el mensaje no arrastra la clave', async () => {

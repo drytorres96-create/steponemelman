@@ -101,7 +101,7 @@ describe('Claude desde el Durable Object', () => {
     expect(cuerpo).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 700, system: 'Sistema de prueba.', output_config: { effort: 'low' } })
     expect(cuerpo).not.toHaveProperty('temperature')
     expect(cuerpo.messages.at(-1).role).toBe('user') // sin prefill
-    expect(cuerpo).not.toHaveProperty('thinking')
+    expect(cuerpo.thinking).toEqual({ type: 'adaptive' })
   })
   it('apaga el pensamiento previo solo cuando la solicitud lo pide', async () => {
     const { call, transporte } = setup()
@@ -193,14 +193,11 @@ describe('Claude desde el Durable Object', () => {
     expect((await call('reintento')).status).toBe(200)
     expect(transporte).toHaveBeenCalledTimes(2)
   })
-  it('si la API rechaza el esfuerzo o el pensamiento, repite la consulta sin ellos', async () => {
+  it('un parámetro rechazado no dispara otra llamada sin los controles de coste', async () => {
     const { call, transporte } = setup()
-    transporte.mockResolvedValueOnce(errorClaude(400, 'invalid_request_error', 'output_config.effort: value not supported')).mockResolvedValueOnce(claude(VEREDICTO))
-    expect((await call('sin-parametros', { sol: solicitud({ pensamiento: 'sin_pensar' }) })).status).toBe(200)
-    expect(transporte).toHaveBeenCalledTimes(2)
-    const segundo = JSON.parse(transporte.mock.calls[1][1]!.body as string)
-    expect(segundo).not.toHaveProperty('output_config')
-    expect(segundo).not.toHaveProperty('thinking')
+    transporte.mockResolvedValue(errorClaude(400, 'invalid_request_error', 'output_config.effort: value not supported'))
+    expect((await call('sin-parametros', { sol: solicitud({ pensamiento: 'sin_pensar' }) })).status).toBe(503)
+    expect(transporte).toHaveBeenCalledTimes(1)
   })
   it('si se agota la espera, la reserva se queda porque el modelo pudo seguir trabajando', async () => {
     const { call, transporte, storage } = setup()
@@ -363,7 +360,7 @@ describe('POST /api/calificar reconstruye la presentación y arma la consulta en
     const { c, cuerpo } = presentacion(version, undefined, indiceDe(version))
     expect((await llamar('/api/calificar', cuerpo)).status).toBe(200)
     const t = enviados[0]
-    expect(t).toMatchObject({ mode: 'calificar', solicitud: { modelo: 'claude-sonnet-5-5', esfuerzo: 'low', pensamiento: 'sin_pensar' } })
+    expect(t).toMatchObject({ mode: 'calificar', solicitud: { modelo: 'claude-haiku-5-5', esfuerzo: 'medium', pensamiento: 'adaptativo' } })
     const pedido = JSON.parse(t.solicitud.mensajes[0].content)
     expect(pedido).toMatchObject({ pregunta: c.evaluacion.pregunta, respuesta_referencia: 'alfa', respuesta_estudiante: 'first element' })
     expect(pedido.respuestas_aceptadas).toContain('alpha')
@@ -539,6 +536,35 @@ function entornoNbme({ politica = POLITICA() as unknown, pregunta = PREGUNTA_NBM
 const chatNbme = (extra: Record<string, unknown> = {}) => ({ tipo: 'nbme', questionId: 'NBME28-P0001', revision: 'r1', optionId: 'A', accion: 'mensaje', mensaje: 'Explícame el mecanismo paso a paso', ...extra })
 
 describe('POST /api/ia/chat sobre una pregunta NBME', () => {
+  it('usa Haiku por defecto y Sonnet sólo para la revisión explícita, con cachés independientes', async () => {
+    const { llamar, enviados } = entornoNbme()
+    const historial = [{ rol: 'yo', texto: 'Explica el ejemplo.' }, { rol: 'ia', texto: 'Esta es la explicación sintética previa.' }]
+    for (const extra of [{ historial }, { historial, revisionSonnet: true }, { historial }])
+      expect((await llamar(chatNbme(extra))).status).toBe(200)
+    expect(enviados.map(t => t.solicitud.modelo)).toEqual(['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'])
+    expect(enviados.every(t => t.solicitud.esfuerzo === 'medium')).toBe(true)
+    expect(enviados[1].solicitud.sistema).toContain('Revisión solicitada explícitamente')
+    expect(enviados[1].solicitud.sistema).toContain('No cambies calificaciones')
+    expect(enviados[1].key).not.toBe(enviados[0].key)
+    expect(enviados[2].key).toBe(enviados[0].key)
+    await llamar(chatNbme({ accion: 'practica' }))
+    expect(enviados[3]).toMatchObject({ mode: 'practica', solicitud: { modelo: 'claude-haiku-5-5', esfuerzo: 'medium', pensamiento: 'adaptativo' } })
+  })
+  it.each([
+    { revisionSonnet: true },
+    { modelo: 'claude-opus-5-5' },
+    { accion: 'practica', revisionSonnet: true, historial: [{ rol: 'yo', texto: 'x' }, { rol: 'ia', texto: 'y' }] },
+  ])('rechaza modelos arbitrarios y revisiones fuera del chat: %j', async extra => {
+    const { llamar, coach } = entornoNbme()
+    expect((await llamar(chatNbme(extra))).status).toBe(400)
+    expect(coach.fetch).not.toHaveBeenCalled()
+  })
+  it('la revisión manual respeta la política de fuentes igual que Haiku', async () => {
+    const { llamar, coach } = entornoNbme({ politica: null })
+    const r = await llamar(chatNbme({ revisionSonnet: true, historial: [{ rol: 'yo', texto: 'x' }, { rol: 'ia', texto: 'y' }] }))
+    expect((await r.json()).codigo).toBe('fuente_en_revision')
+    expect(coach.fetch).not.toHaveBeenCalled()
+  })
   const material = (t: Record<string, any>) => JSON.parse(t.solicitud.sistema.split('<MATERIAL>\n')[1].split('\n</MATERIAL>')[0])
   it('manda el enunciado, la opción elegida y la clave que lee el servidor de su banco', async () => {
     const { llamar, enviados } = entornoNbme()
@@ -609,7 +635,7 @@ describe('POST /api/ia/sesion · el hilo común de las sugeridas del día', () =
       { etiqueta: 'Enzimas: distinguir dos cosas', motivo: 'fallada esta semana y sin acierto limpio después' },
       { etiqueta: 'Hormonas', motivo: 'fallada más de una vez; acertada, pero con ayuda' },
     ])
-    expect(enviados[0].solicitud.pensamiento).toBe('sin_pensar')
+    expect(enviados[0].solicitud).toMatchObject({ modelo: 'claude-haiku-5-5', esfuerzo: 'low', pensamiento: 'sin_pensar' })
   })
   it('una pregunta NBME con la fuente autorizada conserva su etiqueta; sin política o en revisión sale sin ella', async () => {
     const pregunta = item({ tipo: 'pregunta', id: 'NBME28-P0001', etiqueta: 'Hiperplasia suprarrenal' })
@@ -703,7 +729,7 @@ describe('POST /api/ia/sesion · entender el pedido y revisar los candidatos', (
     for (const palabra of ['Hematológico y oncológico', 'Farmacología', 'falladas_sin_recuperar', 'mas_trabajo', 'acertadas_primera', 'Elige tú']) {
       expect(enviados[0].solicitud.sistema).toContain(palabra)
     }
-    expect(enviados[0].solicitud.pensamiento).toBe('sin_pensar')
+    expect(enviados[0].solicitud).toMatchObject({ modelo: 'claude-haiku-5-5', esfuerzo: 'medium', pensamiento: 'adaptativo' })
   })
   it('con las dos preguntas ya hechas, Claude ya no puede preguntar más', async () => {
     const { llamarSesion, enviados } = entornoNbme()
@@ -759,7 +785,7 @@ describe('POST /api/ia/sesion · entender el pedido y revisar los candidatos', (
     const { llamarSesion, enviados } = entornoNbme()
     const r = await llamarSesion(revisar([candidato(), candidato({ id: 'HEM-2', etiqueta: 'Anemia ferropénica: patrón de hierro' })]))
     expect(r.status).toBe(200)
-    expect(enviados[0]).toMatchObject({ mode: 'revisar', contexto: { permitidos: ['HEM-1', 'HEM-2'] } })
+    expect(enviados[0]).toMatchObject({ mode: 'revisar', solicitud: { modelo: 'claude-haiku-5-5', esfuerzo: 'low', pensamiento: 'adaptativo' }, contexto: { permitidos: ['HEM-1', 'HEM-2'] } })
     expect(enviados[0].solicitud.sistema).not.toContain('Linfoma de Hodgkin')
     expect(leerUsuario(enviados[0])).toEqual({
       pedido: 'linfomas que he fallado',

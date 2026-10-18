@@ -50,6 +50,29 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers() })
 
 describe('tutor de la pregunta', () => {
+  it('Sonnet exige pulsar revisar, el reintento conserva esa elección y el siguiente mensaje vuelve al perfil habitual', async () => {
+    mock.preguntar.mockResolvedValueOnce({ estado: 'ok', texto: 'Primera explicación sintética del caso.' })
+      .mockResolvedValueOnce({ estado: 'sin_ia', motivo: 'Fallo temporal de la revisión.' })
+      .mockResolvedValueOnce({ estado: 'ok', texto: 'Explicación revisada con la fuente sintética.' })
+      .mockResolvedValueOnce({ estado: 'ok', texto: 'Otra explicación del perfil habitual.' })
+    await pintar()
+    expect(boton('Revisar con Sonnet')).toBeUndefined()
+    await clic('Mecanismo paso a paso')
+    expect(mock.preguntar).toHaveBeenCalledTimes(1)
+    expect(mock.preguntar.mock.calls[0][4]).toBeUndefined()
+    await clic('Revisar con Sonnet')
+    expect(mock.preguntar.mock.calls[1][4]).toBe(true)
+    expect(mock.preguntar.mock.calls[1][2]).toHaveLength(2)
+    expect(boton('Revisar con Sonnet')).toBeUndefined()
+    await clic('Reintentar')
+    expect(mock.preguntar.mock.calls[2][4]).toBe(true)
+    expect(mock.preguntar.mock.calls[2][2]).toEqual(mock.preguntar.mock.calls[1][2])
+    expect(host.textContent).toContain('Revisión con Sonnet')
+    expect(boton('Revisar con Sonnet')).toBeUndefined()
+    await clic('Key learning point')
+    expect(mock.preguntar.mock.calls[3][4]).toBeUndefined()
+    expect(mock.preguntar).toHaveBeenCalledTimes(4)
+  })
   it('aparece con cualquier resultado y no consulta nada hasta que lo pides', async () => {
     for (const [estado, pastilla] of [['correcta', 'Correcta'], ['parcial', 'Parcialmente correcta'], ['incorrecta', 'Incorrecta']] as const) {
       await pintar({ estado })

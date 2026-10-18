@@ -1,3 +1,4 @@
+import { clavePerfil } from './perfiles-claude'
 import config from '../../project.config.json'
 import { registrar } from './registro'
 import { evaluarTexto, EVALUADOR_VERSION } from '../lib/normalize'
@@ -366,10 +367,10 @@ async function handleChat(request: Request, url: URL, env: Env): Promise<Respons
     const mensaje = (input.mensaje ?? '').trim().normalize('NFC')
     const practica = input.accion === 'practica'
     const solicitud = practica ? solicitudPractica(material.reference, input.evitar, material.estudiante)
-      : solicitudChat(material.reference, input.historial, mensaje, material.estudiante)
+      : solicitudChat(material.reference, input.historial, mensaje, material.estudiante, input.revisionSonnet)
     const trusted: CoachInput = { user: quien.userId, mode: practica ? 'practica' : 'chat', solicitud, source: material.fuente,
       key: await digest(JSON.stringify([quien.userId, identidad, material.reference, material.estudiante ?? '', input.accion, mensaje,
-        input.historial, input.evitar, solicitud.modelo, VERSION_CHAT])) }
+        input.historial, input.evitar, input.revisionSonnet === true, clavePerfil(solicitud), VERSION_CHAT])) }
     return await alCoach(env, trusted.mode, trusted)
   } catch (causa) {
     registrar('ia/chat', causa)
@@ -412,7 +413,7 @@ async function handleSesion(request: Request, url: URL, env: Env): Promise<Respo
       const restantes = Math.max(0, MAX_PREGUNTAS_SEGUIMIENTO - input.preguntasHechas)
       const solicitud = solicitudEntender(input.mensajes, restantes)
       const trusted: CoachInput = { user: quien.userId, mode: 'entender', solicitud, contexto: { preguntas: restantes },
-        key: await digest(JSON.stringify([quien.userId, 'entender', input.mensajes, restantes, solicitud.modelo, VERSION_CONSTRUCTOR])) }
+        key: await digest(JSON.stringify([quien.userId, 'entender', input.mensajes, restantes, clavePerfil(solicitud), VERSION_CONSTRUCTOR])) }
       return await alCoach(env, 'entender', trusted)
     }
 
@@ -425,7 +426,7 @@ async function handleSesion(request: Request, url: URL, env: Env): Promise<Respo
       const pedido = limpiarEtiqueta(input.pedido)
       const solicitud = solicitudRevisar(pedido, input.consulta, revisables)
       const trusted: CoachInput = { user: quien.userId, mode: 'revisar', solicitud, contexto: { permitidos: revisables.map(i => i.id) },
-        key: await digest(JSON.stringify([quien.userId, 'revisar', pedido, input.consulta, revisables, solicitud.modelo, VERSION_CONSTRUCTOR])) }
+        key: await digest(JSON.stringify([quien.userId, 'revisar', pedido, input.consulta, revisables, clavePerfil(solicitud), VERSION_CONSTRUCTOR])) }
       const respuesta = await alCoach(env, 'revisar', trusted)
       if (!respuesta.ok) return respuesta
       return json({ ...await respuesta.json() as Record<string, unknown>, sinRevisar, revisadas: revisables.length, conFuenteRevisada })
@@ -437,7 +438,7 @@ async function handleSesion(request: Request, url: URL, env: Env): Promise<Respo
       senales: i.senales }))
     const solicitud = solicitudHilo(items)
     const trusted: CoachInput = { user: quien.userId, mode: 'hilo', solicitud,
-      key: await digest(JSON.stringify([quien.userId, 'hilo', items, solicitud.modelo, VERSION_SESION])) }
+      key: await digest(JSON.stringify([quien.userId, 'hilo', items, clavePerfil(solicitud), VERSION_SESION])) }
     return await alCoach(env, 'hilo', trusted)
   } catch (causa) {
     registrar('ia/sesion', causa)
@@ -487,7 +488,7 @@ export default {
       const solicitud = solicitudCalificar({ material: reference, pregunta: c.evaluacion.pregunta, referencia: c.respuesta_canonica, aceptadas: acceptedAnswers, respuesta: answer })
       const trusted: CoachInput = { user: userId, mode: 'calificar', solicitud,
         // El modo entra en la clave: una explicación cacheada nunca puede servirse como veredicto.
-        key: await digest(JSON.stringify([userId, indice.corpus_version, c.concept_id, input.version, answer, reference, solicitud.modelo, `calificar-${EVALUADOR_VERSION}`, acceptedAnswers])) }
+        key: await digest(JSON.stringify([userId, indice.corpus_version, c.concept_id, input.version, answer, reference, clavePerfil(solicitud), `calificar-${EVALUADOR_VERSION}`, acceptedAnswers])) }
       return await alCoach(env, 'calificar', trusted)
     } catch (causa) {
       registrar('calificar', causa)
