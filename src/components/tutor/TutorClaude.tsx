@@ -31,10 +31,10 @@ const SALUDO: Record<EstadoRespuesta, string> = {
   revision: 'Esta respuesta quedó pendiente de revisar. Mientras tanto puedo explicarte el mecanismo o la idea central.',
 }
 
-type Accion = { tipo: 'mensaje'; texto: string } | { tipo: 'practica'; masRonda: boolean }
+type Accion = { tipo: 'mensaje'; texto: string; revisionSonnet?: true } | { tipo: 'practica'; masRonda: boolean }
 type Msg =
   | { id: number; rol: 'yo'; texto: string; api: boolean }
-  | { id: number; rol: 'ia'; texto: string; api: boolean; fuente?: FuenteChat }
+  | { id: number; rol: 'ia'; texto: string; api: boolean; fuente?: FuenteChat; revisionSonnet?: true }
   | { id: number; rol: 'error'; motivo: string; accion: Accion }
   | { id: number; rol: 'practica'; ronda: number; estado: 'cargando' | 'lista'; ejercicios: Ejercicio[] }
 
@@ -99,22 +99,24 @@ export function TutorClaude({ origen, estado, numero, sugerencias = [], stemKill
   const empezar = () => { ocupadoRef.current = true; setOcupado(true); control.current = new AbortController(); return control.current.signal }
   const terminar = () => { ocupadoRef.current = false; if (vivo.current) setOcupado(false) }
 
-  const consultar = async (textoPregunta: string) => {
+  const consultar = async (textoPregunta: string, revisionSonnet?: true) => {
     const historial = historialDe(ultimos.current.mensajes)
     const signal = empezar()
-    const r = await preguntarAlTutor(ultimos.current.origen, textoPregunta, historial, signal)
+    const r = revisionSonnet
+      ? await preguntarAlTutor(ultimos.current.origen, textoPregunta, historial, signal, true)
+      : await preguntarAlTutor(ultimos.current.origen, textoPregunta, historial, signal)
     terminar()
     if (!vivo.current) return
-    if (r.estado === 'ok') poner({ id: siguienteId(), rol: 'ia', texto: r.texto, api: true, fuente: r.fuente })
-    else poner({ id: siguienteId(), rol: 'error', motivo: r.motivo, accion: { tipo: 'mensaje', texto: textoPregunta } })
+    if (r.estado === 'ok') poner({ id: siguienteId(), rol: 'ia', texto: r.texto, api: true, fuente: r.fuente, revisionSonnet })
+    else poner({ id: siguienteId(), rol: 'error', motivo: r.motivo, accion: { tipo: 'mensaje', texto: textoPregunta, revisionSonnet } })
   }
 
-  const preguntar = (t: string, quien?: string) => {
+  const preguntar = (t: string, quien?: string, revisionSonnet?: true) => {
     const limpio = t.trim().slice(0, MAX_MENSAJE)
     if (!limpio || ocupadoRef.current) return
     if (quien) setUsadas(prev => [...prev, quien])
     poner({ id: siguienteId(), rol: 'yo', texto: limpio, api: true })
-    void consultar(limpio)
+    void consultar(limpio, revisionSonnet)
   }
 
   const rondas = mensajes.filter((m): m is Extract<Msg, { rol: 'practica' }> => m.rol === 'practica')
@@ -145,7 +147,7 @@ export function TutorClaude({ origen, estado, numero, sugerencias = [], stemKill
   const reintentar = (m: Extract<Msg, { rol: 'error' }>) => {
     if (ocupadoRef.current) return
     quitar(m.id)
-    if (m.accion.tipo === 'mensaje') void consultar(m.accion.texto)
+    if (m.accion.tipo === 'mensaje') void consultar(m.accion.texto, m.accion.revisionSonnet)
     else void generar(m.accion.masRonda)
   }
 
@@ -166,6 +168,8 @@ export function TutorClaude({ origen, estado, numero, sugerencias = [], stemKill
   ].filter(c => !usadas.includes(c.id))
   const hayPractica = rondas.length > 0 || usadas.includes('practica')
   const ultimaRonda = rondas[rondas.length - 1]
+  const ultimoMensaje = mensajes[mensajes.length - 1]
+  const puedeRevisar = ultimoMensaje?.rol === 'ia' && ultimoMensaje.api && !ultimoMensaje.revisionSonnet
 
   return <section className={`tutor${amplio ? ' tutor--amplio' : ''}`} aria-label="Claude, tu tutor de esta pregunta" data-estado={estado}>
     <header className="tutor-cab">
@@ -184,7 +188,7 @@ export function TutorClaude({ origen, estado, numero, sugerencias = [], stemKill
     <div className="tutor-hilo" ref={hilo} role="group" aria-label="Conversación con Claude" tabIndex={0}>
       <Turno rol="ia" texto={SALUDO[estado]} />
       {mensajes.map(m => m.rol === 'yo' ? <Turno key={m.id} rol="yo" texto={m.texto} />
-        : m.rol === 'ia' ? <Turno key={m.id} rol="ia" texto={m.texto} markdown={m.api} fuente={m.fuente} />
+        : m.rol === 'ia' ? <Turno key={m.id} rol="ia" texto={m.texto} markdown={m.api} fuente={m.fuente} revisionSonnet={m.revisionSonnet} />
           : m.rol === 'error' ? <div key={m.id} className="tutor-turno tutor-turno--ia"><Avatar />
             <div className="tutor-burbuja tutor-burbuja--aviso" role="alert"><p>{m.motivo}</p>
               <BotonSalvia className="tutor-btn--chico" disabled={ocupado} onClick={() => reintentar(m)}>Reintentar</BotonSalvia></div></div>
@@ -201,6 +205,10 @@ export function TutorClaude({ origen, estado, numero, sugerencias = [], stemKill
       {ocupado && !rondas.some(r => r.estado === 'cargando') && <div className="tutor-turno tutor-turno--ia" role="status">
         <Avatar /><div className="tutor-burbuja tutor-burbuja--pensando"><span className="tutor-sr">Claude está pensando…</span>
           <span className="tutor-puntos" aria-hidden="true"><i /><i /><i /></span></div></div>}
+      {!ocupado && puedeRevisar && <div className="tutor-revision">
+        <BotonSalvia onClick={() => preguntar('Revisa la explicación anterior con el material de esta pregunta y corrige los errores que encuentres.', undefined, true)}>Revisar con Sonnet</BotonSalvia>
+        <span>Revisión opcional · usa más crédito</span>
+      </div>}
       {!ocupado && (chips.length > 0 || !hayPractica) && <div className="tutor-explora">
         <p className="tutor-etiqueta">Explora este caso</p>
         <div className="tutor-chips">
@@ -229,10 +237,11 @@ const reducirMovimiento = () => { try { return window.matchMedia('(prefers-reduc
 
 export function Avatar() { return <span className="tutor-mini-avatar" aria-hidden="true"><IconoCerebro tamano={15} /></span> }
 
-export function Turno({ rol, texto, markdown = false, fuente }: { rol: 'yo' | 'ia'; texto: string; markdown?: boolean; fuente?: FuenteChat }) {
+export function Turno({ rol, texto, markdown = false, fuente, revisionSonnet }: { rol: 'yo' | 'ia'; texto: string; markdown?: boolean; fuente?: FuenteChat; revisionSonnet?: true }) {
   return <div className={`tutor-turno tutor-turno--${rol}`}>
     {rol === 'ia' && <Avatar />}
     <div className="tutor-burbuja">
+      {revisionSonnet && <p className="tutor-etiqueta">Revisión con Sonnet</p>}
       {markdown ? <TextoClaude texto={texto} /> : <p>{texto}</p>}
       {fuente && <p className="tutor-fuente">Material: {fuente.title}{fuente.page > 0 ? ` · p. ${fuente.page}` : ''}</p>}
     </div>

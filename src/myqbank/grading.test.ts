@@ -13,7 +13,7 @@ const attempt: Intento = {attempt_id:'qa:mq:0',pregunta_id:'qa:mq:0',session_id:
  explicacion_previa:true,fuente_consultada:false,calificado_por_ia:true,motivo_calificacion_ia:'Synthetic: partial answer.',confianza_declarada:null}
 it('explicit recheck preserves identity, text, timing, assistance and original AI reason across reload and merge',()=>{
  const corrected=recheckAcceptedAnswer(concept,attempt,300)!
- expect(corrected).toEqual({...attempt,resultado:'correcta',calificacion:3,tipo_error:'correcta_con_pistas',correccion_manual:true,evaluador_version:'2.5.1',calificacion_actualizada_en:300})
+ expect(corrected).toEqual({...attempt,resultado:'correcta',calificacion:3,tipo_error:'correcta_con_pistas',correccion_manual:true,evaluador_version:'2.6.0',calificacion_actualizada_en:300})
  const state=(a:Intento)=>({...ESTADO_INICIAL,progreso:{[concept.concept_id]:reconstruirProgreso(concept.concept_id,[a],ESTADO_INICIAL.criterios)}})
  const original=state(attempt), updated=state(corrected)
  expect(combinarEstados(original,updated)).toEqual(combinarEstados(updated,original))

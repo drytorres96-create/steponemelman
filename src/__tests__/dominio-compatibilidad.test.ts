@@ -60,6 +60,13 @@ function nbmeFixture() {
 }
 
 describe('compatibilidad de evidencia y mantenimiento con estados guardados', () => {
+  it.each(['2.2.0', '2.5.1', '2.6.0'])('el nuevo perfil de IA conserva los intentos del evaluador %s', evaluador_version => {
+    const raw = studyFixture()
+    for (const p of Object.values(raw.progreso)) for (const i of p.intentos) i.evaluador_version = evaluador_version
+    const leido = leerEstadoDesconocido(JSON.parse(JSON.stringify(raw)))!
+    for (const id of Object.keys(raw.progreso)) expect(leido.progreso[id].intentos).toEqual(raw.progreso[id].intentos)
+    expect(leido.reanudable).toEqual(raw.reanudable)
+  })
   it.each([1, 2, 3] as const)('lee study_state con formato %s y reevalúa flags antiguos sin reescribir historia o continuación', versionFormato => {
     const raw = JSON.parse(JSON.stringify(studyFixture()))
     raw.reanudable.versionFormato = versionFormato
@@ -79,7 +86,7 @@ describe('compatibilidad de evidencia y mantenimiento con estados guardados', ()
     expect(estado.reanudable).toEqual(original.reanudable)
     expect(estado.sesiones).toEqual(original.sesiones)
     expect(raw).toEqual(original)
-    expect(EVALUADOR_VERSION).toBe('2.5.1')
+    expect(EVALUADOR_VERSION).toBe('2.6.0')
     expect(estado.progreso.D.intentos[0].evaluador_version).toBe('2.2.0')
   })
 

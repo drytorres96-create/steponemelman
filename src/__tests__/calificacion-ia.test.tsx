@@ -85,7 +85,7 @@ describe('la IA corrige las respuestas breves', () => {
   it('la recuperación guiada registra práctica en el mismo concepto sin acreditar una respuesta independiente', async () => {
     mock.calificar.mockResolvedValue({ estado: 'ok', veredicto: 'correcta', motivo: 'Es el mismo concepto.' } satisfies ResultadoCalificacion)
     await responder('alfa', { apoyoPrevio: true })
-    expect(ultimo()).toMatchObject({ resultado: 'correcta', explicacion_previa: true, tipo_error: 'correcta_con_pistas', evaluador_version: '2.5.1' })
+    expect(ultimo()).toMatchObject({ resultado: 'correcta', explicacion_previa: true, tipo_error: 'correcta_con_pistas', evaluador_version: '2.6.0' })
     expect(evidenciaIndependiente(ultimo())).toBe(false)
     expect(mock.vista).toHaveBeenCalledWith('QA-1', expect.any(String))
   })
@@ -105,7 +105,7 @@ describe('la IA corrige las respuestas breves', () => {
     mock.calificar.mockResolvedValue({ estado: 'ok', veredicto: 'incorrecta', motivo: 'Respuesta errónea del modelo.' })
     await responder('alfa')
     expect(mock.calificar).not.toHaveBeenCalled()
-    expect(ultimo()).toMatchObject({ resultado: 'correcta', evaluador_version: '2.5.1' })
+    expect(ultimo()).toMatchObject({ resultado: 'correcta', evaluador_version: '2.6.0' })
     expect(ultimo().calificado_por_ia).toBeUndefined()
   })
 

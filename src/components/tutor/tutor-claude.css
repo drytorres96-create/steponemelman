@@ -351,3 +351,6 @@
   .tutor *, .tutor *::before, .tutor *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .tutor-chip:hover, .tutor-capsula-boton:hover { transform: none; }
 }
+.tutor-revision { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-block: 12px; }
+.tutor .tutor-revision .tutor-btn { min-height: 44px; }
+.tutor-revision > span { font-size: .8rem; color: var(--tt-suave); }

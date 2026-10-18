@@ -1,4 +1,5 @@
-import { MODELO_PREDETERMINADO, type SolicitudClaude } from './claude'
+import type { SolicitudClaude } from './claude'
+import { PERFILES_CLAUDE } from './perfiles-claude'
 import { DISCIPLINAS, SISTEMAS } from '../schema/concept'
 import { extraerJSON } from '../lib/practica-activa'
 import {
@@ -35,9 +36,8 @@ Reglas:
 /** `etiquetas` ya viene saneada por el servidor (política de fuentes aplicada a las preguntas NBME). */
 export function solicitudHilo(items: { etiqueta: string; senales: ItemHilo['senales'] }[]): SolicitudClaude {
   const lista = items.map(i => ({ etiqueta: i.etiqueta, motivo: i.senales.map(s => MOTIVO_SENAL[s]).join('; ') }))
-  return { modelo: MODELO_PREDETERMINADO, sistema: SISTEMA_HILO,
-    mensajes: [{ role: 'user', content: JSON.stringify({ items: lista }) }],
-    maxTokens: 500, esfuerzo: 'low', pensamiento: 'sin_pensar', tiempoMs: 12_000 }
+  return { ...PERFILES_CLAUDE.hilo, sistema: SISTEMA_HILO,
+    mensajes: [{ role: 'user', content: JSON.stringify({ items: lista }) }] }
 }
 
 const MAX_HILO = 200
@@ -84,9 +84,8 @@ Formato: devuelve SOLO un objeto JSON válido (sin texto alrededor ni cercas de 
 /** El historial va como datos de un único turno de usuario: sin roles que alternar ni instrucciones mezcladas. */
 export function solicitudEntender(mensajes: TurnoSesion[], restantes: number): SolicitudClaude {
   const conversacion = mensajes.map(m => ({ quien: m.rol === 'yo' ? 'persona' : 'tu pregunta anterior', texto: m.texto }))
-  return { modelo: MODELO_PREDETERMINADO, sistema: SISTEMA_ENTENDER,
-    mensajes: [{ role: 'user', content: JSON.stringify({ conversacion, preguntas_de_seguimiento_restantes: Math.max(0, restantes) }) }],
-    maxTokens: 800, esfuerzo: 'low', pensamiento: 'sin_pensar', tiempoMs: 20_000 }
+  return { ...PERFILES_CLAUDE.entender, sistema: SISTEMA_ENTENDER,
+    mensajes: [{ role: 'user', content: JSON.stringify({ conversacion, preguntas_de_seguimiento_restantes: Math.max(0, restantes) }) }] }
 }
 
 const SISTEMA_REVISAR = `Eres Claude, el asistente de la plataforma de estudio del USMLE Step 1 de un médico graduado (IMG). Recibes lo que la persona pidió, la consulta y candidatos con id y evidencia temática. Para NBME el servidor valida la fuente y aporta una explicación revisada cuando existe, o el objetivo y explicación originales cuando están autorizados. La plataforma aplica el estado del historial y la fuente; puede ampliar a clasificaciones vecinas para encontrar material del mismo tema. Tú solo juzgas si cada candidato ENCAJA con lo pedido.
@@ -105,10 +104,9 @@ Formato: devuelve SOLO un objeto JSON válido (sin texto alrededor ni cercas de 
 
 export function solicitudRevisar(pedido: string, consulta: ConsultaSesion, items: Pick<ItemRevision, 'id' | 'etiqueta'>[]): SolicitudClaude {
   const { sistemas, disciplinas, terminos, estados, fuente } = consulta
-  return { modelo: MODELO_PREDETERMINADO, sistema: SISTEMA_REVISAR,
+  return { ...PERFILES_CLAUDE.revisar, sistema: SISTEMA_REVISAR,
     mensajes: [{ role: 'user', content: JSON.stringify({ pedido, consulta: { fuente, sistemas, disciplinas, terminos, estados },
-      candidatos: items.map(i => ({ id: i.id, etiqueta: i.etiqueta })) }) }],
-    maxTokens: 2500, esfuerzo: 'low', pensamiento: 'sin_pensar', tiempoMs: 40_000 }
+      candidatos: items.map(i => ({ id: i.id, etiqueta: i.etiqueta })) }) }] }
 }
 
 /** Lo que devolvió `entender`, validado con el vocabulario cerrado; null si no es utilizable. */

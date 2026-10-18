@@ -46,6 +46,15 @@ describe('historial que cabe en la petición', () => {
 })
 
 describe('preguntar al tutor', () => {
+  it('la revisión explícita viaja sólo en esa petición y conserva los límites del historial', async () => {
+    red.mockResolvedValue(Response.json({ respuesta: 'Explicación revisada con el material sintético.' }))
+    await preguntarAlTutor(nbme, 'Revisa la respuesta anterior.', pares(6), undefined, true)
+    expect(cuerpoEnviado().revisionSonnet).toBe(true)
+    expect(bytes(cuerpoEnviado())).toBeLessThanOrEqual(5600)
+    expect(PeticionChatZ.safeParse(cuerpoEnviado()).success).toBe(true)
+    await preguntarAlTutor(nbme, 'Ahora explica otra cosa.', pares(1))
+    expect(cuerpoEnviado()).not.toHaveProperty('revisionSonnet')
+  })
   it('manda solo identificadores y el mensaje; el cuerpo cumple el contrato del servidor', async () => {
     red.mockResolvedValue(Response.json({ respuesta: 'Primero cae el filtrado glomerular y por eso sube la creatinina.', source: { title: 'Melman · Renal', page: 12 } }))
     const r = await preguntarAlTutor(concepto, '  Explícame el mecanismo paso a paso ', pares(2, 300))

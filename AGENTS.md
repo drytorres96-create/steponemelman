@@ -30,6 +30,17 @@
 
 ## Límites y autorización vigente
 
+- El 17-oct-2026 Yoel aprobó el reparto económico por función en
+  `src/server/perfiles-claude.ts`: Haiku 5.5 para hilo (sin pensamiento), entender
+  (medium, petición expresa), selección de candidatos (low), chat, práctica y
+  calificación escrita (medium). Razonamiento adaptativo salvo hilo. Las respuestas
+  aceptadas y ejercicios deterministas se corrigen localmente. Sonnet 5.5 medium
+  sólo revisa una explicación al pulsar «Revisar con Sonnet»; nunca subir de modelo
+  automáticamente ni usar Opus de rutina. Un error de parámetros no elimina los
+  controles de razonamiento. Conservar las puertas de fuente, validación y gasto.
+  Cambiar un perfil invalida su caché; cambiar el evaluador también exige versión
+  nueva sin recalificar historial. Guía: `docs/modelos-claude.md`.
+
 - Actualización posterior del 14-oct-2026: MyQBank conserva controles y preguntas
   NBME en inglés y explicaciones, mecanismos y drills nuevos en español. El usuario
   confirmó conservar el encargo español de Claude después de compartir la lista de

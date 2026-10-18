@@ -16,7 +16,6 @@ import { registrar } from './registro'
  */
 
 export type ModeloClaude = 'claude-haiku-5-5' | 'claude-sonnet-5-5' | 'claude-opus-5-5'
-export const MODELO_PREDETERMINADO: ModeloClaude = 'claude-sonnet-5-5'
 
 export type EsfuerzoClaude = 'low' | 'medium' | 'high'
 
@@ -44,7 +43,7 @@ export interface SolicitudClaude {
   /** Tope de salida; incluye los tokens de pensamiento. */
   maxTokens: number
   esfuerzo: EsfuerzoClaude
-  /** `sin_pensar` apaga el pensamiento previo (válido con esfuerzo low/medium/high en Sonnet 5.5). */
+  /** `sin_pensar`: disabled en Haiku, between_tools en Sonnet; Opus no permite apagarlo. */
   pensamiento?: 'adaptativo' | 'sin_pensar'
   tiempoMs: number
 }
@@ -69,8 +68,6 @@ export type CodigoClaude =
   | 'rechazo'     // el modelo declinó contestar
 
 export class ErrorClaude extends Error {
-  /** La API rechazó un parámetro opcional (esfuerzo o pensamiento): se puede reintentar sin ellos. */
-  parametros = false
   constructor(public codigo: CodigoClaude, public estado?: number, mensaje: string = codigo) {
     super(mensaje)
     this.name = 'ErrorClaude'
@@ -87,9 +84,12 @@ export const CHARS_POR_TOKEN = 3
 export const tokensDeTexto = (texto: string) => Math.ceil(texto.length / CHARS_POR_TOKEN)
 
 export function costeUSD(modelo: ModeloClaude, uso: UsoClaude): number {
-  const t = TARIFAS_USD[modelo] ?? TARIFAS_USD['claude-opus-5-5']
-  // Multiplicadores de caché sobre la tarifa de entrada: escritura 2× (el caso más caro) y lectura 0,1×.
-  const entrada = uso.entrada + uso.cacheEscritura * 2 + uso.cacheLectura * 0.1
+  const tokensEntrada = uso.entrada + uso.cacheEscritura + uso.cacheLectura
+  const t = modelo === 'claude-haiku-5-5' && tokensEntrada > 100_000
+    ? { entrada: 0.50, salida: 2.50 } : TARIFAS_USD[modelo] ?? TARIFAS_USD['claude-opus-5-5']
+  // Escritura 2× (reserva conservadora de 1 h); lectura Haiku 0,1×, Sonnet/Opus 0,05×.
+  const lectura = modelo === 'claude-sonnet-5-5' || modelo === 'claude-opus-5-5' ? 0.05 : 0.1
+  const entrada = uso.entrada + uso.cacheEscritura * 2 + uso.cacheLectura * lectura
   return (entrada * t.entrada + uso.salida * t.salida) / 1_000_000
 }
 
@@ -116,7 +116,6 @@ function clasificar(estado: number, cuerpo: unknown): CodigoClaude {
 }
 
 const REINTENTABLES = new Set<CodigoClaude>(['sobrecarga', 'proveedor'])
-const PARAMETRO_OPCIONAL = /output_config|effort|thinking/i
 
 /**
  * Una llamada, con un único reintento ante saturación o fallo transitorio. El tiempo total es el
@@ -125,17 +124,17 @@ const PARAMETRO_OPCIONAL = /output_config|effort|thinking/i
 export async function llamarClaude(apiKey: string | undefined, s: SolicitudClaude,
   opciones: { fetch?: typeof fetch; esperaReintentoMs?: number } = {}): Promise<RespuestaClaude> {
   if (!apiKey) throw new ErrorClaude('sin_clave')
+  if (s.modelo === 'claude-opus-5-5' && s.pensamiento === 'sin_pensar') throw new ErrorClaude('proveedor', 400)
   const enviar = opciones.fetch ?? fetch
   const espera = opciones.esperaReintentoMs ?? 700
   const inicio = Date.now()
-  let conParametros = true
   for (let intento = 0; ; intento++) {
     try {
-      return await intentar(apiKey, s, Math.max(1000, s.tiempoMs - (Date.now() - inicio)), enviar, conParametros)
+      return await intentar(apiKey, s, Math.max(1000, s.tiempoMs - (Date.now() - inicio)), enviar)
     } catch (causa) {
-      if (!(causa instanceof ErrorClaude) || intento >= 2) throw causa
-      // Si la API no acepta esfuerzo o pensamiento, la consulta sigue valiendo sin ellos.
-      if (causa.parametros && conParametros) { conParametros = false; continue }
+      if (!(causa instanceof ErrorClaude)) throw causa
+      // No retirar límites de razonamiento ni subir de modelo ante un parámetro rechazado.
+      if (causa.estado !== undefined && causa.estado < 500) throw causa
       if (!REINTENTABLES.has(causa.codigo) || intento >= 1) throw causa
       if (s.tiempoMs - (Date.now() - inicio) < s.tiempoMs / 2) throw causa
       await new Promise(resolve => setTimeout(resolve, espera))
@@ -143,7 +142,7 @@ export async function llamarClaude(apiKey: string | undefined, s: SolicitudClaud
   }
 }
 
-async function intentar(apiKey: string, s: SolicitudClaude, tiempoMs: number, enviar: typeof fetch, conParametros: boolean): Promise<RespuestaClaude> {
+async function intentar(apiKey: string, s: SolicitudClaude, tiempoMs: number, enviar: typeof fetch): Promise<RespuestaClaude> {
   const control = new AbortController()
   const temporizador = setTimeout(() => control.abort(), tiempoMs)
   let respuesta: Response
@@ -153,8 +152,8 @@ async function intentar(apiKey: string, s: SolicitudClaude, tiempoMs: number, en
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': VERSION_API },
       body: JSON.stringify({
         model: s.modelo, max_tokens: s.maxTokens, system: s.sistema, messages: s.mensajes,
-        ...(conParametros ? { output_config: { effort: s.esfuerzo } } : {}),
-        ...(conParametros && s.pensamiento === 'sin_pensar' ? { thinking: { type: 'between_tools' } } : {}),
+        output_config: { effort: s.esfuerzo },
+        thinking: { type: s.pensamiento === 'sin_pensar' ? (s.modelo === 'claude-haiku-5-5' ? 'disabled' : 'between_tools') : 'adaptive' },
       }),
     })
   } catch (causa) {
@@ -171,10 +170,7 @@ async function intentar(apiKey: string, s: SolicitudClaude, tiempoMs: number, en
       const codigo = clasificar(respuesta.status, cuerpo)
       // Solo el estado, el tipo y el identificador: el mensaje de la API puede citar lo enviado.
       registrar('claude/http', codigo, { estado: respuesta.status, tipo: String((cuerpo as { error?: { type?: unknown } } | null)?.error?.type ?? ''), idPeticion })
-      const fallo = new ErrorClaude(codigo, respuesta.status)
-      const mensaje = (cuerpo as { error?: { message?: unknown } } | null)?.error?.message
-      fallo.parametros = respuesta.status === 400 && codigo === 'proveedor' && typeof mensaje === 'string' && PARAMETRO_OPCIONAL.test(mensaje)
-      throw fallo
+      throw new ErrorClaude(codigo, respuesta.status)
     }
     return leer(cuerpo, s.modelo)
   } catch (causa) {

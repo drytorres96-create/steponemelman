@@ -55,8 +55,9 @@ export function ajustarHistorial(historial: TurnoChat[], sinHistorial: PeticionC
   return elegidas.flat()
 }
 
-function cuerpo(origen: OrigenChat, accion: PeticionChat['accion'], extra: { mensaje?: string; historial?: TurnoChat[]; evitar?: string[] }): PeticionChat {
+function cuerpo(origen: OrigenChat, accion: PeticionChat['accion'], extra: { mensaje?: string; historial?: TurnoChat[]; evitar?: string[]; revisionSonnet?: true }): PeticionChat {
   const base = { accion, ...(extra.mensaje !== undefined ? { mensaje: extra.mensaje.trim().slice(0, MAX_MENSAJE) } : {}),
+    ...(extra.revisionSonnet ? { revisionSonnet: true as const } : {}),
     historial: [] as TurnoChat[], evitar: (extra.evitar ?? []).slice(-12).map(e => e.slice(0, 100)) }
   const sin: PeticionChat = origen.tipo === 'concepto'
     ? { tipo: 'concepto', presentacion: origen.presentacion, resultado: origen.resultado, ...base }
@@ -64,9 +65,9 @@ function cuerpo(origen: OrigenChat, accion: PeticionChat['accion'], extra: { men
   return { ...sin, historial: ajustarHistorial(extra.historial ?? [], sin) }
 }
 
-export async function preguntarAlTutor(origen: OrigenChat, mensaje: string, historial: TurnoChat[], signal?: AbortSignal): Promise<RespuestaChat> {
+export async function preguntarAlTutor(origen: OrigenChat, mensaje: string, historial: TurnoChat[], signal?: AbortSignal, revisionSonnet?: true): Promise<RespuestaChat> {
   if (!mensaje.trim()) return { estado: 'sin_ia', motivo: 'Escribe tu pregunta.' }
-  const r = await solicitarIA<{ respuesta?: unknown; source?: unknown }>('/api/ia/chat', cuerpo(origen, 'mensaje', { mensaje, historial }), LIMITE_CHAT_MS, signal)
+  const r = await solicitarIA<{ respuesta?: unknown; source?: unknown }>('/api/ia/chat', cuerpo(origen, 'mensaje', { mensaje, historial, revisionSonnet }), LIMITE_CHAT_MS, signal)
   if (r.estado === 'sin_ia') return r
   const texto = typeof r.data?.respuesta === 'string' ? r.data.respuesta.trim() : ''
   if (texto.length < 20) return { estado: 'sin_ia', motivo: 'Claude no devolvió una respuesta utilizable.' }

@@ -163,7 +163,7 @@ describe('neurocognición: tramo mixto finito', () => {
     await responder('alfa')
     expect(mock.registrados).toHaveLength(1)
     expect(mock.registrados[0]).toMatchObject({ interaccion: 'recuperacion_libre', recuperacion_activa: true,
-      tipo_evidencia: 'recuerdo', resultado: 'correcta', fuente_consultada: false, explicacion_previa: false, evaluador_version: '2.5.1' })
+      tipo_evidencia: 'recuerdo', resultado: 'correcta', fuente_consultada: false, explicacion_previa: false, evaluador_version: '2.6.0' })
     expect(evaluarDominio(mock.estado!.progreso[c.concept_id], mock.estado!.criterios).cumple).toBe(true)
     const preguntaVersion = mock.registrados[0].pregunta_version
     const guardado = leerEstadoDesconocido(JSON.parse(JSON.stringify(mock.estado)))!
