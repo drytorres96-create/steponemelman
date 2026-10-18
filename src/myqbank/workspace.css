@@ -93,3 +93,18 @@
 .mq-block-open small { color: var(--mq-muted); font-size: 11px; }
 .mq-root .mq-remove-block { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; }
 .mq-remove-block p { margin: 12px 0; overflow-wrap: anywhere; }
+
+/* The study workspace uses the screen, including the space beyond the old 1680px cap.
+   Expanding Claude changes the column width as well as the conversation height. */
+.mq-workspace--study .mq-study { max-width: none; }
+.mq-workspace .mq-question-pane, .mq-workspace .mq-explanation-pane { min-width: 0; }
+.mq-workspace .mq-explanation-pane > .tutor { flex: none; width: 100%; margin-inline: 0; }
+.mq-workspace .tutor--amplio .tutor-burbuja { max-width: min(92%, 900px); }
+.mq-workspace .tutor--amplio .tutor-turno--yo .tutor-burbuja { max-width: min(85%, 680px); }
+@media (min-width: 961px) and (min-height: 601px) {
+  .mq-workspace .mq-study--revealed:has(.tutor--amplio) { grid-template-columns: 176px minmax(240px,.5fr) minmax(0,1.5fr); }
+  .mq-workspace .mq-study--revealed.mq-study--no-rail:has(.tutor--amplio) { grid-template-columns: minmax(240px,.55fr) minmax(0,1.45fr); }
+  .mq-workspace .mq-study--revealed:has(.tutor--amplio) .mq-option { flex-wrap: wrap; }
+  .mq-workspace .mq-study--revealed:has(.tutor--amplio) .mq-option > span:not(.mq-letter) { flex: 1; min-width: 0; }
+  .mq-workspace .mq-study--revealed:has(.tutor--amplio) .mq-option small { width: 100%; text-align: right; }
+}

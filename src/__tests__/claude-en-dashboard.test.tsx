@@ -207,10 +207,11 @@ describe('el diálogo del chat', () => {
     expect(dialogo().textContent).toContain('¿Con qué quieres practicar?')
     expect(mock.pedirEntender).toHaveBeenCalledTimes(1)
   })
-  it('«Empezar la sesión» entrega el material, cierra el diálogo y deja la página como estaba', async () => {
+  it('«Empezar solo con conceptos» entrega la sesión parcial, cierra el diálogo y deja la página como estaba', async () => {
     await montar({ progreso: FALLADO }); await abrirComoPersona()
     await decir('endocrino que he fallado')
-    await clic('Empezar la sesión')
+    expect(dialogo().textContent).toContain('No encontré preguntas verificables del tema para completar la mezcla.')
+    await clic('Empezar solo con conceptos')
     expect(onNuevo).toHaveBeenCalledTimes(1)
     expect(onNuevo.mock.calls[0][0]).toMatchObject({ conceptIds: ['C-ENDO-1'], preguntas: [], titulo: 'Endocrino · falladas', nbmeSessionId: null })
     expect(fondo().hidden).toBe(true)
@@ -223,7 +224,7 @@ describe('el diálogo del chat', () => {
     expect(boton('Empezar la sesión')).toBeUndefined()
     await montar({ progreso: FALLADO, bancoDisponible: true })
     await clic('Reintentar')
-    expect(boton('Empezar la sesión')).toBeDefined()
+    expect(boton('Empezar solo con conceptos')).toBeDefined()
     expect(mock.pedirEntender).toHaveBeenCalledTimes(1)
   })
   it('si el dashboard se desmonta con el diálogo abierto, el desplazamiento de la página se devuelve', async () => {

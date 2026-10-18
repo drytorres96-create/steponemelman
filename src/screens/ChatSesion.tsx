@@ -34,7 +34,7 @@ type Msg =
   | { id: number; rol: 'yo'; texto: string }
   | { id: number; rol: 'ia'; texto: string }
   | { id: number; rol: 'pregunta'; texto: string; opciones: string[] }
-  | { id: number; rol: 'sesion'; material: MaterialNuevo; resumen: string; nota: string[]; usada: boolean }
+  | { id: number; rol: 'sesion'; material: MaterialNuevo; resumen: string; nota: string[]; usada: boolean; incompleta?: 'conceptos' | 'preguntas' }
   | { id: number; rol: 'error'; motivo: string; accion: AccionError }
 
 type SinId<T> = T extends unknown ? Omit<T, 'id'> : never
@@ -101,9 +101,11 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, abierto: abiert
       reiniciarHilo()
       const nota: string[] = []
       if (r.revision) nota.push(`Claude revisó ${plural(r.revision.revisadas, 'candidata', 'candidatas')} y dejó ${r.revision.encajan}.`)
-      if (r.sinRevisar > 0) nota.push(`${plural(r.sinRevisar, 'pregunta NBME no se puede revisar', 'preguntas NBME no se pueden revisar')} con IA y ${r.sinRevisar === 1 ? 'quedó fuera' : 'quedaron fuera'}.`)
+      if (r.revision?.ampliada) nota.push('Busqué también el mismo tema en otras clasificaciones.')
+      if (r.sinRevisar > 0) nota.push(`${plural(r.sinRevisar, 'pregunta quedó fuera', 'preguntas quedaron fuera')} porque no pude verificar una fuente utilizable.`)
+      if (r.aviso) nota.push(r.aviso)
       const resumen = `${plural(r.conceptos, 'concepto', 'conceptos')} y ${plural(r.preguntas, 'pregunta', 'preguntas')} · ≈ ${r.minutos} min`
-      poner({ rol: 'sesion', material: r.material, resumen, nota, usada: false })
+      poner({ rol: 'sesion', material: r.material, resumen, nota, usada: false, incompleta: r.incompleta })
     } else if (r.estado === 'vacio') {
       reiniciarHilo()
       poner({ rol: 'ia', texto: r.motivo })
@@ -202,7 +204,7 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, abierto: abiert
                 <p>{m.resumen}</p>
                 {m.nota.map(n => <p key={n} className="chat-sesion-nota">{n}</p>)}
                 <BotonCoral className="tutor-btn--chico" disabled={abriendo || m.usada} onClick={() => comenzar(m)}>
-                  {m.usada ? 'Sesión abierta' : 'Empezar la sesión'}</BotonCoral>
+                  {m.usada ? 'Sesión abierta' : m.incompleta ? `Empezar solo con ${m.incompleta === 'preguntas' ? 'conceptos' : 'preguntas'}` : 'Empezar la sesión'}</BotonCoral>
               </div></div>)}
       {esperando && <div className="tutor-turno tutor-turno--ia" role="status">
         <Avatar /><div className="tutor-burbuja tutor-burbuja--pensando"><span className="tutor-sr">Claude está pensando…</span>

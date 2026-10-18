@@ -178,7 +178,7 @@ export function ventanaDeRevision(candidatas: FichaSesion[], terminos: readonly 
   return [...candidatas.filter(toca), ...candidatas.filter(f => !toca(f))].slice(0, maximo)
 }
 
-export const aItemRevision = (f: FichaSesion): ItemRevision => ({ tipo: f.tipo, id: f.id, etiqueta: etiquetaDeRevision(f) })
+export const aItemRevision = (f: FichaSesion): ItemRevision => ({ tipo: f.tipo, id: f.id, etiqueta: f.tipo === 'pregunta' ? 'Pregunta NBME' : etiquetaDeRevision(f), ...(f.revision ? { revision: f.revision } : {}) })
 
 // ---------------------------------------------------------------------------------------------
 // Cuánto cabe en los minutos pedidos
@@ -228,7 +228,10 @@ export function armarSesion(candidatas: FichaSesion[], c: Pick<ConsultaSesion, '
   while (true) {
     const turno: 'concepto' | 'pregunta' = pos % (CONCEPTOS_POR_PREGUNTA + 1) < CONCEPTOS_POR_PREGUNTA ? 'concepto' : 'pregunta'
     const orden: ('concepto' | 'pregunta')[] = turno === 'concepto' ? ['concepto', 'pregunta'] : ['pregunta', 'concepto']
-    const elegido = orden.find(t => proximo(t) && (elegidos.conceptos.length + elegidos.preguntas.length === 0 || total + coste(t) <= tope))
+    // Keep room for an NBME item in a short mixed block when both kinds fit.
+    const reservarPregunta = c.fuente === 'mixto' && elegidos.conceptos.length > 0 && !elegidos.preguntas.length
+      && proximo('pregunta') && total + coste('pregunta') <= tope && total + coste('concepto') + coste('pregunta') > tope
+    const elegido = reservarPregunta ? 'pregunta' : orden.find(t => proximo(t) && (elegidos.conceptos.length + elegidos.preguntas.length === 0 || total + coste(t) <= tope))
     if (!elegido) break
     if (elegido === 'concepto') elegidos.conceptos.push(proximo('concepto')!)
     else elegidos.preguntas.push(proximo('pregunta')!)
@@ -270,7 +273,9 @@ const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno
 export type ResultadoSesion =
   | { estado: 'lista'; material: MaterialNuevo; conceptos: number; preguntas: number; minutos: number
       /** Cuántas se revisaron con Claude y cuántas encajaron; ausente si la consulta no pedía un tema libre. */
-      revision?: { revisadas: number; encajan: number; deTotal: number }
+      revision?: { revisadas: number; encajan: number; deTotal: number; ampliada?: boolean }
+      incompleta?: 'conceptos' | 'preguntas'
+      aviso?: string
       /** Preguntas NBME en revisión de fuente que no se pudieron juzgar con la IA. */
       sinRevisar: number }
   | { estado: 'vacio'; motivo: string }
@@ -297,30 +302,66 @@ function explicarVacio(fichas: FichaSesion[], c: ConsultaSesion): string {
   return `No encontré ${ETIQUETA_FUENTE[c.fuente]}${tema ? ` de ${tema}` : ''} con lo que pediste. Prueba con otro tema, otra fuente o sin el filtro de estado.`
 }
 
+/** Bound the work and spending; each round keeps the existing 150-item API limit. */
+export const MAX_RONDAS_BUSQUEDA = 5
+
+function ventanaMixta(fichas: FichaSesion[], consulta: ConsultaSesion): FichaSesion[] {
+  if (consulta.fuente !== 'mixto' || fichas.length <= MAX_ITEMS_REVISION) return ventanaDeRevision(fichas, consulta.terminos)
+  const preguntas = ventanaDeRevision(fichas.filter(f => f.tipo === 'pregunta'), consulta.terminos, 50)
+  const conceptos = ventanaDeRevision(fichas.filter(f => f.tipo === 'concepto'), consulta.terminos, MAX_ITEMS_REVISION - preguntas.length)
+  const chosen = new Set([...preguntas, ...conceptos].map(f => f.id))
+  for (const f of ventanaDeRevision(fichas.filter(f => !chosen.has(f.id)), consulta.terminos, MAX_ITEMS_REVISION - chosen.size)) chosen.add(f.id)
+  return fichas.filter(f => chosen.has(f.id))
+}
+
 export async function resolverSesion(e: EntradaResolver): Promise<ResultadoSesion> {
   const { consulta, pedido } = e
-  let candidatas = filtrarFichas(e.fichas, consulta)
-  if (!candidatas.length) return { estado: 'vacio', motivo: explicarVacio(e.fichas, consulta) }
-  const totalAntes = candidatas.length
-  let revision: { revisadas: number; encajan: number; deTotal: number } | undefined
+  const iniciales = filtrarFichas(e.fichas, consulta)
+  let candidatas = iniciales
+  let revision: { revisadas: number; encajan: number; deTotal: number; ampliada?: boolean } | undefined
   let sinRevisar = 0
   if (consulta.terminos.length) {
-    const ventana = ventanaDeRevision(candidatas, consulta.terminos)
-    const r = await e.revisar(pedido, consulta, ventana.map(aItemRevision), e.signal)
-    if (r.estado !== 'ok') return { estado: 'sin_ia', motivo: r.motivo }
-    const elegidas = new Set(r.ids)
-    candidatas = ventana.filter(f => elegidas.has(f.id))
-    sinRevisar = r.sinRevisar
-    revision = { revisadas: ventana.length, encajan: candidatas.length, deTotal: totalAntes }
-    if (!candidatas.length) {
-      return { estado: 'vacio', motivo: `Revisé ${plural(ventana.length, 'candidata', 'candidatas')} y ninguna encaja con ${consulta.terminos.map(t => `«${t}»`).join(', ')}. Puedes pedirme otro tema o quitar ese detalle.` }
+    candidatas = []
+    const vistas = new Set<string>(), disponibles = new Set(iniciales.map(f => f.id))
+    let revisadas = 0, ampliada = false
+    const falta = (tipo: FichaSesion['tipo']) => (consulta.fuente === 'mixto' || consulta.fuente === (tipo === 'concepto' ? 'conceptos' : 'nbme'))
+      && !candidatas.some(f => f.tipo === tipo)
+    for (let ronda = 0; ronda < MAX_RONDAS_BUSQUEDA; ronda++) {
+      if (e.signal?.aborted) return { estado: 'sin_ia', motivo: 'Se canceló la búsqueda.' }
+      let pendientes = iniciales.filter(f => !vistas.has(f.id) && falta(f.tipo))
+      if (!pendientes.length && (falta('concepto') || falta('pregunta'))) {
+        // Keep history/source filters. Only taxonomy broadens, and Claude must verify the exact topic.
+        pendientes = filtrarFichas(e.fichas, { ...consulta, sistemas: [], disciplinas: [] })
+          .filter(f => !vistas.has(f.id) && falta(f.tipo))
+        if (pendientes.length) ampliada = true
+      }
+      if (!pendientes.length) break
+      pendientes.forEach(f => disponibles.add(f.id))
+      const ventana = ventanaMixta(pendientes, consulta)
+      const r = await e.revisar(pedido, consulta, ventana.map(aItemRevision), e.signal)
+      if (e.signal?.aborted) return { estado: 'sin_ia', motivo: 'Se canceló la búsqueda.' }
+      if (r.estado !== 'ok') return { estado: 'sin_ia', motivo: r.motivo }
+      ventana.forEach(f => vistas.add(f.id))
+      const elegidas = new Set(r.ids)
+      candidatas.push(...ventana.filter(f => elegidas.has(f.id)))
+      sinRevisar += r.sinRevisar
+      revisadas += r.revisadas ?? Math.max(0, ventana.length - r.sinRevisar)
+      if (!falta('concepto') && !falta('pregunta')) break
     }
+    revision = { revisadas, encajan: candidatas.length, deTotal: disponibles.size, ...(ampliada ? { ampliada: true } : {}) }
+    if (!candidatas.length) return { estado: 'vacio', motivo: `No encontré material verificable que encaje con ${consulta.terminos.map(t => `«${t}»`).join(', ')} después de buscar alternativas.${sinRevisar ? ` ${plural(sinRevisar, 'pregunta sigue', 'preguntas siguen')} sin una fuente utilizable para esta búsqueda.` : ''} Puedes pedir otro tema o una sesión más amplia.` }
   }
+  if (!candidatas.length) return { estado: 'vacio', motivo: explicarVacio(e.fichas, consulta) }
   const armada = armarSesion(candidatas, consulta, e.ritmo)
   const material: MaterialNuevo = {
     conceptIds: armada.conceptIds, preguntas: armada.preguntas, titulo: consulta.titulo, nbmeSessionId: null, cada: armada.cada,
     subtitulo: pedido.length > 140 ? `${pedido.slice(0, 139)}…` : pedido,
   }
+  const incompleta = consulta.fuente !== 'mixto' ? undefined : !armada.preguntas.length ? 'preguntas' : !armada.conceptIds.length ? 'conceptos' : undefined
+  const tipoFaltante = incompleta === 'preguntas' ? 'pregunta' : 'concepto'
+  const aviso = !incompleta ? undefined : candidatas.some(f => f.tipo === tipoFaltante)
+    ? `Hay ${incompleta} pertinentes, pero no caben junto al otro material en el tiempo pedido. Puedes pedir una sesión más larga.`
+    : `No encontré ${incompleta} verificables del tema para completar la mezcla. Puedes empezar con lo disponible o pedir otro tema.`
   return { estado: 'lista', material, conceptos: armada.conceptIds.length, preguntas: armada.preguntas.length, minutos: armada.minutos,
-    ...(revision ? { revision } : {}), sinRevisar }
+    ...(revision ? { revision } : {}), sinRevisar, ...(incompleta ? { incompleta, aviso } : {}) }
 }

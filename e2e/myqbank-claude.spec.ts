@@ -4,6 +4,7 @@ import { ESTADO_INICIAL, reconstruirProgreso } from '../src/store/model'
 import type { Intento } from '../src/srs/tipos'
 import { myqbankConcepts } from './arnes/myqbank-fixture'
 import { ordenDeProduccion } from './arnes/orden-produccion'
+import { preguntaNbmeReal } from './arnes/nbme-real-fixture'
 
 /**
  * Claude en el dashboard de MyQBank (workspace=myqbank#dashboard): «Reinforce today» y «Ask Claude for a session»
@@ -314,4 +315,40 @@ test('el chat permanece accesible mientras carga el catálogo NBME', async ({ pa
   release()
   await expect(page.locator('.mq-goal')).toBeVisible()
   await expect(dialogo(page)).toBeVisible()
+})
+
+for (const available of [true, false]) test(`la búsqueda mixta amplía el tema y presenta una sesión ${available ? 'mixta' : 'parcial explícita'}`, async ({ page }) => {
+  await preparar(page)
+  const question = { ...preguntaNbmeReal('QA-NBME-1'), systems: ['Renal'], disciplines: ['Fisiología'], topic: '' }
+  const rounds: { tipo: string; id: string; revision?: string }[][] = []
+  await page.route('**/api/nbme/catalog', route => route.fulfill({ json: { schemaVersion: 1, bankVersion: 'qa', total: 1, questions: [question] } }))
+  await page.route('**/api/nbme/questions', route => route.fulfill({ json: { questions: [question] } }))
+  await page.route('**/api/ia/sesion', route => {
+    const body = route.request().postDataJSON()
+    if (body.fase === 'entender') return route.fulfill({ json: { tipo: 'consulta', consulta: { fuente: 'mixto', sistemas: ['Cardiovascular'], disciplinas: [], terminos: ['synthetic alpha'], estados: [], minutos: 10, titulo: 'Synthetic alpha' } } })
+    if (body.fase === 'revisar') {
+      rounds.push(body.items)
+      return route.fulfill({ json: { ids: body.items.filter((i: { tipo: string }) => i.tipo === 'concepto' || available).map((i: { id: string }) => i.id),
+        sinRevisar: available ? 0 : body.items.filter((i: { tipo: string }) => i.tipo === 'pregunta').length, revisadas: available ? body.items.length : body.items.filter((i: { tipo: string }) => i.tipo === 'concepto').length, cached: false } })
+    }
+    return route.fulfill({ json: { hilo: 'Conceptos sintéticos para practicar.', cached: false } })
+  })
+  await page.goto(url)
+  await expect(page.locator('.mq-goal')).toBeVisible()
+  await page.getByRole('button', { name: 'Open chat', exact: true }).click()
+  await dialogo(page).getByLabel('Lo que quieres estudiar', { exact: true }).fill('Synthetic alpha: conceptos y preguntas, diez minutos')
+  await dialogo(page).getByRole('button', { name: 'Enviar', exact: true }).click()
+  await expect(dialogo(page)).toContainText('Busqué también el mismo tema en otras clasificaciones.')
+  expect(rounds).toHaveLength(2)
+  expect(rounds[0].every(i => i.tipo === 'concepto')).toBe(true)
+  expect(rounds[1]).toEqual([expect.objectContaining({ tipo: 'pregunta', id: question.id, revision: question.revision })])
+  if (!available) {
+    await expect(dialogo(page)).toContainText('No encontré preguntas verificables del tema para completar la mezcla.')
+    await expect(dialogo(page).getByRole('button', { name: 'Empezar la sesión', exact: true })).toHaveCount(0)
+  }
+  await dialogo(page).getByRole('button', { name: available ? 'Empezar la sesión' : 'Empezar solo con conceptos', exact: true }).click()
+  await expect(page.locator('.mq-study')).toBeVisible()
+  const [block] = await bloques(page)
+  expect(block.entries.some(e => e.kind === 'concept')).toBe(true)
+  expect(block.entries.filter(e => e.kind === 'nbme')).toEqual(available ? [expect.objectContaining({ id: question.id, revision: question.revision })] : [])
 })
