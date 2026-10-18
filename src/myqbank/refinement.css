@@ -1,0 +1,228 @@
+/* Production presentation. The isolated ZIP preview keeps its original appearance.
+   Scope beats the lazy-loaded layout sheet as well as the shared legacy components;
+   neither stylesheet order nor the user's progress should change the composition. */
+.mq-root.mq-workspace {
+  --mq-radius: 18px;
+  --mq-control-radius: 10px;
+  --mq-card-shadow: 0 2px 3px -2px var(--mq-shadow), 0 12px 30px -24px var(--mq-shadow);
+  --mq-control-glow: 0 0 0 1px var(--mq-pat-line), 0 3px 8px -5px var(--mq-shadow);
+  font-variant-numeric: tabular-nums;
+}
+.mq-root.mq-workspace[data-theme="light"] {
+  --mq-bg: #F3F6F4; --mq-bar: #FAFCFA; --mq-surface: #FFFFFF; --mq-surfaceStart: #FFFFFF;
+  --mq-inset: #F5F8F6; --mq-chip: #EDF3EF; --mq-dim: #F6F9F7;
+  --mq-line: #DCE6DF; --mq-line2: #C6D6CD; --mq-line3: #E4EBE6; --mq-edge: #DCE6DF;
+  --mq-shadow: #183D2933; --mq-reflection: #FFFFFF80; --mq-actionShadow: #167C6033;
+  --mq-stage: radial-gradient(ellipse at 5% 0%, #D8ECE266, transparent 40%), #F3F6F4;
+}
+.mq-root.mq-workspace[data-theme="dark"] {
+  --mq-bg: #0E1413; --mq-bar: #101816; --mq-surface: #16201D; --mq-surfaceStart: #18231F;
+  --mq-inset: #111A17; --mq-chip: #1D2A24; --mq-line: #2B3932; --mq-line2: #3B4C42;
+  --mq-line3: #26362D; --mq-edge: #2B3932; --mq-shadow: #00000070; --mq-reflection: #FFFFFF08;
+  --mq-stage: radial-gradient(ellipse at 5% 0%, #244B382E, transparent 40%), #0E1413;
+}
+.mq-root.mq-workspace .mq-card { background: var(--mq-surface); box-shadow: var(--mq-card-shadow); }
+.mq-root.mq-workspace :is(h1,h2,h3) { text-wrap: balance; }
+.mq-root.mq-workspace h1 { font-weight: 600; letter-spacing: -.8px; }
+.mq-root.mq-workspace h2 { font-weight: 650; letter-spacing: -.4px; }
+.mq-root.mq-workspace .mq-eyebrow { font-size: 10px; letter-spacing: 1.3px; }
+.mq-root.mq-workspace .mq-header {
+  min-height: 72px; padding-inline: max(24px, calc((100vw - 1616px) / 2)); gap: 28px;
+  background: var(--mq-bar); box-shadow: none;
+}
+.mq-root.mq-workspace .mq-brand { gap: 8px; }
+.mq-root.mq-workspace .mq-brand img { width: 34px; height: 34px; filter: none; }
+.mq-root.mq-workspace .mq-brand span { font-size: 21px; letter-spacing: -.8px; }
+.mq-root.mq-workspace .mq-header .mq-button { border-color: transparent; }
+.mq-root.mq-workspace .mq-header .mq-dashboard-link[aria-current] { background: var(--mq-chip); }
+.mq-root.mq-workspace .mq-button--primary { box-shadow: 0 3px 7px -3px var(--mq-actionShadow); }
+.mq-root.mq-workspace .mq-button::before { content: none; }
+.mq-root.mq-workspace .mq-segmented { background: var(--mq-inset); border-color: var(--mq-line); padding: 3px; }
+.mq-root.mq-workspace .mq-segmented button[aria-pressed=true] {
+  color: var(--mq-ok-ink); background: var(--mq-surface); box-shadow: 0 1px 4px var(--mq-shadow), inset 0 0 0 1px var(--mq-pat-line);
+}
+.mq-root.mq-workspace .mq-chip[aria-pressed=true] { box-shadow: none; }
+.mq-root.mq-workspace .mq-progress { height: 5px; }
+
+/* The next action spans progress and study. The compact overview stays visible
+   beside the system list instead of falling below it on a populated account. */
+.mq-root.mq-workspace .mq-dashboard {
+  max-width: 1680px; padding: 28px 32px; gap: 20px; min-height: 0; max-height: none;
+  grid-template-columns: 240px minmax(0,1fr) 340px;
+  grid-template-rows: auto auto minmax(0,1fr) auto;
+  grid-template-areas: 'resume resume builder' 'overall assistant builder' 'overall systems builder' 'activity systems builder';
+}
+.mq-root.mq-workspace .mq-top { display: contents; }
+.mq-root.mq-workspace .mq-resume { padding: 22px; gap: 24px; min-height: 124px; flex-wrap: wrap; background: linear-gradient(120deg, var(--mq-surface), var(--mq-inset)); }
+.mq-root.mq-workspace .mq-resume > div:first-child { flex: 1 1 300px; }
+.mq-root.mq-workspace .mq-resume h1 { font-size: clamp(24px, 2.2vw, 30px); line-height: 1.2; margin: 8px 0; }
+.mq-root.mq-workspace .mq-resume p { max-width: 48ch; line-height: 1.6; }
+.mq-root.mq-workspace .mq-resume-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mq-root.mq-workspace .mq-claude { grid-area: assistant; gap: 12px; }
+.mq-root.mq-workspace .mq-claude .sugerencia-recuperar { padding: 16px 22px; box-shadow: none; background: var(--mq-surface); border-color: var(--mq-line); }
+.mq-root.mq-workspace .mq-claude .sugerencia-recuperar .rotulo { font-size: 10px; letter-spacing: 1.2px; }
+.mq-root.mq-workspace .mq-claude .sugerencia-recuperar .btn { min-height: 44px; }
+.mq-root.mq-workspace .mq-claude .sugerencia-detalle > summary { min-height: 44px; padding-block: 12px; }
+.mq-root.mq-workspace .mq-claude-entrada { padding: 16px 20px; grid-template-columns: auto minmax(0,1fr); background: var(--mq-pat); box-shadow: none; border-color: var(--mq-pat-line); }
+.mq-root.mq-workspace .mq-claude-entrada > div:last-child { grid-column: 1 / -1; }
+.mq-root.mq-workspace .mq-claude-entrada .mq-button { width: 100%; }
+.mq-root.mq-workspace .mq-claude-marca { background: var(--mq-surface); border-color: var(--mq-line); }
+.mq-root.mq-workspace .mq-activity { display: grid; grid-template-columns: 1fr; align-items: center; gap: 16px; padding: 20px; }
+.mq-root.mq-workspace .mq-activity-chart { min-width: 0; }
+.mq-root.mq-workspace .mq-activity-goal { min-width: 0; padding-top: 16px; border-top: 1px solid var(--mq-line); }
+.mq-root.mq-workspace .mq-week { height: 72px; margin: 10px 0 0; gap: 12px; }
+.mq-root.mq-workspace .mq-week span { min-height: 2px; max-height: 50px; max-width: 28px; }
+.mq-root.mq-workspace .mq-goal .mq-button { width: 100%; }
+.mq-root.mq-workspace .mq-goal .btn { font-size: 12px; padding-inline: 10px; }
+.mq-root.mq-workspace .mq-builder { padding: 20px; gap: 16px; overflow: visible; }
+.mq-root.mq-workspace .mq-section-heading { display: flex; gap: 12px; align-items: center; }
+.mq-root.mq-workspace .mq-section-heading h2 { font-size: 20px; margin-bottom: 2px; }
+.mq-root.mq-workspace .mq-section-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--mq-chip); color: var(--mq-ok-ink); }
+.mq-root.mq-workspace .mq-builder-scroll { gap: 12px; overflow: visible; }
+.mq-root.mq-workspace .mq-suggestion { padding: 8px 0; border: 0; border-block: 1px solid var(--mq-line3); border-radius: 0; background: transparent; }
+.mq-root.mq-workspace .mq-suggestion strong { font-size: 13px; }
+.mq-root.mq-workspace .mq-suggestion p { font-size: 11px; }
+.mq-root.mq-workspace .mq-count-row { display: grid; gap: 8px; }
+.mq-root.mq-workspace .mq-count-presets { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 6px; }
+.mq-root.mq-workspace .mq-count-presets .mq-chip { padding-inline: 6px; min-width: 44px; }
+.mq-root.mq-workspace .mq-stepper { background: var(--mq-inset); }
+.mq-root.mq-workspace .mq-summary { border: 0; border-radius: 10px; padding: 14px; gap: 8px; }
+.mq-root.mq-workspace .mq-builder > .mq-button { min-height: 48px; }
+.mq-root.mq-workspace .mq-systems { padding: 24px; gap: 14px; }
+.mq-root.mq-workspace .mq-system-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.mq-root.mq-workspace .mq-system-toolbar .mq-segmented { min-width: 280px; }
+.mq-root.mq-workspace .mq-system-toolbar .mq-segmented button { white-space: nowrap; }
+.mq-root.mq-workspace .mq-system-toolbar .mq-button { border-color: transparent; padding-inline: 10px; }
+.mq-root.mq-workspace .mq-system-list { padding: 0; overflow: visible; }
+.mq-root.mq-workspace .mq-system-row { grid-template-columns: 24px minmax(100px,1.6fr) 58px minmax(40px,1fr) 48px; min-height: 52px; border-bottom: 1px solid var(--mq-line3); border-radius: 0; }
+.mq-root.mq-workspace .mq-system-row:last-child { border-bottom: 0; }
+.mq-root.mq-workspace .mq-system-row > :is(small,.mq-progress) { display: block; }
+.mq-root.mq-workspace .mq-overall { padding: 20px; gap: 10px; overflow: visible; }
+.mq-root.mq-workspace .mq-overall-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.mq-root.mq-workspace .mq-overall-summary > [role=status] { flex: 1 1 100%; font-size: 13px; color: var(--mq-muted); }
+.mq-root.mq-workspace .mq-overall .mq-rings { width: 80px; height: 80px; margin-inline: auto; }
+.mq-root.mq-workspace .mq-overall .mq-rings strong { font-size: 24px; }
+.mq-root.mq-workspace .mq-overall .mq-rings span { font-size: 10px; }
+.mq-root.mq-workspace .mq-overall .mq-stat-grid { flex: 1 1 100%; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px 0; }
+.mq-root.mq-workspace .mq-stat { background: transparent; border: 0; border-left: 1px solid var(--mq-line); border-radius: 0; padding: 0 12px; gap: 4px; }
+.mq-root.mq-workspace .mq-stat:nth-child(odd) { border-left: 0; padding-left: 0; }
+.mq-root.mq-workspace .mq-stat strong { font-family: var(--mq-font); font-size: 24px; line-height: 1.2; font-weight: 600; letter-spacing: -.8px; }
+.mq-root.mq-workspace .mq-stat span { font-size: 11px; }
+.mq-root.mq-workspace .mq-pace { margin: 0; padding-top: 14px; gap: 12px; font-size: 11px; }
+.mq-root.mq-workspace .mq-saved-blocks { border-top: 1px solid var(--mq-line); padding-top: 4px; }
+.mq-root.mq-workspace .mq-block-history { margin-top: 4px; }
+.mq-root.mq-workspace .mq-block-open { background: var(--mq-inset); }
+.mq-root.mq-workspace .mq-progress-details { width: min(1616px,calc(100% - 64px)); margin: 0 auto 32px; }
+
+/* Reading surfaces stay quiet. Existing desktop panel scrolling and wide Claude
+   columns remain in workspace.css; this layer doesn't change their behavior. */
+.mq-root.mq-workspace .mq-study-tools { background: var(--mq-bar); }
+.mq-root.mq-workspace .mq-rail { background: var(--mq-inset); box-shadow: none; }
+.mq-root.mq-workspace .mq-stem { gap: 22px; }
+.mq-root.mq-workspace .mq-stem > h1 { font-size: 14px; color: var(--mq-muted); letter-spacing: 0; }
+.mq-root.mq-workspace .mq-option { background: var(--mq-surface); border-radius: 12px; }
+.mq-root.mq-workspace .mq-option--selected { background: var(--mq-sel); }
+.mq-root.mq-workspace .mq-option--correct { background: var(--mq-ok-tint); }
+.mq-root.mq-workspace .mq-option--incorrect { background: var(--mq-bad-tint); }
+.mq-root.mq-workspace .mq-explanation-content { padding: 0; border: 0; background: transparent; }
+.mq-root.mq-workspace .mq-explanation-card { min-height: auto; }
+.mq-root.mq-workspace .mq-result { padding: 12px 18px; border-radius: 12px; }
+.mq-root.mq-workspace .mq-tablist { background: var(--mq-inset); }
+.mq-root.mq-workspace .tutor { border-radius: 18px; background: var(--mq-surface); box-shadow: var(--mq-card-shadow); }
+.mq-root.mq-workspace .tutor-avatar { width: 40px; height: 40px; border-radius: 12px; box-shadow: none; background: var(--tt-superficie); }
+.mq-root.mq-workspace .tutor-burbuja { line-height: 1.65; }
+.mq-root.mq-workspace :is(.tutor-icono-boton,.tutor-enlace,.tutor-chip,.tutor-capsula-boton) { min-height: 44px; }
+.mq-root.mq-workspace .tutor-icono-boton { min-width: 44px; }
+.mq-root.mq-workspace .mq-claude-fondo { backdrop-filter: blur(6px); grid-template-columns: minmax(0,1fr); }
+.mq-root.mq-workspace .mq-claude-dialogo { width: min(780px,100%); min-width: 0; }
+.mq-root.mq-workspace .mq-claude-dialogo .tutor { box-shadow: 0 24px 80px #0005; }
+.mq-root.mq-workspace .mq-claude-dialogo .tutor-hilo { max-height: min(560px,calc(100dvh - 280px)); }
+
+/* Account screens use the same spacing and surface hierarchy as the workspace. */
+.mq-root.mq-workspace .mq-settings { width: min(1040px,calc(100% - 48px)); margin: 36px auto; gap: 24px; }
+.mq-root.mq-workspace .mq-settings-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.mq-root.mq-workspace .mq-settings-heading h1 { font-size: 30px; }
+.mq-root.mq-workspace .mq-settings .tarjeta { border-radius: 16px; padding: 22px; box-shadow: var(--mq-card-shadow); }
+.mq-root.mq-workspace .mq-settings .tarjeta.pila { gap: 16px; }
+.mq-root.mq-workspace .mq-settings .sep { margin-block: 8px; }
+.mq-root.mq-workspace .mq-settings details.tarjeta { padding-block: 8px; }
+.mq-root.mq-workspace .mq-settings summary { font-size: 14px; }
+.mq-root.mq-workspace .mq-settings .btn { border-radius: 10px; }
+.mq-root.mq-workspace.mq-auth { background: radial-gradient(ellipse at 50% 35%,var(--mq-pat),transparent 60%),var(--mq-bg); }
+.mq-root.mq-workspace .mq-auth-card { width: min(460px,100%); padding: 32px; gap: 20px; }
+.mq-root.mq-workspace .auth-tabs { padding: 4px; border-radius: 12px; background: var(--mq-inset); gap: 4px; }
+.mq-root.mq-workspace .auth-tabs button { flex: 1; background: transparent; border-color: transparent; }
+.mq-root.mq-workspace .auth-tabs button[aria-pressed=true] { background: var(--mq-surface); color: var(--mq-ok-ink); box-shadow: 0 1px 4px var(--mq-shadow); border-color: var(--mq-line); }
+
+/* Small, event-driven transitions. Reduced motion is also enforced by interactions.css. */
+@media (prefers-reduced-motion: no-preference) {
+  .mq-root.mq-workspace :is(.mq-resume,.mq-claude-entrada,.mq-activity,.mq-builder,.mq-systems,.mq-overall,.mq-auth-card) { animation: mq-refine-enter 300ms var(--mq-ease) both; }
+  .mq-root.mq-workspace .mq-claude-fondo:not([hidden]) .mq-claude-dialogo { animation: mq-refine-enter 200ms var(--mq-ease) both; }
+}
+@keyframes mq-refine-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (min-width: 961px) {
+  .mq-root.mq-workspace .mq-settings .faq { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; align-items: start; }
+  .mq-root.mq-workspace .mq-settings .faq > h2 { grid-column: 1 / -1; }
+}
+@media (min-width: 1440px) {
+  .mq-root.mq-workspace .mq-dashboard { grid-template-columns: 260px minmax(0,1fr) 360px; }
+  .mq-root.mq-workspace .mq-claude-entrada { grid-template-columns: auto minmax(0,1fr) auto; }
+  .mq-root.mq-workspace .mq-claude-entrada > div:last-child { grid-column: auto; }
+}
+@media (hover:hover) and (pointer:fine) {
+  .mq-root.mq-workspace .mq-button:not(:disabled):hover { transform: translateY(-1px); }
+  .mq-root.mq-workspace .mq-button--ghost:not(:disabled):hover { box-shadow: none; }
+}
+@media (max-width: 1100px) {
+  .mq-root.mq-workspace .mq-dashboard { padding: 20px; gap: 16px; grid-template-columns: 220px minmax(0,1fr) 310px; }
+  .mq-root.mq-workspace .mq-activity { gap: 18px; padding: 20px; }
+  .mq-root.mq-workspace .mq-system-row { grid-template-columns: 24px minmax(90px,1fr) 48px; }
+  .mq-root.mq-workspace .mq-system-row > :is(small,.mq-progress) { display: none; }
+}
+@media (max-width: 960px), (max-height: 600px) {
+  .mq-root.mq-workspace .mq-dashboard { display: flex; padding: 20px; }
+  .mq-root.mq-workspace .mq-top { display: flex; flex-direction: column; gap: 16px; }
+  .mq-root.mq-workspace .mq-builder { align-self: stretch; }
+  .mq-root.mq-workspace .mq-header { padding: 10px 20px; gap: 14px; }
+  .mq-root.mq-workspace .mq-progress-details { width: calc(100% - 40px); }
+  .mq-root.mq-workspace .mq-overall .mq-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 0; flex: 1; }
+  .mq-root.mq-workspace .mq-activity { grid-template-columns: 1fr 1fr; }
+  .mq-root.mq-workspace .mq-activity-goal { padding: 0 0 0 20px; border-top: 0; border-left: 1px solid var(--mq-line); }
+}
+@media (max-width: 600px) {
+  .mq-root.mq-workspace .mq-header { padding: 8px 12px; min-height: 64px; gap: 8px; flex-wrap: nowrap; }
+  .mq-root.mq-workspace .mq-header-actions { gap: 0; }
+  .mq-root.mq-workspace .mq-header-actions .mq-button { padding: 10px; }
+  .mq-root.mq-workspace .mq-brand img { width: 28px; height: 28px; }
+  .mq-root.mq-workspace .mq-brand { gap: 5px; }
+  .mq-root.mq-workspace .mq-brand span { font-size: 18px; }
+  .mq-root.mq-workspace .mq-dashboard-link { gap: 5px; padding-inline: 8px; }
+  .mq-root.mq-workspace .mq-dashboard { padding: 16px 12px; gap: 14px; }
+  .mq-root.mq-workspace .mq-resume { padding: 22px; min-height: 0; gap: 18px; }
+  .mq-root.mq-workspace .mq-resume h1 { font-size: 25px; }
+  .mq-root.mq-workspace .mq-activity { grid-template-columns: 1fr; padding: 20px; gap: 20px; }
+  .mq-root.mq-workspace .mq-activity-goal { padding: 18px 0 0; border-left: 0; border-top: 1px solid var(--mq-line); }
+  .mq-root.mq-workspace .mq-week { height: 82px; }
+  .mq-root.mq-workspace :is(.mq-builder,.mq-systems,.mq-overall) { padding: 20px; }
+  .mq-root.mq-workspace .mq-system-toolbar .mq-segmented { width: 100%; min-width: 0; }
+  .mq-root.mq-workspace .mq-overall-summary { gap: 16px; }
+  .mq-root.mq-workspace .mq-overall .mq-rings { margin-inline: auto; }
+  .mq-root.mq-workspace .mq-overall .mq-stat-grid { flex-basis: 100%; }
+  .mq-root.mq-workspace .mq-stat:nth-child(odd) { border-left: 0; padding-left: 0; }
+  .mq-root.mq-workspace .mq-pace { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+  .mq-root.mq-workspace .mq-pace > div { flex-direction: column; gap: 6px; }
+  .mq-root.mq-workspace .mq-pace dd { text-align: left; }
+  .mq-root.mq-workspace .mq-block-history { grid-template-columns: 1fr; }
+  .mq-root.mq-workspace .mq-progress-details { width: calc(100% - 32px); font-size: 14px; }
+  .mq-root.mq-workspace .mq-settings { width: calc(100% - 32px); margin-block: 24px; }
+  .mq-root.mq-workspace .mq-settings .tarjeta { padding: 18px; }
+  .mq-root.mq-workspace.mq-auth { padding: 18px 16px; gap: 24px; }
+  .mq-root.mq-workspace .mq-auth-card { padding: 24px; }
+  .mq-root.mq-workspace .mq-claude-dialogo .tutor-hilo { max-height: calc(100dvh - 280px); }
+}
+@media (max-width: 359px) {
+  .mq-root.mq-workspace .mq-dashboard-link > span { display: none; }
+}
+@supports (padding: env(safe-area-inset-bottom)) {
+  .mq-root.mq-workspace .mq-dashboard { padding-bottom: max(20px,env(safe-area-inset-bottom)); }
+}
