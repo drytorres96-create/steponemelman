@@ -61,6 +61,8 @@ export type ItemHilo = z.infer<typeof ItemHiloZ>
 const ItemRevisionZ = z.object({
   tipo: z.enum(['concepto', 'pregunta']),
   id: IdZ,
+  /** Optional for older clients; new clients pin the NBME revision selected from the catalog. */
+  revision: z.string().min(1).max(80).regex(/^[a-zA-Z0-9_.-]+$/).optional(),
   etiqueta: z.string().min(1).max(MAX_ETIQUETA_REVISION),
 }).strict()
 export type ItemRevision = z.infer<typeof ItemRevisionZ>

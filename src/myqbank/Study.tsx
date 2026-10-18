@@ -228,13 +228,13 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
         {concept && (usaTextoLibre(concept) || concept.interaccion.recomendada === 'numerico') && <ExpectedAnswer concept={concept} source={source}/>}
         {(concept || question) && <Explanation source={concept ?? question!} highlightSource={source} figures={figures.figures}/>}
         {/* Con cualquier resultado: el tutor no espera a que falles. El chat está en español; la interfaz que lo rodea sigue en inglés. */}
-        {concept && conceptAttempt && !conceptAttempt.respuestas_en_conflicto && <TutorClaude key={`${opportunity}:${conceptAttempt.respuesta_dada ?? ''}`} semilla={opportunity}
+        {concept && conceptAttempt && !conceptAttempt.respuestas_en_conflicto && <TutorClaude key={`${opportunity}:${conceptAttempt.respuesta_dada ?? ''}`} semilla={opportunity} amplioInicial
           numero={block.cursor + 1} estado={conceptAttempt.resultado ?? 'revision'} stemKiller={pareceCasoClinico(concept)} sugerencias={sugerenciasDePregunta(concept, 2)}
           onVerPregunta={() => heading.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })}
           origen={{ tipo: 'concepto', resultado: conceptAttempt.resultado ?? 'revision', presentacion: { conceptId: concept.concept_id,
             answer: (conceptAttempt.respuesta_dada ?? '').slice(0, 500), questionId: opportunity, version: entry.revision, formatVersion: 3,
             variantId: concept.variante_id, index: block.cursor, route: block.mode === 'test' ? 'examen' : 'repaso', retry: false } }} />}
-        {question && questionAttempt && !questionAttempt.conflict && <TutorClaude key={`${block.id}:${qPosition}:${questionAttempt.optionId}`} semilla={`${question.id}:${question.revision}`}
+        {question && questionAttempt && !questionAttempt.conflict && <TutorClaude key={`${block.id}:${qPosition}:${questionAttempt.optionId}`} semilla={`${question.id}:${question.revision}`} amplioInicial
           numero={block.cursor + 1} estado={questionAttempt.correct ? 'correcta' : 'incorrecta'}
           onVerPregunta={() => heading.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })}
           origen={{ tipo: 'nbme', questionId: question.id, revision: question.revision, optionId: questionAttempt.optionId }} />}

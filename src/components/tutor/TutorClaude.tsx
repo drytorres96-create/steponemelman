@@ -55,6 +55,8 @@ export interface PropsTutor {
   onSiguiente?: () => void
   /** Identifica la pregunta para barajar los ejercicios de forma estable. */
   semilla: string
+  /** MyQBank opens the conversation using the available study width. */
+  amplioInicial?: boolean
 }
 
 /** Turnos que Claude ya contestó: parejas yo → ia de verdad (el saludo y los avisos no cuentan). */
@@ -69,10 +71,10 @@ function historialDe(mensajes: Msg[]): TurnoChat[] {
 
 const MENSAJES_FIJOS = new Set(['explícame el mecanismo paso a paso', '¿cuál es el key learning point de este ejercicio?', '¿hay un stem killer en esta pregunta?'])
 
-export function TutorClaude({ origen, estado, numero, sugerencias = [], stemKiller = true, onVerPregunta, onSiguiente, semilla }: PropsTutor) {
+export function TutorClaude({ origen, estado, numero, sugerencias = [], stemKiller = true, onVerPregunta, onSiguiente, semilla, amplioInicial = false }: PropsTutor) {
   const [mensajes, setMensajes] = useState<Msg[]>([])
   const [ocupado, setOcupado] = useState(false)
-  const [amplio, setAmplio] = useState(false)
+  const [amplio, setAmplio] = useState(amplioInicial)
   const [texto, setTexto] = useState('')
   const [usadas, setUsadas] = useState<string[]>([])
   const contador = useRef(0)

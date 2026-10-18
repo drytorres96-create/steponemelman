@@ -48,13 +48,13 @@ export async function pedirEntender(mensajes: TurnoSesion[], preguntasHechas: nu
   return entendido ? { estado: 'ok', ...entendido } : { estado: 'sin_ia', motivo: 'Claude no devolvió una respuesta que pueda usar. Vuelve a intentarlo.' }
 }
 
-export type RespuestaRevision = { estado: 'ok'; ids: string[]; sinRevisar: number } | { estado: 'sin_ia'; motivo: string }
+export type RespuestaRevision = { estado: 'ok'; ids: string[]; sinRevisar: number; revisadas?: number; conFuenteRevisada?: number } | { estado: 'sin_ia'; motivo: string }
 
 /** Pide a Claude que deje, de una lista ya filtrada, lo que encaja con lo pedido. Sólo viajan ids y etiquetas. */
 export async function pedirRevision(pedido: string, consulta: ConsultaSesion, items: ItemRevision[], signal?: AbortSignal): Promise<RespuestaRevision> {
   if (!items.length) return { estado: 'ok', ids: [], sinRevisar: 0 }
   const enviados = items.slice(0, MAX_ITEMS_REVISION)
-  const r = await solicitarIA<{ ids?: unknown; sinRevisar?: unknown }>('/api/ia/sesion',
+  const r = await solicitarIA<{ ids?: unknown; sinRevisar?: unknown; revisadas?: unknown; conFuenteRevisada?: unknown }>('/api/ia/sesion',
     { fase: 'revisar', pedido: pedido.slice(0, MAX_PEDIDO), consulta: ConsultaSesionZ.parse(consulta), items: enviados },
     LIMITE_REVISAR_MS, signal, LIMITE_BYTES_REVISAR)
   if (r.estado === 'sin_ia') return r
@@ -62,5 +62,7 @@ export async function pedirRevision(pedido: string, consulta: ConsultaSesion, it
   if (!Array.isArray(ids)) return { estado: 'sin_ia', motivo: 'Claude no devolvió una respuesta que pueda usar. Vuelve a intentarlo.' }
   const permitidos = new Set(enviados.map(i => i.id))
   const sinRevisar = typeof r.data.sinRevisar === 'number' && Number.isInteger(r.data.sinRevisar) && r.data.sinRevisar >= 0 ? r.data.sinRevisar : 0
-  return { estado: 'ok', ids: [...new Set(ids.filter((id): id is string => typeof id === 'string' && permitidos.has(id)))], sinRevisar }
+  const count = (value: unknown) => typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= enviados.length ? value : undefined
+  return { estado: 'ok', ids: [...new Set(ids.filter((id): id is string => typeof id === 'string' && permitidos.has(id)))], sinRevisar: Math.min(sinRevisar, enviados.length),
+    revisadas: count(r.data.revisadas), conFuenteRevisada: count(r.data.conFuenteRevisada) }
 }

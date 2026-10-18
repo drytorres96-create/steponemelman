@@ -524,7 +524,7 @@ function entornoNbme({ politica = POLITICA() as unknown, pregunta = PREGUNTA_NBM
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     if (url.includes('/auth/v1/user')) return Response.json({ id: 'usuario', email_confirmed_at: '2026-01-01' })
     if (url.includes('app_members') || url.includes('nbme_members')) return Response.json([{ user_id: 'usuario' }])
-    if (url.includes('catalog-index.json')) return Response.json([{ payload: { schemaVersion: 1, questions: [{ id: PREGUNTA_NBME.id, status: 'ready' }] } }])
+    if (url.includes('catalog-index.json')) return Response.json([{ path: 'catalog-index.json', payload: { schemaVersion: 1, questions: [{ id: PREGUNTA_NBME.id, revision: 'r1', status: 'ready' }] } }])
     if (url.includes(encodeURIComponent('myqbank/source-safety/v1.json'))) return Response.json(politica === null ? [] : [{ payload: politica }])
     if (url.includes('questions%2F')) return Response.json([{ path: `questions/${PREGUNTA_NBME.id}/r1.json`, payload: pregunta }])
     return Response.json([])

@@ -13,6 +13,7 @@ import { extraerJSON, validarEjercicios } from '../lib/practica-activa'
 import type { NbmeQuestion } from '../nbme/types'
 import { NBME_SOURCE_SAFETY_PATH, readNbmeSourceSafety, originalRecoveryAllowed, type NbmeSourceSafety } from '../nbme/source-safety'
 import { tieneClasificacionContradictoria } from './fuente-recuperacion-confiable'
+import { etiquetasDeSesion } from './etiquetas-sesion'
 import { handleNbme } from './nbme'
 import { handlePlan, type PlanEnv } from './plan'
 import { ErrorClaude, costeDeError, costeReservaUSD, llamarClaude, type CodigoClaude, type SolicitudClaude } from './claude'
@@ -419,10 +420,7 @@ async function handleSesion(request: Request, url: URL, env: Env): Promise<Respo
     const politica = hayNbme ? await politicaNbme(quien.get) : null
 
     if (input.fase === 'revisar') {
-      // Lo que no se puede mostrar a la IA tampoco se puede juzgar con ella: no se manda y se cuenta aparte.
-      const revisables = input.items.filter(i => i.tipo === 'concepto' || nbmeAutorizada(i.id, politica))
-        .map(i => ({ id: i.id, etiqueta: limpiarEtiqueta(i.etiqueta) }))
-      const sinRevisar = input.items.length - revisables.length
+      const { revisables, sinRevisar, conFuenteRevisada } = await etiquetasDeSesion(input.items, politica, quien.get)
       if (!revisables.length) return json({ ids: [], sinRevisar, cached: false })
       const pedido = limpiarEtiqueta(input.pedido)
       const solicitud = solicitudRevisar(pedido, input.consulta, revisables)
@@ -430,7 +428,7 @@ async function handleSesion(request: Request, url: URL, env: Env): Promise<Respo
         key: await digest(JSON.stringify([quien.userId, 'revisar', pedido, input.consulta, revisables, solicitud.modelo, VERSION_CONSTRUCTOR])) }
       const respuesta = await alCoach(env, 'revisar', trusted)
       if (!respuesta.ok) return respuesta
-      return json({ ...await respuesta.json() as Record<string, unknown>, sinRevisar })
+      return json({ ...await respuesta.json() as Record<string, unknown>, sinRevisar, revisadas: revisables.length, conFuenteRevisada })
     }
 
     // fase === 'hilo'

@@ -269,7 +269,7 @@ describe('ventana de revisión', () => {
     expect(etiquetaDeRevision(c)).toBe('Cushing: Reconocer el exceso de cortisol')
     const q = fichasDeSesion(entrada({ preguntas: [pregunta('q-secreta-1', ['Endocrino', 'Renal'], 'Addison')] }))[0]
     expect(etiquetaDeRevision(q)).toBe('Addison · Endocrino/Renal')
-    expect(aItemRevision(q)).toEqual({ tipo: 'pregunta', id: 'q-secreta-1', etiqueta: 'Addison · Endocrino/Renal' })
+    expect(aItemRevision(q)).toEqual({ tipo: 'pregunta', id: 'q-secreta-1', revision: 'r1', etiqueta: 'Pregunta NBME' })
   })
 })
 
@@ -426,5 +426,67 @@ describe('de la consulta a la sesión', () => {
     const r = await resolverSesion({ ...base, pedido: 'x'.repeat(300), consulta: consulta({ sistemas: ['Endocrino'] }), revisar: vi.fn() })
     expect(r.estado).toBe('lista')
     if (r.estado === 'lista') expect(r.material.subtitulo!.length).toBeLessThanOrEqual(140)
+  })
+})
+
+describe('complete the requested mix before offering a partial session', () => {
+  const c = consulta({ sistemas: ['Cardiovascular'], disciplinas: ['Farmacología'], terminos: ['tema alfa'] })
+  const concept = concepto('c-alpha', 'Cardiovascular', 'Tema alfa', { disciplina_primaria: 'Farmacología' })
+  const bank = [pregunta('q-held', ['Cardiovascular'], '', { disciplines: ['Farmacología'] }),
+    pregunta('q-neighbor', ['Renal'], '', { disciplines: ['Fisiología'] })]
+  const fichas = fichasDeSesion(entrada({ conceptos: [concept], preguntas: bank }))
+  it('finds a verified replacement in another classification while preserving the topic and question revision', async () => {
+    const revisar = vi.fn().mockResolvedValueOnce({ estado: 'ok', ids: ['c-alpha'], sinRevisar: 1, revisadas: 1 })
+      .mockResolvedValueOnce({ estado: 'ok', ids: ['q-neighbor', 'invented-id'], sinRevisar: 0, revisadas: 1 })
+    const r = await resolverSesion({ consulta: c, pedido: 'tema alfa', fichas, ritmo: RITMO_PREDETERMINADO, revisar })
+    expect(revisar).toHaveBeenCalledTimes(2)
+    expect(revisar.mock.calls[1][1]).toEqual(c)
+    expect(revisar.mock.calls[1][2]).toEqual([{ tipo: 'pregunta', id: 'q-neighbor', revision: 'r1', etiqueta: 'Pregunta NBME' }])
+    expect(r).toMatchObject({ estado: 'lista', conceptos: 1, preguntas: 1, sinRevisar: 1,
+      material: { preguntas: [{ id: 'q-neighbor', revision: 'r1' }] }, revision: { revisadas: 2, encajan: 2, ampliada: true } })
+  })
+  it('never relaxes the requested history filter to fill the missing type', async () => {
+    const revisar = vi.fn(async () => ({ estado: 'ok' as const, ids: ['q-neighbor'], sinRevisar: 0 }))
+    const r = await resolverSesion({ consulta: { ...c, estados: ['falladas'] }, pedido: 'tema alfa fallado', fichas, ritmo: RITMO_PREDETERMINADO, revisar })
+    expect(revisar).not.toHaveBeenCalled()
+    expect(r.estado).toBe('vacio')
+  })
+  it('reserves NBME candidates in a large mixed list instead of reviewing only concepts', async () => {
+    const many = [...Array.from({ length: 200 }, (_, i) => ({ ...fichas[0], id: `c-${i}` })), fichas[1]]
+    const revisar = vi.fn(async (_p, _c, items: ItemRevision[]) => ({ estado: 'ok' as const, ids: items.map(i => i.id), sinRevisar: 0 }))
+    const r = await resolverSesion({ consulta: c, pedido: 'tema alfa', fichas: many, ritmo: RITMO_PREDETERMINADO, revisar })
+    expect(revisar.mock.calls[0][2]).toHaveLength(150)
+    expect(revisar.mock.calls[0][2].some(i => i.id === 'q-held')).toBe(true)
+    expect(r).toMatchObject({ estado: 'lista', preguntas: 1 })
+  })
+  it('keeps both types in a short session when they fit the existing time allowance', () => {
+    const many = [...Array.from({ length: 10 }, (_, i) => ({ ...fichas[0], id: `c-${i}` })), fichas[1]]
+    const r = armarSesion(many, { fuente: 'mixto', minutos: 5 }, RITMO_PREDETERMINADO)
+    expect(r.conceptIds).toHaveLength(2)
+    expect(r.preguntas).toHaveLength(1)
+  })
+  it('offers an explicitly partial session only after checking alternatives', async () => {
+    const revisar = vi.fn().mockResolvedValueOnce({ estado: 'ok', ids: ['c-alpha'], sinRevisar: 1 })
+      .mockResolvedValue({ estado: 'ok', ids: [], sinRevisar: 0 })
+    const r = await resolverSesion({ consulta: c, pedido: 'tema alfa', fichas, ritmo: RITMO_PREDETERMINADO, revisar })
+    expect(revisar).toHaveBeenCalledTimes(2)
+    expect(r).toMatchObject({ estado: 'lista', incompleta: 'preguntas', aviso: expect.stringContaining('No encontré preguntas verificables') })
+  })
+  it('cancels before starting another search and does not call an unchecked result complete', async () => {
+    const control = new AbortController()
+    const revisar = vi.fn(async () => { control.abort(); return { estado: 'ok' as const, ids: ['c-alpha'], sinRevisar: 1 } })
+    const r = await resolverSesion({ consulta: c, pedido: 'tema alfa', fichas, ritmo: RITMO_PREDETERMINADO, revisar, signal: control.signal })
+    expect(revisar).toHaveBeenCalledTimes(1)
+    expect(r).toMatchObject({ estado: 'sin_ia', motivo: 'Se canceló la búsqueda.' })
+  })
+  it('bounds unsuccessful searches without repeating candidates or calling unchecked items a match', async () => {
+    const many = Array.from({ length: 1000 }, (_, i) => ({ ...fichas[1], id: `q-${i}` }))
+    const revisar = vi.fn(async (_p, _c, _items: ItemRevision[]) => ({ estado: 'ok' as const, ids: [], sinRevisar: 0 }))
+    const r = await resolverSesion({ consulta: { ...c, fuente: 'nbme' }, pedido: 'tema alfa', fichas: many, ritmo: RITMO_PREDETERMINADO, revisar })
+    expect(revisar).toHaveBeenCalledTimes(5)
+    const ids = revisar.mock.calls.flatMap(call => call[2].map(i => i.id))
+    expect(ids).toHaveLength(750)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(r.estado).toBe('vacio')
   })
 })
