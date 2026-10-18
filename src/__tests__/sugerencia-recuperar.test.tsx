@@ -111,3 +111,67 @@ describe('«Para reforzar hoy»', () => {
     expect(mock.pedirHilo).not.toHaveBeenCalled()
   })
 })
+
+describe('«Reinforce today» en el dashboard de MyQBank', () => {
+  it('va en inglés, compacta, con la lista plegada; los nombres y la frase de Claude siguen en español', async () => {
+    await montar({ variante: 'myqbank', candidatas: [
+      ficha('C1'), ficha('C2', { senales: ['fallo_repetido'], puntos: 2 }),
+      ficha('NBME28-P0001', { tipo: 'pregunta', revision: 'r3', senales: ['acierto_con_ayuda'], puntos: 1 })] })
+    const seccion = contenedor.querySelector('section')!
+    expect(seccion.getAttribute('lang')).toBe('en')
+    expect(seccion.textContent).toContain('Optional · once a day')
+    expect(seccion.querySelector('h2')!.textContent).toBe('Reinforce today')
+    expect(seccion.textContent).not.toContain('Para reforzar hoy')
+    // La frase de Claude y los temas conservan su idioma.
+    expect(seccion.querySelector('.sugerencia-hilo')!.getAttribute('lang')).toBe('es')
+    expect(seccion.querySelector('.sugerencia-hilo')!.textContent).toBe('Giran en torno a las hormonas.')
+    expect(seccion.querySelector('.sugerencia-texto')!.getAttribute('lang')).toBe('es')
+    // La lista va dentro de un desplegable cerrado.
+    const detalle = seccion.querySelector('details')!
+    expect(detalle.open).toBe(false)
+    expect(detalle.querySelector('summary')!.textContent).toBe('See the 3 items')
+    expect(detalle.querySelectorAll('li')).toHaveLength(3)
+    expect([...detalle.querySelectorAll('.sugerencia-senal')].map(s => s.textContent)).toEqual(['Missed this week', 'Missed more than once', 'Right, but with help'])
+    expect(detalle.textContent).toContain('What you skip today doesn’t pile up.')
+    // Sin cifras de deuda, igual que en Hoy.
+    expect(seccion.textContent).not.toMatch(/overdue|backlog|behind/i)
+  })
+  it('«Review these 3» abre la misma sesión que en Hoy y no vuelve a salir', async () => {
+    const { onRecuperar, dibujar } = await montar({ variante: 'myqbank' })
+    await act(async () => { boton(/Review these 3/).click() })
+    expect(onRecuperar).toHaveBeenCalledTimes(1)
+    expect(onRecuperar).toHaveBeenCalledWith(expect.objectContaining({
+      conceptIds: ['C1', 'C2'], preguntas: [{ id: 'NBME28-P0001', revision: 'r3' }], titulo: 'Para reforzar · hoy', nbmeSessionId: null, cada: 2,
+    }))
+    expect(leerSugerencia('u1')?.estado).toBe('usada')
+    expect(contenedor.querySelector('section')).toBeNull()
+    await act(async () => { dibujar() })
+    expect(contenedor.querySelector('section')).toBeNull()
+  })
+  it('«Not today» la cierra por hoy sin abrir nada; con un solo ítem el texto va en singular', async () => {
+    const { onRecuperar } = await montar({ variante: 'myqbank', candidatas: [ficha('C1')] })
+    expect(boton(/Review this one/)).toBeTruthy()
+    expect(contenedor.querySelector('summary')!.textContent).toBe('See the item')
+    await act(async () => { boton(/Not today/).click() })
+    expect(onRecuperar).not.toHaveBeenCalled()
+    expect(leerSugerencia('u1')?.estado).toBe('descartada')
+    expect(contenedor.querySelector('section')).toBeNull()
+  })
+  it('las mismas reglas que en Hoy: viernes, sin cuenta cargada o sin candidatas no hay tarjeta', async () => {
+    await montar({ variante: 'myqbank', ahora: VIERNES })
+    expect(contenedor.querySelector('section')).toBeNull()
+    await montar({ variante: 'myqbank', listo: false })
+    expect(contenedor.querySelector('section')).toBeNull()
+    await montar({ variante: 'myqbank', candidatas: [] })
+    expect(contenedor.querySelector('section')).toBeNull()
+    expect(mock.pedirHilo).not.toHaveBeenCalled()
+    expect(localStorage.length).toBe(0)
+  })
+  it('la versión de Hoy sigue sin cambios: lista visible, sin desplegable, en español', async () => {
+    await montar()
+    const seccion = contenedor.querySelector('section')!
+    expect(seccion.getAttribute('lang')).toBeNull()
+    expect(seccion.querySelector('details')).toBeNull()
+    expect(seccion.querySelector('h2')!.textContent).toBe('Para reforzar hoy')
+  })
+})

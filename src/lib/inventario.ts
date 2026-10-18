@@ -23,6 +23,12 @@ export const NOMBRE_SENAL: Record<Senal, string> = {
   fallo_repetido: 'Fallada más de una vez',
   acierto_con_ayuda: 'Acertada con ayuda',
 }
+/** Lo mismo, para el espacio de trabajo MyQBank, que va en inglés. */
+export const NOMBRE_SENAL_EN: Record<Senal, string> = {
+  fallo_reciente: 'Missed this week',
+  fallo_repetido: 'Missed more than once',
+  acierto_con_ayuda: 'Right, but with help',
+}
 /** Cuántos días de estudio distintos y limpios hacen falta tras el último fallo para darlo por superado. */
 export const DIAS_LIMPIOS_PARA_SUPERAR = 2
 

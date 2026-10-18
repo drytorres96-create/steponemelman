@@ -1,7 +1,8 @@
 .mq-workspace { --verde: var(--mq-ok-ink); --rojo: var(--mq-bad-ink); --bg-2: var(--mq-inset); --bg-3: var(--mq-chip); --borde: var(--mq-line); --acento: var(--mq-ok); }
 /* Más específico que .mq-preview (layout.css): en el build esa hoja llega después de esta y, a igual especificidad, bloqueaba el scroll en escritorio. */
 .mq-preview.mq-workspace { height: auto; min-height: 100dvh; overflow: visible; }
-.mq-workspace .mq-dashboard { min-height: 790px; max-height: 1000px; grid-template-rows: auto minmax(280px,1fr) auto; }
+/* Con «Reinforce today» y «Ask Claude» bajo «Your next step», la columna central necesita algo más de alto antes de topar. */
+.mq-workspace .mq-dashboard { min-height: 790px; max-height: 1320px; grid-template-rows: auto minmax(280px,1fr) auto; }
 .mq-workspace .mq-study { min-height: 650px; align-items: start; }
 .mq-workspace .mq-question-pane, .mq-workspace .mq-explanation-pane { max-height: calc(100dvh - 190px); overflow: auto; }
 .mq-workspace .mq-question-pane > .mq-answer-actions { position: static; padding: 12px 0; z-index: 1; background: var(--mq-surface); border-radius: 10px; }

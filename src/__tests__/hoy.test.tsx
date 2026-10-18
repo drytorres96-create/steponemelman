@@ -34,7 +34,7 @@ vi.mock('../plan/api', () => ({
 }))
 vi.mock('../data/corpus', () => ({ cargarTodo: mock.corpus, cargarConceptos: mock.conceptos, cargarModulo: vi.fn() }))
 
-import { Hoy } from '../screens/Hoy'
+import { Hoy, type DatosAsistente } from '../screens/Hoy'
 import { vistaDesdeHash } from '../App'
 
 /** Jueves 24 de septiembre de 2026, 10:00: un día entre semana. La semana va del lunes 21 al domingo 27. */
@@ -533,5 +533,77 @@ describe('portada Hoy', () => {
     await act(async () => { boton('Empezar lo nuevo').click() })
     expect(onNuevo.mock.calls[0][0].conceptIds).toEqual(['C1', 'C2'])
     expect(onNuevo.mock.calls[0][0].preguntas).toEqual([{ id: 'Q1', revision: 'r1' }])
+  })
+})
+
+describe('Hoy entregado a otro sitio (el dashboard de MyQBank)', () => {
+  /** Hoy no pinta su pantalla: calcula el día y entrega lo que necesitan las tarjetas de Claude. */
+  const pintarAsistente = async (renderAsistente: (d: DatosAsistente) => React.ReactNode, props: { onNuevo?: () => void } = {}) => {
+    await act(async () => {
+      root.render(<Hoy onNuevo={props.onNuevo ?? vi.fn()} onCajas={vi.fn()} onBiblioteca={vi.fn()} renderAsistente={renderAsistente} />)
+    })
+    await act(async () => { await Promise.resolve() })
+  }
+
+  it('entre semana entrega los datos del día, no pinta la portada y pinta lo que devuelve quien lo pide', async () => {
+    diaConCajas()
+    const onNuevo = vi.fn()
+    const recibido: DatosAsistente[] = []
+    await pintarAsistente(d => { recibido.push(d); return <p id="asistente">tarjetas de Claude</p> }, { onNuevo })
+
+    expect(host.querySelector('#asistente')!.textContent).toBe('tarjetas de Claude')
+    // Ni anillo, ni pasos, ni la tarjeta cerrada del chat de Hoy: eso lo pinta el dashboard por su cuenta.
+    expect(host.querySelector('.anillo-doble')).toBeNull()
+    expect(host.querySelector('.chat-sesion-cerrada')).toBeNull()
+    expect(host.textContent).not.toContain('Preparando tu día')
+    expect(botones()).toHaveLength(0)
+
+    const d = recibido[recibido.length - 1]
+    expect(d.listo).toBe(true)
+    expect(d.ocupado).toBe(false)
+    expect(d.ahora).toBe(HOY(10))
+    expect(d.onNuevo).toBe(onNuevo)
+    expect(Array.isArray(d.candidatas)).toBe(true)
+    // Lo que vence hoy en las cajas ya está en el día: no se ofrece además como «para reforzar».
+    expect(d.enCajasHoy.has('concepto:X1')).toBe(true)
+    expect(d.candidatas.map(c => c.id)).not.toContain('X1')
+    expect(d.progreso).toBe(app.estado.progreso)
+    expect(d.nbme).toBe(nbme.state)
+    expect(d.publicados.has('C1')).toBe(true)
+    expect(d.listas.has('Q9')).toBe(true)
+    expect(d.modulos).toHaveLength(1)
+  })
+  it('con el día completo no entrega nada: las tarjetas no existen', async () => {
+    diaCompleto()
+    const pedir = vi.fn(() => <p id="asistente">no</p>)
+    await pintarAsistente(pedir)
+    expect(pedir).not.toHaveBeenCalled()
+    expect(host.innerHTML).toBe('')
+  })
+  it('el viernes no entrega nada, aunque haya material y cajas', async () => {
+    vi.setSystemTime(new Date('2026-09-25T10:00:00-04:00'))
+    diaConCajas()
+    const pedir = vi.fn(() => <p id="asistente">no</p>)
+    await pintarAsistente(pedir)
+    expect(pedir).not.toHaveBeenCalled()
+    expect(host.innerHTML).toBe('')
+  })
+  it('mientras carga el banco no pinta nada (ni el «Preparando tu día…» de Hoy) y luego entrega los datos', async () => {
+    diaConCajas()
+    nbme = { ...nbme, catalog: null, loading: true }
+    const pedir = vi.fn(() => <p id="asistente">sí</p>)
+    await pintarAsistente(pedir)
+    expect(pedir).not.toHaveBeenCalled()
+    expect(host.innerHTML).toBe('')
+    nbme = { ...nbme, catalog: { questions: [meta('Q9')] }, loading: false }
+    await pintarAsistente(pedir)
+    expect(pedir).toHaveBeenCalled()
+    expect(host.querySelector('#asistente')).not.toBeNull()
+  })
+  it('sin `renderAsistente` Hoy se pinta como siempre', async () => {
+    diaConCajas()
+    await pintar()
+    expect(host.querySelector('.anillo-doble')).not.toBeNull()
+    expect(host.querySelector('.chat-sesion-cerrada')).not.toBeNull()
   })
 })

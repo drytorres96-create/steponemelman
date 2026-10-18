@@ -3,7 +3,7 @@ import { cargarConceptos } from '../data/corpus'
 import type { Concepto, Modulo } from '../schema/concept'
 import type { NbmeQuestionMeta } from '../nbme/types'
 import type { MaterialNuevo } from '../lib/nuevo-hoy'
-import { NOMBRE_SENAL, PESO_SENAL, type FichaInventario, type Senal } from '../lib/inventario'
+import { NOMBRE_SENAL, NOMBRE_SENAL_EN, PESO_SENAL, type FichaInventario, type Senal } from '../lib/inventario'
 import { decidirSugerencia, guardarSugerencia, leerSugerencia, type ItemSugerido, type SugerenciaDelDia } from '../lib/sugerencia-diaria'
 import { etiquetaCorta, pedirHilo } from '../lib/sesion-claude'
 
@@ -22,7 +22,7 @@ function filaDeConcepto(item: ItemSugerido, c: Concepto | undefined): Fila {
   return { item, titulo: c.clasificacion.tema || c.objetivo, detalle: c.objetivo }
 }
 
-export function SugerenciaRecuperar({ usuario, ahora, candidatas, listo, modulos, listas, onRecuperar }: {
+export function SugerenciaRecuperar({ usuario, ahora, candidatas, listo, modulos, listas, onRecuperar, variante = 'hoy' }: {
   usuario: string
   ahora: number
   /** Todo lo frágil que hoy podría sugerirse, ya sin lo que está en las cajas ni lo tocado hoy. */
@@ -32,6 +32,11 @@ export function SugerenciaRecuperar({ usuario, ahora, candidatas, listo, modulos
   modulos: Modulo[]
   listas: Map<string, NbmeQuestionMeta>
   onRecuperar: (material: MaterialNuevo) => void
+  /**
+   * `myqbank`: la versión del dashboard de MyQBank, en inglés y compacta (cabecera con los botones y la lista plegada).
+   * Los nombres de los conceptos y la frase de Claude siguen en español.
+   */
+  variante?: 'hoy' | 'myqbank'
 }) {
   const [guardada, setGuardada] = useState<SugerenciaDelDia | null>(() => leerSugerencia(usuario))
   const decision = useMemo(() => decidirSugerencia({ ahora, guardada, candidatas, listo }), [ahora, guardada, candidatas, listo])
@@ -62,6 +67,9 @@ export function SugerenciaRecuperar({ usuario, ahora, candidatas, listo, modulos
   const filas: Fila[] = useMemo(() => (mostrar?.items ?? []).map(item => item.tipo === 'concepto'
     ? filaDeConcepto(item, conceptos?.get(item.id))
     : { item, titulo: listas.get(item.id)?.topic || 'Pregunta NBME', detalle: (listas.get(item.id)?.systems ?? []).join(' · ') }), [mostrar, conceptos, listas])
+  const english = variante === 'myqbank'
+  const nombres = english ? NOMBRE_SENAL_EN : NOMBRE_SENAL
+  const es = english ? { lang: 'es' } : {}
 
   // Una frase de Claude con el hilo común, una vez al día. Si no llega, la tarjeta ya está completa.
   const pidioHilo = useRef<string | null>(null)
@@ -108,24 +116,42 @@ export function SugerenciaRecuperar({ usuario, ahora, candidatas, listo, modulos
       cada: Math.max(1, Math.round(ids.length / Math.max(1, preguntas.length))) })
   }
 
+  const lista = <ul className="sugerencia-lista">
+    {filas.map(f => <li key={`${f.item.tipo}:${f.item.id}`}>
+      <span className="sugerencia-texto" {...es}>
+        <strong>{f.titulo}</strong>
+        {f.detalle && f.detalle !== f.titulo && <span className="mini">{f.detalle.length > 110 ? `${f.detalle.slice(0, 109)}…` : f.detalle}</span>}
+      </span>
+      <span className="sugerencia-senal">{nombres[principal(f.item.senales)]}</span>
+    </li>)}
+  </ul>
+  const botones = <div className="fila">
+    <button type="button" className="btn principal" onClick={repasar}>
+      {english ? (filas.length === 1 ? 'Review this one' : `Review these ${filas.length}`) : filas.length === 1 ? 'Repasar este' : `Repasar estos ${filas.length}`}</button>
+    <button type="button" className="btn fantasma" onClick={() => cambiarEstado('descartada')}>{english ? 'Not today' : 'Hoy no'}</button>
+  </div>
+  const nota = <p className="mini">{english ? 'Based on what you missed and what you got right only with help. What you skip today doesn’t pile up.'
+    : 'Sale de tus fallos y aciertos con ayuda. Lo que no uses hoy no se acumula.'}</p>
+
+  if (english) return <section className="tarjeta sugerencia-recuperar sugerencia-mq" aria-labelledby="sugerencia-recuperar-titulo" lang="en">
+    <div className="sugerencia-mq-cab">
+      <div><p className="rotulo">Optional · once a day</p><h2 id="sugerencia-recuperar-titulo">Reinforce today</h2></div>
+      {botones}
+    </div>
+    {mostrar.hilo && <p className="sugerencia-hilo" lang="es">{mostrar.hilo}</p>}
+    <details className="sugerencia-detalle">
+      <summary>{filas.length === 1 ? 'See the item' : `See the ${filas.length} items`}</summary>
+      {lista}
+      {nota}
+    </details>
+  </section>
+
   return <section className="tarjeta sugerencia-recuperar" aria-labelledby="sugerencia-recuperar-titulo">
     <p className="rotulo">Opcional · una vez al día</p>
     <h2 id="sugerencia-recuperar-titulo">Para reforzar hoy</h2>
     {mostrar.hilo && <p className="sugerencia-hilo">{mostrar.hilo}</p>}
-    <ul className="sugerencia-lista">
-      {filas.map(f => <li key={`${f.item.tipo}:${f.item.id}`}>
-        <span className="sugerencia-texto">
-          <strong>{f.titulo}</strong>
-          {f.detalle && f.detalle !== f.titulo && <span className="mini">{f.detalle.length > 110 ? `${f.detalle.slice(0, 109)}…` : f.detalle}</span>}
-        </span>
-        <span className="sugerencia-senal">{NOMBRE_SENAL[principal(f.item.senales)]}</span>
-      </li>)}
-    </ul>
-    <div className="fila">
-      <button type="button" className="btn principal" onClick={repasar}>
-        {filas.length === 1 ? 'Repasar este' : `Repasar estos ${filas.length}`}</button>
-      <button type="button" className="btn fantasma" onClick={() => cambiarEstado('descartada')}>Hoy no</button>
-    </div>
-    <p className="mini">Sale de tus fallos y aciertos con ayuda. Lo que no uses hoy no se acumula.</p>
+    {lista}
+    {botones}
+    {nota}
   </section>
 }

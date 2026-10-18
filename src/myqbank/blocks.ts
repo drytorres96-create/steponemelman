@@ -71,8 +71,8 @@ export function mergeBlock(a: StudyBlock, b: StudyBlock): StudyBlock {
 export function mergeBlocks(a: Record<string, StudyBlock> = {}, b: Record<string, StudyBlock> = {}): Record<string, StudyBlock> {
   return Object.fromEntries([...new Set([...Object.keys(a), ...Object.keys(b)])].sort().map(id => [id, a[id] && b[id] ? mergeBlock(a[id], b[id]) : a[id] ?? b[id]]))
 }
-export function createBlock(id: string, entries: BlockEntry[], mode: StudyBlock['mode'], now = Date.now(), retryOf?: string): StudyBlock {
-  return StudyBlockZ.parse({ id, entries, mode, title: `${entries.length}-item ${mode === 'test' ? 'Test' : 'Tutor'} block`, createdAt: now,
+export function createBlock(id: string, entries: BlockEntry[], mode: StudyBlock['mode'], now = Date.now(), retryOf?: string, title?: string): StudyBlock {
+  return StudyBlockZ.parse({ id, entries, mode, title: title?.trim().slice(0, 120) || `${entries.length}-item ${mode === 'test' ? 'Test' : 'Tutor'} block`, createdAt: now,
     cursor: 0, changedAt: now, paused: false, drafts: {}, skipped: {}, flags: {}, reviewed: {}, ...(retryOf ? { retryOf } : {}) })
 }
 export function blockOpportunity(blockId: string, position: number): string { return `${blockId}:mq:${position}` }

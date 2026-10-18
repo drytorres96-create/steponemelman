@@ -62,7 +62,7 @@ if (escena === 'mantenimiento') {
   // Acreditado hace meses: sigue demostrado, pero su fecha FSRS ya venció.
   progreso.C12 = reconstruirProgreso('C12', [intento(haceDias(100)), intento(haceDias(98)), intento(haceDias(96))], CRITERIOS_POR_DEFECTO)
 }
-export const conceptosFragiles = escena === 'fragil' ? Array.from({ length: 27 }, (_, i) => `G${i + 1}`) : []
+export const conceptosFragiles = escena === 'fragil' ? Array.from({ length: 27 }, (_, i) => `G${String(i + 1).padStart(2, '0')}`) : []
 export const conceptosMuchas = escena === 'muchas' ? Array.from({ length: 25 }, (_, i) => `K${i}`) : []
 if (escena === 'huerfanos') {
   // Only the second ID is published. The first remains in the saved history.

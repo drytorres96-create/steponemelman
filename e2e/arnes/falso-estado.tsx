@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { ESTADO_INICIAL, reconstruirProgreso, registrarVistaConceptoEstado } from '@app/store/model'
 import { nuevoProgreso } from '@app/srs/fsrs'
 import { CRITERIOS_POR_DEFECTO } from '@app/srs/mastery'
-import { conceptos, conAplicacion, progreso } from './escena'
+import { conceptos, conAplicacion, progreso, conceptosFragiles } from './escena'
 import { mergeBlock } from '../../src/myqbank/blocks'
 import { myqbankConcepts } from './myqbank-fixture'
 
@@ -51,7 +51,9 @@ let valor: any = {
   avisoLocal: null, descartarAvisoLocal: () => {},
   exportar: (extra?: Record<string, unknown>) => JSON.stringify({ ...extra, ...estado }), importar: () => ({ ok: true, mensaje: '' }), reiniciar: async () => {},
 }
-if (myqbank) valor.indice = { ...valor.indice, n_conceptos: myqbankConcepts.length, modulos: [{ ...valor.indice.modulos[0], sesiones: [{ session_id:'QA-S', titulo:'Synthetic', objetivo:'QA', conceptos:myqbankConcepts.map(c=>c.concept_id) }] }] }
+// Con `escena=fragil` el espacio MyQBank publica además los conceptos frágiles de la escena, para poder probar «Reinforce today».
+const publicadosMyqbank = [...myqbankConcepts.map(c => c.concept_id), ...conceptosFragiles]
+if (myqbank) valor.indice = { ...valor.indice, n_conceptos: publicadosMyqbank.length, modulos: [{ ...valor.indice.modulos[0], sesiones: [{ session_id:'QA-S', titulo:'Synthetic', objetivo:'QA', conceptos:publicadosMyqbank }] }] }
 const suscribir = (f: () => void) => { oyentes.add(f); return () => oyentes.delete(f) }
 export function useApp() { return useSyncExternalStore(suscribir, () => valor) }
 export function ProveedorEstado({ children }: { children: unknown }) { return children }

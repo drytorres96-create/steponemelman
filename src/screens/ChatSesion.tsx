@@ -45,12 +45,20 @@ export interface PropsChatSesion extends DatosSesion {
   onNuevo: (material: MaterialNuevo) => void
   /** Otra sesión se está abriendo: no se lanza una segunda. */
   ocupado?: boolean
+  /**
+   * Con `onCerrar`, quien lo monta decide cuándo está abierto (el diálogo del dashboard de MyQBank):
+   * no hay tarjeta cerrada y la conversación se conserva aunque `abierto` sea falso, porque el componente sigue montado.
+   */
+  abierto?: boolean
+  onCerrar?: () => void
 }
 
 const reducirMovimiento = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches } catch { return false } }
 
-export function ChatSesion({ onNuevo, ocupado: abriendo = false, ...datos }: PropsChatSesion) {
-  const [abierto, setAbierto] = useState(false)
+export function ChatSesion({ onNuevo, ocupado: abriendo = false, abierto: abiertoPadre = false, onCerrar, ...datos }: PropsChatSesion) {
+  const controlado = onCerrar !== undefined
+  const [abiertoPropio, setAbierto] = useState(false)
+  const abierto = controlado ? abiertoPadre : abiertoPropio
   const [mensajes, setMensajes] = useState<Msg[]>([])
   const [esperando, setEsperando] = useState(false)
   const [texto, setTexto] = useState('')
@@ -158,6 +166,7 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, ...datos }: Pro
   }
 
   if (!abierto) {
+    if (controlado) return null
     return <section className="tarjeta chat-sesion-cerrada" aria-labelledby="chat-sesion-titulo">
       <p className="rotulo">Con tus palabras · opcional</p>
       <h2 id="chat-sesion-titulo">Pídele a Claude una sesión</h2>
@@ -177,7 +186,7 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, ...datos }: Pro
     <header className="tutor-cab">
       <span className="tutor-avatar" aria-hidden="true"><IconoCerebro tamano={22} /></span>
       <div className="tutor-titulo"><strong>Claude</strong><span>Arma tu sesión con tus palabras</span></div>
-      <button type="button" className="tutor-icono-boton" aria-label="Cerrar el chat" onClick={() => setAbierto(false)}><Cruz /></button>
+      <button type="button" className="tutor-icono-boton" aria-label="Cerrar el chat" onClick={() => controlado ? onCerrar() : setAbierto(false)}><Cruz /></button>
     </header>
 
     <div className="tutor-hilo" ref={zona} role="group" aria-label="Conversación con Claude" aria-live="polite" tabIndex={0}>
