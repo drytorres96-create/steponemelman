@@ -136,7 +136,7 @@ describe('«Reinforce today» en el dashboard de MyQBank', () => {
     // Sin cifras de deuda, igual que en Hoy.
     expect(seccion.textContent).not.toMatch(/overdue|backlog|behind/i)
   })
-  it('«Review these 3» abre la misma sesión que en Hoy y no vuelve a salir', async () => {
+  it('«Review these 3» abre la misma sesión y conserva el estado usado sin ofrecerla otra vez', async () => {
     const { onRecuperar, dibujar } = await montar({ variante: 'myqbank' })
     await act(async () => { boton(/Review these 3/).click() })
     expect(onRecuperar).toHaveBeenCalledTimes(1)
@@ -144,26 +144,36 @@ describe('«Reinforce today» en el dashboard de MyQBank', () => {
       conceptIds: ['C1', 'C2'], preguntas: [{ id: 'NBME28-P0001', revision: 'r3' }], titulo: 'Para reforzar · hoy', nbmeSessionId: null, cada: 2,
     }))
     expect(leerSugerencia('u1')?.estado).toBe('usada')
-    expect(contenedor.querySelector('section')).toBeNull()
+    expect(contenedor.textContent).toContain('Today’s optional review has already been opened.')
+    expect(contenedor.querySelector('h2')!.textContent).toBe('Reinforce today')
+    expect(contenedor.querySelectorAll('button')).toHaveLength(0)
     await act(async () => { dibujar() })
-    expect(contenedor.querySelector('section')).toBeNull()
+    expect(contenedor.querySelector('h2')!.textContent).toBe('Reinforce today')
+    expect(contenedor.querySelectorAll('button')).toHaveLength(0)
   })
-  it('«Not today» la cierra por hoy sin abrir nada; con un solo ítem el texto va en singular', async () => {
+  it('«Not today» conserva el estado descartado sin abrir nada; con un ítem usa el singular', async () => {
     const { onRecuperar } = await montar({ variante: 'myqbank', candidatas: [ficha('C1')] })
     expect(boton(/Review this one/)).toBeTruthy()
     expect(contenedor.querySelector('summary')!.textContent).toBe('See the item')
     await act(async () => { boton(/Not today/).click() })
     expect(onRecuperar).not.toHaveBeenCalled()
     expect(leerSugerencia('u1')?.estado).toBe('descartada')
-    expect(contenedor.querySelector('section')).toBeNull()
+    expect(contenedor.textContent).toContain('Skipped for today.')
+    expect(contenedor.querySelector('h2')!.textContent).toBe('Reinforce today')
+    expect(contenedor.querySelectorAll('button')).toHaveLength(0)
   })
-  it('las mismas reglas que en Hoy: viernes, sin cuenta cargada o sin candidatas no hay tarjeta', async () => {
+  it('viernes, carga pendiente o sin candidatas: tarjeta visible sin consumir el refuerzo', async () => {
     await montar({ variante: 'myqbank', ahora: VIERNES })
-    expect(contenedor.querySelector('section')).toBeNull()
+    expect(contenedor.querySelector('h2')!.textContent).toBe('Reinforce today')
+    expect(contenedor.querySelectorAll('button')).toHaveLength(0)
     await montar({ variante: 'myqbank', listo: false })
-    expect(contenedor.querySelector('section')).toBeNull()
+    expect(contenedor.textContent).toContain('Preparing your optional review…')
+    expect(contenedor.querySelector('h2')!.textContent).toBe('Reinforce today')
+    expect(contenedor.querySelectorAll('button')).toHaveLength(0)
     await montar({ variante: 'myqbank', candidatas: [] })
-    expect(contenedor.querySelector('section')).toBeNull()
+    expect(contenedor.textContent).toContain('No extra review suggested right now.')
+    expect(contenedor.querySelector('h2')!.textContent).toBe('Reinforce today')
+    expect(contenedor.querySelectorAll('button')).toHaveLength(0)
     expect(mock.pedirHilo).not.toHaveBeenCalled()
     expect(localStorage.length).toBe(0)
   })

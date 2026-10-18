@@ -34,7 +34,8 @@ vi.mock('../plan/api', () => ({
 }))
 vi.mock('../data/corpus', () => ({ cargarTodo: mock.corpus, cargarConceptos: mock.conceptos, cargarModulo: vi.fn() }))
 
-import { Hoy, type DatosAsistente } from '../screens/Hoy'
+import { Hoy } from '../screens/Hoy'
+import { AsistenteDashboard, type DatosAsistente } from '../myqbank/AsistenteDashboard'
 import { vistaDesdeHash } from '../App'
 
 /** Jueves 24 de septiembre de 2026, 10:00: un día entre semana. La semana va del lunes 21 al domingo 27. */
@@ -71,17 +72,18 @@ const cp = (extra: Partial<PlanCheckpoint>): PlanCheckpoint => ({ id: 1, idx: 1,
 let host: HTMLDivElement
 let root: Root
 let app: { indice: unknown; estado: typeof ESTADO_INICIAL; sincronizacion?: { estado: string; mensaje: string; ultima: number | null } }
-let nbme: { state: { sessions: Record<string, unknown>; attempts: Record<string, NbmeAttempt> }; catalog: { questions: NbmeQuestionMeta[] } | null; loading: boolean; error: string | null }
+let nbme: { state: { sessions: Record<string, unknown>; attempts: Record<string, NbmeAttempt> }; catalog: { questions: NbmeQuestionMeta[] } | null; loading: boolean; error: string | null; syncStatus: { state: string; lastSyncedAt: number | null } }
 
 function datos({ progresos = {}, respuestas = [], preguntas = [], conceptos = [] as string[] }:
   { progresos?: Record<string, ProgresoConcepto>; respuestas?: NbmeAttempt[]; preguntas?: string[]; conceptos?: string[] }) {
   app = {
     indice: { n_conceptos: 0, modulos: [{ module_id: 'M', sesiones: [{ session_id: 'S', conceptos: [...conceptos, ...Object.keys(progresos)] }] }], documentos: [], glosario: [], cuarentena: 0 },
     estado: { ...ESTADO_INICIAL, progreso: progresos },
+    sincronizacion: { estado: "sincronizado", mensaje: "", ultima: HOY(9) },
   }
   nbme = {
     state: { sessions: {}, attempts: Object.fromEntries(respuestas.map(r => [r.id, r])) },
-    catalog: { questions: preguntas.map(meta) }, loading: false, error: null,
+    catalog: { questions: preguntas.map(meta) }, loading: false, error: null, syncStatus: { state: "synced", lastSyncedAt: HOY(9) },
   }
 }
 
@@ -536,11 +538,11 @@ describe('portada Hoy', () => {
   })
 })
 
-describe('Hoy entregado a otro sitio (el dashboard de MyQBank)', () => {
-  /** Hoy no pinta su pantalla: calcula el día y entrega lo que necesitan las tarjetas de Claude. */
+describe('el asistente del dashboard, independiente de Hoy', () => {
+  /** El asistente entrega el material sin depender del cierre ni del plan semanal. */
   const pintarAsistente = async (renderAsistente: (d: DatosAsistente) => React.ReactNode, props: { onNuevo?: () => void } = {}) => {
     await act(async () => {
-      root.render(<Hoy onNuevo={props.onNuevo ?? vi.fn()} onCajas={vi.fn()} onBiblioteca={vi.fn()} renderAsistente={renderAsistente} />)
+      root.render(<AsistenteDashboard onNuevo={props.onNuevo ?? vi.fn()}>{renderAsistente}</AsistenteDashboard>)
     })
     await act(async () => { await Promise.resolve() })
   }
@@ -567,40 +569,66 @@ describe('Hoy entregado a otro sitio (el dashboard de MyQBank)', () => {
     // Lo que vence hoy en las cajas ya está en el día: no se ofrece además como «para reforzar».
     expect(d.enCajasHoy.has('concepto:X1')).toBe(true)
     expect(d.candidatas.map(c => c.id)).not.toContain('X1')
-    expect(d.progreso).toBe(app.estado.progreso)
-    expect(d.nbme).toBe(nbme.state)
+    expect(d.progreso).toEqual(app.estado.progreso)
+    expect(d.nbme).toEqual(nbme.state)
     expect(d.publicados.has('C1')).toBe(true)
     expect(d.listas.has('Q9')).toBe(true)
     expect(d.modulos).toHaveLength(1)
   })
-  it('con el día completo no entrega nada: las tarjetas no existen', async () => {
+  it('con el día completo el asistente sigue disponible', async () => {
     diaCompleto()
     const pedir = vi.fn(() => <p id="asistente">no</p>)
     await pintarAsistente(pedir)
-    expect(pedir).not.toHaveBeenCalled()
-    expect(host.innerHTML).toBe('')
+    expect(pedir).toHaveBeenCalled()
+    expect(host.querySelector('#asistente')).not.toBeNull()
   })
-  it('el viernes no entrega nada, aunque haya material y cajas', async () => {
+  it('el viernes entrega material para el chat opcional', async () => {
     vi.setSystemTime(new Date('2026-09-25T10:00:00-04:00'))
     diaConCajas()
     const pedir = vi.fn(() => <p id="asistente">no</p>)
     await pintarAsistente(pedir)
-    expect(pedir).not.toHaveBeenCalled()
-    expect(host.innerHTML).toBe('')
+    expect(pedir).toHaveBeenCalled()
+    expect(host.querySelector('#asistente')).not.toBeNull()
   })
-  it('mientras carga el banco no pinta nada (ni el «Preparando tu día…» de Hoy) y luego entrega los datos', async () => {
+  it('mientras carga el banco mantiene la entrada del chat y después actualiza el material', async () => {
     diaConCajas()
     nbme = { ...nbme, catalog: null, loading: true }
     const pedir = vi.fn(() => <p id="asistente">sí</p>)
     await pintarAsistente(pedir)
-    expect(pedir).not.toHaveBeenCalled()
-    expect(host.innerHTML).toBe('')
+    expect(pedir).toHaveBeenCalled()
+    expect(host.querySelector('#asistente')).not.toBeNull()
     nbme = { ...nbme, catalog: { questions: [meta('Q9')] }, loading: false }
     await pintarAsistente(pedir)
     expect(pedir).toHaveBeenCalled()
     expect(host.querySelector('#asistente')).not.toBeNull()
   })
-  it('sin `renderAsistente` Hoy se pinta como siempre', async () => {
+  it('no carga ni espera las sesiones semanales para entregar el asistente', async () => {
+    diaConCajas()
+    mock.historial.mockReset().mockImplementation(() => new Promise(() => {}))
+    mock.plan.mockClear()
+    const pedir = vi.fn(() => <p id="asistente">chat disponible</p>)
+    await pintarAsistente(pedir)
+    expect(host.textContent).toContain('chat disponible')
+    expect(mock.historial).not.toHaveBeenCalled()
+    expect(mock.plan).not.toHaveBeenCalled()
+  })
+  it('excluye respuestas de Test abiertos sin ocultar el chat ni modificar el historial', async () => {
+    const { createBlock } = await import('../myqbank/blocks')
+    datos({ conceptos: ['C1'], preguntas: ['Q9'], progresos: { C1: progreso('C1', [
+      intento(HOY(9), { session_id: 'pendiente', resultado: 'incorrecta', calificacion: 1 }),
+    ]) }, respuestas: [{ ...respuesta('Q9', HOY(9), false), sessionId: 'pendiente' }] })
+    app.estado.myqbankBlocks = { pendiente: createBlock('pendiente', [{ kind: 'nbme', id: 'Q9', revision: 'r1' }], 'test', HOY(8)) }
+    const antes = structuredClone(app.estado)
+    const recibido: DatosAsistente[] = []
+    await pintarAsistente(d => { recibido.push(d); return <p>chat</p> })
+    const d = recibido.at(-1)!
+    expect(d.progreso.C1.intentos).toEqual([])
+    expect(d.nbme.attempts).toEqual({})
+    expect(d.candidatas).toEqual([])
+    expect(host.textContent).toBe('chat')
+    expect(app.estado).toEqual(antes)
+  })
+  it('Hoy se pinta como siempre', async () => {
     diaConCajas()
     await pintar()
     expect(host.querySelector('.anillo-doble')).not.toBeNull()

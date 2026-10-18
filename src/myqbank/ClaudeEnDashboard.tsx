@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { IconoCerebro } from '../components/tutor/IconoCerebro'
 import { ChatSesion } from '../screens/ChatSesion'
 import { SugerenciaRecuperar } from '../screens/SugerenciaRecuperar'
-import type { DatosAsistente } from '../screens/Hoy'
+import type { DatosAsistente } from './AsistenteDashboard'
 import { Button, Card } from './components'
 import './claude-dashboard.css'
 
@@ -77,7 +77,7 @@ export function ClaudeEnDashboard(d: DatosAsistente) {
       <div ref={dialogo} className="mq-claude-dialogo" role="dialog" aria-modal="true" aria-label="Pídele a Claude una sesión" lang="es">
         <ChatSesion abierto={abierto} onCerrar={cerrar} onNuevo={m => { setAbierto(false); d.onNuevo(m) }} ocupado={d.ocupado}
           progreso={d.progreso} criterios={d.criterios} nbme={d.nbme} listas={d.listas} publicados={d.publicados}
-          modulos={d.modulos} enCajasHoy={d.enCajasHoy} />
+          modulos={d.modulos} enCajasHoy={d.enCajasHoy} bancoDisponible={d.bancoDisponible} />
       </div>
     </div>
   </section>

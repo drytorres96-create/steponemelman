@@ -10,6 +10,8 @@ import { pedirRevision } from '../lib/sesion-claude'
 
 /** Lo que la pantalla ya sabe de la persona: con esto, y sólo con esto, la plataforma arma la sesión. */
 export interface DatosSesion {
+  /** False while the NBME catalog is unavailable; do not present an empty bank as a result. */
+  bancoDisponible?: boolean
   progreso: Record<string, ProgresoConcepto>
   criterios: CriteriosDominio
   nbme: NbmeState
@@ -27,6 +29,7 @@ export type ResultadoFlujo = ResultadoSesion | { estado: 'error'; motivo: string
  * historial, filtra y, sólo cuando se pidió un tema libre, deja que Claude revise la lista corta.
  */
 export async function armarDesdeConsulta(consulta: ConsultaSesion, pedido: string, d: DatosSesion, signal?: AbortSignal, ahora = Date.now()): Promise<ResultadoFlujo> {
+  if (consulta.fuente !== 'conceptos' && d.bancoDisponible === false) return { estado: 'error', motivo: 'El banco de preguntas aún no está disponible. Puedes pedir una sesión de conceptos o volver a intentar cuando cargue.' }
   let conceptos: Concepto[] = []
   if (consulta.fuente !== 'nbme') {
     try { conceptos = (await cargarTodo(d.modulos)).filter(c => d.publicados.has(c.concept_id)) }

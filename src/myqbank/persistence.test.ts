@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { activateNbmeSession, updateNbmeSession, completeNbmeSession, deriveNbmeSession, emptyNbmeState, markNbmePosition, mergeNbmeStates, navigateNbmeSession, parseNbmeState, questionProgress, setNbmeDraft, startNbmeSession, submitNbmeAnswer } from '../nbme/model'
 import type { NbmeQuestion } from '../nbme/types'
-import { blockTime, timeBlock, createBlock, draftBlock, markBlock, mergeBlock, parseBlocks, patchBlock } from './blocks'
+import { blockTime, timeBlock, createBlock, draftBlock, markBlock, mergeBlock, parseBlocks, patchBlock, removeBlock } from './blocks'
 import { ESTADO_INICIAL, combinarEstados, leerEstadoDesconocido, reconstruirProgreso } from '../store/model'
 import type { Intento } from '../srs/tipos'
 import { anchorAnnotation, mergeAnnotation, type Annotation } from './annotations'
@@ -113,4 +113,29 @@ it('does not infer previous explanations merely from a mode change', async () =>
   const a = {...test,assistedConceptIds:[entries[0].id]}, b = {...test,assistedConceptIds:[entries[1].id]}
   expect(mergeBlock(a,b)).toEqual(mergeBlock(b,a))
   expect(parseBlocks({[test.id]:mergeBlock(a,b)})).not.toBeNull()
+})
+
+
+describe('removing saved blocks preserves study history', () => {
+  for (const mode of ['tutor', 'test'] as const) it(`${mode}: a removed block cannot return from an older device`, () => {
+    const base = createBlock('removed', [{ kind: 'nbme', id: question.id, revision: question.revision }], mode, 100)
+    const drafted = draftBlock(base, 0, { choice: 1 }, 110)
+    const removed = removeBlock(drafted, 200)
+    const offline = patchBlock(drafted, { paused: false }, 9999)
+    const merged = mergeBlock(removed, offline)
+    expect(merged).toEqual(mergeBlock(offline, removed))
+    expect(merged).toMatchObject({ archivedAt: 200, completedAt: 200, paused: true, drafts: drafted.drafts, entries: drafted.entries })
+    expect(removeBlock(removed, 300)).toBe(removed)
+    for (const state of [ESTADO_INICIAL, { ...ESTADO_INICIAL, myqbankBlocks: { removed: drafted } }]) {
+      const updated = { ...state, myqbankBlocks: { removed } }
+      const combined = combinarEstados(updated, { ...state, myqbankBlocks: { removed: offline } })
+      expect(leerEstadoDesconocido(JSON.parse(JSON.stringify(combined)))?.myqbankBlocks?.removed).toEqual(merged)
+      expect(combined.progreso).toEqual(state.progreso)
+    }
+  })
+  it('removing a finished block retains its original completion', () => {
+    const base = createBlock('finished', [{ kind: 'nbme', id: question.id, revision: question.revision }], 'tutor', 100)
+    const finished = patchBlock(base, { completedAt: 150 }, 150)
+    expect(removeBlock(finished, 300)).toMatchObject({ completedAt: 150, archivedAt: 300 })
+  })
 })

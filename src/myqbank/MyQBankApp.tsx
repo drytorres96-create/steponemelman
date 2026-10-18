@@ -14,6 +14,7 @@ import { aplicarVariante } from '../lib/variantes'
 import { versionPregunta } from '../screens/sesion'
 import { Hoy, type MaterialNuevo } from '../screens/Hoy'
 import { ClaudeEnDashboard } from './ClaudeEnDashboard'
+import { AsistenteDashboard } from './AsistenteDashboard'
 import type { ItemCaja } from '../lib/cajas'
 import { construirGuion } from '../semana/guion'
 import type { Cola } from '../screens/Reproductor'
@@ -21,7 +22,7 @@ import { Resguardo } from '../components/Resguardo'
 import { Brand, Button, Icon, StateMessage } from './components'
 import { Dashboard } from './Dashboard'
 import { AnnotationProvider, useAnnotations } from './AnnotationProvider'
-import { blockOpportunity, createBlock, modeChangeEvidence, patchBlock, type BlockEntry, type StudyBlock } from './blocks'
+import { blockOpportunity, createBlock, modeChangeEvidence, patchBlock, removeBlock, type BlockEntry, type StudyBlock } from './blocks'
 import type { BankItem } from './selection'
 import type { BlockMode } from './contracts'
 import './layout.css'
@@ -50,6 +51,28 @@ function Workspace() {
     const handler = () => { if (['#dashboard','#hoy','#progreso','#modulos'].includes(location.hash)) { nbme.pauseSession(); setView('dashboard') } else if (['#settings','#ajustes'].includes(location.hash)) { nbme.pauseSession(); setView('settings') } }
     window.addEventListener('hashchange', handler); return () => window.removeEventListener('hashchange', handler)
   }, [nbme.pauseSession])
+  // The two histories sync independently. A saved removal also applies when an older NBME copy arrives later.
+  useEffect(() => {
+    for (const saved of Object.values(app.estado.myqbankBlocks ?? {})) {
+      const session = nbme.state.sessions[saved.id]
+      if (saved.archivedAt !== undefined && session && (!nbme.state.archivedSessions?.[saved.id] || session.completedAt === undefined)) {
+        nbme.archiveSession(saved.id, { complete: true })
+      }
+    }
+  }, [app.estado.myqbankBlocks, nbme.state.sessions, nbme.state.archivedSessions, nbme.archiveSession, nbme.syncStatus.state])
+  const removeSaved = (id: string): boolean => {
+    const saved = app.estado.myqbankBlocks?.[id]
+    if (!saved || saved.archivedAt !== undefined) return true
+    if (busy) return false
+    // Archive both copies locally; their existing sync engines preserve the histories.
+    if (nbme.state.sessions[id] && !nbme.state.archivedSessions?.[id] && !nbme.archiveSession(id, { complete: true })) {
+      setError('Could not remove this block yet. Wait for saved progress to load and retry.')
+      return false
+    }
+    app.guardarBloque(removeBlock(saved))
+    setError(null)
+    return true
+  }
   async function open(block: StudyBlock) {
     setBusy(true); setError(null)
     try {
@@ -145,7 +168,7 @@ function Workspace() {
   if (!app.listo) return <StateMessage state="loading" title="Loading your study space">Your saved progress is being restored.</StateMessage>
   if (!app.indice) return <StateMessage state="error" title="Material unavailable" action={<Button onClick={() => location.reload()}>Retry</Button>}>{app.errorCarga}</StateMessage>
   const legacyPending = hayConceptosPendientes(app.estado.reanudable) || Object.values(nbme.state.sessions).some(s => !s.mode && s.paused && !nbme.state.archivedSessions?.[s.id])
-  const pendingTest = Object.values(app.estado.myqbankBlocks ?? {}).some(b => b.mode === 'test' && b.completedAt === undefined)
+  const pendingTest = Object.values(app.estado.myqbankBlocks ?? {}).some(b => b.mode === 'test' && b.completedAt === undefined && b.archivedAt === undefined)
   return <div lang="en" className={`mq-root mq-preview mq-workspace ${view === 'block' ? 'mq-workspace--study' : ''}`} data-theme={theme.piel === 'claro' ? 'light' : 'dark'}>
     <a className="mq-skip-link" href="#mq-main">Skip to content</a><header className="mq-header"><Brand/>{!studying && <Button className="mq-dashboard-link" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={dashboard}><Icon name="dashboard"/>Dashboard</Button>}
       <div className="mq-header-actions"><Button aria-label={theme.piel === 'claro' ? 'Switch to dark theme' : 'Switch to light theme'} onClick={theme.alternar}><Icon name={theme.piel === 'claro' ? 'moon' : 'sun'}/></Button>
@@ -154,11 +177,10 @@ function Workspace() {
     {app.avisoLocal && <p role="status">{app.avisoLocal}<Button onClick={app.descartarAvisoLocal}>Dismiss</Button></p>}
     <Resguardo key={view} alFallar={e => <StateMessage state="error" title="Could not open this screen" action={<Button onClick={dashboard}><Icon name="dashboard"/>Dashboard</Button>}>{e.message}</StateMessage>}>
     <Suspense fallback={<StateMessage state="loading" title="Opening your workspace">Your progress remains saved.</StateMessage>}>
-      {view === 'dashboard' && <><Dashboard busy={busy} error={error} onStart={create} onResume={open}
+      {view === 'dashboard' && <><Dashboard busy={busy} error={error} onStart={create} onResume={open} onRemove={removeSaved}
         legacyResume={legacyPending ? <Button disabled={busy} onClick={() => void resumeLegacy()}>Resume earlier session</Button> : null}
         dailyGoal={pendingTest ? <p>Finish your Test block to update the daily goal.</p> : <Hoy compact busy={busy} onNuevo={newDaily} onCajas={openCajas} onRetomar={resumeLegacy} onBiblioteca={() => {}}/>}
-        // Con un Test abierto no se muestra nada que dependa de las respuestas: lo contestado no cuenta hasta cerrarlo.
-        assistant={pendingTest ? null : <Hoy busy={busy} onNuevo={newClaude} onCajas={openCajas} onBiblioteca={() => {}} renderAsistente={datos => <ClaudeEnDashboard {...datos}/>}/>}/>
+        assistant={<AsistenteDashboard busy={busy} onNuevo={newClaude}>{datos => <ClaudeEnDashboard {...datos}/>}</AsistenteDashboard>}/>
         <details className="mq-progress-details" onToggle={e => setDetails(e.currentTarget.open)}><summary>Detailed progress and study plan</summary>{details && (pendingTest ? <p>End your Test block to see updated results.</p> : <ProgressDetails onNuevo={newDaily} onCajas={openCajas} onRetomar={resumeLegacy}/>)}</details></>}
       {view === 'block' && error && <p role="alert">{error}</p>}
       {view === 'block' && block && <Study block={block} busy={busy} onModeChange={(b, mode) => create([], mode, undefined, b.entries, b)} onExit={dashboard} onRetry={b => create([], 'tutor', b.id, b.entries)}/>}

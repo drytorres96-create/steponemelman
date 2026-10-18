@@ -90,6 +90,12 @@ export function modeChangeEvidence(block: StudyBlock, answeredConceptIds: string
 export function patchBlock(block: StudyBlock, patch: Partial<Pick<StudyBlock, 'cursor' | 'paused' | 'completedAt' | 'archivedAt'>>, now = Date.now()): StudyBlock {
   return StudyBlockZ.parse({ ...block, ...patch, changedAt: Math.max(now, block.changedAt + 1) })
 }
+/** Removing a saved block ends it without inventing answers; the tombstone survives device merges. */
+export function removeBlock(block: StudyBlock, now = Date.now()): StudyBlock {
+  if (block.archivedAt !== undefined) return block
+  const at = Math.max(now, block.createdAt)
+  return patchBlock(block, { archivedAt: at, completedAt: block.completedAt ?? at, paused: true }, at)
+}
 export function markBlock(block: StudyBlock, field: 'flags' | 'skipped' | 'reviewed', position: number, value: boolean, now = Date.now()): StudyBlock {
   return StudyBlockZ.parse({ ...block, [field]: { ...block[field], [position]: { value, changedAt: Math.max(now, (block[field][position]?.changedAt ?? 0) + 1) } } })
 }
