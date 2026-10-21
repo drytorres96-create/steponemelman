@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  aItemRevision, armarSesion, describirConsulta, etiquetaDeRevision, fichasDeSesion, filtrarFichas, MAX_PREGUNTAS_SESION,
-  resolverSesion, RITMO_PREDETERMINADO, ritmoDe, ventanaDeRevision, type EntradaFichas, type FichaSesion,
+  aItemRevision, armarSesion, conceptosParaLeer, describirConsulta, esTematica, etiquetaDeRevision, fichasDeSesion, filtrarFichas, MAX_PREGUNTAS_SESION,
+  repartirPorTemas, resolverSesion, RITMO_PREDETERMINADO, ritmoDe, type EntradaFichas, type FichaSesion, type LecturaBanco,
 } from '../lib/constructor-sesion'
 import { MAX_ETIQUETA_REVISION, type ConsultaSesion, type ItemRevision } from '../lib/contexto-sesion'
 import { emptyNbmeState } from '../nbme/model'
@@ -242,34 +242,60 @@ describe('filtrar: los filtros cerrados los aplica la plataforma', () => {
   })
 })
 
-describe('ventana de revisión', () => {
+describe('qué conceptos se leen con Claude', () => {
   const muchos = (n: number, titulo = (i: number) => `Concepto ${i}`) => fichasDeSesion(entrada({
     conceptos: Array.from({ length: n }, (_, i) => concepto(`c-${i}`, 'Endocrino', titulo(i))) }))
+  const variados = fichasDeSesion(entrada({ conceptos: [
+    concepto('c-cardio-fisio', 'Cardiovascular', 'Ciclo cardíaco'),
+    concepto('c-renal-farma', 'Renal', 'Diuréticos de asa', { disciplina_primaria: 'Farmacología' }),
+    concepto('c-micro', 'Multisistémico', 'Vancomicina', { disciplina_primaria: 'Microbiología' }, 'Mecanismo de los antimicrobianos glucopeptídicos'),
+    concepto('c-endo', 'Endocrino', 'Cushing'),
+  ] }))
 
-  it('si caben, se revisan todas y en el mismo orden', () => {
-    const f = muchos(30)
-    expect(ventanaDeRevision(f, ['x'])).toEqual(f)
+  it('las pistas se suman con «o»: basta un sistema, una disciplina o un término para entrar a lectura', () => {
+    const c = consulta({ sistemas: ['Cardiovascular'], disciplinas: ['Farmacología'], terminos: ['farmacología antimicrobiana'] })
+    expect(ids(conceptosParaLeer(variados, c))).toEqual(['c-cardio-fisio', 'c-renal-farma'])
+    // Un concepto sólo de Microbiología entra si se da esa pista o si su texto nombra el tema pedido.
+    expect(ids(conceptosParaLeer(variados, { ...c, disciplinas: ['Farmacología', 'Microbiología'] }))).toEqual(['c-cardio-fisio', 'c-renal-farma', 'c-micro'])
+    expect(ids(conceptosParaLeer(variados, consulta({ sistemas: ['Cardiovascular'], terminos: ['antimicrobianos'] })))).toEqual(['c-cardio-fisio', 'c-micro'])
   })
-  it('si no caben, entran primero las que ya mencionan lo pedido, sin tildes ni mayúsculas', () => {
-    const f = muchos(400, i => (i === 399 ? 'Síndrome de ÁNEMIA' : `Concepto ${i}`))
-    const v = ventanaDeRevision(f, ['anemia'])
-    expect(v).toHaveLength(150)
-    expect(v[0].id).toBe('c-399')
-    expect(v[1].id).toBe('c-0')
+  it('sin pistas de clasificación entran todos, primero los que nombran algún término, sin tildes ni mayúsculas', () => {
+    const f = muchos(1000, i => (i === 999 ? 'Síndrome de ÁNEMIA' : `Concepto ${i}`))
+    const v = conceptosParaLeer(f, consulta({ terminos: ['anemia'] }))
+    expect(v).toHaveLength(900)
+    expect(v.some(x => x.id === 'c-999')).toBe(true)
+    expect(v[0].id).toBe('c-0') // conserva el orden de estudio; el tope sólo decide quién entra
   })
-  it('nunca pasa del máximo, con o sin coincidencias', () => {
-    const f = muchos(400, i => `anemia ${i}`)
-    expect(ventanaDeRevision(f, ['anemia'])).toHaveLength(150)
-    expect(ventanaDeRevision(f, [])).toHaveLength(150)
+  it('nunca pasa del máximo', () => {
+    expect(conceptosParaLeer(muchos(1200), consulta({ sistemas: ['Endocrino'] }))).toHaveLength(900)
+    expect(conceptosParaLeer(muchos(10), consulta({ sistemas: ['Endocrino'] }), 4)).toHaveLength(4)
   })
-  it('la etiqueta lleva tema y objetivo (o tema y sistema), nunca pasa de 90 caracteres y no incluye identificadores', () => {
-    const largo = muchos(1, () => 'T'.repeat(200))[0]
+  it('una consulta es temática si nombra un sistema, una disciplina o un bloque libre', () => {
+    expect(esTematica(consulta())).toBe(false)
+    expect(esTematica(consulta({ estados: ['falladas'] }))).toBe(false)
+    for (const extra of [{ sistemas: ['Renal' as const] }, { disciplinas: ['Farmacología' as const] }, { terminos: ['anemias'] }]) expect(esTematica(consulta(extra))).toBe(true)
+  })
+  it('la etiqueta lleva tema y objetivo (o tema y sistema), nunca pasa del tope y no incluye identificadores', () => {
+    const largo = muchos(1, () => 'T'.repeat(300))[0]
     expect(etiquetaDeRevision(largo).length).toBeLessThanOrEqual(MAX_ETIQUETA_REVISION)
     const c = fichasDeSesion(entrada({ conceptos: [concepto('c-1', 'Endocrino', 'Cushing', {}, 'Reconocer el exceso de cortisol')] }))[0]
     expect(etiquetaDeRevision(c)).toBe('Cushing: Reconocer el exceso de cortisol')
     const q = fichasDeSesion(entrada({ preguntas: [pregunta('q-secreta-1', ['Endocrino', 'Renal'], 'Addison')] }))[0]
     expect(etiquetaDeRevision(q)).toBe('Addison · Endocrino/Renal')
     expect(aItemRevision(q)).toEqual({ tipo: 'pregunta', id: 'q-secreta-1', revision: 'r1', etiqueta: 'Pregunta NBME' })
+  })
+})
+
+describe('repartir entre los temas pedidos', () => {
+  const f = fichasDeSesion(entrada({
+    conceptos: ['a1', 'a2', 'a3', 'b1', 'c1', 'c2'].map(id => concepto(id, 'Cardiovascular', id)),
+    preguntas: ['qa', 'qb'].map(id => pregunta(id, ['Cardiovascular'], id)) }))
+  const tema = new Map([['a1', 1], ['a2', 1], ['a3', 1], ['b1', 2], ['c1', 3], ['c2', 3], ['qa', 1], ['qb', 2]])
+  it('alterna los temas por turnos y conserva el orden dentro de cada uno, por separado en conceptos y preguntas', () => {
+    expect(ids(repartirPorTemas(f, tema, 3))).toEqual(['a1', 'b1', 'c1', 'a2', 'c2', 'a3', 'qa', 'qb'])
+  })
+  it('con un solo tema no cambia nada', () => {
+    expect(repartirPorTemas(f, tema, 1)).toEqual(f)
   })
 })
 
@@ -290,6 +316,18 @@ describe('armar la sesión según los minutos', () => {
     expect(s.conceptIds).toEqual([])
     expect(s.preguntas).toHaveLength(4)
     expect(s.preguntas[0]).toEqual({ id: 'q-0', revision: 'r1' })
+  })
+  it('con una cantidad pedida manda el número de ítems, no los minutos', () => {
+    const s = armarSesion(mezcla(60, 30), { fuente: 'mixto', minutos: 10, cantidad: 40 }, ritmo)
+    expect(s.conceptIds).toHaveLength(30)
+    expect(s.preguntas).toHaveLength(10)
+    expect(s.minutos).toBeGreaterThan(10)
+    expect(armarSesion(conceptos(60), { fuente: 'conceptos', minutos: 30, cantidad: 12 }, ritmo).conceptIds).toHaveLength(12)
+  })
+  it('con una cantidad pedida, si falta de un tipo sigue con el otro; un bloque NBME no pasa de veinte', () => {
+    const pocas = armarSesion(mezcla(60, 3), { fuente: 'mixto', minutos: 10, cantidad: 40 }, ritmo)
+    expect([pocas.conceptIds.length, pocas.preguntas.length]).toEqual([37, 3])
+    expect(armarSesion(preguntas(40), { fuente: 'nbme', minutos: 5, cantidad: 40 }, ritmo).preguntas).toHaveLength(MAX_PREGUNTAS_SESION)
   })
   it('mixto: tres conceptos por cada pregunta', () => {
     const s = armarSesion(mezcla(40, 40), { fuente: 'mixto', minutos: 20 }, ritmo)
@@ -343,8 +381,9 @@ describe('describir lo entendido', () => {
   it('resume tema, estado, fuente y minutos con las palabras de la plataforma', () => {
     expect(describirConsulta(consulta({ sistemas: ['Endocrino'], estados: ['por_repasar'], fuente: 'nbme', minutos: 20 })))
       .toBe('Endocrino · por repasar · preguntas NBME · ≈ 20 min')
-    expect(describirConsulta(consulta({ sistemas: ['Hematológico y oncológico'], terminos: ['oncología'] })))
-      .toBe('Hematológico y oncológico + «oncología» · conceptos y preguntas · ≈ 10 min')
+    // Con temas nombrados, sistemas y disciplinas son pistas: se enseña lo que se pidió.
+    expect(describirConsulta(consulta({ sistemas: ['Cardiovascular', 'Respiratorio'], disciplinas: ['Farmacología'], terminos: ['farmacología cardiovascular', 'farmacología respiratoria'], cantidad: 40 })))
+      .toBe('«farmacología cardiovascular» + «farmacología respiratoria» · conceptos y preguntas · 40 ítems')
     expect(describirConsulta(consulta())).toBe('todo el material · conceptos y preguntas · ≈ 10 min')
   })
 })
@@ -362,25 +401,25 @@ describe('de la consulta a la sesión', () => {
   const fichas = fichasDeSesion(entrada({ conceptos, preguntas, progreso: prog }))
   const base = { pedido: 'una sesión', fichas, ritmo: RITMO_PREDETERMINADO }
 
-  it('sin términos libres no llama a la IA: la plataforma decide sola', async () => {
+  it('sin un tema no llama a la IA: la plataforma decide sola con el historial', async () => {
     const revisar = vi.fn()
-    const r = await resolverSesion({ ...base, consulta: consulta({ sistemas: ['Endocrino'], estados: ['falladas'], titulo: 'Endocrino fallado' }), revisar })
+    const r = await resolverSesion({ ...base, consulta: consulta({ estados: ['falladas'], titulo: 'Endocrino fallado' }), revisar })
     expect(revisar).not.toHaveBeenCalled()
     expect(r).toMatchObject({ estado: 'lista', conceptos: 1, preguntas: 0, sinRevisar: 0 })
     if (r.estado !== 'lista') return
     expect(r.material).toMatchObject({ conceptIds: ['c-endo-1'], titulo: 'Endocrino fallado', nbmeSessionId: null, cada: 3, subtitulo: 'una sesión' })
     expect(r.revision).toBeUndefined()
   })
-  it('con términos libres revisa sólo la lista ya filtrada y se queda con lo que la IA deja', async () => {
+  it('con un tema, Claude lee todas las preguntas NBME y los conceptos con alguna pista, y la sesión lleva lo que deja', async () => {
     const revisar = vi.fn(async (_p: string, _c: ConsultaSesion, _items: ItemRevision[]) => ({ estado: 'ok' as const, ids: ['c-hema-2', 'q-hema', 'c-endo-1'], sinRevisar: 0 }))
     const r = await resolverSesion({ ...base, pedido: 'hematología y oncología', consulta: consulta({ sistemas: ['Hematológico y oncológico'], terminos: ['oncología'], minutos: 30 }), revisar })
     expect(revisar).toHaveBeenCalledTimes(1)
     const items = revisar.mock.calls[0][2]
     expect(items.map(i => i.id).sort()).toEqual(['c-hema-1', 'c-hema-2', 'c-hema-3', 'q-hema'])
     expect(items.every(i => i.etiqueta.length <= MAX_ETIQUETA_REVISION)).toBe(true)
-    expect(r).toMatchObject({ estado: 'lista', conceptos: 1, preguntas: 1, revision: { revisadas: 4, encajan: 2, deTotal: 4 } })
+    expect(r).toMatchObject({ estado: 'lista', conceptos: 1, preguntas: 1, revision: { revisadas: 4, encajan: 2, deTotal: 6 } })
     if (r.estado !== 'lista') return
-    // «c-endo-1» no se filtró por la consulta: aunque la IA lo devolviera, no entra.
+    // «c-endo-1» no se mandó a leer: aunque la IA lo devolviera, no entra.
     expect(r.material.conceptIds).toEqual(['c-hema-2'])
     expect(r.material.preguntas).toEqual([{ id: 'q-hema', revision: 'r1' }])
   })
@@ -418,32 +457,66 @@ describe('de la consulta a la sesión', () => {
     expect(r.motivo).not.toMatch(/atrasad|pendiente|debes|deuda/i)
   })
   it('sin material de ese tema, lo dice sin sugerir que falta estudio', async () => {
-    const r = await resolverSesion({ ...base, consulta: consulta({ sistemas: ['Cardiovascular'] }), revisar: vi.fn() })
+    const revisar = vi.fn(async () => ({ estado: 'ok' as const, ids: [], sinRevisar: 0 }))
+    const r = await resolverSesion({ ...base, consulta: consulta({ sistemas: ['Cardiovascular'] }), revisar })
     expect(r.estado).toBe('vacio')
     if (r.estado === 'vacio') expect(r.motivo).toContain('Cardiovascular')
+    if (r.estado === 'vacio') expect(r.motivo).not.toMatch(/atrasad|pendiente|debes|deuda/i)
   })
   it('el subtítulo no pasa de 140 caracteres', async () => {
-    const r = await resolverSesion({ ...base, pedido: 'x'.repeat(300), consulta: consulta({ sistemas: ['Endocrino'] }), revisar: vi.fn() })
+    const todas = vi.fn(async (_p: string, _c: ConsultaSesion, items: ItemRevision[]) => ({ estado: 'ok' as const, ids: items.map(i => i.id), sinRevisar: 0 }))
+    const r = await resolverSesion({ ...base, pedido: 'x'.repeat(300), consulta: consulta({ sistemas: ['Endocrino'] }), revisar: todas })
     expect(r.estado).toBe('lista')
     if (r.estado === 'lista') expect(r.material.subtitulo!.length).toBeLessThanOrEqual(140)
   })
 })
 
-describe('complete the requested mix before offering a partial session', () => {
-  const c = consulta({ sistemas: ['Cardiovascular'], disciplinas: ['Farmacología'], terminos: ['tema alfa'] })
-  const concept = concepto('c-alpha', 'Cardiovascular', 'Tema alfa', { disciplina_primaria: 'Farmacología' })
+describe('leer cada ítem por su contenido, no por su etiqueta', () => {
+  const c = consulta({ sistemas: ['Cardiovascular'], disciplinas: ['Farmacología'], terminos: ['farmacología cardiovascular'] })
+  const concept = concepto('c-alpha', 'Cardiovascular', 'Amiodarona', { disciplina_primaria: 'Farmacología' })
   const bank = [pregunta('q-held', ['Cardiovascular'], '', { disciplines: ['Farmacología'] }),
     pregunta('q-neighbor', ['Renal'], '', { disciplines: ['Fisiología'] })]
   const fichas = fichasDeSesion(entrada({ conceptos: [concept], preguntas: bank }))
-  it('finds a verified replacement in another classification while preserving the topic and question revision', async () => {
-    const revisar = vi.fn().mockResolvedValueOnce({ estado: 'ok', ids: ['c-alpha'], sinRevisar: 1, revisadas: 1 })
-      .mockResolvedValueOnce({ estado: 'ok', ids: ['q-neighbor', 'invented-id'], sinRevisar: 0, revisadas: 1 })
-    const r = await resolverSesion({ consulta: c, pedido: 'tema alfa', fichas, ritmo: RITMO_PREDETERMINADO, revisar })
-    expect(revisar).toHaveBeenCalledTimes(2)
-    expect(revisar.mock.calls[1][1]).toEqual(c)
-    expect(revisar.mock.calls[1][2]).toEqual([{ tipo: 'pregunta', id: 'q-neighbor', revision: 'r1', etiqueta: 'Pregunta NBME' }])
-    expect(r).toMatchObject({ estado: 'lista', conceptos: 1, preguntas: 1, sinRevisar: 1,
-      material: { preguntas: [{ id: 'q-neighbor', revision: 'r1' }] }, revision: { revisadas: 2, encajan: 2, ampliada: true } })
+  const todas = () => vi.fn(async (_p: string, _c: ConsultaSesion, items: ItemRevision[]) => ({ estado: 'ok' as const, ids: items.map(i => i.id), sinRevisar: 0 }))
+  const lectura = (faltan: string[] = [], leer?: LecturaBanco['leer']): LecturaBanco & { pendientes: ReturnType<typeof vi.fn>; leer: ReturnType<typeof vi.fn> } => ({
+    pendientes: vi.fn(async () => ({ estado: 'ok' as const, faltan })),
+    leer: vi.fn(leer ?? (async refs => ({ estado: 'ok' as const, leidas: refs.length, sinFuente: 0, pendientes: 0 }))),
+  })
+
+  it('una pregunta mal etiquetada entra si Claude, al leerla, ve que trata el tema pedido', async () => {
+    const revisar = vi.fn().mockResolvedValue({ estado: 'ok', ids: ['c-alpha', 'q-neighbor', 'invented-id'], grupos: [1, 1, 1], sinRevisar: 0, revisadas: 3 })
+    const r = await resolverSesion({ consulta: c, pedido: 'farmacología cardiovascular', fichas, ritmo: RITMO_PREDETERMINADO, revisar, lectura: lectura() })
+    expect(revisar).toHaveBeenCalledTimes(1)
+    expect(revisar.mock.calls[0][2]).toEqual(expect.arrayContaining([{ tipo: 'pregunta', id: 'q-neighbor', revision: 'r1', etiqueta: 'Pregunta NBME' }]))
+    expect(r).toMatchObject({ estado: 'lista', conceptos: 1, preguntas: 1, material: { preguntas: [{ id: 'q-neighbor', revision: 'r1' }] }, revision: { revisadas: 3, encajan: 2 } })
+  })
+  it('antes de seleccionar lee sólo las preguntas sin ficha, en lotes de veinte, y va contando', async () => {
+    const banco = Array.from({ length: 70 }, (_, i) => ({ ...fichas[1], id: `q-${i}` }))
+    const lee = lectura(banco.slice(5).map(f => f.id))
+    const progreso: string[] = []
+    const r = await resolverSesion({ consulta: { ...c, fuente: 'nbme' }, pedido: 'x', fichas: banco, ritmo: RITMO_PREDETERMINADO, revisar: todas(), lectura: lee, onProgreso: t => progreso.push(t) })
+    expect(lee.pendientes).toHaveBeenCalledWith(banco.map(f => ({ id: f.id, revision: 'r1' })), undefined)
+    expect(lee.leer.mock.calls.map(call => call[0].length)).toEqual([20, 20, 20, 5])
+    expect(lee.leer.mock.calls.flatMap(call => call[0].map((x: { id: string }) => x.id))).toEqual(banco.slice(5).map(f => f.id))
+    expect(progreso.some(t => t.includes('65 de 65'))).toBe(true)
+    expect(progreso.at(-1)).toMatch(/revisa las candidatas una por una: 70 de 70/)
+    expect(r).toMatchObject({ estado: 'lista' })
+  })
+  it('un lote de lectura que falla no tumba la sesión: lo dice; si fallan todos, avisa con el motivo', async () => {
+    const banco = Array.from({ length: 40 }, (_, i) => ({ ...fichas[1], id: `q-${i}` }))
+    const parcial = lectura(banco.map(f => f.id), async refs => refs[0].id === 'q-0' ? { estado: 'sin_ia', motivo: 'Saturado' } : { estado: 'ok', leidas: refs.length, sinFuente: 0, pendientes: 0 })
+    // Después de leer se vuelve a preguntar qué falta: las veinte del lote caído.
+    parcial.pendientes.mockResolvedValueOnce({ estado: 'ok', faltan: banco.map(f => f.id) }).mockResolvedValueOnce({ estado: 'ok', faltan: banco.slice(0, 20).map(f => f.id) })
+    const seleccion = todas()
+    const r = await resolverSesion({ consulta: { ...c, fuente: 'nbme' }, pedido: 'x', fichas: banco, ritmo: RITMO_PREDETERMINADO, revisar: seleccion, lectura: parcial })
+    expect(r).toMatchObject({ estado: 'lista', sinLeer: 20, sinRevisar: 0 })
+    // Lo no leído no se manda a seleccionar, así que no se confunde con «sin fuente».
+    expect(seleccion.mock.calls[0][2].map(i => i.id)).toEqual(banco.slice(20).map(f => f.id))
+    const nada = lectura(banco.map(f => f.id), async () => ({ estado: 'sin_ia', motivo: 'Claude no tiene saldo disponible.' }))
+    const revisar = todas()
+    expect(await resolverSesion({ consulta: { ...c, fuente: 'nbme' }, pedido: 'x', fichas: banco, ritmo: RITMO_PREDETERMINADO, revisar, lectura: nada }))
+      .toEqual({ estado: 'sin_ia', motivo: 'Claude no tiene saldo disponible.' })
+    expect(revisar).not.toHaveBeenCalled()
   })
   it('never relaxes the requested history filter to fill the missing type', async () => {
     const revisar = vi.fn(async () => ({ estado: 'ok' as const, ids: ['q-neighbor'], sinRevisar: 0 }))
@@ -451,13 +524,60 @@ describe('complete the requested mix before offering a partial session', () => {
     expect(revisar).not.toHaveBeenCalled()
     expect(r.estado).toBe('vacio')
   })
-  it('reserves NBME candidates in a large mixed list instead of reviewing only concepts', async () => {
-    const many = [...Array.from({ length: 200 }, (_, i) => ({ ...fichas[0], id: `c-${i}` })), fichas[1]]
-    const revisar = vi.fn(async (_p, _c, items: ItemRevision[]) => ({ estado: 'ok' as const, ids: items.map(i => i.id), sinRevisar: 0 }))
-    const r = await resolverSesion({ consulta: c, pedido: 'tema alfa', fichas: many, ritmo: RITMO_PREDETERMINADO, revisar })
-    expect(revisar.mock.calls[0][2]).toHaveLength(150)
-    expect(revisar.mock.calls[0][2].some(i => i.id === 'q-held')).toBe(true)
-    expect(r).toMatchObject({ estado: 'lista', preguntas: 1 })
+  it('revisa en lotes de ciento cincuenta, sin repetir candidatas ni dar por buena una no revisada', async () => {
+    const many = Array.from({ length: 1000 }, (_, i) => ({ ...fichas[1], id: `q-${i}` }))
+    const revisar = vi.fn(async (_p, _c, _items: ItemRevision[]) => ({ estado: 'ok' as const, ids: [], sinRevisar: 0 }))
+    const r = await resolverSesion({ consulta: { ...c, fuente: 'nbme' }, pedido: 'tema alfa', fichas: many, ritmo: RITMO_PREDETERMINADO, revisar })
+    expect(revisar.mock.calls.map(call => call[2].length)).toEqual([150, 150, 150, 150, 150, 150, 100])
+    const vistos = revisar.mock.calls.flatMap(call => call[2].map(i => i.id))
+    expect(new Set(vistos).size).toBe(1000)
+    expect(r.estado).toBe('vacio')
+  })
+  it('si falla un lote de la selección, no presenta una sesión a medias', async () => {
+    const many = Array.from({ length: 400 }, (_, i) => ({ ...fichas[1], id: `q-${i}` }))
+    const revisar = vi.fn().mockResolvedValueOnce({ estado: 'ok', ids: ['q-1'], sinRevisar: 0 }).mockResolvedValue({ estado: 'sin_ia', motivo: 'Claude tardó demasiado.', codigo: 'tiempo' })
+    expect(await resolverSesion({ consulta: { ...c, fuente: 'nbme' }, pedido: 'x', fichas: many, ritmo: RITMO_PREDETERMINADO, revisar }))
+      .toEqual({ estado: 'sin_ia', motivo: 'Claude tardó demasiado.' })
+    // Un plazo agotado pudo facturarse: no se repite por su cuenta.
+    expect(revisar).toHaveBeenCalledTimes(3)
+  })
+  it('un límite de ritmo o una saturación, que no se facturan, se reintentan una vez; otros fallos no', async () => {
+    const limite = { estado: 'sin_ia', motivo: 'Demasiadas consultas.', codigo: 'limite' }
+    const revisar = vi.fn().mockResolvedValueOnce(limite).mockResolvedValue({ estado: 'ok', ids: ['c-alpha'], sinRevisar: 0 })
+    const r = await resolverSesion({ consulta: { ...c, fuente: 'conceptos' }, pedido: 'x', fichas, ritmo: RITMO_PREDETERMINADO, revisar, esperaReintentoMs: 1 })
+    expect(revisar).toHaveBeenCalledTimes(2)
+    expect(r).toMatchObject({ estado: 'lista', conceptos: 1 })
+    const dosVeces = vi.fn().mockResolvedValue({ ...limite, codigo: 'sobrecarga' })
+    expect(await resolverSesion({ consulta: { ...c, fuente: 'conceptos' }, pedido: 'x', fichas, ritmo: RITMO_PREDETERMINADO, revisar: dosVeces, esperaReintentoMs: 1 }))
+      .toMatchObject({ estado: 'sin_ia' })
+    expect(dosVeces).toHaveBeenCalledTimes(2)
+    const credito = vi.fn().mockResolvedValue({ ...limite, codigo: 'credito' })
+    await resolverSesion({ consulta: { ...c, fuente: 'conceptos' }, pedido: 'x', fichas, ritmo: RITMO_PREDETERMINADO, revisar: credito, esperaReintentoMs: 1 })
+    expect(credito).toHaveBeenCalledTimes(1)
+    const lee = lectura(['q-held'], vi.fn().mockResolvedValueOnce({ ...limite }).mockResolvedValue({ estado: 'ok', leidas: 1, sinFuente: 0, pendientes: 0 }))
+    await resolverSesion({ consulta: { ...c, fuente: 'nbme' }, pedido: 'x', fichas, ritmo: RITMO_PREDETERMINADO, revisar: todas(), lectura: lee, esperaReintentoMs: 1 })
+    expect(lee.leer).toHaveBeenCalledTimes(2)
+  })
+  it('una sesión de varios temas los reparte por turnos y dice cuántos lleva de cada uno', async () => {
+    const tres = consulta({ fuente: 'conceptos', sistemas: ['Cardiovascular', 'Respiratorio'], disciplinas: ['Farmacología', 'Microbiología'],
+      terminos: ['farmacología cardiovascular', 'farmacología respiratoria', 'farmacología antimicrobiana'], cantidad: 6 })
+    const conceptos = [...['cv1', 'cv2', 'cv3', 'cv4', 'cv5'].map(id => concepto(id, 'Cardiovascular', id, { disciplina_primaria: 'Farmacología' })),
+      ...['re1', 're2'].map(id => concepto(id, 'Respiratorio', id, { disciplina_primaria: 'Farmacología' })),
+      ...['am1', 'am2', 'am3'].map(id => concepto(id, 'Multisistémico', id, { disciplina_primaria: 'Microbiología' }))]
+    const f = fichasDeSesion(entrada({ conceptos }))
+    const grupo: Record<string, number> = { cv: 1, re: 2, am: 3 }
+    const revisar = vi.fn(async (_p: string, _c: ConsultaSesion, items: ItemRevision[]) => ({ estado: 'ok' as const, ids: items.map(i => i.id), grupos: items.map(i => grupo[i.id.slice(0, 2)]), sinRevisar: 0 }))
+    const r = await resolverSesion({ consulta: tres, pedido: 'x', fichas: f, ritmo: RITMO_PREDETERMINADO, revisar })
+    expect(r).toMatchObject({ estado: 'lista', conceptos: 6, reparto: [
+      { tema: 'farmacología cardiovascular', n: 2 }, { tema: 'farmacología respiratoria', n: 2 }, { tema: 'farmacología antimicrobiana', n: 2 }] })
+    if (r.estado === 'lista') expect(r.material.conceptIds).toEqual(['cv1', 're1', 'am1', 'cv2', 're2', 'am2'])
+  })
+  it('si pide más ítems de los que encajan, lo dice; un bloque sólo NBME no pasa de veinte', async () => {
+    const r = await resolverSesion({ consulta: { ...c, cantidad: 40 }, pedido: 'x', fichas, ritmo: RITMO_PREDETERMINADO, revisar: todas() })
+    expect(r).toMatchObject({ estado: 'lista', conceptos: 1, preguntas: 2, aviso: 'Pediste 40 ítems y encontré 3 que encajan con lo pedido.' })
+    const banco = Array.from({ length: 30 }, (_, i) => ({ ...fichas[1], id: `q-${i}` }))
+    const nbme = await resolverSesion({ consulta: { ...c, fuente: 'nbme', cantidad: 40 }, pedido: 'x', fichas: banco, ritmo: RITMO_PREDETERMINADO, revisar: todas() })
+    expect(nbme).toMatchObject({ estado: 'lista', preguntas: 20, aviso: expect.stringContaining('como mucho 20 preguntas') })
   })
   it('keeps both types in a short session when they fit the existing time allowance', () => {
     const many = [...Array.from({ length: 10 }, (_, i) => ({ ...fichas[0], id: `c-${i}` })), fichas[1]]
@@ -465,28 +585,16 @@ describe('complete the requested mix before offering a partial session', () => {
     expect(r.conceptIds).toHaveLength(2)
     expect(r.preguntas).toHaveLength(1)
   })
-  it('offers an explicitly partial session only after checking alternatives', async () => {
-    const revisar = vi.fn().mockResolvedValueOnce({ estado: 'ok', ids: ['c-alpha'], sinRevisar: 1 })
-      .mockResolvedValue({ estado: 'ok', ids: [], sinRevisar: 0 })
+  it('offers an explicitly partial session when no question fits the topic', async () => {
+    const revisar = vi.fn().mockResolvedValue({ estado: 'ok', ids: ['c-alpha'], sinRevisar: 1 })
     const r = await resolverSesion({ consulta: c, pedido: 'tema alfa', fichas, ritmo: RITMO_PREDETERMINADO, revisar })
-    expect(revisar).toHaveBeenCalledTimes(2)
     expect(r).toMatchObject({ estado: 'lista', incompleta: 'preguntas', aviso: expect.stringContaining('No encontré preguntas verificables') })
   })
-  it('cancels before starting another search and does not call an unchecked result complete', async () => {
+  it('cancels and does not call an unchecked result complete', async () => {
     const control = new AbortController()
     const revisar = vi.fn(async () => { control.abort(); return { estado: 'ok' as const, ids: ['c-alpha'], sinRevisar: 1 } })
     const r = await resolverSesion({ consulta: c, pedido: 'tema alfa', fichas, ritmo: RITMO_PREDETERMINADO, revisar, signal: control.signal })
     expect(revisar).toHaveBeenCalledTimes(1)
     expect(r).toMatchObject({ estado: 'sin_ia', motivo: 'Se canceló la búsqueda.' })
-  })
-  it('bounds unsuccessful searches without repeating candidates or calling unchecked items a match', async () => {
-    const many = Array.from({ length: 1000 }, (_, i) => ({ ...fichas[1], id: `q-${i}` }))
-    const revisar = vi.fn(async (_p, _c, _items: ItemRevision[]) => ({ estado: 'ok' as const, ids: [], sinRevisar: 0 }))
-    const r = await resolverSesion({ consulta: { ...c, fuente: 'nbme' }, pedido: 'tema alfa', fichas: many, ritmo: RITMO_PREDETERMINADO, revisar })
-    expect(revisar).toHaveBeenCalledTimes(5)
-    const ids = revisar.mock.calls.flatMap(call => call[2].map(i => i.id))
-    expect(ids).toHaveLength(750)
-    expect(new Set(ids).size).toBe(ids.length)
-    expect(r.estado).toBe('vacio')
   })
 })

@@ -40,6 +40,10 @@
   controles de razonamiento. Conservar las puertas de fuente, validación y gasto.
   Cambiar un perfil invalida su caché; cambiar el evaluador también exige versión
   nueva sin recalificar historial. Guía: `docs/modelos-claude.md`.
+- El 21-oct-2026 Yoel pidió que armar una sesión desde el chat use Opus 5.5 aunque
+  tarde minutos: `entender` y `revisar` con high, `leer` (una ficha por pregunta NBME,
+  guardada en el Durable Object) con medium. Las etiquetas del banco sólo son pistas;
+  Claude decide por el contenido de cada ítem. Opus sigue fuera de cualquier otra función.
 
 - Actualización posterior del 14-oct-2026: MyQBank conserva controles y preguntas
   NBME en inglés y explicaciones, mecanismos y drills nuevos en español. El usuario

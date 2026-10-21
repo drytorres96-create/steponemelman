@@ -115,6 +115,8 @@
 .tutor-burbuja--aviso { border-color: var(--tt-ambar-borde); background: var(--tt-ambar-fondo); display: grid; gap: 10px; justify-items: start; }
 .tutor-burbuja--pensando { display: inline-flex; align-items: center; min-height: 40px; padding: 10px 16px; color: var(--tt-suave); }
 .tutor-burbuja--pensando .tutor-puntos i { width: 6px; height: 6px; }
+/* Armar una sesión con Opus tarda minutos: se dice qué está leyendo. */
+.tutor-burbuja--pensando .chat-sesion-progreso { margin-right: 10px; font-size: .88rem; line-height: 1.45; overflow-wrap: anywhere; }
 
 /* ---------- sugerencias en cápsulas ---------- */
 .tutor-explora { animation: tutor-entra 220ms ease-out both; }

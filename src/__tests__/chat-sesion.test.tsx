@@ -17,10 +17,13 @@ const mock = vi.hoisted(() => ({
   cargarTodo: vi.fn(),
   pedirEntender: vi.fn(),
   pedirRevision: vi.fn(),
+  pedirLecturasPendientes: vi.fn(),
+  pedirLectura: vi.fn(),
 }))
 vi.mock('../data/corpus', () => ({ cargarTodo: mock.cargarTodo }))
 vi.mock('../lib/sesion-claude', async importOriginal => ({
   ...(await importOriginal<typeof import('../lib/sesion-claude')>()), pedirEntender: mock.pedirEntender, pedirRevision: mock.pedirRevision,
+  pedirLecturasPendientes: mock.pedirLecturasPendientes, pedirLectura: mock.pedirLectura,
 }))
 
 import { ChatSesion, type PropsChatSesion } from '../screens/ChatSesion'
@@ -75,7 +78,10 @@ beforeEach(() => {
   localStorage.clear()
   mock.cargarTodo.mockReset().mockResolvedValue(CORPUS)
   mock.pedirEntender.mockReset().mockResolvedValue({ estado: 'ok', tipo: 'consulta', consulta: consulta() })
-  mock.pedirRevision.mockReset().mockResolvedValue({ estado: 'ok', ids: [], sinRevisar: 0 })
+  // Por defecto Claude se queda con todo lo que lee; cada prueba dice lo contrario cuando importa.
+  mock.pedirRevision.mockReset().mockImplementation(async (_p: string, _c: ConsultaSesion, items: ItemRevision[]) => ({ estado: 'ok', ids: items.map(i => i.id), sinRevisar: 0 }))
+  mock.pedirLecturasPendientes.mockReset().mockResolvedValue({ estado: 'ok', faltan: [] })
+  mock.pedirLectura.mockReset().mockImplementation(async (refs: unknown[]) => ({ estado: 'ok', leidas: refs.length, sinFuente: 0, pendientes: 0 }))
   onNuevo.mockReset()
   contenedor = document.createElement('div'); document.body.appendChild(contenedor); raiz = createRoot(contenedor)
 })
@@ -168,12 +174,13 @@ describe('preguntas de seguimiento con un clic', () => {
 })
 
 describe('de lo pedido a la sesión lista', () => {
-  it('sin términos libres la plataforma decide sola: no hay revisión con IA y queda el botón para empezar', async () => {
-    mock.pedirEntender.mockResolvedValue({ estado: 'ok', tipo: 'consulta', consulta: consulta({ estados: ['falladas'], titulo: 'Endocrino · falladas' }) })
+  it('sin un tema la plataforma decide sola con el historial: no hay lectura con IA y queda el botón para empezar', async () => {
+    mock.pedirEntender.mockResolvedValue({ estado: 'ok', tipo: 'consulta', consulta: consulta({ sistemas: [], estados: ['falladas'], titulo: 'Endocrino · falladas' }) })
     await montar(); await abrir()
     await decir('endocrino que he fallado')
     expect(mock.pedirRevision).not.toHaveBeenCalled()
-    expect(contenedor.textContent).toContain('Entendí: Endocrino · falladas · conceptos y preguntas · ≈ 10 min')
+    expect(mock.pedirLecturasPendientes).not.toHaveBeenCalled()
+    expect(contenedor.textContent).toContain('Entendí: todo el material · falladas · conceptos y preguntas · ≈ 10 min. Busco en tu material…')
     expect(contenedor.textContent).toContain('Endocrino · falladas')
     expect(contenedor.textContent).toContain('1 concepto y 0 preguntas · ≈ 2 min')
     expect(contenedor.textContent).toContain('No encontré preguntas verificables')
@@ -182,19 +189,23 @@ describe('de lo pedido a la sesión lista', () => {
     expect(onNuevo.mock.calls[0][0]).toMatchObject({ conceptIds: ['C-ENDO-1'], preguntas: [], titulo: 'Endocrino · falladas', nbmeSessionId: null, subtitulo: 'endocrino que he fallado' })
     expect(boton('Sesión abierta')!.hasAttribute('disabled')).toBe(true)
   })
-  it('con un tema libre, Claude revisa sólo las etiquetas de lo que cumple los filtros y la sesión lleva lo que deja', async () => {
+  it('con un tema, Claude lee el banco NBME y cada candidata, aunque su etiqueta sea de otro sistema, y la sesión lleva lo que deja', async () => {
     mock.pedirEntender.mockResolvedValue({ estado: 'ok', tipo: 'consulta', consulta: consulta({ sistemas: ['Hematológico y oncológico'], terminos: ['oncología'], titulo: 'Hematología y oncología' }) })
+    mock.pedirLecturasPendientes.mockResolvedValue({ estado: 'ok', faltan: [PREGUNTA.id] })
     mock.pedirRevision.mockResolvedValue({ estado: 'ok', ids: ['C-HEMA-2'], sinRevisar: 0 })
     await montar(); await abrir()
     await decir('hematología y lo relacionado con oncología')
-    expect(mock.pedirRevision).toHaveBeenCalledTimes(2)
-    expect(mock.pedirRevision.mock.calls[1][2].every((i: ItemRevision) => i.tipo === 'pregunta')).toBe(true)
+    expect(contenedor.textContent).toContain('Claude va a leer cada candidata por su contenido, no por su etiqueta; puede tardar unos minutos.')
+    // La pregunta está etiquetada como Endocrino: aun así se lee, porque las etiquetas no deciden.
+    expect(mock.pedirLecturasPendientes.mock.calls[0][0]).toEqual([{ id: PREGUNTA.id, revision: 'r3' }])
+    expect(mock.pedirLectura.mock.calls[0][0]).toEqual([{ id: PREGUNTA.id, revision: 'r3' }])
+    expect(mock.pedirRevision).toHaveBeenCalledTimes(1)
     const [pedido, , items] = mock.pedirRevision.mock.calls[0] as [string, ConsultaSesion, ItemRevision[]]
     expect(pedido).toBe('hematología y lo relacionado con oncología')
-    expect(items.map(i => i.id).sort()).toEqual(['C-HEMA-1', 'C-HEMA-2'])
-    expect(items[0]).toEqual({ tipo: 'concepto', id: expect.any(String), etiqueta: expect.stringMatching(/^(Anemia ferropénica|Linfoma de Hodgkin): Objetivo de /) })
-    expect(contenedor.textContent).toContain('Claude revisó 3 candidatas y dejó 1.')
-    expect(contenedor.textContent).toContain('Busqué también el mismo tema en otras clasificaciones.')
+    expect(items.map(i => i.id).sort()).toEqual(['C-HEMA-1', 'C-HEMA-2', 'NBME28-P0001'])
+    expect(items.find(i => i.tipo === 'concepto')).toEqual({ tipo: 'concepto', id: expect.any(String), etiqueta: expect.stringMatching(/^(Anemia ferropénica|Linfoma de Hodgkin): Objetivo de /) })
+    expect(items.find(i => i.tipo === 'pregunta')).toEqual({ tipo: 'pregunta', id: PREGUNTA.id, revision: 'r3', etiqueta: 'Pregunta NBME' })
+    expect(contenedor.textContent).toContain('Claude leyó 3 candidatas una por una y se quedó con 1.')
     await clic('Empezar solo con conceptos')
     expect(onNuevo.mock.calls[0][0].conceptIds).toEqual(['C-HEMA-2'])
   })
@@ -242,12 +253,32 @@ describe('de lo pedido a la sesión lista', () => {
   })
 })
 
+describe('mientras Claude lee', () => {
+  it('dice qué está haciendo, y al terminar enseña cuántas leyó y el reparto por temas', async () => {
+    mock.pedirEntender.mockResolvedValue({ estado: 'ok', tipo: 'consulta', consulta: consulta({ sistemas: ['Endocrino', 'Hematológico y oncológico'],
+      terminos: ['endocrino', 'hematología'], cantidad: 4, titulo: 'Mezcla' }) })
+    const espera = unico<unknown>()
+    mock.pedirRevision.mockReturnValueOnce(espera.p)
+    await montar(); await abrir()
+    await decir('endocrino y hematología, 4 ítems')
+    expect(contenedor.textContent).toContain('Entendí: «endocrino» + «hematología» · conceptos y preguntas · 4 ítems.')
+    expect(contenedor.querySelector('[role="status"]')?.textContent).toContain('Claude revisa las candidatas una por una: 0 de')
+    const grupos: Record<string, number> = { 'C-ENDO-1': 1, 'C-ENDO-2': 1, 'C-HEMA-1': 2, 'C-HEMA-2': 2 }
+    await act(async () => { espera.ok({ estado: 'ok', ids: Object.keys(grupos), grupos: Object.values(grupos), sinRevisar: 0 }); await Promise.resolve() })
+    expect(contenedor.querySelector('[role="status"]')).toBeNull()
+    expect(contenedor.textContent).toContain('4 conceptos y 0 preguntas · 4 ítems')
+    expect(contenedor.textContent).toContain('Claude leyó 5 candidatas una por una y se quedó con 4.')
+    expect(contenedor.textContent).toContain('Reparto: endocrino 2 · hematología 2.')
+  })
+})
+
 describe('cuando no hay nada o algo falla', () => {
   it('si nada cumple lo pedido, lo dice sin botón de empezar', async () => {
     mock.pedirEntender.mockResolvedValue({ estado: 'ok', tipo: 'consulta', consulta: consulta({ sistemas: ['Cardiovascular'] }) })
+    mock.pedirRevision.mockResolvedValue({ estado: 'ok', ids: [], sinRevisar: 0 })
     await montar(); await abrir()
     await decir('cardio')
-    expect(contenedor.textContent).toContain('No encontré conceptos y preguntas de Cardiovascular')
+    expect(contenedor.textContent).toContain('Claude leyó 1 candidata y ninguna trata Cardiovascular.')
     expect(boton('Empezar la sesión')).toBeUndefined()
     expect(onNuevo).not.toHaveBeenCalled()
   })

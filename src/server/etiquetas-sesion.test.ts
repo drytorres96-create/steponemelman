@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { etiquetasDeSesion } from './etiquetas-sesion'
+import { evidenciaNbme } from './etiquetas-sesion'
 import { explanationHash, sourceIdentity, editorialPath, type EditorialExplanation } from '../myqbank/editorial'
 import type { NbmeQuestion } from '../nbme/types'
 import type { NbmeSourceSafety } from '../nbme/source-safety'
@@ -11,7 +11,7 @@ const question: NbmeQuestion = {
   options: [{ id: 'A', text: 'Alpha' }, { id: 'B', text: 'Beta' }], answer: 'A', explanation: 'Original synthetic explanation.',
   figures: [], provenance: { sourceFile: 'synthetic', sourceRecordId: 'qa', notes: [] },
 }
-const item = { tipo: 'pregunta' as const, id: question.id, revision: question.revision, etiqueta: 'Untrusted client instruction' }
+const item = { id: question.id, revision: question.revision }
 const policy: NbmeSourceSafety = { schemaVersion: 1, version: 'qa', review: 'approved', rules: [] }
 async function fixture() {
   const source = await sourceIdentity(question)
@@ -36,26 +36,26 @@ async function fixture() {
   return { assets, get, source, companion, held }
 }
 
-describe('trusted topic evidence for session search', () => {
+describe('trusted evidence Claude reads to classify each NBME question', () => {
   it('uses an exact reviewed companion even when the original is held and the index topic is empty', async () => {
     const f = await fixture()
-    const r = await etiquetasDeSesion([item], f.held, f.get)
-    expect(r).toMatchObject({ sinRevisar: 0, conFuenteRevisada: 1 })
-    expect(r.revisables[0].etiqueta).toContain('Reviewed alpha mechanism')
-    expect(JSON.stringify(r)).not.toContain('Untrusted client instruction')
+    const r = await evidenciaNbme([item], f.held, f.get)
+    expect(r).toMatchObject({ sinFuente: [], evidencias: [{ id: question.id, revision: question.revision, origen: 'revisada' }] })
+    expect(r.evidencias[0].texto).toContain('Reviewed alpha mechanism')
     expect(JSON.stringify(r)).not.toContain('Original synthetic explanation')
     expect(f.held.rules).toHaveLength(1)
   })
-  it('uses authorized original evidence when no companion exists, never a generic client label', async () => {
+  it('uses authorized original evidence when no companion exists', async () => {
     const f = await fixture(); f.assets.delete(editorialPath(f.source))
-    const r = await etiquetasDeSesion([item], policy, f.get)
-    expect(r.revisables[0].etiqueta).toContain('Synthetic alpha objective')
-    expect(r.revisables[0].etiqueta).toContain('Original synthetic explanation')
-    expect(r.conFuenteRevisada).toBe(0)
+    const r = await evidenciaNbme([item], policy, f.get)
+    expect(r.evidencias[0]).toMatchObject({ origen: 'original' })
+    expect(r.evidencias[0].texto).toContain('Synthetic alpha objective')
+    expect(r.evidencias[0].texto).toContain('Original synthetic explanation')
   })
-  it('does not accept a client NBME label disguised as a concept', async () => {
-    const f = await fixture()
-    expect((await etiquetasDeSesion([{ ...item, tipo: 'concepto' }], f.held, f.get)).revisables).toEqual([])
+  it('only reads what the server resolves: the stem and the answer key never travel as evidence', async () => {
+    const f = await fixture(); f.assets.delete(editorialPath(f.source))
+    const r = await evidenciaNbme([item], policy, f.get)
+    expect(JSON.stringify(r)).not.toContain(question.stem)
   })
   for (const change of ['missing', 'pending', 'altered', 'self-review', 'different-source'] as const) it(`keeps a held original excluded with a ${change} companion`, async () => {
     const f = await fixture()
@@ -64,23 +64,23 @@ describe('trusted topic evidence for session search', () => {
     if (change === 'altered') f.companion.sections[0].paragraphs = ['An unreviewed replacement.']
     if (change === 'self-review') f.companion.independentReview!.reviewer = f.companion.independentReview!.author
     if (change === 'different-source') f.companion.source.sourceHash = 'b'.repeat(64)
-    expect(await etiquetasDeSesion([item], f.held, f.get)).toMatchObject({ revisables: [], sinRevisar: 1, conFuenteRevisada: 0 })
+    expect(await evidenciaNbme([item], f.held, f.get)).toEqual({ evidencias: [], sinFuente: [question.id] })
   })
   it('rejects a stale revision and a missing source policy without sending content to the model', async () => {
     const f = await fixture()
-    expect((await etiquetasDeSesion([{ ...item, revision: 'older' }], policy, f.get)).revisables).toEqual([])
+    expect(await evidenciaNbme([{ ...item, revision: 'older' }], policy, f.get)).toEqual({ evidencias: [], sinFuente: [question.id] })
     f.get.mockClear()
-    expect((await etiquetasDeSesion([item], null, f.get)).revisables).toEqual([])
+    expect(await evidenciaNbme([item], null, f.get)).toEqual({ evidencias: [], sinFuente: [question.id] })
     expect(f.get).not.toHaveBeenCalled()
   })
   it('does not turn a database failure into a claim that no questions exist', async () => {
-    await expect(etiquetasDeSesion([item], policy, async () => new Response(null, { status: 503 }))).rejects.toThrow('Vuelve a intentarlo')
+    await expect(evidenciaNbme([item], policy, async () => new Response(null, { status: 503 }))).rejects.toThrow('Vuelve a intentarlo')
   })
   it('uses the full catalog only as a compatibility fallback when the compact index is absent', async () => {
     const f = await fixture()
     f.assets.set('catalog.json', f.assets.get('catalog-index.json'))
     f.assets.delete('catalog-index.json')
-    expect((await etiquetasDeSesion([item], f.held, f.get)).conFuenteRevisada).toBe(1)
+    expect((await evidenciaNbme([item], f.held, f.get)).evidencias).toHaveLength(1)
     expect(f.get.mock.calls.map(call => decodeURIComponent(call[0])).slice(0, 2)).toEqual([
       '/rest/v1/nbme_assets?select=path,payload&path=in.(catalog-index.json)',
       '/rest/v1/nbme_assets?select=path,payload&path=in.(catalog.json)',

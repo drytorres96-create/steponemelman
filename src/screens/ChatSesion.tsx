@@ -3,7 +3,7 @@ import { Avatar, Turno } from '../components/tutor/TutorClaude'
 import { IconoCerebro } from '../components/tutor/IconoCerebro'
 import { BotonCoral, BotonSalvia, Cruz, Enviar, manejadoresBrillo } from '../components/tutor/controles'
 import '../components/tutor/tutor-claude.css'
-import { describirConsulta } from '../lib/constructor-sesion'
+import { describirConsulta, esTematica } from '../lib/constructor-sesion'
 import { MAX_PEDIDO, type ConsultaSesion, type TurnoSesion } from '../lib/contexto-sesion'
 import type { MaterialNuevo } from '../lib/nuevo-hoy'
 import { pedirEntender } from '../lib/sesion-claude'
@@ -11,10 +11,10 @@ import { armarDesdeConsulta, type DatosSesion } from './chat-sesion-flujo'
 
 /**
  * «Pídele a Claude una sesión»: la persona describe con sus palabras lo que quiere estudiar.
- * Claude lo traduce al vocabulario de la plataforma (y, si falta algo que cambia la sesión,
- * pregunta con botones, como mucho dos veces); la plataforma filtra con el historial real y,
- * sólo si se pidió un tema libre, Claude revisa la lista corta. Al final queda un botón para
- * empezar. Nada de esto se guarda: la conversación vive en esta pantalla.
+ * Claude (Opus) lo traduce al vocabulario de la plataforma (y, si falta algo que cambia la sesión,
+ * pregunta con botones, como mucho dos veces); la plataforma filtra con el historial real y, si se
+ * pidió un tema, Claude lee cada candidata por su contenido. Puede tardar unos minutos y se va
+ * diciendo qué hace. Al final queda un botón para empezar. La conversación vive en esta pantalla.
  *
  * Es opcional y no cuenta como deuda ni consume la sugerencia del día; lo que se estudie desde
  * aquí registra intentos como cualquier otra sesión.
@@ -61,6 +61,8 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, abierto: abiert
   const abierto = controlado ? abiertoPadre : abiertoPropio
   const [mensajes, setMensajes] = useState<Msg[]>([])
   const [esperando, setEsperando] = useState(false)
+  /** Qué está haciendo Claude mientras arma la sesión: puede tardar minutos. */
+  const [progreso, setProgreso] = useState<string | null>(null)
   const [texto, setTexto] = useState('')
   const contador = useRef(0)
   const vivo = useRef(true)
@@ -86,7 +88,7 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, abierto: abiert
   const poner = (m: SinId<Msg>) => setMensajes(prev => [...prev, { ...m, id: siguienteId() } as Msg])
   const quitar = (id: number) => setMensajes(prev => prev.filter(m => m.id !== id))
   const empezar = () => { ocupadoRef.current = true; setEsperando(true); control.current = new AbortController(); return control.current.signal }
-  const terminar = () => { ocupadoRef.current = false; setEsperando(false) }
+  const terminar = () => { ocupadoRef.current = false; setEsperando(false); setProgreso(null) }
   const reiniciarHilo = () => { hilo.current = { turnos: [], preguntas: 0 } }
 
   /** Una petición cancelada o de una pantalla que ya no existe no toca nada. */
@@ -94,17 +96,18 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, abierto: abiert
 
   const armar = async (consulta: ConsultaSesion, pedido: string) => {
     const signal = empezar()
-    const r = await armarDesdeConsulta(consulta, pedido, ultimos.current, signal)
+    const r = await armarDesdeConsulta(consulta, pedido, ultimos.current, signal, Date.now(), t => { if (vigente(signal)) setProgreso(t) })
     if (!vigente(signal)) return
     terminar()
     if (r.estado === 'lista') {
       reiniciarHilo()
       const nota: string[] = []
-      if (r.revision) nota.push(`Claude revisó ${plural(r.revision.revisadas, 'candidata', 'candidatas')} y dejó ${r.revision.encajan}.`)
-      if (r.revision?.ampliada) nota.push('Busqué también el mismo tema en otras clasificaciones.')
+      if (r.revision) nota.push(`Claude leyó ${plural(r.revision.revisadas, 'candidata', 'candidatas')} una por una y se quedó con ${r.revision.encajan}.`)
+      if (r.reparto) nota.push(`Reparto: ${r.reparto.map(x => `${x.tema} ${x.n}`).join(' · ')}.`)
       if (r.sinRevisar > 0) nota.push(`${plural(r.sinRevisar, 'pregunta quedó fuera', 'preguntas quedaron fuera')} porque no pude verificar una fuente utilizable.`)
+      if (r.sinLeer) nota.push(`${plural(r.sinLeer, 'pregunta NBME no se pudo leer', 'preguntas NBME no se pudieron leer')} esta vez; se leerán en la próxima sesión.`)
       if (r.aviso) nota.push(r.aviso)
-      const resumen = `${plural(r.conceptos, 'concepto', 'conceptos')} y ${plural(r.preguntas, 'pregunta', 'preguntas')} · ≈ ${r.minutos} min`
+      const resumen = `${plural(r.conceptos, 'concepto', 'conceptos')} y ${plural(r.preguntas, 'pregunta', 'preguntas')}${consulta.cantidad ? ` · ${plural(r.conceptos + r.preguntas, 'ítem', 'ítems')}` : ''} · ≈ ${r.minutos} min`
       poner({ rol: 'sesion', material: r.material, resumen, nota, usada: false, incompleta: r.incompleta })
     } else if (r.estado === 'vacio') {
       reiniciarHilo()
@@ -125,7 +128,8 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, abierto: abiert
       return
     }
     const pedido = hilo.current.turnos.filter(t => t.rol === 'yo').map(t => t.texto).join(' · ').slice(0, MAX_PEDIDO)
-    poner({ rol: 'ia', texto: `Entendí: ${describirConsulta(r.consulta)}. Busco en tu material…` })
+    poner({ rol: 'ia', texto: `Entendí: ${describirConsulta(r.consulta)}. ${esTematica(r.consulta)
+      ? 'Claude va a leer cada candidata por su contenido, no por su etiqueta; puede tardar unos minutos.' : 'Busco en tu material…'}` })
     await armar(r.consulta, pedido)
   }
 
@@ -207,7 +211,8 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, abierto: abiert
                   {m.usada ? 'Sesión abierta' : m.incompleta ? `Empezar solo con ${m.incompleta === 'preguntas' ? 'conceptos' : 'preguntas'}` : 'Empezar la sesión'}</BotonCoral>
               </div></div>)}
       {esperando && <div className="tutor-turno tutor-turno--ia" role="status">
-        <Avatar /><div className="tutor-burbuja tutor-burbuja--pensando"><span className="tutor-sr">Claude está pensando…</span>
+        <Avatar /><div className="tutor-burbuja tutor-burbuja--pensando">{progreso
+          ? <span className="chat-sesion-progreso">{progreso}</span> : <span className="tutor-sr">Claude está pensando…</span>}
           <span className="tutor-puntos" aria-hidden="true"><i /><i /><i /></span></div></div>}
       {mostrarOpciones && ultimo.rol === 'pregunta' && <div className="tutor-explora">
         <div className="tutor-chips" role="group" aria-label="Opciones de respuesta">

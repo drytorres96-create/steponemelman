@@ -6,10 +6,12 @@ import { DISCIPLINAS, SISTEMAS } from '../schema/concept'
  * Sólo viajan identificadores, etiquetas cortas del propio ítem y lo que la persona escribe;
  * nunca texto de preguntas NBME ni enunciados del corpus.
  *
- * Tres fases:
+ * Fases:
  * - `hilo`: una frase con el hilo común de las sugeridas del día.
  * - `entender`: interpreta lo que la persona pide y, si falta algo que cambia la sesión, hace una pregunta con opciones.
- * - `revisar`: de una lista corta ya filtrada por la plataforma, deja los ítems que encajan con lo pedido.
+ * - `lecturas`: qué preguntas NBME aún no tienen ficha de lectura (no llama a Claude).
+ * - `leer`: Claude lee preguntas NBME una por una con el material que autoriza el servidor y guarda su ficha.
+ * - `revisar`: Claude lee las fichas de las candidatas y deja las que encajan con lo pedido, con el tema que cubren.
  */
 
 export const SENALES_INVENTARIO = ['fallo_reciente', 'fallo_repetido', 'acierto_con_ayuda'] as const
@@ -39,8 +41,15 @@ export type MinutosSesion = (typeof MINUTOS_SESION)[number]
 export const MINUTOS_PREDETERMINADOS: MinutosSesion = 10
 
 export const MAX_PEDIDO = 300
-export const MAX_ETIQUETA_REVISION = 90
-export const MAX_ITEMS_REVISION = 150
+export const MAX_ETIQUETA_REVISION = 160
+/** Candidatas por llamada de selección: las fichas son cortas y Opus las lee una a una. */
+export const MAX_ITEMS_REVISION = 300
+/** Preguntas NBME que Claude lee en una sola llamada: el material de cada una es largo. */
+export const MAX_ITEMS_LECTURA = 20
+/** Cuántas referencias admite la consulta de fichas pendientes: el banco entero cabe. */
+export const MAX_REFS_LECTURAS = 800
+/** Tope de ítems que se pueden pedir por número en una sesión. */
+export const MAX_CANTIDAD_SESION = 60
 /** Cuántas preguntas de seguimiento hace Claude como mucho antes de armar la consulta. */
 export const MAX_PREGUNTAS_SEGUIMIENTO = 2
 export const MAX_TURNOS_SESION = 7
@@ -49,6 +58,10 @@ export const MAX_OPCIONES = 4
 export const MAX_TEXTO_OPCION = 32
 
 const IdZ = z.string().min(1).max(120).regex(/^[\w.:-]+$/)
+const RevisionZ = z.string().min(1).max(80).regex(/^[a-zA-Z0-9_.-]+$/)
+/** Una pregunta NBME fijada por revisión: lo único que viaja para leerla. */
+const RefNbmeZ = z.object({ id: z.string().regex(/^NBME(?:27|28|29)-P\d{4}$/), revision: RevisionZ }).strict()
+export type RefNbme = z.infer<typeof RefNbmeZ>
 
 const ItemHiloZ = z.object({
   tipo: z.enum(['concepto', 'pregunta']),
@@ -62,7 +75,7 @@ const ItemRevisionZ = z.object({
   tipo: z.enum(['concepto', 'pregunta']),
   id: IdZ,
   /** Optional for older clients; new clients pin the NBME revision selected from the catalog. */
-  revision: z.string().min(1).max(80).regex(/^[a-zA-Z0-9_.-]+$/).optional(),
+  revision: RevisionZ.optional(),
   etiqueta: z.string().min(1).max(MAX_ETIQUETA_REVISION),
 }).strict()
 export type ItemRevision = z.infer<typeof ItemRevisionZ>
@@ -82,6 +95,8 @@ export const ConsultaSesionZ = z.object({
   terminos: z.array(TerminoZ).max(5),
   estados: z.array(z.enum(ESTADOS_SESION)).max(4),
   minutos: z.union([z.literal(5), z.literal(10), z.literal(20), z.literal(30)]),
+  /** Si la persona pidió un número de ítems, manda sobre los minutos. */
+  cantidad: z.number().int().min(1).max(MAX_CANTIDAD_SESION).optional(),
   titulo: z.string().trim().min(3).max(60),
 }).strict()
 export type ConsultaSesion = z.infer<typeof ConsultaSesionZ>
@@ -95,7 +110,11 @@ export const PeticionSesionZ = z.discriminatedUnion('fase', [
     mensajes: z.array(TurnoSesionZ).min(1).max(MAX_TURNOS_SESION),
     preguntasHechas: z.number().int().min(0).max(MAX_PREGUNTAS_SEGUIMIENTO),
   }).strict(),
-  /** Revisar ítem por ítem una lista ya filtrada. */
+  /** Qué preguntas de la lista aún no tienen ficha de lectura. No gasta. */
+  z.object({ fase: z.literal('lecturas'), items: z.array(RefNbmeZ).min(1).max(MAX_REFS_LECTURAS) }).strict(),
+  /** Leer con Claude, una por una, las preguntas que aún no tienen ficha. */
+  z.object({ fase: z.literal('leer'), items: z.array(RefNbmeZ).min(1).max(MAX_ITEMS_LECTURA) }).strict(),
+  /** Revisar ítem por ítem las candidatas que dejan la fuente y el historial. */
   z.object({
     fase: z.literal('revisar'),
     pedido: z.string().trim().min(1).max(MAX_PEDIDO),
@@ -107,7 +126,7 @@ export const PeticionSesionZ = z.discriminatedUnion('fase', [
   if (p.fase === 'entender' && p.mensajes.length > 0 && p.mensajes[p.mensajes.length - 1].rol !== 'yo') {
     ctx.addIssue({ code: 'custom', message: 'El último turno debe ser de la persona.', path: ['mensajes'] })
   }
-  if (p.fase === 'revisar' && new Set(p.items.map(i => i.id)).size !== p.items.length) {
+  if ((p.fase === 'revisar' || p.fase === 'leer' || p.fase === 'lecturas') && new Set(p.items.map(i => i.id)).size !== p.items.length) {
     ctx.addIssue({ code: 'custom', message: 'Hay identificadores repetidos.', path: ['items'] })
   }
 })
@@ -124,7 +143,7 @@ export type SalidaEntender =
 const sinAcentos = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
 
 /** El valor canónico de una lista cerrada, tolerando mayúsculas y tildes; null si no es de la lista. */
-function canonico<T extends string>(valor: unknown, lista: readonly T[]): T | null {
+export function canonico<T extends string>(valor: unknown, lista: readonly T[]): T | null {
   if (typeof valor !== 'string') return null
   const buscado = sinAcentos(valor)
   return lista.find(x => sinAcentos(x) === buscado) ?? null
@@ -141,6 +160,14 @@ function listaCerrada<T extends string>(valor: unknown, lista: readonly T[], max
     if (!salida.includes(c)) salida.push(c)
   }
   return salida.length <= maximo ? salida : null
+}
+
+/** Un número de ítems razonable; por encima del tope se queda en el tope, y lo que no es un número invalida la consulta. */
+function cantidadPedida(valor: unknown): number | undefined | null {
+  if (valor === undefined || valor === null) return undefined
+  const n = typeof valor === 'string' && /\d/.test(valor) ? Number(valor.replace(/[^\d]/g, '')) : valor
+  if (typeof n !== 'number' || !Number.isFinite(n) || n < 1) return null
+  return Math.min(MAX_CANTIDAD_SESION, Math.round(n))
 }
 
 const MINUTOS_NUMERICOS: readonly number[] = MINUTOS_SESION
@@ -171,7 +198,8 @@ export function normalizarConsulta(crudo: unknown): ConsultaSesion | null {
   const disciplinas = listaCerrada(o.disciplinas, DISCIPLINAS, 5)
   const estados = listaCerrada(o.estados, ESTADOS_SESION, 4)
   const minutos = minutosCercanos(o.minutos)
-  if (!fuente || !sistemas || !disciplinas || !estados || !minutos) return null
+  const cantidad = cantidadPedida(o.cantidad)
+  if (!fuente || !sistemas || !disciplinas || !estados || !minutos || cantidad === null) return null
   const terminos: string[] = []
   if (o.terminos !== undefined && o.terminos !== null) {
     if (!Array.isArray(o.terminos) || o.terminos.length > 5) return null
@@ -181,7 +209,7 @@ export function normalizarConsulta(crudo: unknown): ConsultaSesion | null {
       if (!terminos.some(x => sinAcentos(x) === sinAcentos(limpio))) terminos.push(limpio)
     }
   }
-  const base = { fuente, sistemas, disciplinas, terminos, estados, minutos }
+  const base = { fuente, sistemas, disciplinas, terminos, estados, minutos, ...(cantidad ? { cantidad } : {}) }
   const titulo = limpiar(o.titulo, 60) ?? tituloDe(base)
   const leida = ConsultaSesionZ.safeParse({ ...base, titulo: titulo.length >= 3 ? titulo : tituloDe(base) })
   return leida.success ? leida.data : null

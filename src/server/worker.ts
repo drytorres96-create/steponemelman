@@ -14,17 +14,22 @@ import { extraerJSON, validarEjercicios } from '../lib/practica-activa'
 import type { NbmeQuestion } from '../nbme/types'
 import { NBME_SOURCE_SAFETY_PATH, readNbmeSourceSafety, originalRecoveryAllowed, type NbmeSourceSafety } from '../nbme/source-safety'
 import { tieneClasificacionContradictoria } from './fuente-recuperacion-confiable'
-import { etiquetasDeSesion } from './etiquetas-sesion'
+import { evidenciaNbme, type OrigenEvidencia } from './etiquetas-sesion'
 import { handleNbme } from './nbme'
 import { handlePlan, type PlanEnv } from './plan'
 import { ErrorClaude, costeDeError, costeReservaUSD, llamarClaude, type CodigoClaude, type SolicitudClaude } from './claude'
 import { MAX_MATERIAL, VERSION_CHAT, materialChatConcepto, materialChatNbme, solicitudCalificar, solicitudChat, solicitudPractica, type MaterialChat } from './ia-chat'
-import { VERSION_CONSTRUCTOR, VERSION_SESION, solicitudEntender, solicitudHilo, solicitudRevisar, validarEntenderSalida, validarHilo, validarRevision } from './ia-sesion'
+import {
+  VERSION_CONSTRUCTOR, VERSION_LECTURA, VERSION_SESION, solicitudEntender, solicitudHilo, solicitudLeer, solicitudRevisar, textoDeFicha,
+  validarEntenderSalida, validarHilo, validarLectura, validarRevision, type FichaLectura,
+} from './ia-sesion'
 
 const DAY = 86400000
 
 interface Storage {
   get<T>(key: string): Promise<T | undefined>
+  /** Hasta 128 claves por llamada; las que no existen no aparecen en el mapa. */
+  get<T>(keys: string[]): Promise<Map<string, T>>
   put(key: string, value: unknown): Promise<void>
   delete(keys: string[]): Promise<number>
   list<T>(options: { prefix: string }): Promise<Map<string, T>>
@@ -43,9 +48,12 @@ interface Env extends PlanEnv {
   ASSETS: { fetch(request: Request): Promise<Response> }
 }
 
-type ModoClaude = 'calificar' | 'chat' | 'practica' | 'hilo' | 'entender' | 'revisar'
-/** Lo que el validador necesita saber de la petición: los ids que se pueden devolver y cuántas preguntas de seguimiento quedan. */
-export type ContextoValidacion = { permitidos?: string[]; preguntas?: number }
+type ModoClaude = 'calificar' | 'chat' | 'practica' | 'hilo' | 'entender' | 'leer' | 'revisar'
+/**
+ * Lo que el validador necesita saber de la petición: los ids que se pueden devolver, cuántas preguntas
+ * de seguimiento quedan y cuántos temas se pidieron. `lectura` dice dónde guardar cada ficha leída.
+ */
+export type ContextoValidacion = { permitidos?: string[]; preguntas?: number; temas?: number; lectura?: { id: string; clave: string; origen: OrigenEvidencia }[] }
 type CoachInput = { user: string; key: string; mode: ModoClaude; solicitud: SolicitudClaude; source?: { title: string; page: number }; contexto?: ContextoValidacion }
 export type CoachVeredicto = { veredicto: 'correcta' | 'parcial' | 'incorrecta'; motivo: string }
 
@@ -58,7 +66,18 @@ export const LLAMADAS_POR_DIA = 500
  * veredicto que se guarda en el historial, así que llega hasta el final; el chat y los
  * ejercicios son prescindibles y se quedan fuera los primeros.
  */
-export const TECHO_POR_MODO: Record<ModoClaude, number> = { calificar: 1, chat: 0.9, practica: 0.9, entender: 0.85, revisar: 0.85, hilo: 0.8 }
+export const TECHO_POR_MODO: Record<ModoClaude, number> = { calificar: 1, chat: 0.9, practica: 0.9, entender: 0.85, leer: 0.85, revisar: 0.85, hilo: 0.8 }
+
+/**
+ * Ficha de lectura guardada de una pregunta NBME, por id, revisión y versión del prompt de lectura.
+ * No caduca: la pregunta fijada por revisión no cambia. «sin_fuente» recuerda que hoy no hay material
+ * que la IA pueda leer, y sólo vale un día para que una explicación revisada nueva se lea pronto.
+ */
+export type FichaGuardada = { v: 1; at: number } & ({ origen: OrigenEvidencia } & FichaLectura | { origen: 'sin_fuente' })
+export const VIGENCIA_SIN_FUENTE_MS = DAY
+export const claveLectura = (r: { id: string; revision: string }) => `lectura:${VERSION_LECTURA}:${r.id}:${r.revision}`
+export const fichaVigente = (f: FichaGuardada | undefined, ahora = Date.now()): boolean =>
+  !!f && f.v === 1 && (f.origen !== 'sin_fuente' || ahora - f.at < VIGENCIA_SIN_FUENTE_MS)
 
 export const presupuestoMensualUSD = (env: Pick<Env, 'CLAUDE_PRESUPUESTO_USD'>): number => {
   const n = Number(env.CLAUDE_PRESUPUESTO_USD)
@@ -115,7 +134,8 @@ export function validarSalida(modo: ModoClaude, salida: string, parada?: string,
   if (modo === 'calificar') return validarCalificacion(salida)
   if (modo === 'hilo') return validarHilo(salida)
   if (modo === 'entender') return validarEntenderSalida(salida, contexto.preguntas ?? 0)
-  if (modo === 'revisar') return validarRevision(salida, contexto.permitidos ?? [])
+  if (modo === 'leer') return validarLectura(salida, contexto.permitidos ?? [])
+  if (modo === 'revisar') return validarRevision(salida, contexto.permitidos ?? [], contexto.temas ?? 0)
   if (modo === 'chat') {
     const respuesta = salida.trim()
     return respuesta.length >= 20 ? { respuesta: respuesta.slice(0, 8000) } : null
@@ -130,6 +150,9 @@ export class StudyCoach {
   constructor(private state: { storage: Storage }, private env: Env) {}
 
   async fetch(request: Request): Promise<Response> {
+    const ruta = new URL(request.url).pathname
+    if (ruta === '/lecturas') return this.lecturas(await request.json() as { claves: string[] })
+    if (ruta === '/lecturas/sin-fuente') return this.sinFuente(await request.json() as { claves: string[] })
     const input = await request.json() as CoachInput
     // Dos peticiones idénticas a la vez comparten una sola llamada (y un solo gasto).
     const current = this.pending.get(input.key)
@@ -139,9 +162,42 @@ export class StudyCoach {
     try { return (await work).clone() } finally { this.pending.delete(input.key) }
   }
 
+  /** Las fichas guardadas de estas claves. Sólo lee: nunca llama a Claude ni gasta. */
+  private async lecturas({ claves }: { claves: string[] }): Promise<Response> {
+    const fichas: Record<string, FichaGuardada> = {}
+    const validas = (Array.isArray(claves) ? claves : []).filter(c => typeof c === 'string' && c.startsWith('lectura:'))
+    for (let n = 0; n < validas.length; n += 128) {
+      for (const [k, v] of await this.state.storage.get<FichaGuardada>(validas.slice(n, n + 128))) fichas[k] = v
+    }
+    return json({ fichas })
+  }
+
+  /** Recuerda por un día que estas preguntas no tienen material legible, sin pisar una ficha ya leída. */
+  private async sinFuente({ claves }: { claves: string[] }): Promise<Response> {
+    const validas = (Array.isArray(claves) ? claves : []).filter(c => typeof c === 'string' && c.startsWith('lectura:'))
+    for (let n = 0; n < validas.length; n += 128) {
+      const lote = validas.slice(n, n + 128)
+      const ya = await this.state.storage.get<FichaGuardada>(lote)
+      for (const clave of lote) {
+        if (ya.get(clave)?.origen === 'revisada' || ya.get(clave)?.origen === 'original') continue
+        await this.state.storage.put(clave, { v: 1, at: Date.now(), origen: 'sin_fuente' } satisfies FichaGuardada)
+      }
+    }
+    return json({ ok: true })
+  }
+
+  private async guardarFichas(lectura: NonNullable<ContextoValidacion['lectura']>, fichas: Record<string, FichaLectura>) {
+    for (const l of lectura) {
+      const f = fichas[l.id]
+      if (f && l.clave.startsWith('lectura:')) await this.state.storage.put(l.clave, { v: 1, at: Date.now(), origen: l.origen, ...f } satisfies FichaGuardada)
+    }
+  }
+
   private async atender(input: CoachInput): Promise<Response> {
     const cacheKey = `cache:${input.key}`
-    const guardado = await this.state.storage.get<{ at: number; cuerpo: Record<string, unknown> }>(cacheKey)
+    // Una lectura se guarda como fichas por pregunta, no como respuesta en caché.
+    const lectura = input.mode === 'leer'
+    const guardado = lectura ? undefined : await this.state.storage.get<{ at: number; cuerpo: Record<string, unknown> }>(cacheKey)
     if (guardado?.cuerpo && Date.now() - guardado.at < 7 * DAY) return json({ ...guardado.cuerpo, ...(input.source ? { source: input.source } : {}), cached: true })
     const reserva = costeReservaUSD(input.solicitud)
     const mes = await this.admitir(input.user, input.mode, reserva)
@@ -157,8 +213,11 @@ export class StudyCoach {
         registrar('coach/salida-invalida', input.mode, { parada: r.parada })
         return unavailable('respuesta')
       }
-      await this.state.storage.put(cacheKey, { at: Date.now(), cuerpo })
-      await this.podarCache()
+      if (lectura) await this.guardarFichas(input.contexto?.lectura ?? [], (cuerpo as { fichas: Record<string, FichaLectura> }).fichas)
+      else {
+        await this.state.storage.put(cacheKey, { at: Date.now(), cuerpo })
+        await this.podarCache()
+      }
       return json({ ...cuerpo, ...(input.source ? { source: input.source } : {}), cached: false })
     } catch (causa) {
       if (causa instanceof ErrorClaude) {
@@ -219,7 +278,7 @@ export class StudyCoach {
 
 /** Tope del cuerpo de una petición de IA. Revisar una lista de candidatos necesita más que una pregunta suelta. */
 const LIMITE_CUERPO = 6000
-const LIMITE_CUERPO_SESION = 24_000
+export const LIMITE_CUERPO_SESION = 160_000
 
 async function boundedBody(request: Request, limite = LIMITE_CUERPO): Promise<string | null> {
   const reader = request.body?.getReader()
@@ -385,14 +444,27 @@ const ETIQUETA_NBME_RESERVADA = 'Pregunta NBME'
 const nbmeAutorizada = (id: string, politica: NbmeSourceSafety | null) => /^NBME(?:27|28|29)-P\d{4}$/.test(id) && originalRecoveryAllowed(politica, id)
 const limpiarEtiqueta = (t: string) => t.replace(/\s+/g, ' ').trim().normalize('NFC')
 
+/** Las fichas guardadas de estas preguntas, por clave. Lee del Durable Object sin gastar. */
+async function fichasGuardadas(env: Env, claves: string[]): Promise<Map<string, FichaGuardada>> {
+  if (!claves.length) return new Map()
+  const r = await env.COACH.get(env.COACH.idFromName('study-coach-v1')).fetch(new Request('https://coach/lecturas', { method: 'POST', body: JSON.stringify({ claves }) }))
+  if (!r.ok) throw new Error('lecturas')
+  const { fichas } = await r.json() as { fichas?: Record<string, FichaGuardada> }
+  return new Map(Object.entries(fichas ?? {}))
+}
+
+const ID_NBME = /^NBME(?:27|28|29)-P\d{4}$/
+
 /**
  * Ayudas de organización del estudio (no explican una pregunta):
  * - `hilo`: la frase con el hilo común de las sugeridas del día.
  * - `entender`: traduce lo que la persona pide al vocabulario cerrado de la plataforma, o hace una pregunta de seguimiento.
- * - `revisar`: de una lista que la plataforma ya filtró, deja los ítems que encajan con lo pedido.
- * El navegador manda identificadores, etiquetas cortas y lo que la persona escribe; la plataforma ya
- * decidió qué es frágil o fallado, y aquí Claude sólo redacta o interpreta. Las preguntas NBME pasan
- * por la política de fuentes antes de que su etiqueta llegue a la IA.
+ * - `lecturas`: qué preguntas NBME de la lista aún no tienen ficha de lectura. No llama a Claude.
+ * - `leer`: Claude lee, una por una, las preguntas sin ficha con el material que resuelve el servidor, y la ficha se guarda.
+ * - `revisar`: Claude lee la ficha de cada candidata y deja las que tratan lo pedido, con el tema que cubren.
+ * El navegador manda identificadores, etiquetas cortas de sus conceptos y lo que la persona escribe; la
+ * plataforma ya decidió qué es frágil o fallado. Las preguntas NBME pasan por la política de fuentes
+ * antes de que su material o su ficha lleguen a la IA.
  */
 async function handleSesion(request: Request, url: URL, env: Env): Promise<Response> {
   const parado = preflight(request, url, 'POST', LIMITE_CUERPO_SESION)
@@ -417,20 +489,61 @@ async function handleSesion(request: Request, url: URL, env: Env): Promise<Respo
       return await alCoach(env, 'entender', trusted)
     }
 
-    const hayNbme = input.items.some(i => i.tipo === 'pregunta')
-    const politica = hayNbme ? await politicaNbme(quien.get) : null
+    if (input.fase === 'lecturas' || input.fase === 'leer') {
+      const claves = input.items.map(claveLectura)
+      const guardadas = await fichasGuardadas(env, claves)
+      const faltan = input.items.filter((_, n) => !fichaVigente(guardadas.get(claves[n])))
+      if (input.fase === 'lecturas') return json({ faltan: faltan.map(r => r.id) })
+      const yaLeidas = input.items.length - faltan.length
+      if (!faltan.length) return json({ leidas: yaLeidas, sinFuente: 0, pendientes: 0 })
+      const politica = await politicaNbme(quien.get)
+      // Sin política vigente nada sale hacia la IA, y tampoco se recuerda como «sin fuente»: puede ser un fallo pasajero.
+      if (!politica) return json({ leidas: yaLeidas, sinFuente: faltan.length, pendientes: 0 })
+      const { evidencias, sinFuente } = await evidenciaNbme(faltan, politica, quien.get)
+      if (sinFuente.length) {
+        const marcadas = faltan.filter(r => sinFuente.includes(r.id)).map(claveLectura)
+        await env.COACH.get(env.COACH.idFromName('study-coach-v1')).fetch(new Request('https://coach/lecturas/sin-fuente', { method: 'POST', body: JSON.stringify({ claves: marcadas }) }))
+      }
+      if (!evidencias.length) return json({ leidas: yaLeidas, sinFuente: sinFuente.length, pendientes: 0 })
+      const solicitud = solicitudLeer(evidencias)
+      const lectura = evidencias.map(e => ({ id: e.id, clave: claveLectura(e), origen: e.origen }))
+      const trusted: CoachInput = { user: quien.userId, mode: 'leer', solicitud, contexto: { permitidos: evidencias.map(e => e.id), lectura },
+        key: await digest(JSON.stringify(['leer', evidencias, clavePerfil(solicitud), VERSION_LECTURA])) }
+      const respuesta = await alCoach(env, 'leer', trusted)
+      if (!respuesta.ok) return respuesta
+      const leidasAhora = Object.keys((await respuesta.json() as { fichas?: Record<string, unknown> }).fichas ?? {}).length
+      return json({ leidas: yaLeidas + leidasAhora, sinFuente: sinFuente.length, pendientes: evidencias.length - leidasAhora })
+    }
 
     if (input.fase === 'revisar') {
-      const { revisables, sinRevisar, conFuenteRevisada } = await etiquetasDeSesion(input.items, politica, quien.get)
-      if (!revisables.length) return json({ ids: [], sinRevisar, cached: false })
+      const preguntas = input.items.filter((i): i is typeof i & { revision: string } => i.tipo === 'pregunta' && ID_NBME.test(i.id) && !!i.revision)
+      const politica = preguntas.length ? await politicaNbme(quien.get) : null
+      const claves = new Map(preguntas.map(p => [p.id, claveLectura(p)]))
+      const guardadas = politica ? await fichasGuardadas(env, [...claves.values()]) : new Map<string, FichaGuardada>()
+      let conFuenteRevisada = 0
+      // Un concepto lleva su tema y objetivo; una pregunta NBME, la ficha que Claude escribió al leerla.
+      // Una ficha leída del original sólo vale mientras la política siga autorizando ese original.
+      const revisables = input.items.flatMap(i => {
+        if (i.tipo === 'concepto') return i.id.startsWith('NBME') ? [] : [{ id: i.id, etiqueta: limpiarEtiqueta(i.etiqueta) }]
+        const f = claves.has(i.id) ? guardadas.get(claves.get(i.id)!) : undefined
+        if (!f || f.origen === 'sin_fuente' || (f.origen === 'original' && !originalRecoveryAllowed(politica, i.id))) return []
+        if (f.origen === 'revisada') conFuenteRevisada++
+        return [{ id: i.id, etiqueta: textoDeFicha(f) }]
+      })
+      const sinRevisar = input.items.length - revisables.length
+      if (!revisables.length) return json({ ids: [], grupos: [], sinRevisar, cached: false })
       const pedido = limpiarEtiqueta(input.pedido)
       const solicitud = solicitudRevisar(pedido, input.consulta, revisables)
-      const trusted: CoachInput = { user: quien.userId, mode: 'revisar', solicitud, contexto: { permitidos: revisables.map(i => i.id) },
+      const trusted: CoachInput = { user: quien.userId, mode: 'revisar', solicitud,
+        contexto: { permitidos: revisables.map(i => i.id), temas: input.consulta.terminos.length },
         key: await digest(JSON.stringify([quien.userId, 'revisar', pedido, input.consulta, revisables, clavePerfil(solicitud), VERSION_CONSTRUCTOR])) }
       const respuesta = await alCoach(env, 'revisar', trusted)
       if (!respuesta.ok) return respuesta
       return json({ ...await respuesta.json() as Record<string, unknown>, sinRevisar, revisadas: revisables.length, conFuenteRevisada })
     }
+
+    const hayNbme = input.items.some(i => i.tipo === 'pregunta')
+    const politica = hayNbme ? await politicaNbme(quien.get) : null
 
     // fase === 'hilo'
     const items = input.items.map(i => ({

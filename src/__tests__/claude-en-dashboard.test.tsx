@@ -22,11 +22,13 @@ const concepto = (id: string, sistema: string, tema: string) => ({
 })
 const mock = vi.hoisted(() => ({
   cargarTodo: vi.fn(), cargarConceptos: vi.fn(), pedirEntender: vi.fn(), pedirRevision: vi.fn(), pedirHilo: vi.fn(),
+  pedirLecturasPendientes: vi.fn(), pedirLectura: vi.fn(),
 }))
 vi.mock('../data/corpus', () => ({ cargarTodo: mock.cargarTodo, cargarConceptos: mock.cargarConceptos }))
 vi.mock('../lib/sesion-claude', async importOriginal => ({
   ...(await importOriginal<typeof import('../lib/sesion-claude')>()),
   pedirEntender: mock.pedirEntender, pedirRevision: mock.pedirRevision, pedirHilo: mock.pedirHilo,
+  pedirLecturasPendientes: mock.pedirLecturasPendientes, pedirLectura: mock.pedirLectura,
 }))
 
 import { ClaudeEnDashboard } from '../myqbank/ClaudeEnDashboard'
@@ -82,7 +84,10 @@ beforeEach(() => {
   mock.cargarTodo.mockReset().mockResolvedValue(CORPUS)
   mock.cargarConceptos.mockReset().mockImplementation(async (ids: string[]) => new Map(ids.map(id => [id, CORPUS.find(c => c.concept_id === id) ?? CORPUS[0]])))
   mock.pedirEntender.mockReset().mockResolvedValue({ estado: 'ok', tipo: 'consulta', consulta })
-  mock.pedirRevision.mockReset().mockResolvedValue({ estado: 'ok', ids: [], sinRevisar: 0 })
+  // Claude se queda con lo que lee: el tema ya lo acota la consulta de estas pruebas.
+  mock.pedirRevision.mockReset().mockImplementation(async (_p: unknown, _c: unknown, items: { id: string }[]) => ({ estado: 'ok', ids: items.map(i => i.id), sinRevisar: 0 }))
+  mock.pedirLecturasPendientes.mockReset().mockResolvedValue({ estado: 'ok', faltan: [] })
+  mock.pedirLectura.mockReset().mockResolvedValue({ estado: 'ok', leidas: 0, sinFuente: 0, pendientes: 0 })
   mock.pedirHilo.mockReset().mockResolvedValue({ estado: 'ok', hilo: 'Hormonas de la suprarrenal.' })
   onNuevo.mockReset()
   // jsdom no calcula diseño: sin esto ningún elemento «se ve» y no habría a qué llevar el foco con Tab.
