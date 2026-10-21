@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 
-export type RespuestaIA<T> = { estado: 'ok'; data: T } | { estado: 'sin_ia'; motivo: string }
+/** `codigo` es la causa que nombra el servidor (por ejemplo «limite» o «sobrecarga»), cuando la nombra. */
+export type RespuestaIA<T> = { estado: 'ok'; data: T } | { estado: 'sin_ia'; motivo: string; codigo?: string }
 
 /** Un transporte acotado para todas las ayudas de IA: sin reintentos ni proveedor alternativo. */
 /** Tope de bytes de una petición normal; las rutas que revisan listas piden más y lo dicen. */
@@ -32,7 +33,8 @@ export async function solicitarIA<T>(ruta: string, cuerpo: unknown, limiteMs: nu
     if (!response.ok) {
       const espera = Number(response.headers.get('Retry-After'))
       const motivo = typeof data?.error === 'string' ? data.error : 'No se pudo obtener la ayuda.'
-      return { estado: 'sin_ia', motivo: motivo + (espera > 0 && espera <= 60 ? ` Puedes volver a intentarlo en ${Math.ceil(espera)} s.` : '') }
+      return { estado: 'sin_ia', motivo: motivo + (espera > 0 && espera <= 60 ? ` Puedes volver a intentarlo en ${Math.ceil(espera)} s.` : ''),
+        ...(typeof data?.codigo === 'string' ? { codigo: data.codigo } : {}) }
     }
     return { estado: 'ok', data: data as T }
   } catch {

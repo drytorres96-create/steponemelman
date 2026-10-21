@@ -8,8 +8,9 @@ type Peticion = Record<string, any>
 type Respuesta = { status?: number; json: unknown }
 
 /**
- * Simula `/api/ia/sesion`: `entender` y `revisar` las contesta lo que se le pase, en orden;
- * el hilo de «Para reforzar hoy» se contesta con una frase fija. Todo lo demás, como sin servidor.
+ * Simula `/api/ia/sesion`: `entender` y `revisar` las contesta lo que se le pase, en orden. Sin guion,
+ * `revisar` se queda con todo lo que lee, como un Claude que confirma el tema. El hilo de «Para reforzar
+ * hoy» se contesta con una frase fija y la lectura del banco NBME no tiene nada pendiente.
  */
 async function instalarRed(page: Page, guion: { entender?: (p: Peticion, n: number) => Respuesta; revisar?: (p: Peticion, n: number) => Respuesta } = {}) {
   const entender: Peticion[] = [], revisar: Peticion[] = []
@@ -19,10 +20,13 @@ async function instalarRed(page: Page, guion: { entender?: (p: Peticion, n: numb
     if (ruta === '/api/ia/sesion') {
       const cuerpo = req.postDataJSON() as Peticion
       if (cuerpo.fase === 'hilo') return route.fulfill({ json: { hilo: 'Son conceptos que fallaste esta semana.', cached: false } })
+      if (cuerpo.fase === 'lecturas') return route.fulfill({ json: { faltan: [] } })
+      if (cuerpo.fase === 'leer') return route.fulfill({ json: { leidas: cuerpo.items.length, sinFuente: 0, pendientes: 0 } })
       const lista = cuerpo.fase === 'entender' ? entender : revisar
       lista.push(cuerpo)
+      const todas = { json: { ids: (cuerpo.items ?? []).map((i: Peticion) => i.id), sinRevisar: 0 } }
       const r = (cuerpo.fase === 'entender' ? guion.entender : guion.revisar)?.(cuerpo, lista.length)
-        ?? { status: 503, json: { error: 'Sin guion.', codigo: 'proveedor' } }
+        ?? (cuerpo.fase === 'revisar' ? todas : { status: 503, json: { error: 'Sin guion.', codigo: 'proveedor' } })
       return route.fulfill({ status: r.status ?? 200, json: r.json })
     }
     return route.fulfill({ status: 503, json: { disponible: false, error: 'Synthetic backend unavailable.' } })
@@ -76,9 +80,10 @@ for (const width of [390, 1280]) test.describe(`Pídele a Claude una sesión a $
     expect(n).toBeLessThanOrEqual(29)
     expect(await sinDesborde(page)).toBe(true)
 
-    // Dos llamadas a Claude, sin revisión (no hubo tema libre) y con la conversación completa en la segunda.
+    // Dos llamadas para entender, con la conversación completa en la segunda, y una lectura de las candidatas:
+    // pidió un sistema, y las etiquetas no deciden solas qué entra.
     expect(red.entender).toHaveLength(2)
-    expect(red.revisar).toHaveLength(0)
+    expect(red.revisar).toHaveLength(1)
     expect(red.entender[0]).toMatchObject({ fase: 'entender', preguntasHechas: 0, mensajes: [{ rol: 'yo', texto: 'una sesión de renal de las que he fallado' }] })
     expect(red.entender[1].preguntasHechas).toBe(1)
     expect(red.entender[1].mensajes.map((m: Peticion) => m.rol)).toEqual(['yo', 'ia', 'yo'])
@@ -92,7 +97,7 @@ for (const width of [390, 1280]) test.describe(`Pídele a Claude una sesión a $
     expect(await page.evaluate(() => window.__leerProgresoSintetico().progreso)).toEqual(antes)
   })
 
-  test('con un tema libre, Claude revisa sólo etiquetas de lo ya filtrado y la sesión lleva lo que deja', async ({ page }) => {
+  test('con un tema, Claude lee las candidatas por su tema y objetivo y la sesión lleva lo que deja', async ({ page }) => {
     const red = await instalarRed(page, {
       entender: () => ({ json: consulta({ terminos: ['mecanismo renal'], estados: [], titulo: 'Renal · mecanismo' }) }),
       revisar: p => ({ json: { ids: p.items.slice(0, 3).map((i: Peticion) => i.id), sinRevisar: 0 } }),
@@ -101,7 +106,7 @@ for (const width of [390, 1280]) test.describe(`Pídele a Claude una sesión a $
     await decir(page, 'renal y lo relacionado con mecanismos')
 
     await expect(panel(page).locator('.chat-sesion-resultado')).toContainText('3 conceptos y 0 preguntas')
-    await expect(panel(page)).toContainText(/Claude revisó \d+ candidatas y dejó 3\./)
+    await expect(panel(page)).toContainText(/Claude leyó \d+ candidatas una por una y se quedó con 3\./)
     expect(red.revisar).toHaveLength(1)
     const cuerpo = red.revisar[0]
     expect(cuerpo.pedido).toBe('renal y lo relacionado con mecanismos')
@@ -109,7 +114,7 @@ for (const width of [390, 1280]) test.describe(`Pídele a Claude una sesión a $
     expect(cuerpo.items.length).toBeGreaterThan(3)
     for (const i of cuerpo.items) {
       expect(Object.keys(i).sort()).toEqual(['etiqueta', 'id', 'tipo'])
-      expect(i.etiqueta.length).toBeLessThanOrEqual(90)
+      expect(i.etiqueta.length).toBeLessThanOrEqual(160)
     }
     // Ni explicaciones, ni respuestas, ni enunciados: sólo el tema y el objetivo.
     expect(JSON.stringify(cuerpo)).not.toMatch(/Ejemplo de interfaz|demostraci[oó]n\./)

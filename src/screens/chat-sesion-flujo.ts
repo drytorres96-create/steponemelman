@@ -6,7 +6,7 @@ import type { ProgresoConcepto } from '../srs/tipos'
 import { fichasDeSesion, resolverSesion, ritmoDe, type ResultadoSesion } from '../lib/constructor-sesion'
 import type { ConsultaSesion } from '../lib/contexto-sesion'
 import { mediasDeRitmo } from '../lib/ritmo'
-import { pedirRevision } from '../lib/sesion-claude'
+import { pedirLectura, pedirLecturasPendientes, pedirRevision } from '../lib/sesion-claude'
 
 /** Lo que la pantalla ya sabe de la persona: con esto, y sólo con esto, la plataforma arma la sesión. */
 export interface DatosSesion {
@@ -26,9 +26,10 @@ export type ResultadoFlujo = ResultadoSesion | { estado: 'error'; motivo: string
 
 /**
  * De la consulta ya entendida a una sesión lista: carga el material si hace falta, interpreta el
- * historial, filtra y, sólo cuando se pidió un tema libre, deja que Claude revise la lista corta.
+ * historial, filtra y, cuando se pidió un tema, deja que Claude lea el banco y cada candidata.
  */
-export async function armarDesdeConsulta(consulta: ConsultaSesion, pedido: string, d: DatosSesion, signal?: AbortSignal, ahora = Date.now()): Promise<ResultadoFlujo> {
+export async function armarDesdeConsulta(consulta: ConsultaSesion, pedido: string, d: DatosSesion, signal?: AbortSignal, ahora = Date.now(),
+  onProgreso?: (texto: string) => void): Promise<ResultadoFlujo> {
   if (consulta.fuente !== 'conceptos' && d.bancoDisponible === false) return { estado: 'error', motivo: 'El banco de preguntas aún no está disponible. Puedes pedir una sesión de conceptos o volver a intentar cuando cargue.' }
   let conceptos: Concepto[] = []
   if (consulta.fuente !== 'nbme') {
@@ -41,5 +42,6 @@ export async function armarDesdeConsulta(consulta: ConsultaSesion, pedido: strin
     enCajasHoy: d.enCajasHoy, conceptoDisponible: id => d.publicados.has(id), ahora,
   })
   const ritmo = ritmoDe(mediasDeRitmo(d.progreso, Object.values(d.nbme.attempts)))
-  return resolverSesion({ consulta, pedido, fichas, ritmo, revisar: pedirRevision, signal })
+  return resolverSesion({ consulta, pedido, fichas, ritmo, revisar: pedirRevision, signal, onProgreso,
+    lectura: { pendientes: pedirLecturasPendientes, leer: pedirLectura } })
 }

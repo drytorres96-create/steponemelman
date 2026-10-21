@@ -37,6 +37,8 @@ async function preparar(page: Page, { ahora = MIERCOLES, bloques = {} }: { ahora
         entender.push(cuerpo)
         return route.fulfill({ json: { tipo: 'consulta', consulta: { fuente: 'conceptos', sistemas: ['Renal'], disciplinas: [], terminos: [], estados: ['falladas'], minutos: 10, titulo: 'Renal · falladas' } } })
       }
+      // Claude lee las candidatas y confirma el tema de todas.
+      if (cuerpo.fase === 'revisar') return route.fulfill({ json: { ids: (cuerpo.items as { id: string }[]).map(i => i.id), sinRevisar: 0, cached: false } })
     }
     return route.fulfill({ status: 503, json: { disponible: false, error: 'Synthetic backend unavailable.' } })
   })
@@ -317,19 +319,27 @@ test('el chat permanece accesible mientras carga el catálogo NBME', async ({ pa
   await expect(dialogo(page)).toBeVisible()
 })
 
-for (const available of [true, false]) test(`la búsqueda mixta amplía el tema y presenta una sesión ${available ? 'mixta' : 'parcial explícita'}`, async ({ page }) => {
+for (const available of [true, false]) test(`la búsqueda mixta lee el banco NBME y presenta una sesión ${available ? 'mixta' : 'parcial explícita'}`, async ({ page }) => {
   await preparar(page)
+  // Etiquetada como Renal: aun así se lee, porque las etiquetas del banco no deciden qué entra.
   const question = { ...preguntaNbmeReal('QA-NBME-1'), systems: ['Renal'], disciplines: ['Fisiología'], topic: '' }
   const rounds: { tipo: string; id: string; revision?: string }[][] = []
+  const lecturas: { id: string; revision: string }[][] = []
   await page.route('**/api/nbme/catalog', route => route.fulfill({ json: { schemaVersion: 1, bankVersion: 'qa', total: 1, questions: [question] } }))
   await page.route('**/api/nbme/questions', route => route.fulfill({ json: { questions: [question] } }))
   await page.route('**/api/ia/sesion', route => {
     const body = route.request().postDataJSON()
     if (body.fase === 'entender') return route.fulfill({ json: { tipo: 'consulta', consulta: { fuente: 'mixto', sistemas: ['Cardiovascular'], disciplinas: [], terminos: ['synthetic alpha'], estados: [], minutos: 10, titulo: 'Synthetic alpha' } } })
+    if (body.fase === 'lecturas') return route.fulfill({ json: { faltan: body.items.map((i: { id: string }) => i.id) } })
+    if (body.fase === 'leer') {
+      lecturas.push(body.items)
+      return route.fulfill({ json: { leidas: available ? body.items.length : 0, sinFuente: available ? 0 : body.items.length, pendientes: 0 } })
+    }
     if (body.fase === 'revisar') {
       rounds.push(body.items)
+      const preguntas = body.items.filter((i: { tipo: string }) => i.tipo === 'pregunta')
       return route.fulfill({ json: { ids: body.items.filter((i: { tipo: string }) => i.tipo === 'concepto' || available).map((i: { id: string }) => i.id),
-        sinRevisar: available ? 0 : body.items.filter((i: { tipo: string }) => i.tipo === 'pregunta').length, revisadas: available ? body.items.length : body.items.filter((i: { tipo: string }) => i.tipo === 'concepto').length, cached: false } })
+        sinRevisar: available ? 0 : preguntas.length, revisadas: available ? body.items.length : body.items.length - preguntas.length, cached: false } })
     }
     return route.fulfill({ json: { hilo: 'Conceptos sintéticos para practicar.', cached: false } })
   })
@@ -338,10 +348,11 @@ for (const available of [true, false]) test(`la búsqueda mixta amplía el tema 
   await page.getByRole('button', { name: 'Open chat', exact: true }).click()
   await dialogo(page).getByLabel('Lo que quieres estudiar', { exact: true }).fill('Synthetic alpha: conceptos y preguntas, diez minutos')
   await dialogo(page).getByRole('button', { name: 'Enviar', exact: true }).click()
-  await expect(dialogo(page)).toContainText('Busqué también el mismo tema en otras clasificaciones.')
-  expect(rounds).toHaveLength(2)
-  expect(rounds[0].every(i => i.tipo === 'concepto')).toBe(true)
-  expect(rounds[1]).toEqual([expect.objectContaining({ tipo: 'pregunta', id: question.id, revision: question.revision })])
+  await expect(dialogo(page)).toContainText(/Claude leyó \d+ candidatas? una por una y se quedó con \d+\./)
+  expect(lecturas).toEqual([[{ id: question.id, revision: question.revision }]])
+  expect(rounds).toHaveLength(1)
+  expect(rounds[0]).toContainEqual(expect.objectContaining({ tipo: 'pregunta', id: question.id, revision: question.revision }))
+  expect(rounds[0].some(i => i.tipo === 'concepto')).toBe(true)
   if (!available) {
     await expect(dialogo(page)).toContainText('No encontré preguntas verificables del tema para completar la mezcla.')
     await expect(dialogo(page).getByRole('button', { name: 'Empezar la sesión', exact: true })).toHaveCount(0)

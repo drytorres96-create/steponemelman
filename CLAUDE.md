@@ -100,16 +100,23 @@ pedírsela con la URL concreta y decirle qué debe ver.
 
 La configuración ejecutable está en `src/server/perfiles-claude.ts`, no en el
 prompt ni en la suscripción de claude.ai. Haiku 5.5 hace el trabajo habitual:
-hilo sin pensamiento; entender lo que Yoel quiere estudiar con razonamiento
-**medium** (petición expresa); selección de candidatos con **low**; chat,
-recuperación activa y calificación escrita con **medium**. Salvo hilo, se usa
-pensamiento adaptativo. Conservar la corrección determinista local.
+hilo sin pensamiento; chat, recuperación activa y calificación escrita con
+**medium**. Salvo hilo, se usa pensamiento adaptativo. Conservar la corrección
+determinista local.
+
+**Actualización del 21-oct-2026, a petición expresa de Yoel:** armar una sesión
+desde el chat usa **Opus 5.5** aunque tarde minutos: entender el pedido y
+seleccionar candidatas con **high**, leer el banco NBME con **medium**. Claude lee
+cada candidata por su contenido; las etiquetas del banco no son fiables y sólo
+sirven de pista. Cada pregunta NBME se lee una vez y su ficha se guarda en el
+Durable Object. La consulta admite `cantidad` de ítems (hasta 60).
 
 Sonnet 5.5 medium sólo se invoca con la acción explícita «Revisar con Sonnet»
-después de una explicación. La siguiente pregunta vuelve a Haiku. No añadir
-escaladas automáticas ni Opus de rutina, ni retirar los parámetros de razonamiento
-ante un error de API. La revisión no modifica intentos o notas. Mantener el
-presupuesto vigente, las comprobaciones de fuente y la validación de respuestas.
+después de una explicación. La siguiente pregunta vuelve a Haiku. Fuera del
+constructor de sesiones, no añadir escaladas automáticas ni Opus de rutina; en
+ningún caso retirar los parámetros de razonamiento ante un error de API. La
+revisión no modifica intentos o notas. Mantener el presupuesto vigente, las
+comprobaciones de fuente y la validación de respuestas.
 Ver `docs/modelos-claude.md` para ajustar perfiles, caché y límites.
 
 Aplicación React 18 + Vite 6 + TypeScript. Worker de Cloudflare en

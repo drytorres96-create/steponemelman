@@ -6,15 +6,16 @@ import type { ProgresoConcepto } from '../srs/tipos'
 import { escalonDePregunta } from './cajas'
 import { inicioDelDia } from './dia'
 import { eventosDeConcepto, eventosDePregunta, senalesDe, type Evento } from './inventario'
-import { MAX_ETIQUETA_REVISION, MAX_ITEMS_REVISION, type ConsultaSesion, type EstadoSesion, type ItemRevision } from './contexto-sesion'
+import { MAX_ETIQUETA_REVISION, MAX_ITEMS_LECTURA, type ConsultaSesion, type EstadoSesion, type ItemRevision, type RefNbme } from './contexto-sesion'
 import type { MaterialNuevo } from './nuevo-hoy'
-import type { RespuestaRevision } from './sesion-claude'
+import type { RespuestaLectura, RespuestaPendientes, RespuestaRevision } from './sesion-claude'
 
 /**
  * Armar una sesión a medida: la plataforma conoce el historial de cada concepto y pregunta, así que
- * ella decide qué es «fallada», «por repasar» o «de las que más trabajo dieron» y filtra. Claude sólo
- * traduce el pedido a esa consulta y, cuando la persona pide un tema libre, revisa la lista corta ya
- * filtrada. Todo lo de aquí es una función pura sobre datos que la aplicación ya tiene.
+ * ella decide qué es «fallada», «por repasar» o «de las que más trabajo dieron» y filtra. Claude
+ * traduce el pedido a esa consulta y, cuando se pide un tema, lee cada candidata por su contenido:
+ * las etiquetas del banco no son fiables, así que no deciden qué entra. Lo demás es una función pura
+ * sobre datos que la aplicación ya tiene.
  */
 
 const sinAcentos = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
@@ -167,17 +168,6 @@ export function etiquetaDeRevision(f: FichaSesion): string {
   return (limpia.length > MAX_ETIQUETA_REVISION ? `${limpia.slice(0, MAX_ETIQUETA_REVISION - 1)}…` : limpia) || 'Sin título'
 }
 
-/**
- * La ventana que se revisa con Claude: como mucho 150 fichas. Si hay más, primero entran las que
- * ya mencionan algún término pedido (sin tildes ni mayúsculas) y después el resto en su orden.
- */
-export function ventanaDeRevision(candidatas: FichaSesion[], terminos: readonly string[], maximo = MAX_ITEMS_REVISION): FichaSesion[] {
-  if (candidatas.length <= maximo) return candidatas
-  const buscados = terminos.map(sinAcentos).filter(Boolean)
-  const toca = (f: FichaSesion) => { const t = sinAcentos(`${f.titulo} ${f.detalle}`); return buscados.some(b => t.includes(b)) }
-  return [...candidatas.filter(toca), ...candidatas.filter(f => !toca(f))].slice(0, maximo)
-}
-
 export const aItemRevision = (f: FichaSesion): ItemRevision => ({ tipo: f.tipo, id: f.id, etiqueta: f.tipo === 'pregunta' ? 'Pregunta NBME' : etiquetaDeRevision(f), ...(f.revision ? { revision: f.revision } : {}) })
 
 // ---------------------------------------------------------------------------------------------
@@ -214,14 +204,17 @@ export interface SesionArmada {
 }
 
 /**
- * Elige, en el orden recibido, lo que cabe en los minutos pedidos. En una sesión mixta alterna tres
- * conceptos y una pregunta; si falta de un tipo, sigue con el otro. Siempre entra al menos un ítem.
+ * Elige, en el orden recibido, lo que cabe en los minutos pedidos o, si se pidió un número de ítems,
+ * hasta ese número. En una sesión mixta alterna tres conceptos y una pregunta; si falta de un tipo,
+ * sigue con el otro. Siempre entra al menos un ítem.
  */
-export function armarSesion(candidatas: FichaSesion[], c: Pick<ConsultaSesion, 'fuente' | 'minutos'>, ritmo: RitmoSesion): SesionArmada {
+export function armarSesion(candidatas: FichaSesion[], c: Pick<ConsultaSesion, 'fuente' | 'minutos' | 'cantidad'>, ritmo: RitmoSesion): SesionArmada {
   const conceptos = c.fuente === 'nbme' ? [] : candidatas.filter(f => f.tipo === 'concepto')
   const preguntas = c.fuente === 'conceptos' ? [] : candidatas.filter(f => f.tipo === 'pregunta' && f.revision)
   const tope = c.minutos * MARGEN
+  const porCantidad = c.cantidad !== undefined
   const elegidos = { conceptos: [] as FichaSesion[], preguntas: [] as FichaSesion[] }
+  const cuantos = () => elegidos.conceptos.length + elegidos.preguntas.length
   let total = 0, pos = 0
   const proximo = (tipo: 'concepto' | 'pregunta') => tipo === 'concepto' ? conceptos[elegidos.conceptos.length] : elegidos.preguntas.length < MAX_PREGUNTAS_SESION ? preguntas[elegidos.preguntas.length] : undefined
   const coste = (tipo: 'concepto' | 'pregunta') => tipo === 'concepto' ? ritmo.conceptoMin : ritmo.preguntaMin
@@ -229,9 +222,10 @@ export function armarSesion(candidatas: FichaSesion[], c: Pick<ConsultaSesion, '
     const turno: 'concepto' | 'pregunta' = pos % (CONCEPTOS_POR_PREGUNTA + 1) < CONCEPTOS_POR_PREGUNTA ? 'concepto' : 'pregunta'
     const orden: ('concepto' | 'pregunta')[] = turno === 'concepto' ? ['concepto', 'pregunta'] : ['pregunta', 'concepto']
     // Keep room for an NBME item in a short mixed block when both kinds fit.
-    const reservarPregunta = c.fuente === 'mixto' && elegidos.conceptos.length > 0 && !elegidos.preguntas.length
+    const reservarPregunta = !porCantidad && c.fuente === 'mixto' && elegidos.conceptos.length > 0 && !elegidos.preguntas.length
       && proximo('pregunta') && total + coste('pregunta') <= tope && total + coste('concepto') + coste('pregunta') > tope
-    const elegido = reservarPregunta ? 'pregunta' : orden.find(t => proximo(t) && (elegidos.conceptos.length + elegidos.preguntas.length === 0 || total + coste(t) <= tope))
+    const cabe = (t: 'concepto' | 'pregunta') => porCantidad ? cuantos() < c.cantidad! : cuantos() === 0 || total + coste(t) <= tope
+    const elegido = reservarPregunta ? 'pregunta' : orden.find(t => proximo(t) && cabe(t))
     if (!elegido) break
     if (elegido === 'concepto') elegidos.conceptos.push(proximo('concepto')!)
     else elegidos.preguntas.push(proximo('pregunta')!)
@@ -257,14 +251,19 @@ export const ETIQUETA_ESTADO: Record<EstadoSesion, string> = {
 }
 const ETIQUETA_FUENTE = { conceptos: 'conceptos', nbme: 'preguntas NBME', mixto: 'conceptos y preguntas' } as const
 
+const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
+
 /** Lo que la plataforma entendió, para que la persona pueda corregirlo antes de armar nada. */
 export function describirConsulta(c: ConsultaSesion): string {
-  const tema = [...c.sistemas, ...c.disciplinas, ...c.terminos.map(t => `«${t}»`)]
+  // Con temas nombrados, los sistemas y disciplinas son sólo pistas: se muestra lo que se pidió.
+  const tema = c.terminos.length ? c.terminos.map(t => `«${t}»`) : [...c.sistemas, ...c.disciplinas]
   return [tema.length ? tema.join(' + ') : 'todo el material', c.estados.length ? c.estados.map(s => ETIQUETA_ESTADO[s]).join(' o ') : '',
-    ETIQUETA_FUENTE[c.fuente], `≈ ${c.minutos} min`].filter(Boolean).join(' · ')
+    ETIQUETA_FUENTE[c.fuente], c.cantidad ? plural(c.cantidad, 'ítem', 'ítems') : `≈ ${c.minutos} min`].filter(Boolean).join(' · ')
 }
 
-const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
+/** Si el pedido nombra un tema (sistema, disciplina o bloque libre), Claude lee las candidatas. */
+export const esTematica = (c: Pick<ConsultaSesion, 'sistemas' | 'disciplinas' | 'terminos'>) => c.sistemas.length + c.disciplinas.length + c.terminos.length > 0
+
 
 // ---------------------------------------------------------------------------------------------
 // De la consulta a la sesión
@@ -272,14 +271,23 @@ const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno
 
 export type ResultadoSesion =
   | { estado: 'lista'; material: MaterialNuevo; conceptos: number; preguntas: number; minutos: number
-      /** Cuántas se revisaron con Claude y cuántas encajaron; ausente si la consulta no pedía un tema libre. */
-      revision?: { revisadas: number; encajan: number; deTotal: number; ampliada?: boolean }
+      /** Cuántas leyó Claude y cuántas encajaron; ausente si la consulta no nombraba un tema. */
+      revision?: { revisadas: number; encajan: number; deTotal: number }
+      /** Cuántos ítems de la sesión cubren cada tema pedido, cuando se pidieron varios. */
+      reparto?: { tema: string; n: number }[]
       incompleta?: 'conceptos' | 'preguntas'
       aviso?: string
-      /** Preguntas NBME en revisión de fuente que no se pudieron juzgar con la IA. */
-      sinRevisar: number }
+      /** Preguntas NBME sin una fuente que la IA pueda leer: no se juzgaron. */
+      sinRevisar: number
+      /** Preguntas NBME que Claude no pudo leer esta vez; se leerán en la próxima sesión. */
+      sinLeer?: number }
   | { estado: 'vacio'; motivo: string }
   | { estado: 'sin_ia'; motivo: string }
+
+export interface LecturaBanco {
+  pendientes: (refs: RefNbme[], signal?: AbortSignal) => Promise<RespuestaPendientes>
+  leer: (refs: RefNbme[], signal?: AbortSignal) => Promise<RespuestaLectura>
+}
 
 export interface EntradaResolver {
   consulta: ConsultaSesion
@@ -288,7 +296,13 @@ export interface EntradaResolver {
   fichas: FichaSesion[]
   ritmo: RitmoSesion
   revisar: (pedido: string, consulta: ConsultaSesion, items: ItemRevision[], signal?: AbortSignal) => Promise<RespuestaRevision>
+  /** Lee con Claude las preguntas NBME que aún no tienen ficha. Sin ella, las preguntas sin ficha no se juzgan. */
+  lectura?: LecturaBanco
+  /** Qué está haciendo ahora, para enseñarlo mientras espera. */
+  onProgreso?: (texto: string) => void
   signal?: AbortSignal
+  /** Pausa antes de repetir un lote que chocó con el límite de ritmo (las pruebas la acortan). */
+  esperaReintentoMs?: number
 }
 
 /** Qué decirle cuando no hay nada: qué hay disponible sin el filtro más estricto, sin contar deuda. */
@@ -302,54 +316,152 @@ function explicarVacio(fichas: FichaSesion[], c: ConsultaSesion): string {
   return `No encontré ${ETIQUETA_FUENTE[c.fuente]}${tema ? ` de ${tema}` : ''} con lo que pediste. Prueba con otro tema, otra fuente o sin el filtro de estado.`
 }
 
-/** Bound the work and spending; each round keeps the existing 150-item API limit. */
-export const MAX_RONDAS_BUSQUEDA = 5
+/** Conceptos que se mandan a leer como mucho en una sesión: acota gasto y espera. Las preguntas NBME se leen todas. */
+export const MAX_CONCEPTOS_REVISION = 900
+/** Llamadas a Claude a la vez: lo bastante para no eternizar la espera, sin saturar el límite de ritmo. */
+export const LECTURAS_EN_PARALELO = 3
+export const REVISIONES_EN_PARALELO = 3
+/** Candidatas por llamada de selección: Opus con razonamiento alto las lee una a una dentro del plazo del Worker. */
+export const LOTE_REVISION = 150
+/** Un límite de ritmo o una saturación no se facturan: cada lote se reintenta una vez tras esta espera. */
+export const ESPERA_REINTENTO_MS = 20_000
+const REINTENTABLES = new Set(['limite', 'sobrecarga'])
 
-function ventanaMixta(fichas: FichaSesion[], consulta: ConsultaSesion): FichaSesion[] {
-  if (consulta.fuente !== 'mixto' || fichas.length <= MAX_ITEMS_REVISION) return ventanaDeRevision(fichas, consulta.terminos)
-  const preguntas = ventanaDeRevision(fichas.filter(f => f.tipo === 'pregunta'), consulta.terminos, 50)
-  const conceptos = ventanaDeRevision(fichas.filter(f => f.tipo === 'concepto'), consulta.terminos, MAX_ITEMS_REVISION - preguntas.length)
-  const chosen = new Set([...preguntas, ...conceptos].map(f => f.id))
-  for (const f of ventanaDeRevision(fichas.filter(f => !chosen.has(f.id)), consulta.terminos, MAX_ITEMS_REVISION - chosen.size)) chosen.add(f.id)
-  return fichas.filter(f => chosen.has(f.id))
+/** Una llamada que choca con el límite de ritmo o la saturación de la API se repite una vez, con pausa. */
+async function conReintento<R extends { estado: string; codigo?: string }>(hacer: () => Promise<R>, signal?: AbortSignal, esperaMs = ESPERA_REINTENTO_MS): Promise<R> {
+  const r = await hacer()
+  if (r.estado === 'ok' || !r.codigo || !REINTENTABLES.has(r.codigo) || signal?.aborted) return r
+  await new Promise<void>(listo => {
+    const t = setTimeout(listo, esperaMs)
+    signal?.addEventListener('abort', () => { clearTimeout(t); listo() }, { once: true })
+  })
+  return signal?.aborted ? r : hacer()
+}
+
+/** Las raíces de las palabras de un término («farmacología antimicrobiana» → «farmac», «antimi»). */
+const raices = (t: string) => sinAcentos(t).split(/[^a-z0-9ñ]+/).filter(w => w.length >= 5).map(w => w.slice(0, 6))
+
+/** El texto de la ficha nombra el término entero, o todas las raíces de sus palabras. */
+function tocaTermino(f: FichaSesion, terminos: readonly string[]): boolean {
+  const texto = sinAcentos(`${f.titulo} ${f.detalle}`)
+  return terminos.some(t => { const r = raices(t); return texto.includes(sinAcentos(t)) || (r.length > 0 && r.every(x => texto.includes(x))) })
+}
+
+/**
+ * Los conceptos que merece la pena leer. Las pistas (sistemas, disciplinas, términos) se suman con «o»:
+ * basta una para que un concepto entre a lectura, y Claude decide después por su contenido. Sin pistas
+ * de clasificación, entran todos, primero los que nombran algún término. Nunca más del tope.
+ */
+export function conceptosParaLeer(conceptos: FichaSesion[], c: Pick<ConsultaSesion, 'sistemas' | 'disciplinas' | 'terminos'>, maximo = MAX_CONCEPTOS_REVISION): FichaSesion[] {
+  const hayPistas = c.sistemas.length + c.disciplinas.length > 0
+  const fuerza = (f: FichaSesion) => (c.sistemas.length && coincide(f.sistemas, c.sistemas) ? 1 : 0)
+    + (c.disciplinas.length && coincide(f.disciplinas, c.disciplinas) ? 1 : 0) + (c.terminos.length && tocaTermino(f, c.terminos) ? 2 : 0)
+  const conFuerza = conceptos.map(f => ({ f, n: fuerza(f) })).filter(x => !hayPistas || x.n > 0)
+  const elegidos = new Set(conFuerza.sort((a, b) => b.n - a.n).slice(0, maximo).map(x => x.f.id))
+  return conceptos.filter(f => elegidos.has(f.id))
+}
+
+/** Ejecuta las tareas con, como mucho, `n` a la vez, en orden. */
+async function enParalelo<T, R>(tareas: T[], n: number, hacer: (t: T) => Promise<R>): Promise<R[]> {
+  const salida: R[] = new Array(tareas.length)
+  let siguiente = 0
+  await Promise.all(Array.from({ length: Math.min(n, tareas.length) }, async () => {
+    while (siguiente < tareas.length) { const k = siguiente++; salida[k] = await hacer(tareas[k]) }
+  }))
+  return salida
+}
+
+const trozos = <T>(lista: T[], tamano: number) => Array.from({ length: Math.ceil(lista.length / tamano) }, (_, n) => lista.slice(n * tamano, (n + 1) * tamano))
+
+/**
+ * Lee con Claude las preguntas NBME que aún no tienen ficha. Lo ya leído se recuerda en el servidor,
+ * así que sólo la primera vez tarda. Un lote que falla no tumba la sesión: esas preguntas se quedan
+ * fuera esta vez y se devuelven aparte, para no confundirlas con las que no tienen fuente. Si fallan
+ * todos, se avisa con el motivo.
+ */
+async function leerBanco(preguntas: FichaSesion[], lectura: LecturaBanco, e: EntradaResolver): Promise<{ sinLeer: ReadonlySet<string> } | { estado: 'sin_ia'; motivo: string }> {
+  const refs = preguntas.map(f => ({ id: f.id, revision: f.revision! }))
+  e.onProgreso?.('Compruebo qué preguntas NBME ya leyó Claude…')
+  const p = await lectura.pendientes(refs, e.signal)
+  if (p.estado !== 'ok') return p
+  const pedidas = new Set(p.faltan)
+  const faltan = refs.filter(r => pedidas.has(r.id))
+  if (!faltan.length) return { sinLeer: new Set() }
+  const lotes = trozos(faltan, MAX_ITEMS_LECTURA)
+  let hechas = 0, fallidas = 0, motivo = ''
+  const caidas = new Set<string>()
+  const avisar = () => e.onProgreso?.(`Claude lee las preguntas NBME una por una: ${hechas} de ${faltan.length}. Sólo la primera vez tarda; después las recuerda.`)
+  avisar()
+  await enParalelo(lotes, LECTURAS_EN_PARALELO, async lote => {
+    if (e.signal?.aborted) return
+    const r = await conReintento(() => lectura.leer(lote, e.signal), e.signal, e.esperaReintentoMs)
+    if (r.estado !== 'ok') { fallidas += lote.length; motivo ||= r.motivo; lote.forEach(x => caidas.add(x.id)) }
+    else fallidas += r.pendientes
+    hechas += lote.length
+    avisar()
+  })
+  if (fallidas === faltan.length) return { estado: 'sin_ia', motivo: motivo || 'Claude no pudo leer las preguntas NBME. Vuelve a intentarlo.' }
+  if (!fallidas) return { sinLeer: new Set() }
+  // Qué quedó de verdad sin ficha (un lote puede contestar con alguna ficha inválida): se pregunta, sin gastar.
+  const despues = await lectura.pendientes(faltan, e.signal)
+  return { sinLeer: despues.estado === 'ok' ? new Set(despues.faltan) : caidas }
+}
+
+/** Reparte por turnos entre los temas pedidos, conservando dentro de cada tema el orden de estudio. */
+export function repartirPorTemas(elegidas: FichaSesion[], tema: ReadonlyMap<string, number>, temas: number): FichaSesion[] {
+  if (temas <= 1) return elegidas
+  const turnar = (lista: FichaSesion[]) => {
+    const colas = Array.from({ length: temas }, (_, n) => lista.filter(f => (tema.get(f.id) ?? 1) === n + 1))
+    const salida: FichaSesion[] = []
+    for (let k = 0; colas.some(c => k < c.length); k++) for (const c of colas) if (k < c.length) salida.push(c[k])
+    return salida
+  }
+  return [...turnar(elegidas.filter(f => f.tipo === 'concepto')), ...turnar(elegidas.filter(f => f.tipo === 'pregunta'))]
 }
 
 export async function resolverSesion(e: EntradaResolver): Promise<ResultadoSesion> {
   const { consulta, pedido } = e
-  const iniciales = filtrarFichas(e.fichas, consulta)
-  let candidatas = iniciales
-  let revision: { revisadas: number; encajan: number; deTotal: number; ampliada?: boolean } | undefined
-  let sinRevisar = 0
-  if (consulta.terminos.length) {
-    candidatas = []
-    const vistas = new Set<string>(), disponibles = new Set(iniciales.map(f => f.id))
-    let revisadas = 0, ampliada = false
-    const falta = (tipo: FichaSesion['tipo']) => (consulta.fuente === 'mixto' || consulta.fuente === (tipo === 'concepto' ? 'conceptos' : 'nbme'))
-      && !candidatas.some(f => f.tipo === tipo)
-    for (let ronda = 0; ronda < MAX_RONDAS_BUSQUEDA; ronda++) {
+  let candidatas = filtrarFichas(e.fichas, consulta)
+  let revision: { revisadas: number; encajan: number; deTotal: number } | undefined
+  let sinRevisar = 0, sinLeer = 0
+  const tema = new Map<string, number>()
+  if (esTematica(consulta)) {
+    // Sólo la fuente y el historial filtran; el tema lo decide Claude leyendo cada candidata.
+    const pool = filtrarFichas(e.fichas, { ...consulta, sistemas: [], disciplinas: [] })
+    let preguntas = pool.filter(f => f.tipo === 'pregunta' && f.revision)
+    const conceptos = conceptosParaLeer(pool.filter(f => f.tipo === 'concepto'), consulta)
+    if (preguntas.length && e.lectura) {
+      const leido = await leerBanco(preguntas, e.lectura, e)
       if (e.signal?.aborted) return { estado: 'sin_ia', motivo: 'Se canceló la búsqueda.' }
-      let pendientes = iniciales.filter(f => !vistas.has(f.id) && falta(f.tipo))
-      if (!pendientes.length && (falta('concepto') || falta('pregunta'))) {
-        // Keep history/source filters. Only taxonomy broadens, and Claude must verify the exact topic.
-        pendientes = filtrarFichas(e.fichas, { ...consulta, sistemas: [], disciplinas: [] })
-          .filter(f => !vistas.has(f.id) && falta(f.tipo))
-        if (pendientes.length) ampliada = true
-      }
-      if (!pendientes.length) break
-      pendientes.forEach(f => disponibles.add(f.id))
-      const ventana = ventanaMixta(pendientes, consulta)
-      const r = await e.revisar(pedido, consulta, ventana.map(aItemRevision), e.signal)
-      if (e.signal?.aborted) return { estado: 'sin_ia', motivo: 'Se canceló la búsqueda.' }
-      if (r.estado !== 'ok') return { estado: 'sin_ia', motivo: r.motivo }
-      ventana.forEach(f => vistas.add(f.id))
-      const elegidas = new Set(r.ids)
-      candidatas.push(...ventana.filter(f => elegidas.has(f.id)))
-      sinRevisar += r.sinRevisar
-      revisadas += r.revisadas ?? Math.max(0, ventana.length - r.sinRevisar)
-      if (!falta('concepto') && !falta('pregunta')) break
+      if ('estado' in leido) return leido
+      // Lo que no se pudo leer esta vez no se manda a seleccionar: se cuenta aparte.
+      sinLeer = preguntas.filter(f => leido.sinLeer.has(f.id)).length
+      preguntas = preguntas.filter(f => !leido.sinLeer.has(f.id))
     }
-    revision = { revisadas, encajan: candidatas.length, deTotal: disponibles.size, ...(ampliada ? { ampliada: true } : {}) }
-    if (!candidatas.length) return { estado: 'vacio', motivo: `No encontré material verificable que encaje con ${consulta.terminos.map(t => `«${t}»`).join(', ')} después de buscar alternativas.${sinRevisar ? ` ${plural(sinRevisar, 'pregunta sigue', 'preguntas siguen')} sin una fuente utilizable para esta búsqueda.` : ''} Puedes pedir otro tema o una sesión más amplia.` }
+    const aLeer = [...preguntas, ...conceptos]
+    if (!aLeer.length) return { estado: 'vacio', motivo: explicarVacio(e.fichas, consulta) }
+    const lotes = trozos(aLeer, LOTE_REVISION)
+    let hechas = 0, revisadas = 0, error: string | null = null
+    const avisar = () => e.onProgreso?.(`Claude revisa las candidatas una por una: ${hechas} de ${aLeer.length}…`)
+    avisar()
+    const elegidas = new Set<string>()
+    await enParalelo(lotes, REVISIONES_EN_PARALELO, async lote => {
+      if (error || e.signal?.aborted) return
+      const r = await conReintento(() => e.revisar(pedido, consulta, lote.map(aItemRevision), e.signal), e.signal, e.esperaReintentoMs)
+      if (r.estado !== 'ok') { error ||= r.motivo; return }
+      r.ids.forEach((id, n) => { elegidas.add(id); tema.set(id, r.grupos?.[n] ?? 1) })
+      sinRevisar += r.sinRevisar
+      revisadas += r.revisadas ?? Math.max(0, lote.length - r.sinRevisar)
+      hechas += lote.length
+      avisar()
+    })
+    if (e.signal?.aborted) return { estado: 'sin_ia', motivo: 'Se canceló la búsqueda.' }
+    if (error) return { estado: 'sin_ia', motivo: error }
+    const posicion = new Map(pool.map((f, n) => [f.id, n]))
+    candidatas = repartirPorTemas(aLeer.filter(f => elegidas.has(f.id)).sort((a, b) => posicion.get(a.id)! - posicion.get(b.id)!), tema, consulta.terminos.length)
+    revision = { revisadas, encajan: candidatas.length, deTotal: pool.length }
+    const temaPedido = consulta.terminos.length ? consulta.terminos.map(t => `«${t}»`).join(', ') : [...consulta.sistemas, ...consulta.disciplinas].join(' + ')
+    if (!candidatas.length) return { estado: 'vacio', motivo: `Claude leyó ${plural(revisadas, 'candidata', 'candidatas')} y ninguna trata ${temaPedido}.${sinRevisar ? ` ${plural(sinRevisar, 'pregunta sigue', 'preguntas siguen')} sin una fuente utilizable.` : ''} Puedes pedir otro tema o una sesión más amplia.` }
   }
   if (!candidatas.length) return { estado: 'vacio', motivo: explicarVacio(e.fichas, consulta) }
   const armada = armarSesion(candidatas, consulta, e.ritmo)
@@ -357,11 +469,23 @@ export async function resolverSesion(e: EntradaResolver): Promise<ResultadoSesio
     conceptIds: armada.conceptIds, preguntas: armada.preguntas, titulo: consulta.titulo, nbmeSessionId: null, cada: armada.cada,
     subtitulo: pedido.length > 140 ? `${pedido.slice(0, 139)}…` : pedido,
   }
+  const total = armada.conceptIds.length + armada.preguntas.length
   const incompleta = consulta.fuente !== 'mixto' ? undefined : !armada.preguntas.length ? 'preguntas' : !armada.conceptIds.length ? 'conceptos' : undefined
   const tipoFaltante = incompleta === 'preguntas' ? 'pregunta' : 'concepto'
-  const aviso = !incompleta ? undefined : candidatas.some(f => f.tipo === tipoFaltante)
-    ? `Hay ${incompleta} pertinentes, pero no caben junto al otro material en el tiempo pedido. Puedes pedir una sesión más larga.`
-    : `No encontré ${incompleta} verificables del tema para completar la mezcla. Puedes empezar con lo disponible o pedir otro tema.`
+  const avisos: string[] = []
+  if (incompleta) avisos.push(candidatas.some(f => f.tipo === tipoFaltante)
+    ? `Hay ${incompleta} pertinentes, pero no caben junto al otro material ${consulta.cantidad ? 'en los ítems pedidos' : 'en el tiempo pedido'}. Puedes pedir una sesión más larga.`
+    : `No encontré ${incompleta} verificables del tema para completar la mezcla. Puedes empezar con lo disponible o pedir otro tema.`)
+  if (consulta.cantidad && total < consulta.cantidad) {
+    const topeNbme = armada.preguntas.length === MAX_PREGUNTAS_SESION && candidatas.filter(f => f.tipo === 'pregunta').length > MAX_PREGUNTAS_SESION
+    avisos.push(topeNbme && !armada.conceptIds.length
+      ? `Un bloque NBME admite como mucho ${MAX_PREGUNTAS_SESION} preguntas, así que la sesión lleva ${total}.`
+      : `Pediste ${plural(consulta.cantidad, 'ítem', 'ítems')} y encontré ${total} que encajan con lo pedido.`)
+  }
+  const elegidos = new Set([...armada.conceptIds, ...armada.preguntas.map(q => q.id)])
+  const reparto = consulta.terminos.length > 1 && tema.size
+    ? consulta.terminos.map((t, n) => ({ tema: t, n: [...elegidos].filter(id => (tema.get(id) ?? 1) === n + 1).length })) : undefined
   return { estado: 'lista', material, conceptos: armada.conceptIds.length, preguntas: armada.preguntas.length, minutos: armada.minutos,
-    ...(revision ? { revision } : {}), sinRevisar, ...(incompleta ? { incompleta, aviso } : {}) }
+    ...(revision ? { revision } : {}), ...(reparto ? { reparto } : {}), sinRevisar, ...(sinLeer ? { sinLeer } : {}),
+    ...(incompleta ? { incompleta } : {}), ...(avisos.length ? { aviso: avisos.join(' ') } : {}) }
 }

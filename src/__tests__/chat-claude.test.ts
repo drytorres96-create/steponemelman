@@ -82,7 +82,7 @@ describe('preguntar al tutor', () => {
 
   it('traslada el motivo del servidor cuando Claude no está disponible', async () => {
     red.mockResolvedValue(Response.json({ error: 'Claude no tiene saldo disponible ahora.', codigo: 'credito' }, { status: 503 }))
-    expect(await preguntarAlTutor(concepto, 'Hola', [])).toEqual({ estado: 'sin_ia', motivo: 'Claude no tiene saldo disponible ahora.' })
+    expect(await preguntarAlTutor(concepto, 'Hola', [])).toEqual({ estado: 'sin_ia', motivo: 'Claude no tiene saldo disponible ahora.', codigo: 'credito' })
   })
 })
 
