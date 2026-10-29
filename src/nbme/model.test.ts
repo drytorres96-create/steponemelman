@@ -113,6 +113,39 @@ describe('independent private-question state', () => {
     expect(() => submitNbmeAnswer(start(), 'S1', 0, { ...q, figureRequired: true }, 'A', 20, 2000)).toThrow()
   })
 
+  it.each(['legacy', 'tutor', 'test'] as const)('keeps saved %s grades separate from a new editorial revision and key', mode => {
+    const original = { ...q, revision: 'source-original-v1' }
+    const editorial = { ...q, revision: 'source-editorial-v2', answer: 'B', stem: 'Different synthetic evaluation.' }
+    const settings = mode === 'legacy' ? {} : { mode }
+    const begin = (id: string, question: NbmeQuestion, bankVersion: string, now: number) =>
+      startNbmeSession(emptyNbmeState(bankVersion), { id, title: 'Synthetic revision compatibility',
+        refs: [{ id: question.id, revision: question.revision }], ...settings }, now)
+    const historical = submitNbmeAnswer(begin('historical', original, 'synthetic-v1', 1000),
+      'historical', 0, original, 'B', 100, 2000)
+    const current = submitNbmeAnswer(begin('editorial', editorial, 'synthetic-v2', 3000),
+      'editorial', 0, editorial, 'B', 100, 4000)
+    const historicalJson = JSON.stringify(historical), currentJson = JSON.stringify(current)
+    const restoredHistorical = parseNbmeState(JSON.parse(historicalJson))!
+    const restoredCurrent = parseNbmeState(JSON.parse(currentJson))!
+    expect(restoredHistorical).toEqual(historical)
+    expect(restoredCurrent).toEqual(current)
+
+    const merged = mergeNbmeStates(restoredHistorical, restoredCurrent)
+    expect(merged).toEqual(mergeNbmeStates(restoredCurrent, restoredHistorical))
+    expect(parseNbmeState(JSON.parse(JSON.stringify(merged)))).toEqual(merged)
+    expect(Object.keys(merged.attempts)).toHaveLength(2)
+    expect(merged.attempts['historical:0']).toEqual(historical.attempts['historical:0'])
+    expect(merged.attempts['historical:0']).toMatchObject({ revision: original.revision, optionId: 'B', correct: false })
+    expect(merged.attempts['editorial:0']).toMatchObject({ revision: editorial.revision, optionId: 'B', correct: true })
+    expect(referenciasPendientesNbme(merged, 'historical')).toEqual([{ id: q.id, revision: original.revision }])
+    expect(referenciasPendientesNbme(merged, 'editorial')).toEqual([{ id: q.id, revision: editorial.revision }])
+    expect(deriveNbmeSession(activateNbmeSession(merged, 'historical', 5000), 'historical')?.attempt)
+      .toEqual(historical.attempts['historical:0'])
+    expect(submitNbmeAnswer(merged, 'historical', 0, editorial, 'B', 100, 5000)).toBe(merged)
+    expect(JSON.stringify(historical)).toBe(historicalJson)
+    expect(JSON.stringify(current)).toBe(currentJson)
+  })
+
   it('merges elapsed time by maximum, keeps draft and filter edits without touching concepts', () => {
     const base = start()
     const a = updateNbmeFilters(updateNbmeSession(base, 'S1', { elapsedMs: 1000 }), { form: '28' }, 5000)
