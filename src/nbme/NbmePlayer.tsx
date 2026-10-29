@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject, type ReactNode } from 'react'
 import { Modal } from '../components/comunes'
 import { FigureViewer } from './FigureViewer'
+import { EditorialVariantBadge } from './EditorialVariantBadge'
 import { useNbme } from './NbmeProvider'
 import { analizarColumnasOpciones, analizarEnunciado, normalizarTexto, preguntaConLecturasDudosas } from './texto'
 import type { NbmeQuestion } from './types'
@@ -264,6 +265,7 @@ export function NbmePlayer({ onSalir, onEstudiar, onBuscar, modoPaso = false, on
               <h1 id="nbme-question-title" className="nbme-question-heading" tabIndex={-1} ref={titleRef}>
                 {sessionView.current?.round ? 'Vuelve a intentarlo' : modoPaso ? 'Pregunta NBME' : `Pregunta ${(sessionView.current?.position ?? 0) + 1} de ${sessionView.initialCount}`}
               </h1>
+              <EditorialVariantBadge question={currentQuestion}/>
               <p className="mini">{yaPracticada ? 'Pregunta ya practicada aquí' : 'Pregunta nueva aquí'}
                 {reintentoTrasExplicacion && ' · Corrección tras ver la explicación'}</p>
               <Enunciado texto={columnasOpciones?.enunciado ?? currentQuestion.stem} renderText={(text, region) => highlighted(text, `stem:${region}`)}/>
