@@ -9,6 +9,7 @@ import type { Intento } from '../srs/tipos'
 import { Enunciado, useQuestionFigures, type LoadedFigure } from '../nbme/NbmePlayer'
 import { analizarColumnasOpciones, normalizarTexto, preguntaConLecturasDudosas } from '../nbme/texto'
 import { FigureViewer } from '../nbme/FigureViewer'
+import { EditorialVariantBadge } from '../nbme/EditorialVariantBadge'
 import { Modal } from '../components/comunes'
 import { RecuperacionTrasFallo } from '../nbme/RecuperacionTrasFallo'
 import { TutorClaude } from '../components/tutor/TutorClaude'
@@ -186,6 +187,7 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
       </Card>}
       <div className="mq-question-pane">{closed && <div className="mq-complete" role="status"><strong>Block complete</strong><span>{correctCount} / {evaluated} {assistedCount ? 'unassisted' : 'graded'} correct · {block.entries.length - completed} unanswered{assistedCount > 0 && <> · {assistedCount} with help</>} · {states.filter(s => s === 'pending').length} pending</span><Button aria-label="Practice again" title="Practice again" disabled={busy} onClick={() => void onRetry(block)}><Icon name="retry"/></Button></div>}
         <Card className="mq-stem"><h1 ref={heading} tabIndex={-1}>Question {block.cursor + 1}</h1>
+          {question && <EditorialVariantBadge question={question}/>}
           {concept ? <><p><HighlightText text={concept.evaluacion.pregunta} source={source} region="stem"/></p>{concept.contexto && <p><HighlightText text={concept.contexto} source={source} region="context"/></p>}</>
             : question ? <Enunciado texto={columns?.enunciado ?? question.stem} renderText={(text, region) => <HighlightText text={text} source={source} region={`stem:${region}`}/>}/>
               : <StateMessage state="error" title="Question unavailable" action={<Button onClick={() => void nbme.retryQuestionLoad()}>Retry</Button>}>Your saved place and answers are preserved.</StateMessage>}

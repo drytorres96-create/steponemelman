@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { EVALUADOR_VERSION } from '../src/lib/normalize'
 const url='/?workspace=myqbank&proveedor=nbme-real&escena=abierto'
 async function start(page:Page, mode='Tutor') {
  let requests=0
@@ -23,7 +24,7 @@ test('accepted answers bypass a contradictory model and keep an independent grad
  await page.getByRole('button',{name:'Submit answer',exact:true}).click()
  await expect(page.locator('.mq-result')).toHaveText('Correct')
  expect(requests()).toBe(0)
- expect(await attempts(page)).toEqual([expect.objectContaining({resultado:'correcta',explicacion_previa:false,evaluador_version:'2.6.0'})])
+ expect(await attempts(page)).toEqual([expect.objectContaining({resultado:'correcta',explicacion_previa:false,evaluador_version:EVALUADOR_VERSION})])
  expect((await attempts(page))[0].calificado_por_ia).toBeUndefined()
 })
 for(const mode of ['Tutor','Test'])test(`partial result and reason persist; ${mode} respects feedback timing`,async({page})=>{
@@ -82,7 +83,7 @@ test('recheck an old AI grade retains one assisted attempt across reload',async(
  await expect(page.locator('.mq-result')).toHaveText('Correct with help')
  const saved=await attempts(page)
  expect(saved).toHaveLength(1)
- expect(saved[0]).toMatchObject({...before,resultado:'correcta',calificacion:3,tipo_error:'correcta_con_pistas',correccion_manual:true,evaluador_version:'2.6.0'})
+ expect(saved[0]).toMatchObject({...before,resultado:'correcta',calificacion:3,tipo_error:'correcta_con_pistas',correccion_manual:true,evaluador_version:EVALUADOR_VERSION})
  expect(saved[0].calificacion_actualizada_en).toBeGreaterThanOrEqual(before.ts)
 })
 
