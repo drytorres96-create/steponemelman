@@ -1,0 +1,227 @@
+/* Suave's soft panels, rounded controls and restrained motion, expressed in
+   MyQBank's own semantic palette. Reading panes retain their existing sizing,
+   scroll ownership and answer/review behavior. */
+.mq-root.mq-workspace .mq-study-tools {
+  background: var(--mq-glass, var(--mq-bar));
+  border-bottom-color: var(--mq-line);
+  box-shadow: inset 0 1px 0 var(--mq-reflection);
+  gap: 12px;
+}
+.mq-root.mq-workspace .mq-study-tools .mq-position {
+  font-family: var(--mq-display, var(--mq-font));
+  font-size: 17px;
+  letter-spacing: -.03em;
+  white-space: nowrap;
+}
+.mq-root.mq-workspace .mq-mode-help { line-height: 1.5; }
+.mq-root.mq-workspace .mq-study { gap: 20px; }
+.mq-root.mq-workspace .mq-rail {
+  border-color: transparent;
+  border-radius: var(--mq-radius-lg);
+  background: var(--mq-glass, var(--mq-surface));
+  box-shadow: var(--mq-shadow-2), inset 0 0 0 1px var(--mq-line);
+  gap: 16px;
+}
+.mq-root.mq-workspace .mq-rail .mq-rings {
+  width: 100px;
+  height: 100px;
+  padding: 3px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--mq-pat) 0%, transparent 70%);
+}
+.mq-root.mq-workspace .mq-rail .mq-rings strong {
+  font-family: var(--mq-display, var(--mq-font));
+  font-size: 26px;
+  letter-spacing: -.03em;
+}
+.mq-root.mq-workspace .mq-rail > .mq-small { text-align: center; line-height: 1.6; }
+.mq-root.mq-workspace .mq-question-grid { gap: 6px; padding-block: 4px; }
+.mq-root.mq-workspace .mq-question-number {
+  min-height: 44px;
+  border-radius: 50%;
+  border-color: var(--mq-line2);
+  background: var(--mq-surface);
+  color: var(--mq-text2);
+  box-shadow: var(--mq-shadow-1);
+  font-family: var(--mq-display, var(--mq-font)) !important;
+  font-weight: 600 !important;
+}
+.mq-root.mq-workspace .mq-question-number[aria-current] {
+  outline: 2px solid var(--mq-ok);
+  outline-offset: 2px;
+  box-shadow: inset 0 0 0 1px var(--mq-surface), var(--mq-shadow-1);
+}
+.mq-root.mq-workspace .mq-question-number--correct { background: var(--mq-ok-tint); color: var(--mq-ok-ink); border-color: var(--mq-ok); }
+.mq-root.mq-workspace .mq-question-number--incorrect { background: var(--mq-bad-tint); color: var(--mq-bad-ink); border-color: var(--mq-bad-ink); }
+.mq-root.mq-workspace .mq-question-number--saved { background: var(--mq-chip); }
+.mq-root.mq-workspace :is(.mq-question-number--assisted, .mq-question-number--partial) { background: var(--mq-inset); color: var(--mq-mark-ink); border-color: var(--mq-mark-ink); }
+.mq-root.mq-workspace .mq-question-number--pending { border-color: var(--mq-mark-ink); }
+.mq-root.mq-workspace .mq-question-number--skipped { border-style: dashed; }
+
+/* Solid surfaces behind medical text keep long reading sessions calm. */
+.mq-root.mq-workspace .mq-stem {
+  border-color: transparent;
+  border-radius: var(--mq-radius-lg);
+  background: var(--mq-surface);
+  box-shadow: var(--mq-shadow-2), inset 0 0 0 1px var(--mq-line);
+  padding: 26px;
+  gap: 20px;
+}
+.mq-root.mq-workspace .mq-stem > h1 {
+  font-family: var(--mq-display, var(--mq-font));
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--mq-ok-ink);
+  letter-spacing: -.02em;
+  line-height: 1.3;
+}
+.mq-root.mq-workspace .mq-stem :is(p, .nbme-stem) { line-height: 1.7; }
+.mq-root.mq-workspace .mq-stem .nbme-image-button {
+  border-radius: var(--mq-radius-sm);
+  overflow: hidden;
+  transform: none;
+}
+.mq-root.mq-workspace .mq-option {
+  border-radius: var(--mq-radius-md);
+  border-color: var(--mq-line2);
+  background: var(--mq-surface);
+  padding: 14px 16px;
+  font-size: 15px;
+  line-height: 1.55;
+  gap: 10px;
+  box-shadow: var(--mq-shadow-1);
+}
+.mq-root.mq-workspace .mq-option input { flex: none; }
+.mq-root.mq-workspace .mq-option .mq-letter {
+  width: 30px;
+  height: 30px;
+  font-family: var(--mq-display, var(--mq-font));
+  font-size: 14px;
+  border: 1px solid var(--mq-line);
+  background: var(--mq-inset);
+}
+.mq-root.mq-workspace .mq-option small { font-size: 12px; }
+.mq-root.mq-workspace .mq-option--selected { background: var(--mq-sel); border-color: var(--mq-ok); }
+.mq-root.mq-workspace .mq-option--correct { background: var(--mq-ok-tint); border-color: var(--mq-ok); }
+.mq-root.mq-workspace .mq-option--incorrect { background: var(--mq-bad-tint); border-color: var(--mq-bad-ink); }
+.mq-root.mq-workspace :is(.mq-option--selected, .mq-option--correct) .mq-letter { background: var(--mq-ok); color: var(--mq-on-ok); border-color: transparent; }
+.mq-root.mq-workspace .mq-option--incorrect .mq-letter { background: var(--mq-bad); color: var(--mq-on-bad); border-color: transparent; }
+.mq-root.mq-workspace .mq-option:focus-within { outline: 3px solid var(--mq-ok); outline-offset: 3px; }
+.mq-root.mq-workspace :is(.mq-answer-actions, .mq-explanation-actions) { gap: 10px; }
+.mq-root.mq-workspace .mq-question-pane > .mq-answer-actions { background: transparent; }
+.mq-root.mq-workspace .mq-learning-actions {
+  padding: 16px;
+  border-radius: var(--mq-radius-md);
+  background: var(--mq-inset);
+  box-shadow: inset 0 0 0 1px var(--mq-line);
+  gap: 10px;
+}
+.mq-root.mq-workspace .mq-concept-interaction :is(.opcion, .ficha, .zona) { border-radius: var(--mq-radius-sm); }
+.mq-root.mq-workspace .mq-concept-interaction .opcion { padding: 14px 16px; line-height: 1.6; }
+.mq-root.mq-workspace .mq-concept-interaction .flecha-ops [role=radio] { border-radius: 50%; }
+.mq-root.mq-workspace :is(.mq-result, .mq-saved, .mq-complete) {
+  border-radius: var(--mq-radius-md);
+  padding: 16px 20px;
+  box-shadow: var(--mq-shadow-1);
+  line-height: 1.5;
+}
+.mq-root.mq-workspace .mq-result strong { font-family: var(--mq-display, var(--mq-font)); font-size: 18px; font-weight: 650; }
+.mq-root.mq-workspace .mq-result--incorrect { border-color: var(--mq-bad-ink); }
+.mq-root.mq-workspace .mq-result--assisted { border-color: var(--mq-mark-ink); }
+.mq-root.mq-workspace .mq-complete { gap: 8px; }
+.mq-root.mq-workspace .mq-complete > strong { font-family: var(--mq-display, var(--mq-font)); font-size: 20px; }
+.mq-root.mq-workspace .mq-explanation-pane { gap: 16px; }
+.mq-root.mq-workspace :is(.mq-explanation-card, .mq-expected-answer) {
+  border-radius: var(--mq-radius-lg);
+  border-color: transparent;
+  background: var(--mq-surface);
+  padding: 24px;
+  box-shadow: var(--mq-shadow-2), inset 0 0 0 1px var(--mq-line);
+}
+.mq-root.mq-workspace .mq-explanation-content { gap: 18px; line-height: 1.7; }
+.mq-root.mq-workspace .mq-explanation-content h3 { font-size: 19px; line-height: 1.3; }
+.mq-root.mq-workspace :is(.mq-drill-answer, .mq-expected-wording) { border-radius: var(--mq-radius-sm); padding: 16px; line-height: 1.65; }
+.mq-root.mq-workspace .mq-tablist {
+  padding: 5px;
+  border-color: transparent;
+  border-radius: var(--mq-radius-md);
+  background: var(--mq-inset);
+  box-shadow: inset 0 0 0 1px var(--mq-line);
+}
+.mq-root.mq-workspace .mq-tablist button { border-radius: var(--mq-radius-sm); min-height: 44px; }
+.mq-root.mq-workspace .mq-tablist button[aria-selected=true] {
+  color: var(--mq-ok-ink);
+  background: var(--mq-surface);
+  box-shadow: var(--mq-shadow-1), inset 0 0 0 1px var(--mq-pat-line);
+}
+.mq-root.mq-workspace .mq-tablist button::after { content: none; }
+.mq-root.mq-workspace .mq-tab-number { font-family: var(--mq-display, var(--mq-font)); color: var(--mq-ok-ink); }
+.mq-root.mq-workspace .mq-sources { padding: 0 16px; border-radius: var(--mq-radius-md); background: var(--mq-inset); box-shadow: inset 0 0 0 1px var(--mq-line); }
+.mq-root.mq-workspace .mq-sources summary { color: var(--mq-text2); }
+
+/* Reference values have one outer panel and one inset table, not nested cards. */
+.mq-root.mq-workspace .mq-lab-reference {
+  border-radius: var(--mq-radius-lg);
+  border-color: transparent;
+  padding: 20px;
+  gap: 14px;
+  background: var(--mq-surface);
+  box-shadow: var(--mq-shadow-2), inset 0 0 0 1px var(--mq-line);
+}
+.mq-root.mq-workspace .mq-lab-heading h2 { font-size: 19px; }
+.mq-root.mq-workspace .mq-lab-emblem { width: 44px; height: 44px; border-radius: var(--mq-radius-sm); border: 0; box-shadow: inset 0 0 0 1px var(--mq-pat-line); }
+.mq-root.mq-workspace .mq-lab-search input { border-radius: var(--mq-radius-sm); }
+.mq-root.mq-workspace .mq-lab-scroll { border-color: transparent; border-radius: var(--mq-radius-md); box-shadow: inset 0 0 0 1px var(--mq-line); }
+.mq-root.mq-workspace .mq-lab-section-heading { padding: 14px; }
+.mq-root.mq-workspace .mq-lab-section-heading h3 { font-family: var(--mq-display, var(--mq-font)); font-size: 14px; }
+.mq-root.mq-workspace .mq-lab-reference :is(th, td) { padding: 12px; }
+.mq-root.mq-workspace .mq-lab-reference tbody tr:last-child > * { border-bottom: 0; }
+.mq-root.mq-workspace .mq-lab-count { color: var(--mq-muted); }
+.mq-root.mq-workspace .mq-highlight-toolbar { border-radius: var(--mq-radius-md); background: var(--mq-surface); box-shadow: var(--mq-shadow-3); }
+
+/* Native dialogs retain their built-in focus trapping and Escape behavior. */
+.mq-root.mq-workspace .mq-dialog {
+  width: min(500px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--mq-radius-sheet);
+  border-color: transparent;
+  padding: 28px;
+  box-shadow: var(--mq-shadow-3), inset 0 0 0 1px var(--mq-line);
+  background: var(--mq-surface);
+}
+.mq-root.mq-workspace .mq-dialog h2 { font-family: var(--mq-display, var(--mq-font)); font-size: 24px; line-height: 1.25; }
+.mq-root.mq-workspace .mq-dialog p { color: var(--mq-text2); line-height: 1.65; margin-block: 18px 24px; }
+.mq-root.mq-workspace .mq-dialog > .mq-inline { gap: 10px; }
+.mq-root.mq-workspace .mq-dialog > .mq-inline > .mq-button { flex: 1; }
+.mq-root.mq-workspace .mq-dialog::backdrop { background: color-mix(in srgb, var(--mq-bg) 72%, transparent); backdrop-filter: blur(6px); }
+
+@media (hover: hover) and (pointer: fine) {
+  .mq-root.mq-workspace .mq-options:not(:disabled) .mq-option:hover { box-shadow: inset 0 0 0 1px var(--mq-ok), var(--mq-shadow-1); }
+  .mq-root.mq-workspace .mq-question-number:not(:disabled):hover { background: var(--mq-hover); transform: translateY(-1px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mq-root.mq-workspace :is(.mq-result, .mq-saved) { animation: mq-suave-feedback 260ms var(--mq-ease-out, ease-out) both; }
+  .mq-root.mq-workspace .mq-dialog[open] { animation: mq-suave-sheet 360ms var(--mq-spring-soft, ease-out) both; }
+}
+@keyframes mq-suave-feedback { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes mq-suave-sheet { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (max-width: 960px), (max-height: 600px) {
+  .mq-root.mq-workspace .mq-study { gap: 16px; }
+  .mq-root.mq-workspace .mq-rail { padding: 8px 16px; border-radius: var(--mq-radius-md); }
+  .mq-root.mq-workspace .mq-mobile-map summary { font-family: var(--mq-display, var(--mq-font)); font-size: 14px; color: var(--mq-text2); }
+  .mq-root.mq-workspace .mq-question-grid { padding-block: 6px 12px; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); }
+  .mq-root.mq-workspace .mq-stem { padding: 22px; }
+}
+@media (max-width: 600px) {
+  .mq-root.mq-workspace .mq-study-tools { padding: 12px; }
+  .mq-root.mq-workspace .mq-study-tools .mq-button:not(:disabled):hover { transform: none; }
+  .mq-root.mq-workspace .mq-study { padding-inline: 12px; }
+  .mq-root.mq-workspace .mq-stem { padding: 20px; border-radius: var(--mq-radius-lg); }
+  .mq-root.mq-workspace .mq-option { padding: 13px 14px; }
+  .mq-root.mq-workspace :is(.mq-explanation-card, .mq-expected-answer, .mq-lab-reference) { padding: 18px; }
+  .mq-root.mq-workspace .mq-dialog { margin: auto auto max(12px, env(safe-area-inset-bottom)); padding: 24px; width: calc(100vw - 24px); max-height: calc(100dvh - 24px); }
+  .mq-root.mq-workspace .mq-dialog > .mq-inline { flex-direction: column; align-items: stretch; }
+  .mq-root.mq-workspace .mq-dialog > .mq-inline > .mq-button { width: 100%; }
+}

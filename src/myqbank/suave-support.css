@@ -1,0 +1,334 @@
+/* Suave panel/sheet language, scoped to the existing MyQBank workspace.
+   Settings and progress keep document scrolling; the assistant keeps its
+   existing React focus trap, conversation state and scrolling boundaries. */
+
+.mq-root.mq-workspace .mq-settings {
+  gap: 24px;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.mq-root.mq-workspace .mq-settings-heading h1 {
+  font-family: var(--mq-display);
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: 700;
+  letter-spacing: -.035em;
+}
+.mq-root.mq-workspace :is(.mq-sync-health, .mq-settings .tarjeta) {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--mq-line);
+  border-radius: var(--mq-radius-lg);
+  background: var(--mq-glass);
+  box-shadow: var(--mq-shadow-2), inset 0 1px 0 var(--mq-reflection);
+}
+.mq-root.mq-workspace :is(.mq-sync-health, .mq-settings) h2 {
+  font-family: var(--mq-display);
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -.025em;
+}
+.mq-root.mq-workspace .mq-settings .pila { gap: 20px; }
+.mq-root.mq-workspace .mq-settings .tarjeta.pila { gap: 18px; }
+.mq-root.mq-workspace .mq-settings details.tarjeta { padding-block: 8px; }
+.mq-root.mq-workspace .mq-settings summary {
+  color: var(--mq-text2);
+  min-height: 48px;
+  padding-block: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.mq-root.mq-workspace .mq-settings details[open] > summary {
+  color: var(--mq-ok-ink);
+}
+.mq-root.mq-workspace .mq-settings .rejilla > div {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+.mq-root.mq-workspace .mq-settings label {
+  color: var(--mq-text2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.mq-root.mq-workspace .mq-settings :is(input:not([type=file]), select) {
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 14px;
+  border-radius: var(--mq-radius-sm);
+  font-size: 16px;
+}
+.mq-root.mq-workspace :is(.mq-settings, .mq-progress-details, .mq-legacy-study) .btn {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 10px 16px;
+  border-radius: var(--mq-radius-sm);
+  font-family: var(--mq-font);
+  line-height: 1.4;
+  box-shadow: var(--mq-shadow-1);
+  white-space: normal;
+}
+.mq-root.mq-workspace :is(.mq-settings, .mq-progress-details, .mq-legacy-study) .btn.principal {
+  font-family: var(--mq-display);
+  font-weight: 650;
+  background: var(--mq-action);
+  color: var(--mq-on-accent);
+}
+.mq-root.mq-workspace .mq-settings :is(.aviso, [role=alert]) {
+  border-radius: var(--mq-radius-sm);
+  overflow-wrap: anywhere;
+}
+.mq-root.mq-workspace .mq-settings .faq-grupo > h3 {
+  font-family: var(--mq-display);
+  font-size: 17px;
+  color: var(--mq-text);
+  letter-spacing: -.02em;
+}
+.mq-root.mq-workspace .mq-settings .faq-pregunta + .faq-pregunta {
+  border-color: var(--mq-line);
+}
+.mq-root.mq-workspace .mq-settings .faq-respuesta {
+  gap: 10px;
+  color: var(--mq-text2);
+  font-size: 14px;
+  line-height: 1.65;
+  padding-bottom: 18px;
+}
+.mq-root.mq-workspace .mq-settings .scroll-x {
+  border-radius: var(--mq-radius-sm);
+  scrollbar-width: thin;
+  scrollbar-color: var(--mq-line2) transparent;
+}
+.mq-root.mq-workspace .mq-settings .tabla th {
+  background: var(--mq-inset);
+  color: var(--mq-text2);
+}
+.mq-root.mq-workspace .mq-settings .tabla :is(th, td) {
+  padding: 12px 14px;
+  border-color: var(--mq-line);
+}
+
+/* A neutral surface per store: one successful store never implies all synced. */
+.mq-root.mq-workspace .mq-sync-health dl { gap: 8px; }
+.mq-root.mq-workspace .mq-sync-health dl > div {
+  padding: 14px 16px;
+  border: 0;
+  border-radius: var(--mq-radius-sm);
+  background: var(--mq-inset);
+  box-shadow: inset 0 0 0 1px var(--mq-line3);
+  align-items: start;
+}
+.mq-root.mq-workspace .mq-sync-health dt {
+  color: var(--mq-text2);
+  font-size: 14px;
+}
+.mq-root.mq-workspace .mq-sync-health dd {
+  color: var(--mq-text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.mq-root.mq-workspace .mq-sync-health dd span { color: var(--mq-text2); }
+
+/* Claude is the coral companion to MyQBank's jade actions. */
+.mq-root.mq-workspace .mq-claude { gap: 16px; }
+.mq-root.mq-workspace .mq-claude-entrada {
+  padding: 20px;
+  gap: 16px;
+  border-radius: var(--mq-radius-lg);
+  border-color: var(--mq-line);
+  background: radial-gradient(ellipse at 0% 0%, var(--mq-mark-tint), transparent 72%), var(--mq-glass);
+  box-shadow: var(--mq-shadow-2), inset 0 1px 0 var(--mq-reflection);
+}
+.mq-root.mq-workspace .mq-claude-marca {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  color: var(--mq-mark-ink);
+  background: var(--mq-mark-tint);
+  border-color: var(--mq-end-line);
+  box-shadow: var(--mq-shadow-1);
+}
+.mq-root.mq-workspace .mq-claude-texto { gap: 6px; }
+.mq-root.mq-workspace .mq-claude-texto h2 {
+  font-family: var(--mq-display);
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -.025em;
+}
+.mq-root.mq-workspace .mq-claude-texto p { line-height: 1.55; }
+.mq-root.mq-workspace .mq-claude .sugerencia-recuperar {
+  padding: 20px;
+  border-radius: var(--mq-radius-lg);
+  background: var(--mq-glass);
+  box-shadow: var(--mq-shadow-2);
+}
+.mq-root.mq-workspace .mq-claude .sugerencia-recuperar h2 {
+  font-family: var(--mq-display);
+  font-size: 19px;
+}
+.mq-root.mq-workspace .mq-claude .sugerencia-recuperar .btn {
+  border-radius: var(--mq-radius-sm);
+  min-height: 44px;
+}
+.mq-root.mq-workspace .mq-claude .sugerencia-detalle > summary { color: var(--mq-text2); }
+.mq-root.mq-workspace .mq-claude-fondo {
+  background: color-mix(in srgb, var(--mq-bg) 66%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.mq-root.mq-workspace .mq-claude-dialogo { border-radius: var(--mq-radius-sheet); }
+
+/* Map the existing tutor's semantic tokens instead of loading a second theme. */
+.mq-root.mq-workspace[data-theme] .tutor {
+  --tt-panel-a: var(--mq-surfaceStart);
+  --tt-panel-b: var(--mq-surface);
+  --tt-tarjeta: var(--mq-surface);
+  --tt-borde: var(--mq-line);
+  --tt-borde-claro: var(--mq-control-line);
+  --tt-texto: var(--mq-text);
+  --tt-suave: var(--mq-text2);
+  --tt-tenue: var(--mq-muted);
+  --tt-superficie: var(--mq-inset);
+  --tt-superficie-2: var(--mq-chip);
+  --tt-burbuja-ia: var(--mq-inset);
+  --tt-burbuja-yo: var(--mq-sel);
+  --tt-burbuja-yo-texto: var(--mq-text);
+  --tt-coral-texto: var(--mq-mark-ink);
+  --tt-jade: var(--mq-ok-ink);
+  --tt-jade-fondo: var(--mq-ok-tint);
+  --tt-jade-borde: var(--mq-ok-soft);
+  --tt-rosa: var(--mq-bad-ink);
+  --tt-rosa-fondo: var(--mq-bad-tint);
+  --tt-rosa-borde: var(--mq-bad-soft);
+  --tt-sombra: var(--mq-shadow-2);
+  --tt-brillo: var(--mq-mark-tint);
+  font-family: var(--mq-font);
+  border-radius: var(--mq-radius-lg);
+  padding: 22px 20px 18px;
+  font-size: 15px;
+  line-height: 1.6;
+  box-shadow: var(--mq-shadow-2), inset 0 1px 0 var(--mq-reflection);
+}
+.mq-root.mq-workspace .mq-claude-dialogo .tutor {
+  border-radius: var(--mq-radius-sheet);
+  box-shadow: var(--mq-shadow-3), inset 0 1px 0 var(--mq-reflection);
+}
+.mq-root.mq-workspace .tutor :is(.tutor-titulo strong, .tutor-ejercicio-titulo, .tutor-practica-cab strong) {
+  font-family: var(--mq-display);
+  font-weight: 650;
+  letter-spacing: -.02em;
+}
+.mq-root.mq-workspace .tutor :is(.tutor-avatar, .tutor-mini-avatar) {
+  color: var(--mq-mark-ink);
+  background: var(--mq-mark-tint);
+  border-color: var(--mq-end-line);
+  box-shadow: none;
+}
+.mq-root.mq-workspace .tutor :is(.tutor-btn, .tutor-chip, .tutor-capsula-boton, .tutor-enlace, .tutor-opcion) {
+  min-height: 44px;
+}
+.mq-root.mq-workspace .tutor .tutor-chip span {
+  max-width: none;
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.mq-root.mq-workspace .tutor :is(.tutor-icono-boton, .tutor-enviar) {
+  min-width: 44px;
+  width: 44px;
+  min-height: 44px;
+  height: 44px;
+}
+.mq-root.mq-workspace .tutor :is(.tutor-btn, .tutor-chip, .tutor-capsula-boton, .tutor-icono-boton)::before {
+  /* Controls already have real 44px hit areas; don't overlap their neighbours. */
+  content: none;
+}
+.mq-root.mq-workspace .tutor .tutor-burbuja {
+  padding: 13px 16px;
+  border-radius: var(--mq-radius-md);
+  border-bottom-left-radius: 8px;
+}
+.mq-root.mq-workspace .tutor .tutor-turno--yo .tutor-burbuja {
+  border-radius: var(--mq-radius-md);
+  border-bottom-right-radius: 8px;
+}
+.mq-root.mq-workspace .tutor .tutor-practica {
+  border-radius: var(--mq-radius-md);
+  background: var(--mq-inset);
+  padding: 18px;
+}
+.mq-root.mq-workspace .tutor .tutor-entrada {
+  min-height: 56px;
+  border-radius: 28px;
+  padding: 5px 5px 5px 16px;
+}
+.mq-root.mq-workspace .tutor .tutor-hilo { scrollbar-gutter: stable; }
+
+/* Older saved sessions and detailed progress inherit the same panel language. */
+.mq-root.mq-workspace .mq-progress-details {
+  border: 1px solid var(--mq-line);
+  border-radius: var(--mq-radius-lg);
+  background: var(--mq-glass);
+  padding: 6px 24px;
+  box-shadow: var(--mq-shadow-1);
+}
+.mq-root.mq-workspace .mq-progress-details > summary {
+  min-height: 52px;
+  color: var(--mq-text2);
+  font-family: var(--mq-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+.mq-root.mq-workspace .mq-progress-details[open] { padding-bottom: 24px; }
+.mq-root.mq-workspace .mq-progress-details .premium-progress { padding-top: 12px; }
+.mq-root.mq-workspace :is(.mq-progress-details, .mq-legacy-study) :is(.tarjeta, .premium-progress-card, .hoy-desplegable) {
+  border-radius: var(--mq-radius-md);
+  border-color: var(--mq-line);
+  background: var(--mq-inset);
+  box-shadow: none;
+  color: var(--mq-text);
+}
+.mq-root.mq-workspace :is(.mq-progress-details, .mq-legacy-study) :is(h1, h2, h3, .premium-progress-card > strong) {
+  font-family: var(--mq-display);
+}
+.mq-root.mq-workspace :is(.mq-progress-details, .mq-legacy-study) :is(.ficha, .zona) {
+  border-radius: var(--mq-radius-sm);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mq-root.mq-workspace .mq-settings summary:hover { color: var(--mq-ok-ink); }
+  .mq-root.mq-workspace :is(.mq-settings, .mq-progress-details, .mq-legacy-study) .btn:not(:disabled):hover {
+    border-color: var(--mq-hoverline);
+    box-shadow: var(--mq-shadow-2);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mq-root.mq-workspace .mq-claude-fondo:not([hidden]) .mq-claude-dialogo {
+    animation: mq-suave-sheet-in 340ms var(--mq-spring-soft) both;
+  }
+  .mq-root.mq-workspace :is(.mq-settings, .mq-progress-details, .mq-legacy-study) .btn:not(:disabled):active {
+    transform: scale(.98);
+  }
+}
+@keyframes mq-suave-sheet-in {
+  /* Stay inside the 8px minimum mobile gutter throughout the entrance. */
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 600px) {
+  .mq-root.mq-workspace :is(.mq-sync-health, .mq-settings .tarjeta) { padding: 20px; }
+  .mq-root.mq-workspace .mq-settings details.tarjeta { padding-block: 8px; }
+  .mq-root.mq-workspace .mq-settings-heading { gap: 18px; }
+  .mq-root.mq-workspace .mq-settings-heading .mq-inline { width: 100%; }
+  .mq-root.mq-workspace .mq-settings-heading .mq-inline .mq-button { flex: 1; }
+  .mq-root.mq-workspace .mq-sync-health dl > div { padding: 14px; }
+  .mq-root.mq-workspace .mq-claude-fondo {
+    padding: 12px 8px max(8px, env(safe-area-inset-bottom));
+  }
+  .mq-root.mq-workspace .mq-claude-dialogo {
+    max-height: calc(100dvh - 20px - env(safe-area-inset-bottom));
+  }
+  .mq-root.mq-workspace[data-theme] .tutor { padding: 18px 14px 14px; }
+  .mq-root.mq-workspace .tutor .tutor-cab { gap: 9px; }
+  .mq-root.mq-workspace .tutor .tutor-practica { padding: 15px 13px; }
+  .mq-root.mq-workspace .mq-progress-details { padding-inline: 18px; }
+}

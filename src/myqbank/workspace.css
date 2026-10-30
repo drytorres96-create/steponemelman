@@ -1,4 +1,7 @@
 @import './refinement.css';
+@import './suave.css';
+@import './suave-study.css';
+@import './suave-support.css';
 
 .mq-workspace { --verde: var(--mq-ok-ink); --rojo: var(--mq-bad-ink); --bg-2: var(--mq-inset); --bg-3: var(--mq-chip); --borde: var(--mq-line); --acento: var(--mq-ok); }
 /* Más específico que .mq-preview (layout.css): en el build esa hoja llega después de esta y, a igual especificidad, bloqueaba el scroll en escritorio. */
