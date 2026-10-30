@@ -78,13 +78,19 @@ for (const width of [390, 1280]) test(`answered question navigation resets readi
     expect(await explanation.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true)
     await explanation.focus()
     await page.keyboard.press('End')
-    await expect.poll(() => explanation.evaluate(el => el.scrollTop)).toBeGreaterThan(0)
+    // End scrolls asynchronously in Chromium. Navigation must start after that
+    // scroll reaches its destination, not while its next animation frame is pending.
+    await expect.poll(() => explanation.evaluate(el => Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop))).toBeLessThanOrEqual(1)
   }
   await page.getByRole('button', { name: 'Previous question', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Question 1', exact: true })).toBeFocused()
   await expect(page.getByRole('heading', { name: 'Question 1', exact: true })).toBeInViewport()
-  expect(await explanation.evaluate(el => el.scrollTop)).toBe(0)
-  expect(await page.getByRole('region', { name: 'Question and answer', exact: true }).evaluate(el => el.scrollTop)).toBe(0)
+  // The new source is loaded asynchronously; inspect the settled reading surface,
+  // rather than the transient Loading explanation frame.
+  await expect(explanation.getByRole('heading', { name: 'Original explanation', exact: true })).toBeVisible()
+  await expect.poll(() => explanation.evaluate(el => el.scrollTop)).toBe(0)
+  if (width > 960) await expect(explanation.locator('.mq-result')).toBeInViewport({ ratio: 1 })
+  await expect.poll(() => page.getByRole('region', { name: 'Question and answer', exact: true }).evaluate(el => el.scrollTop)).toBe(0)
 })
 
 for (const width of [390, 1280]) test(`settings show all three sync states without horizontal overflow at ${width}px`, async ({ page }) => {
