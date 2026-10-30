@@ -9,6 +9,7 @@ import { calcularEstado, evaluarDominio, type CriteriosDominio } from '../srs/ma
 import { supabase } from '../lib/supabase'
 import { leer, escribir } from './db'
 import { apartarCopia } from './apartar'
+import { recoverSavedCopies } from './recovery'
 import { ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, combinarEstados, reconstruirProgreso, registrarVistaConceptoEstado, serializarEstable, type EstadoApp, type Reanudable } from './model'
 import { StudySyncEngine, leerSnapshot, diagnosticoSync, type CloudSnapshot, type SyncReply, type CodigoSync } from './sync'
 export type { EstadoApp, RegistroSesion, Reanudable } from './model'
@@ -65,6 +66,7 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
   const vivo = useRef(true)
   const cambio = useRef(0)
   const guardados = useRef(Promise.resolve())
+  const falloLocal = useRef(false)
   const [edicion, setEdicion] = useState(0)
   const reiniciando = useRef(false)
   const syncEnCurso = useRef<{ engine: StudySyncEngine; promise: Promise<boolean> } | null>(null)
@@ -72,8 +74,12 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
   const persistir = useCallback(() => {
     const registro: Guardado = { state: actual.current, snapshot: motor.current?.snapshot ?? null, savedAt: Date.now() }
     // Respaldo inmediato para la última respuesta si se cierra la pestaña.
-    try { localStorage.setItem(`step1-respaldo:${clave}`, JSON.stringify(registro)) } catch { /* IndexedDB conserva la copia principal. */ }
-    guardados.current = guardados.current.catch(() => undefined).then(() => escribir(clave, registro))
+    let respaldoGuardado = false
+    try { localStorage.setItem(`step1-respaldo:${clave}`, JSON.stringify(registro)); respaldoGuardado = true } catch { /* IndexedDB conserva la copia principal. */ }
+    guardados.current = guardados.current.catch(() => undefined).then(async () => {
+      try { await escribir(clave, registro, { estricto: true }); falloLocal.current = false }
+      catch (error) { falloLocal.current = !respaldoGuardado; if (!respaldoGuardado) throw error }
+    })
     return guardados.current
   }, [clave])
   const reemplazar = useCallback((nuevo: EstadoApp) => {
@@ -104,7 +110,8 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
         const resultado = await engine.flush()
         if (!esActual()) return false
         // Sin cambios no hay nada nuevo que guardar: cada edición ya se guardó al hacerla.
-        if (lectura.kind !== 'unchanged' || resultado.kind !== 'unchanged') await persistir()
+        // A confirmed cloud copy is safe even when both browser storage mechanisms fail.
+        if (falloLocal.current || lectura.kind !== 'unchanged' || resultado.kind !== 'unchanged') await persistir().catch(() => undefined)
         if (!esActual()) return false
         // Una respuesta nueva también puede llegar mientras se escribe IndexedDB.
         if (serializarEstable(actual.current) !== serializarEstable(engine.snapshot?.state)) {
@@ -112,14 +119,16 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
           setEdicion(++cambio.current)
           return false
         }
-        setSync({ estado: 'sincronizado', ultima: Date.now(), mensaje: lectura.kind === 'reset' || resultado.kind === 'reset'
-          ? 'Progreso actualizado tras el reinicio de tu cuenta' : 'Progreso sincronizado' })
+        setSync({ estado: falloLocal.current ? 'error' : 'sincronizado', ultima: Date.now(), mensaje: falloLocal.current
+          ? 'Tu progreso está guardado en tu cuenta, pero no se pudo actualizar la copia de este dispositivo. Reintenta sincronizar antes de usarlo sin conexión.'
+          : lectura.kind === 'reset' || resultado.kind === 'reset' ? 'Progreso actualizado tras el reinicio de tu cuenta' : 'Progreso sincronizado' })
         return true
       } catch (causa) {
         const { codigo, mensaje } = diagnosticoSync(causa)
         // Una línea en la consola para poder distinguir el fallo sin adivinar.
         console.warn('[sync]', codigo, causa)
-        if (esActual()) setSync(s => ({ ...s, estado: 'error', mensaje, codigo }))
+        if (esActual()) setSync(s => ({ ...s, estado: 'error', mensaje: falloLocal.current
+          ? 'No se pudo guardar en este dispositivo ni completar la sincronización. Mantén la página abierta y vuelve a intentar.' : mensaje, codigo }))
         return false
       }
     })()
@@ -137,13 +146,14 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
     reiniciando.current = false
     void (async () => {
       const crudo = await leer<unknown>(clave)
-      let guardado = leerGuardado(crudo, userId)
+      const principal = leerGuardado(crudo, userId)
+      let respaldo: Guardado | null = null
       let respaldoCrudo: unknown = null
       try {
         respaldoCrudo = JSON.parse(localStorage.getItem(`step1-respaldo:${clave}`) || 'null')
-        const respaldo = leerGuardado(respaldoCrudo, userId)
-        if (respaldo && (!guardado || respaldo.savedAt > guardado.savedAt)) guardado = respaldo
+        respaldo = leerGuardado(respaldoCrudo, userId)
       } catch { /* Un respaldo malformado no reemplaza IndexedDB. */ }
+      const guardado = recoverSavedCopies(principal, respaldo, combinarEstados)
       // Una copia ilegible no bloquea el estudio, pero tampoco se aprovecha a medias: mezclar
       // un progreso sin su revisión con el de la nube podría revivir un reinicio. Se aparta
       // entera y se empieza de cero, sin revisión, para que la primera sincronización traiga
@@ -306,8 +316,12 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
         const respuesta = data as SyncReply
         if (!respuesta.ok || !respuesta.row) throw new Error('Hay cambios en otro dispositivo. Sincroniza y vuelve a intentarlo.')
         engine.acceptReset(respuesta.row)
-        await persistir()
-        if (vivo.current && motor.current === engine) setSync({ estado: 'sincronizado', ultima: Date.now(), mensaje: 'Progreso reiniciado en tu cuenta' })
+        // The server has already reset this generation. A local storage failure
+        // must not report a failed reset or invite another destructive request.
+        await persistir().catch(() => undefined)
+        if (vivo.current && motor.current === engine) setSync({ estado: falloLocal.current ? 'error' : 'sincronizado', ultima: Date.now(), mensaje: falloLocal.current
+          ? 'Progreso reiniciado en tu cuenta, pero no se pudo actualizar la copia de este dispositivo. Reintenta sincronizar antes de usarlo sin conexión.'
+          : 'Progreso reiniciado en tu cuenta' })
       } finally { if (motor.current === engine) reiniciando.current = false }
     },
   }), [listo, indice, estado, errorCarga, avisoLocal, sincronizacion, sincronizarAhora, registrarIntento, registrarVistaConcepto, editar, persistir])

@@ -7,7 +7,7 @@ import { emptyNbmeState, startNbmeSession } from '../nbme/model'
 import type { NbmeQuestionMeta } from '../nbme/types'
 import type { ItemCaja } from '../lib/cajas'
 
-const AHORA = new Date(2026, 9, 5, 10).getTime()
+const AHORA = Date.parse('2026-10-05T10:00:00-04:00')
 const serie = (hechos: number, linea: number) => ({ hechos, linea, meta: 510, ...rumboDe(hechos, linea), proyeccion: null })
 const meta = (hechos = 50, linea = 57): ResumenMeta => ({ dia: 11, conceptos: serie(hechos, linea), preguntas: serie(20, 20), filas: [], semanasConsolidacion: 4 })
 const caja = (id: string, hecho = false): ItemCaja => ({ id, tipo: 'concepto', caja: 1, vence: AHORA - 1, hecho })
@@ -90,7 +90,7 @@ describe('ponerse al día sin cambiar qué cuenta como dominio ni añadir deuda 
 
 it('Hoy y recuperación seleccionan exactamente los mismos IDs y reutilizan sólo la sesión NBME con las mismas referencias', () => {
   // Sábado: entre semana no entran preguntas NBME nuevas y la sesión NBME no tendría nada que reutilizar.
-  const sabado = new Date(2026, 9, 17, 10).getTime()
+  const sabado = Date.parse('2026-10-17T10:00:00-04:00')
   const e: EntradaDia = { progreso: {}, intentosPreguntas: [], conceptosSemana: ['C2', 'C1'], preguntasSemana: ['Q2', 'Q1'], cajas: { hechos: 0, techo: 0 }, ahora: sabado }
   const q = (id: string): NbmeQuestionMeta => ({ id, revision: 'r2', form: '27', section: 1, item: 1, page: 1, systems: [], disciplines: [], topic: 'Synthetic', objective: null, status: 'ready', reasons: [], figureRequired: false, conceptLinks: [] })
   const listas = new Map(['Q1', 'Q2'].map(id => [id, q(id)]))

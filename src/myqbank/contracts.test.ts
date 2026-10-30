@@ -15,6 +15,13 @@ describe('My Q Bank presentation contracts', () => {
     const section: ExplanationSection = { id: 'key', label: 'Key idea', status: 'available', heading: 'Clave', paragraphs: ['Texto respaldado.'] }
     expect(availableSections([section, { ...section, id: 'choices', status: 'not_applicable' }, { ...section, id: 'pattern', status: 'pending' }, { ...section, id: 'empty', paragraphs: [] }, { ...section, id: 'blank', paragraphs: ['  '] }, { ...section, id: 'drill', paragraphs: [], drill: { prompt: 'Pregunta', answer: '' } }])).toEqual([section])
   })
+  it('keeps a question and a concept with the same opaque ID as distinct items', () => {
+    const common = { id: 'shared', systems: ['renal'], pools: ['unused'] as const }
+    const question: EligibleItem = { ...common, kind: 'nbme' }
+    const concept: EligibleItem = { ...common, kind: 'concept' }
+    expect(selectUniqueItems([question, concept, question], 'mixed', ['renal'], ['unused']))
+      .toEqual([question, concept])
+  })
   it.each([
     ['test',false,false,false], ['test',true,false,false], ['test',false,true,false], ['test',true,true,true],
     ['tutor',false,false,false], ['tutor',true,false,true], ['tutor',false,true,false], ['tutor',true,true,true],

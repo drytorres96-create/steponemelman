@@ -26,10 +26,13 @@ export async function solicitarIA<T>(ruta: string, cuerpo: unknown, limiteMs: nu
     const { data: { session } } = await Promise.race([supabase.auth.getSession(), cancelada])
     if (!session) return { estado: 'sin_ia', motivo: 'Sin sesión iniciada.' }
     if (control.signal.aborted) return { estado: 'sin_ia', motivo: 'Cancelado.' }
-    const response = await fetch(ruta, { method: 'POST', signal: control.signal,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` }, body })
+    const response = await Promise.race([fetch(ruta, { method: 'POST', signal: control.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` }, body }), cancelada])
     if (!response.headers.get('content-type')?.includes('application/json')) return { estado: 'sin_ia', motivo: 'La ayuda de IA no está disponible en este entorno.' }
-    const data = await response.json()
+    // El plazo cubre también la descarga del cuerpo. Un transporte que tarde en
+    // obedecer abort() nunca puede dejar el chat esperando ni entregar un éxito tardío.
+    const data = await Promise.race([response.json(), cancelada])
+    if (control.signal.aborted) return { estado: 'sin_ia', motivo: signal?.aborted ? 'Cancelado.' : 'La IA tardó demasiado. Puedes seguir estudiando.' }
     if (!response.ok) {
       const espera = Number(response.headers.get('Retry-After'))
       const motivo = typeof data?.error === 'string' ? data.error : 'No se pudo obtener la ayuda.'

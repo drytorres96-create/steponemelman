@@ -51,7 +51,7 @@ function setup(entorno: Record<string, unknown> = {}) {
   const storage = new MemoryStorage()
   const transporte = vi.fn(async (_url: string, _init?: RequestInit) => claude(VEREDICTO))
   vi.stubGlobal('fetch', transporte)
-  const env = { ANTHROPIC_API_KEY: 'sk-ant-prueba', ASSETS: { fetch: vi.fn().mockResolvedValue(new Response('site')) }, COACH: { idFromName: vi.fn(), get: vi.fn() }, ...entorno }
+  const env = { ANTHROPIC_API_KEY: 'SYNTHETIC_NON_SECRET_ANTHROPIC_KEY', ASSETS: { fetch: vi.fn().mockResolvedValue(new Response('site')) }, COACH: { idFromName: vi.fn(), get: vi.fn() }, ...entorno }
   const coach = new StudyCoach({ storage }, env)
   const call = (key: string, { user = 'one', mode = 'calificar', sol = solicitud(), contexto }: { user?: string; mode?: string; sol?: SolicitudClaude; contexto?: { permitidos?: string[]; preguntas?: number } } = {}) =>
     coach.fetch(new Request(`https://coach/${mode}`, { method: 'POST', body: JSON.stringify({ key, user, mode, solicitud: sol, source: { title: 'QA', page: 1 }, ...(contexto ? { contexto } : {}) }) }))
@@ -102,7 +102,7 @@ describe('Claude desde el Durable Object', () => {
     expect((await call('k-forma')).status).toBe(200)
     const [url, init] = transporte.mock.calls[0]
     expect(url).toBe('https://api.anthropic.com/v1/messages')
-    expect(init!.headers).toMatchObject({ 'x-api-key': 'sk-ant-prueba', 'anthropic-version': '2023-06-01', 'content-type': 'application/json' })
+    expect(init!.headers).toMatchObject({ 'x-api-key': 'SYNTHETIC_NON_SECRET_ANTHROPIC_KEY', 'anthropic-version': '2023-06-01', 'content-type': 'application/json' })
     const cuerpo = JSON.parse(init!.body as string)
     expect(cuerpo).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 700, system: 'Sistema de prueba.', output_config: { effort: 'low' } })
     expect(cuerpo).not.toHaveProperty('temperature')
@@ -360,7 +360,7 @@ function entornoRutas(c = originalSintetico, indice: unknown = indiceSintetico, 
   }))
   const enviados: Record<string, any>[] = []
   const coach = { fetch: vi.fn(async (req: Request) => { enviados.push(await req.json()); return Response.json({ ok: true }) }) }
-  const env = { ...(conClave ? { ANTHROPIC_API_KEY: 'sk-ant-prueba' } : {}), ASSETS: { fetch: vi.fn() }, COACH: { idFromName: vi.fn(), get: vi.fn().mockReturnValue(coach) } }
+  const env = { ...(conClave ? { ANTHROPIC_API_KEY: 'SYNTHETIC_NON_SECRET_ANTHROPIC_KEY' } : {}), ASSETS: { fetch: vi.fn() }, COACH: { idFromName: vi.fn(), get: vi.fn().mockReturnValue(coach) } }
   const llamar = (path: string, body: unknown) => worker.fetch(new Request(`https://site${path}`, { method: 'POST', headers: AUTH, body: JSON.stringify(body) }), env)
   return { env, coach, enviados, llamar }
 }
@@ -558,7 +558,7 @@ function entornoNbme({ politica = POLITICA() as unknown, pregunta = PREGUNTA_NBM
     if (cuerpo.mode === 'leer') return Response.json({ fichas: Object.fromEntries((cuerpo.contexto.permitidos as string[]).map(id => [id, { sistemas: ['Endocrino'], disciplinas: ['Fisiología'], tema: 'Tema leído' }])) })
     return Response.json({ ok: true })
   }) }
-  const env = { ANTHROPIC_API_KEY: 'sk-ant-prueba', ASSETS: { fetch: vi.fn() }, COACH: { idFromName: vi.fn(), get: vi.fn().mockReturnValue(coach) } }
+  const env = { ANTHROPIC_API_KEY: 'SYNTHETIC_NON_SECRET_ANTHROPIC_KEY', ASSETS: { fetch: vi.fn() }, COACH: { idFromName: vi.fn(), get: vi.fn().mockReturnValue(coach) } }
   const llamar = (body: unknown) => worker.fetch(new Request('https://site/api/ia/chat', { method: 'POST', headers: AUTH, body: JSON.stringify(body) }), env)
   const llamarSesion = (body: unknown, entorno = env) => worker.fetch(new Request('https://site/api/ia/sesion', { method: 'POST', headers: AUTH, body: JSON.stringify(body) }), entorno)
   return { llamar, llamarSesion, enviados, coach, env, marcadas }
@@ -913,6 +913,16 @@ describe('POST /api/ia/sesion · entender el pedido y revisar los candidatos', (
     expect(await (await llamarSesion({ fase: 'leer', items: [ref] })).json()).toEqual({ leidas: 1, sinFuente: 0, pendientes: 0 })
     expect(enviados).toEqual([])
   })
+  it('leer: una ficha guardada sin fuente no se anuncia como leída ni se vuelve a pagar', async () => {
+    const otra = { id: 'NBME28-P0002', revision: 'r1' }
+    const { llamarSesion, enviados } = entornoNbme({ fichas: {
+      [claveP1]: fichaLeida('original'),
+      [claveLectura(otra)]: { v: 1, at: Date.now(), origen: 'sin_fuente' },
+    } })
+    expect(await (await llamarSesion({ fase: 'leer', items: [ref, otra] })).json())
+      .toEqual({ leidas: 1, sinFuente: 1, pendientes: 0 })
+    expect(enviados).toEqual([])
+  })
   it('leer: una pregunta retenida sin explicación revisada no sale hacia la IA y se recuerda como «sin fuente»', async () => {
     const regla = { source: { kind: 'nbme', id: 'NBME28-P0001', revision: 'r1', sourceHash: 'a'.repeat(64) }, originalRecovery: 'reviewed_only' }
     const { llamarSesion, enviados, marcadas } = entornoNbme({ politica: POLITICA([regla]) })
@@ -1013,6 +1023,12 @@ describe('POST /api/ia/sesion · entender el pedido y revisar los candidatos', (
       expect(fichaVigente({ v: 1, at: ahora - 1000, origen: 'sin_fuente' }, ahora)).toBe(true)
       expect(fichaVigente({ v: 1, at: ahora - VIGENCIA_SIN_FUENTE_MS, origen: 'sin_fuente' }, ahora)).toBe(false)
       expect(fichaVigente(undefined, ahora)).toBe(false)
+      for (const invalida of [
+        { v: 1, at: ahora, origen: 'original' },
+        { v: 1, at: ahora, origen: 'otra', sistemas: ['Renal'], disciplinas: ['Fisiología'], tema: 'Nefrona' },
+        { v: 1, at: ahora, origen: 'revisada', sistemas: ['Inventado'], disciplinas: ['Fisiología'], tema: 'Nefrona' },
+        { v: 1, at: ahora + 1000, origen: 'sin_fuente' },
+      ]) expect(fichaVigente(invalida as never, ahora)).toBe(false)
     })
     it('el Durable Object guarda cada ficha leída en su clave, no como caché, y la sirve después', async () => {
       const { call, transporte, storage, env } = setup()
@@ -1098,10 +1114,11 @@ beforeEach(() => olvidarCachePlan())
  * limpio: la pantalla degrada, no se rompe.
  */
 const AUTORIZACION = { Authorization: 'Bearer ' + 'x'.repeat(30) }
+// Public test doubles only. These markers cannot authenticate to any service.
 const secretos = {
   PLAN_SUPABASE_URL: 'https://plan.supabase.co',
-  PLAN_SUPABASE_SERVICE_KEY: 'clave-de-servicio',
-  PLAN_USER_ID: 'dd1d5d7c-a9f4-42aa-a08e-f40603c767c2',
+  PLAN_SUPABASE_SERVICE_KEY: 'SYNTHETIC_NON_SECRET_SERVICE_KEY',
+  PLAN_USER_ID: '00000000-0000-4000-8000-000000000001',
 }
 const entornoPlan = (extra: Record<string, unknown> = {}) => ({
   COACH: { idFromName: vi.fn(), get: vi.fn() },

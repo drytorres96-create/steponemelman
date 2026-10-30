@@ -80,7 +80,8 @@ export async function pedirLectura(refs: RefNbme[], signal?: AbortSignal): Promi
   if (r.estado === 'sin_ia') return r
   const n = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= enviados.length ? v : null
   const leidas = n(r.data?.leidas), sinFuente = n(r.data?.sinFuente), pendientes = n(r.data?.pendientes)
-  if (leidas === null || sinFuente === null || pendientes === null) return { estado: 'sin_ia', motivo: 'Claude no devolvió una lectura que pueda usar. Vuelve a intentarlo.' }
+  if (leidas === null || sinFuente === null || pendientes === null || leidas + sinFuente + pendientes !== enviados.length)
+    return { estado: 'sin_ia', motivo: 'Claude no devolvió una lectura que pueda usar. Vuelve a intentarlo.' }
   return { estado: 'ok', leidas, sinFuente, pendientes }
 }
 

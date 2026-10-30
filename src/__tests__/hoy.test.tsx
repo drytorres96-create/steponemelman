@@ -12,6 +12,7 @@ import type { SesionSemanal } from '../semana/tipos'
 import type { Concepto } from '../schema/concept'
 import { cajaDeConcepto } from '../lib/cajas'
 import { resumenProgresoAprendizaje } from '../lib/progreso-aprendizaje'
+import { instanteEstudio } from '../lib/calendario-estudio'
 
 /**
  * La portada pone el techo. Lo que se comprueba es lo que decide si Yoel cierra el
@@ -38,10 +39,12 @@ import { Hoy } from '../screens/Hoy'
 import { AsistenteDashboard, type DatosAsistente } from '../myqbank/AsistenteDashboard'
 import { vistaDesdeHash } from '../App'
 
+/** Las fixtures usan Nueva York, igual que el plan, con independencia de la zona del proceso. */
+const SEPTIEMBRE = (dia: number, h: number, m = 0) => instanteEstudio({ anio: 2026, mes: 9, dia }, h) + m * 60_000
 /** Jueves 24 de septiembre de 2026, 10:00: un día entre semana. La semana va del lunes 21 al domingo 27. */
-const HOY = (h: number, m = 0) => new Date(2026, 8, 24, h, m).getTime()
+const HOY = (h: number, m = 0) => SEPTIEMBRE(24, h, m)
 /** Sábado 26 de la misma semana: el único tipo de día en el que entran preguntas NBME nuevas. */
-const SABADO = (h: number, m = 0) => new Date(2026, 8, 26, h, m).getTime()
+const SABADO = (h: number, m = 0) => SEPTIEMBRE(26, h, m)
 
 let serie = 0
 const intento = (ts: number, extra: Partial<Intento> = {}): Intento => ({
@@ -147,8 +150,8 @@ function diaCompleto() {
 function diaConCajas() {
   const semana = ids('C', 12)
   datos({
-    progresos: { X1: progreso('X1', [fallo(new Date(2026, 8, 22, 9).getTime())]) },
-    respuestas: [respuesta('Q9', new Date(2026, 8, 22, 10).getTime(), false)],
+    progresos: { X1: progreso('X1', [fallo(SEPTIEMBRE(22, 9))]) },
+    respuestas: [respuesta('Q9', SEPTIEMBRE(22, 10), false)],
     conceptos: semana, preguntas: ['Q9'],
   })
   mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, semana)])
@@ -170,7 +173,7 @@ describe('portada Hoy', () => {
     expect(mock.plan).toHaveBeenLastCalledWith('x'.repeat(30), '2026-09-21')
   })
   it('el domingo pide el plan del mismo lunes que sus guiones', async () => {
-    vi.setSystemTime(new Date(2026, 8, 27, 10))
+    vi.setSystemTime(new Date(SEPTIEMBRE(27, 10)))
     datos({ conceptos: ['C1'] })
     mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, ['C1'])])
     mock.plan.mockImplementation(async (_token: string, dia: string) => ({
@@ -292,8 +295,8 @@ describe('portada Hoy', () => {
     vi.setSystemTime(new Date('2026-09-25T03:05:00-04:00'))
     const semana = ids('C', 12)
     datos({
-      progresos: { X1: progreso('X1', [fallo(new Date(2026, 8, 22, 9).getTime())]) },
-      respuestas: [respuesta('Q9', new Date(2026, 8, 22, 10).getTime(), false)],
+      progresos: { X1: progreso('X1', [fallo(SEPTIEMBRE(22, 9))]) },
+      respuestas: [respuesta('Q9', SEPTIEMBRE(22, 10), false)],
       conceptos: semana, preguntas: ['Q1', 'Q9'],
     })
     mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, semana, ['Q1'])])
@@ -317,7 +320,7 @@ describe('portada Hoy', () => {
   })
 
   it('el viernes sigue cerrado aunque no lleguen las sesiones de la semana', async () => {
-    vi.setSystemTime(new Date(2026, 8, 25, 10))
+    vi.setSystemTime(new Date(SEPTIEMBRE(25, 10)))
     mock.historial.mockRejectedValue(new Error('sin red'))
     await pintar()
     expect(botones()).toHaveLength(0)
@@ -326,10 +329,10 @@ describe('portada Hoy', () => {
   })
 
   it('el fin de semana el techo sube a 10 conceptos, 5 preguntas y 35 cajas, sin contar lo que queda fuera', async () => {
-    vi.setSystemTime(new Date(2026, 8, 26, 10))
+    vi.setSystemTime(new Date(SABADO(10)))
     const semana = ids('C', 25), preguntas = ids('Q', 12)
     // 40 fallos del martes vencen hoy: entran 35 y los otros cinco esperan sin dejar rastro.
-    const progresos = Object.fromEntries(ids('X', 40).map((id, i) => [id, progreso(id, [fallo(new Date(2026, 8, 22, 9, i).getTime())])]))
+    const progresos = Object.fromEntries(ids('X', 40).map((id, i) => [id, progreso(id, [fallo(SEPTIEMBRE(22, 9, i))])]))
     datos({ progresos, conceptos: semana, preguntas })
     mock.historial.mockResolvedValue([sesion('lunes', '2026-09-21', 1, semana, preguntas)])
     const onCajas = vi.fn()
@@ -385,8 +388,8 @@ describe('portada Hoy', () => {
       progresos: {
         ...Object.fromEntries(semana.slice(0, 3).map((id, i) => [id, progreso(id, [intento(HOY(8, i))])])),
         // Dos conceptos de otros días que se fallaron: vencen hoy.
-        X1: progreso('X1', [fallo(new Date(2026, 8, 22, 9).getTime())]),
-        X2: progreso('X2', [fallo(new Date(2026, 8, 22, 10).getTime())]),
+        X1: progreso('X1', [fallo(SEPTIEMBRE(22, 9))]),
+        X2: progreso('X2', [fallo(SEPTIEMBRE(22, 10))]),
       },
       conceptos: semana,
     })
@@ -437,8 +440,8 @@ describe('portada Hoy', () => {
     datos({
       progresos: {
         ...Object.fromEntries(semana.slice(0, 3).map((id, i) => [id, progreso(id, [intento(HOY(8, i))])])),
-        X1: progreso('X1', [fallo(new Date(2026, 8, 22, 9).getTime())]),
-        X2: progreso('X2', [fallo(new Date(2026, 8, 22, 10).getTime())]),
+        X1: progreso('X1', [fallo(SEPTIEMBRE(22, 9))]),
+        X2: progreso('X2', [fallo(SEPTIEMBRE(22, 10))]),
       },
       conceptos: semana, preguntas: ['Q1', 'Q2'],
     })
@@ -478,7 +481,7 @@ describe('portada Hoy', () => {
     datos({
       progresos: {
         ...Object.fromEntries(semana.map((id, i) => [id, progreso(id, [intento(HOY(8, i))])])),
-        X1: progreso('X1', [fallo(new Date(2026, 8, 22, 9).getTime())]),
+        X1: progreso('X1', [fallo(SEPTIEMBRE(22, 9))]),
       },
       conceptos: semana,
     })

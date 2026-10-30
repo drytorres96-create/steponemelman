@@ -146,6 +146,14 @@ function cerradas<T extends string>(valor: unknown, lista: readonly T[]): T[] | 
   return salida
 }
 
+/** El almacenamiento persistente también cruza versiones: una ficha incompleta no se reutiliza. */
+export function validarFichaLectura(valor: unknown): FichaLectura | null {
+  if (!valor || typeof valor !== 'object') return null
+  const f = valor as Record<string, unknown>
+  const sistemas = cerradas(f.sistemas, SISTEMAS), disciplinas = cerradas(f.disciplinas, DISCIPLINAS), tema = limpiarTema(f.tema)
+  return sistemas && disciplinas && tema ? { sistemas, disciplinas, tema } : null
+}
+
 /**
  * Las fichas utilizables de una lectura, sólo de las preguntas enviadas. Una ficha con un valor
  * fuera del vocabulario se descarta (esa pregunta sigue pendiente); sin ninguna válida, no es utilizable.
@@ -157,8 +165,8 @@ export function validarLectura(salida: string, permitidos: readonly string[]): {
   const fichas: Record<string, FichaLectura> = {}
   for (const f of obj.fichas as Record<string, unknown>[]) {
     if (!f || typeof f !== 'object' || typeof f.id !== 'string' || !validos.has(f.id) || fichas[f.id]) continue
-    const sistemas = cerradas(f.sistemas, SISTEMAS), disciplinas = cerradas(f.disciplinas, DISCIPLINAS), tema = limpiarTema(f.tema)
-    if (sistemas && disciplinas && tema) fichas[f.id] = { sistemas, disciplinas, tema }
+    const ficha = validarFichaLectura(f)
+    if (ficha) fichas[f.id] = ficha
   }
   return Object.keys(fichas).length ? { fichas } : null
 }

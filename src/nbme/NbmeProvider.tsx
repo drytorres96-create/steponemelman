@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { supabase } from '../lib/supabase'
 import { leer, escribir } from '../store/db'
 import { apartarCopia } from '../store/apartar'
+import { recoverSavedCopies } from '../store/recovery'
 import { crearUUID } from '../store/model'
 import { createNbmeApi, parseNbmeCatalog, parseNbmeQuestion, questionRefKey, NbmeAccessError } from './api'
 import { preguntaConLecturasDudosas } from './texto'
@@ -344,11 +345,11 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       if (discarded && !await apartarCopia(key, `step1-backup:${key}`, { copia: stored, respaldo: corruptBackup ? rawBackup : backup })) {
         throw new Error('La copia local de preguntas no es válida y no pudo apartarse.')
       }
-      const saved = principal && fallback ? (principal.savedAt >= fallback.savedAt ? principal : fallback) : principal ?? fallback
+      const saved = recoverSavedCopies(principal, fallback, mergeNbmeStates)
       if (!isCurrent()) return
       if (discarded) setLocalNotice('La copia de preguntas NBME de este dispositivo estaba dañada. Se apartó sin borrarla y tus preguntas se recuperaron de tu cuenta.')
       if (readFailure) setStorageWarning('No se pudo leer uno de los respaldos locales. Sincroniza para recuperar el progreso de tu cuenta.')
-      actual.current = principal && fallback ? mergeNbmeStates(principal.state, fallback.state) : saved?.state ?? emptyNbmeState()
+      actual.current = saved?.state ?? emptyNbmeState()
       setState(actual.current)
       let engine: NbmeSyncEngine
       const check = () => { if (!isCurrent() || engineRef.current !== engine) throw new Error('La cuenta ya no está activa.') }

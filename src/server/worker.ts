@@ -21,7 +21,7 @@ import { ErrorClaude, costeDeError, costeReservaUSD, llamarClaude, type CodigoCl
 import { MAX_MATERIAL, VERSION_CHAT, materialChatConcepto, materialChatNbme, solicitudCalificar, solicitudChat, solicitudPractica, type MaterialChat } from './ia-chat'
 import {
   VERSION_CONSTRUCTOR, VERSION_LECTURA, VERSION_SESION, solicitudEntender, solicitudHilo, solicitudLeer, solicitudRevisar, textoDeFicha,
-  validarEntenderSalida, validarHilo, validarLectura, validarRevision, type FichaLectura,
+  validarEntenderSalida, validarFichaLectura, validarHilo, validarLectura, validarRevision, type FichaLectura,
 } from './ia-sesion'
 
 const DAY = 86400000
@@ -77,7 +77,9 @@ export type FichaGuardada = { v: 1; at: number } & ({ origen: OrigenEvidencia } 
 export const VIGENCIA_SIN_FUENTE_MS = DAY
 export const claveLectura = (r: { id: string; revision: string }) => `lectura:${VERSION_LECTURA}:${r.id}:${r.revision}`
 export const fichaVigente = (f: FichaGuardada | undefined, ahora = Date.now()): boolean =>
-  !!f && f.v === 1 && (f.origen !== 'sin_fuente' || ahora - f.at < VIGENCIA_SIN_FUENTE_MS)
+  !!f && f.v === 1 && Number.isFinite(f.at) && f.at >= 0 && (f.origen === 'sin_fuente'
+    ? f.at <= ahora && ahora - f.at < VIGENCIA_SIN_FUENTE_MS
+    : (f.origen === 'original' || f.origen === 'revisada') && validarFichaLectura(f) !== null)
 
 export const presupuestoMensualUSD = (env: Pick<Env, 'CLAUDE_PRESUPUESTO_USD'>): number => {
   const n = Number(env.CLAUDE_PRESUPUESTO_USD)
@@ -495,17 +497,18 @@ async function handleSesion(request: Request, url: URL, env: Env): Promise<Respo
       const guardadas = await fichasGuardadas(env, claves)
       const faltan = input.items.filter((_, n) => !fichaVigente(guardadas.get(claves[n])))
       if (input.fase === 'lecturas') return json({ faltan: faltan.map(r => r.id) })
-      const yaLeidas = input.items.length - faltan.length
-      if (!faltan.length) return json({ leidas: yaLeidas, sinFuente: 0, pendientes: 0 })
+      const sinFuenteGuardadas = input.items.filter((_, n) => fichaVigente(guardadas.get(claves[n])) && guardadas.get(claves[n])?.origen === 'sin_fuente').length
+      const yaLeidas = input.items.length - faltan.length - sinFuenteGuardadas
+      if (!faltan.length) return json({ leidas: yaLeidas, sinFuente: sinFuenteGuardadas, pendientes: 0 })
       const politica = await politicaNbme(quien.get)
       // Sin política vigente nada sale hacia la IA, y tampoco se recuerda como «sin fuente»: puede ser un fallo pasajero.
-      if (!politica) return json({ leidas: yaLeidas, sinFuente: faltan.length, pendientes: 0 })
+      if (!politica) return json({ leidas: yaLeidas, sinFuente: sinFuenteGuardadas + faltan.length, pendientes: 0 })
       const { evidencias, sinFuente } = await evidenciaNbme(faltan, politica, quien.get)
       if (sinFuente.length) {
         const marcadas = faltan.filter(r => sinFuente.includes(r.id)).map(claveLectura)
         await env.COACH.get(env.COACH.idFromName('study-coach-v1')).fetch(new Request('https://coach/lecturas/sin-fuente', { method: 'POST', body: JSON.stringify({ claves: marcadas }) }))
       }
-      if (!evidencias.length) return json({ leidas: yaLeidas, sinFuente: sinFuente.length, pendientes: 0 })
+      if (!evidencias.length) return json({ leidas: yaLeidas, sinFuente: sinFuenteGuardadas + sinFuente.length, pendientes: 0 })
       const solicitud = solicitudLeer(evidencias)
       const lectura = evidencias.map(e => ({ id: e.id, clave: claveLectura(e), origen: e.origen }))
       const trusted: CoachInput = { user: quien.userId, mode: 'leer', solicitud, contexto: { permitidos: evidencias.map(e => e.id), lectura },
@@ -513,7 +516,7 @@ async function handleSesion(request: Request, url: URL, env: Env): Promise<Respo
       const respuesta = await alCoach(env, 'leer', trusted)
       if (!respuesta.ok) return respuesta
       const leidasAhora = Object.keys((await respuesta.json() as { fichas?: Record<string, unknown> }).fichas ?? {}).length
-      return json({ leidas: yaLeidas + leidasAhora, sinFuente: sinFuente.length, pendientes: evidencias.length - leidasAhora })
+      return json({ leidas: yaLeidas + leidasAhora, sinFuente: sinFuenteGuardadas + sinFuente.length, pendientes: evidencias.length - leidasAhora })
     }
 
     if (input.fase === 'revisar') {
@@ -527,7 +530,7 @@ async function handleSesion(request: Request, url: URL, env: Env): Promise<Respo
       const revisables = input.items.flatMap(i => {
         if (i.tipo === 'concepto') return i.id.startsWith('NBME') ? [] : [{ id: i.id, etiqueta: limpiarEtiqueta(i.etiqueta) }]
         const f = claves.has(i.id) ? guardadas.get(claves.get(i.id)!) : undefined
-        if (!f || f.origen === 'sin_fuente' || (f.origen === 'original' && !originalRecoveryAllowed(politica, i.id))) return []
+        if (!f || !fichaVigente(f) || f.origen === 'sin_fuente' || (f.origen === 'original' && !originalRecoveryAllowed(politica, i.id))) return []
         if (f.origen === 'revisada') conFuenteRevisada++
         return [{ id: i.id, etiqueta: textoDeFicha(f) }]
       })

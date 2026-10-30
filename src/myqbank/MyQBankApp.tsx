@@ -21,6 +21,7 @@ import type { Cola } from '../screens/Reproductor'
 import { Resguardo } from '../components/Resguardo'
 import { Brand, Button, Icon, StateMessage } from './components'
 import { Dashboard } from './Dashboard'
+import { SyncHealth } from './SyncHealth'
 import { AnnotationProvider, useAnnotations } from './AnnotationProvider'
 import { blockOpportunity, createBlock, modeChangeEvidence, patchBlock, removeBlock, type BlockEntry, type StudyBlock } from './blocks'
 import type { BankItem } from './selection'
@@ -170,7 +171,7 @@ function Workspace() {
   const legacyPending = hayConceptosPendientes(app.estado.reanudable) || Object.values(nbme.state.sessions).some(s => !s.mode && s.paused && !nbme.state.archivedSessions?.[s.id])
   const pendingTest = Object.values(app.estado.myqbankBlocks ?? {}).some(b => b.mode === 'test' && b.completedAt === undefined && b.archivedAt === undefined)
   return <div lang="en" className={`mq-root mq-preview mq-workspace ${view === 'block' ? 'mq-workspace--study' : ''}`} data-theme={theme.piel === 'claro' ? 'light' : 'dark'}>
-    <a className="mq-skip-link" href="#mq-main">Skip to content</a><header className="mq-header"><Brand/>{!studying && <Button className="mq-dashboard-link" aria-label="Dashboard" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={dashboard}><Icon name="dashboard"/><span>Dashboard</span></Button>}
+    <a className="mq-skip-link" href="#mq-main" onClick={event => { event.preventDefault(); const main = document.getElementById('mq-main'); main?.focus({ preventScroll: true }); main?.scrollIntoView({ block: 'start' }) }}>Skip to content</a><header className="mq-header"><Brand/>{!studying && <Button className="mq-dashboard-link" aria-label="Dashboard" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={dashboard}><Icon name="dashboard"/><span>Dashboard</span></Button>}
       <div className="mq-header-actions"><Button aria-label={theme.piel === 'claro' ? 'Switch to dark theme' : 'Switch to light theme'} onClick={theme.alternar}><Icon name={theme.piel === 'claro' ? 'moon' : 'sun'}/></Button>
         {!studying && <Button aria-label="Settings" onClick={() => { setView('settings'); location.hash = 'settings' }}><Icon name="settings"/><span>Settings</span></Button>}</div>
     </header>
@@ -184,7 +185,7 @@ function Workspace() {
         <details className="mq-progress-details" onToggle={e => setDetails(e.currentTarget.open)}><summary>Detailed progress and study plan</summary>{details && (pendingTest ? <p>End your Test block to see updated results.</p> : <ProgressDetails onNuevo={newDaily} onCajas={openCajas} onRetomar={resumeLegacy}/>)}</details></>}
       {view === 'block' && error && <p role="alert">{error}</p>}
       {view === 'block' && block && <Study block={block} busy={busy} onModeChange={(b, mode) => create([], mode, undefined, b.entries, b)} onExit={dashboard} onRetry={b => create([], 'tutor', b.id, b.entries)}/>}
-      {view === 'settings' && <main id="mq-main" tabIndex={-1} className="mq-settings"><div className="mq-settings-heading"><h1>Settings</h1><div className="mq-inline"><Button onClick={() => void Promise.all([app.sincronizarAhora(), nbme.syncNow(), annotations.sync()])}>Sync now</Button><Button onClick={async () => { const saved = await Promise.all([app.sincronizarAhora(), nbme.syncNow(), annotations.sync()]); if (saved.every(Boolean) || confirm('Some changes are pending or could not be verified. Signing out now may leave them only on this device, or lose them if local storage failed. Sign out?')) await auth.signOut() }}>Sign out</Button></div></div><Settings english extraBackup={{ myqbankAnnotations: { userId: auth.user!.id, rows: annotations.rows } }} restoreExtra={backup => annotations.restore(backup.myqbankAnnotations)}/></main>}
+      {view === 'settings' && <main id="mq-main" tabIndex={-1} className="mq-settings"><div className="mq-settings-heading"><h1>Settings</h1><div className="mq-inline"><Button onClick={() => void Promise.all([app.sincronizarAhora(), nbme.syncNow(), annotations.sync()])}>Sync now</Button><Button onClick={async () => { const saved = await Promise.all([app.sincronizarAhora(), nbme.syncNow(), annotations.sync()]); if (saved.every(Boolean) || confirm('Some changes are pending or could not be verified. Signing out now may leave them only on this device, or lose them if local storage failed. Sign out?')) await auth.signOut() }}>Sign out</Button></div></div><SyncHealth/><Settings english extraBackup={{ myqbankAnnotations: { userId: auth.user!.id, rows: annotations.rows } }} restoreExtra={backup => annotations.restore(backup.myqbankAnnotations)}/></main>}
       {view === 'legacy-concepts' && legacy && <main id="mq-main" tabIndex={-1} className="mq-legacy-study"><Reproductor cola={legacy.cola} indiceInicial={legacy.index} onSalir={dashboard} etiquetaSalida="Dashboard"/></main>}
       {view === 'legacy-nbme' && <main id="mq-main" tabIndex={-1} className="mq-legacy-study"><NbmePlayer recuperarErrores onSalir={dashboard} etiquetaSalida="Dashboard"/></main>}
     </Suspense></Resguardo>

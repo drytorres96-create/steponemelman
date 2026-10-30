@@ -5,7 +5,7 @@ import { IndiceZ } from '../schema/concept'
 import { ESTADO_INICIAL, type EstadoApp } from '../store/model'
 
 const mock = vi.hoisted(() => ({ app: vi.fn(), cargar: vi.fn(), leer: vi.fn(), escribir: vi.fn(), descargar: vi.fn(),
-  semanas: vi.fn(), plan: vi.fn() }))
+  semanas: vi.fn(), plan: vi.fn(), importar: vi.fn() }))
 vi.mock('../store/estado', () => ({ useApp: mock.app }))
 vi.mock('../store/db', () => ({ leer: mock.leer, escribir: mock.escribir }))
 vi.mock('../data/corpus', () => ({ cargarTodo: mock.cargar, cargarCuarentena: async () => ({ conceptos: [] }) }))
@@ -25,7 +25,7 @@ beforeEach(() => {
   estado = { ...ESTADO_INICIAL, criterios: { ...ESTADO_INICIAL.criterios }, progreso: {} }
   guardar.mockImplementation(c => { estado = { ...estado, criterios: c } })
   mock.app.mockImplementation(() => ({ estado, actualizarCriterios: guardar,
-    exportar: (extra?: Record<string, unknown>) => JSON.stringify({ ...estado, ...extra }), indice }))
+    exportar: (extra?: Record<string, unknown>) => JSON.stringify({ ...estado, ...extra }), importar: mock.importar, indice }))
   mock.cargar.mockResolvedValue([]); mock.leer.mockResolvedValue({}); mock.escribir.mockResolvedValue(undefined)
   mock.semanas.mockResolvedValue([{ id: 'semana-sintetica' }]); mock.plan.mockResolvedValue({ eventoId: 'S-sintetica' })
 })
@@ -68,6 +68,30 @@ describe('simplificación con datos conservados', () => {
     expect(archivo).toMatchObject({ version: 1, nbme: { marca: 'preguntas' }, semanas: null, plan: null })
     expect(boton('Exportar progreso').disabled).toBe(false)
     vi.useRealTimers()
+  })
+
+  it('un archivo ilegible muestra reintento y permite seleccionar el mismo respaldo otra vez', async () => {
+    await act(async () => root.render(<Ajustes english />))
+    const input = host.querySelector<HTMLInputElement>('input[type="file"]')!
+    const file = { text: vi.fn().mockRejectedValueOnce(new Error('Unreadable')).mockResolvedValueOnce('{}') }
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] })
+    await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })))
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('Could not read or import the file')
+    expect(mock.importar).not.toHaveBeenCalled()
+    expect(boton('Import progress').disabled).toBe(false)
+    mock.importar.mockReturnValue({ ok: true, mensaje: 'Restored' })
+    await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })))
+    expect(mock.importar).toHaveBeenCalledExactlyOnceWith('{}')
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('Restored')
+    expect(input.value).toBe('')
+  })
+
+  it('un fallo de exportación deja un mensaje y un botón para reintentar', async () => {
+    mock.descargar.mockImplementationOnce(() => { throw new Error('Download failed') })
+    await act(async () => root.render(<Ajustes english />))
+    await click('Export progress')
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('Could not prepare the backup')
+    expect(boton('Export progress').disabled).toBe(false)
   })
 
   it('edita criterios como borrador, valida y guarda todos en una sola operación', async () => {

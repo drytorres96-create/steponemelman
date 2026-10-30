@@ -331,10 +331,11 @@ export function questionProgress(state: NbmeState, qid: string): NbmeQuestionPro
   const attempts = Object.values(state.attempts).filter(a => a.questionId === qid)
     .sort((a, b) => a.submittedAt - b.submittedAt || a.id.localeCompare(b.id))
   const first = attempts[0], last = attempts.at(-1)
+  const latestVisible = attempts.filter(attempt => !isHiddenNbmeAttempt(state, attempt)).at(-1)
   return { questionId: qid, seen: !!first, attempts: attempts.length,
     firstCorrect: !first || first.conflict || isHiddenNbmeAttempt(state, first) ? null : first.correct, firstSubmittedAt: first?.submittedAt ?? null,
-    latestCorrect: !last || last.conflict || isHiddenNbmeAttempt(state, last) ? null : last.correct, latestSubmittedAt: last?.submittedAt ?? null,
-    pendingError: !!last && !isHiddenNbmeAttempt(state, last) && (!last.correct || last.conflict === true) }
+    latestCorrect: !latestVisible || latestVisible.conflict ? null : latestVisible.correct, latestSubmittedAt: last?.submittedAt ?? null,
+    pendingError: !!latestVisible && (!latestVisible.correct || latestVisible.conflict === true) }
 }
 export function isHiddenNbmeAttempt(state: NbmeState, attempt: NbmeAttempt): boolean {
   const session = state.sessions[attempt.sessionId]
