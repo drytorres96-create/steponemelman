@@ -6,14 +6,15 @@ import { AnnotationZ, canonicalAnnotation, mergeAnnotation, type Annotation, typ
 
 const RowZ = z.object({ id: z.string().uuid(), user_id: z.string(), payload: AnnotationZ, revision: z.number().int().positive() })
 const SavedZ = z.object({ userId: z.string(), rows: z.array(z.object({ id: z.string().uuid(), payload: AnnotationZ, revision: z.number().int().nonnegative(), dirty: z.boolean() })) })
-type Context = { rows: AnnotationRecord[]; ready: boolean; status: string; save: (id: string, annotation: Annotation) => void; sync: () => Promise<void>; restore: (input: unknown) => string }
+type Context = { rows: AnnotationRecord[]; ready: boolean; status: string; save: (id: string, annotation: Annotation) => void; sync: () => Promise<boolean>; restore: (input: unknown) => string }
 const C = createContext<Context | null>(null)
 export function AnnotationProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const key = `myqbank-annotations:${userId}`
   const [rows, setRows] = useState<AnnotationRecord[]>([])
   const [ready, setReady] = useState(false)
   const [status, setStatus] = useState('Loading annotations…')
-  const actual = useRef<AnnotationRecord[]>([]), alive = useRef(false), loaded = useRef(false), busy = useRef(false)
+  const actual = useRef<AnnotationRecord[]>([]), alive = useRef(false), loaded = useRef(false)
+  const inFlight = useRef<Promise<boolean> | null>(null)
   const epoch = useRef(0), localFailed = useRef(false)
   const writes = useRef(Promise.resolve()), saveTimer = useRef<ReturnType<typeof setTimeout>>()
   const persist = useCallback(() => {
@@ -24,18 +25,22 @@ export function AnnotationProvider({ userId, children }: { userId: string; child
     void writes.current.then(() => { localFailed.current = false }).catch(() => { localFailed.current = !backup; if (alive.current) setStatus(backup ? 'Local backup saved; sync is pending.' : 'Could not save annotations. Keep this window open and retry.') })
   }, [key, userId])
   const publish = useCallback((next: AnnotationRecord[]) => { actual.current = next; if (alive.current) setRows(next); persist() }, [persist])
-  const sync = useCallback(async () => {
-    if (!alive.current || !loaded.current || busy.current) return
-    if (!navigator.onLine) { setStatus(localFailed.current ? 'Local storage unavailable · keep this window open' : 'Saved on this device · offline'); return }
+  const sync = useCallback(async function syncAnnotations(): Promise<boolean> {
+    if (!alive.current || !loaded.current) return false
+    // A manual sync (especially before sign-out) must wait for the current one.
+    if (inFlight.current) {
+      const ok = await inFlight.current
+      return ok && actual.current.some(r => r.dirty) ? syncAnnotations() : ok
+    }
+    if (!navigator.onLine) { setStatus(localFailed.current ? 'Local storage unavailable · keep this window open' : 'Saved on this device · offline'); return false }
     const generation = epoch.current
     const valid = () => alive.current && generation === epoch.current
-    busy.current = true
     setStatus('Syncing annotations…')
-    try {
+    const work = (async (): Promise<boolean> => { try {
       // Pagination includes tombstones; an old device must learn about deletions.
       for (let offset = 0; ; offset += 500) {
         const { data, error } = await supabase.from('myqbank_annotations').select('id,user_id,payload,revision').eq('user_id', userId).order('id').range(offset, offset + 499)
-        if (!valid()) return
+        if (!valid()) return false
         if (error) throw error
         const remote = z.array(RowZ).parse(data)
         if (remote.some(r => r.user_id !== userId)) throw new Error('Account mismatch')
@@ -54,7 +59,7 @@ export function AnnotationProvider({ userId, children }: { userId: string; child
         if (!pending.length) break
         for (const operation of pending) {
           const { data, error } = await supabase.rpc('sync_myqbank_annotation', { p_id: operation.id, p_payload: operation.payload, p_expected_revision: operation.revision })
-          if (!valid()) return
+          if (!valid()) return false
           if (error) throw error
           const response = z.object({ ok: z.boolean(), row: RowZ.nullable() }).parse(data)
           if (!response.row || response.row.user_id !== userId || response.row.id !== operation.id) throw new Error('Annotation access changed')
@@ -66,13 +71,20 @@ export function AnnotationProvider({ userId, children }: { userId: string; child
           }))
         }
       }
-      setStatus(actual.current.some(r => r.dirty) ? 'Changes pending · retry sync' : 'Annotations synced')
-    } catch { if (valid()) setStatus(localFailed.current ? 'Could not save annotations · keep this window open and retry' : 'Saved on this device · retry sync') }
-    finally { if (valid()) busy.current = false }
+      if (!valid()) return false
+      const clean = !actual.current.some(r => r.dirty)
+      setStatus(clean ? 'Annotations synced' : 'Changes pending · retry sync')
+      return clean
+    } catch {
+      if (valid()) setStatus(localFailed.current ? 'Could not save annotations · keep this window open and retry' : 'Saved on this device · retry sync')
+      return false
+    } })()
+    inFlight.current = work
+    try { return await work } finally { if (inFlight.current === work) inFlight.current = null }
   }, [publish, userId])
   useEffect(() => {
     alive.current = true
-    epoch.current++; busy.current = false
+    epoch.current++; inFlight.current = null
     let cancelled = false
     void (async () => {
       const sources: unknown[] = []
@@ -95,7 +107,7 @@ export function AnnotationProvider({ userId, children }: { userId: string; child
     const activate = () => { void sync() }
     window.addEventListener('online', activate); window.addEventListener('focus', activate)
     const interval = setInterval(activate, 30000)
-    return () => { cancelled = true; alive.current = false; loaded.current = false; epoch.current++; clearInterval(interval); clearTimeout(saveTimer.current)
+    return () => { cancelled = true; alive.current = false; loaded.current = false; epoch.current++; inFlight.current = null; clearInterval(interval); clearTimeout(saveTimer.current)
       window.removeEventListener('online', activate); window.removeEventListener('focus', activate) }
   }, [key, userId, sync])
   const save = (id: string, input: Annotation) => {

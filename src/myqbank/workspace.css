@@ -108,3 +108,20 @@
   .mq-workspace .mq-study--revealed:has(.tutor--amplio) .mq-option > span:not(.mq-letter) { flex: 1; min-width: 0; }
   .mq-workspace .mq-study--revealed:has(.tutor--amplio) .mq-option small { width: 100%; text-align: right; }
 }
+
+/* Keep study actions together on a phone without sacrificing touch targets. */
+@media (max-width: 600px) {
+  .mq-workspace .mq-study-tools > :last-child {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.2fr);
+    gap: 6px;
+  }
+  .mq-workspace .mq-study-tools > :last-child .mq-button {
+    min-width: 0;
+    min-height: 44px;
+    padding-inline: 4px;
+    font-size: 12px !important;
+    white-space: nowrap;
+  }
+  .mq-workspace .mq-study-tools > :last-child .mq-button > svg { display: none; }
+}

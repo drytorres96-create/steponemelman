@@ -63,6 +63,7 @@ export type CodigoClaude =
   | 'limite'      // límite de ritmo de la API; pasa solo
   | 'sobrecarga'  // la API está saturada
   | 'tiempo'      // el servidor dejó de esperar
+  | 'conexion'    // se perdió la conexión; el proveedor pudo procesar la petición
   | 'proveedor'   // cualquier otro fallo del servicio
   | 'respuesta'   // contestó, pero sin nada utilizable
   | 'rechazo'     // el modelo declinó contestar
@@ -76,7 +77,7 @@ export class ErrorClaude extends Error {
    * Si el intento pudo costar dinero. Un error HTTP de la API no factura; que se agote nuestra
    * espera, sí puede (el modelo pudo seguir trabajando), y un rechazo se factura según la documentación.
    */
-  get pudoFacturarse() { return this.codigo === 'tiempo' || this.codigo === 'rechazo' || this.codigo === 'respuesta' }
+  get pudoFacturarse() { return this.codigo === 'tiempo' || this.codigo === 'conexion' || this.codigo === 'rechazo' || this.codigo === 'respuesta' }
 }
 
 /** Estimación pesimista de tokens de entrada: sobrestimar solo adelanta el freno. */
@@ -160,7 +161,9 @@ async function intentar(apiKey: string, s: SolicitudClaude, tiempoMs: number, en
     clearTimeout(temporizador)
     if (control.signal.aborted) throw new ErrorClaude('tiempo')
     registrar('claude/red', causa)
-    throw new ErrorClaude('proveedor', undefined, 'sin conexión con la API')
+    // Un fallo de red no confirma que la API no haya recibido la petición. No repetirla
+    // automáticamente y conservar la reserva evita duplicar y subestimar el gasto.
+    throw new ErrorClaude('conexion', undefined, 'sin conexión con la API')
   }
   try {
     let cuerpo: unknown = null
@@ -186,6 +189,12 @@ async function intentar(apiKey: string, s: SolicitudClaude, tiempoMs: number, en
 function leer(cuerpo: unknown, modelo: ModeloClaude): RespuestaClaude {
   const m = cuerpo as { content?: unknown; stop_reason?: unknown; model?: unknown; usage?: Record<string, unknown> } | null
   const numero = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0
+  const usoValido = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0
+  // En una respuesta 200 malformada el proveedor pudo haber cobrado. Sin los dos
+  // contadores obligatorios no se conoce el coste: conservar la reserva completa.
+  const opcionalValido = (v: unknown) => v == null || usoValido(v)
+  if (!usoValido(m?.usage?.input_tokens) || !usoValido(m?.usage?.output_tokens)
+    || !opcionalValido(m?.usage?.cache_creation_input_tokens) || !opcionalValido(m?.usage?.cache_read_input_tokens)) throw new ErrorClaude('respuesta')
   const uso: UsoClaude = { entrada: numero(m?.usage?.input_tokens), salida: numero(m?.usage?.output_tokens),
     cacheEscritura: numero(m?.usage?.cache_creation_input_tokens), cacheLectura: numero(m?.usage?.cache_read_input_tokens) }
   const parada = typeof m?.stop_reason === 'string' ? m.stop_reason : ''

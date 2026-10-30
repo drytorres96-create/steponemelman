@@ -33,10 +33,10 @@ it('keeps a new deletion made during a CAS response and sends it in the next pas
   let finish!:(value:unknown)=>void
   fake.rpc.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve})).mockImplementation(async(_name,args)=>({data:{ok:true,row:{id,user_id:'QA-owner',payload:args.p_payload,revision:2}},error:null}))
   online.mockReturnValue(true)
-  let syncing!:Promise<void>
-  await act(async()=>{syncing=current.sync();await Promise.resolve()})
+  let syncing!:Promise<boolean>, signOutSync!:Promise<boolean>
+  await act(async()=>{syncing=current.sync();await Promise.resolve();signOutSync=current.sync()})
   await act(async()=>current.save(id,{...payload,deleted:true,changedAt:200}))
-  await act(async()=>{finish({data:{ok:true,row:{id,user_id:'QA-owner',payload,revision:1}},error:null});await syncing})
+  await act(async()=>{finish({data:{ok:true,row:{id,user_id:'QA-owner',payload,revision:1}},error:null});expect(await syncing).toBe(true);expect(await signOutSync).toBe(true)})
   expect(fake.rpc).toHaveBeenCalledTimes(2)
   expect(current.rows[0]).toMatchObject({payload:{deleted:true},revision:2,dirty:false})
 })
@@ -48,4 +48,23 @@ it('ignores a stale cloud response after switching accounts',async()=>{
   await act(async()=>finish({data:[{id,user_id:'QA-owner',payload,revision:1}],error:null}))
   expect(current.rows).toEqual([])
   expect(JSON.parse(localStorage.getItem('myqbank-annotations:QA-other')!).rows).toEqual([])
+})
+it('waits for an in-flight sync before reporting that annotations are safe to sign out',async()=>{
+  const online=vi.spyOn(navigator,'onLine','get').mockReturnValue(false);await mount()
+  await act(async()=>current.save(id,payload))
+  let finish!:(value:unknown)=>void
+  fake.rpc.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve}))
+  online.mockReturnValue(true)
+  let first!:Promise<boolean>, second!:Promise<boolean>, finished=false
+  await act(async()=>{first=current.sync();await Promise.resolve();second=current.sync();void second.then(()=>{finished=true});await Promise.resolve()})
+  expect(finished).toBe(false)
+  await act(async()=>{finish({data:{ok:true,row:{id,user_id:'QA-owner',payload,revision:1}},error:null});expect(await first).toBe(true);expect(await second).toBe(true)})
+  expect(current.rows[0].dirty).toBe(false)
+})
+it('reports an unsuccessful sync when annotations remain pending',async()=>{
+  const online=vi.spyOn(navigator,'onLine','get').mockReturnValue(false);await mount()
+  await act(async()=>current.save(id,payload))
+  fake.rpc.mockResolvedValue({data:null,error:new Error('network failure')});online.mockReturnValue(true)
+  await act(async()=>expect(await current.sync()).toBe(false))
+  expect(current.rows[0].dirty).toBe(true)
 })

@@ -24,3 +24,16 @@ it('open Test answers appear as used without becoming Incorrect pool items', () 
   const items=bankItems([],{schemaVersion:1,bankVersion:'qa',total:1,questions:[q]},ESTADO_INICIAL,state)
   expect(items[0]).toMatchObject({seen:true,firstCorrect:null,pools:[]})
 })
+it('keeps ready questions with missing system labels selectable without changing their source taxonomy', () => {
+  const missing = { ...preguntaNbmeReal('QA-missing'), systems: [] }
+  const blank = { ...preguntaNbmeReal('QA-blank'), systems: [' ', ''] }
+  const labeled = { ...preguntaNbmeReal('QA-labeled'), systems: ['Renal'] }
+  const items = bankItems([], { schemaVersion: 1, bankVersion: 'qa', total: 3, questions: [missing, blank, labeled] }, ESTADO_INICIAL, emptyNbmeState())
+  expect(items.map(item => item.systems)).toEqual([['Unclassified'], ['Unclassified'], ['Renal']])
+  expect(missing.systems).toEqual([])
+  expect(blank.systems).toEqual([' ', ''])
+  const options = { material: 'nbme' as const, systems: ['Unclassified', 'Renal'], pools: ['unused' as const], form: 'all', search: '' }
+  expect(selectBankItems(items, options, ESTADO_INICIAL).map(item => item.id)).toEqual(['QA-missing', 'QA-blank', 'QA-labeled'])
+  expect(selectBankItems(items, { ...options, systems: ['Unclassified'] }, ESTADO_INICIAL).map(item => item.id)).toEqual(['QA-missing', 'QA-blank'])
+  expect(selectBankItems(items, { ...options, systems: [] }, ESTADO_INICIAL)).toEqual([])
+})

@@ -97,6 +97,7 @@ export const MOTIVOS = {
   limite: 'Claude está recibiendo demasiadas consultas ahora mismo. Vuelve a intentarlo en un minuto.',
   sobrecarga: 'Claude está saturado en este momento. Vuelve a intentarlo en unos segundos.',
   tiempo: 'Claude tardó demasiado en contestar. Puedes volver a intentarlo.',
+  conexion: 'Se perdió la conexión con Claude y no se recibió su respuesta. Puedes volver a intentarlo.',
   proveedor: 'Claude no pudo contestar ahora. Puedes volver a intentarlo.',
   respuesta: 'La respuesta de Claude llegó incompleta o no se pudo comprobar. Vuelve a intentarlo.',
   rechazo: 'Claude no quiso contestar esta consulta. Reformúlala o sigue con la explicación.',

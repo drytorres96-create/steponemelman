@@ -132,12 +132,28 @@ describe('llamarClaude', () => {
     expect(red).toHaveBeenCalledTimes(1)
   })
 
-  it('sin conexión es un fallo del proveedor y el mensaje no arrastra la clave', async () => {
+  it('una conexión perdida no se reintenta ni se supone gratuita, y no expone la clave', async () => {
     const red = vi.fn(async () => { throw new TypeError(`fetch failed (x-api-key ${CLAVE})`) })
     const e = await llamarClaude(CLAVE, solicitud(), { fetch: red as never, esperaReintentoMs: 0 }).catch(x => x)
-    expect(e.codigo).toBe('proveedor')
+    expect(e.codigo).toBe('conexion')
+    expect(e.pudoFacturarse).toBe(true)
+    expect(red).toHaveBeenCalledTimes(1)
     expect(e.message).not.toContain(CLAVE)
     for (const llamada of (console.error as unknown as { mock: { calls: unknown[][] } }).mock.calls) expect(String(llamada[0])).not.toContain(CLAVE)
+  })
+
+  it('una respuesta 200 sin contadores fiables conserva la reserva', async () => {
+    for (const usage of [{}, { input_tokens: 10, output_tokens: 2, cache_creation_input_tokens: -1 },
+      { input_tokens: 10, output_tokens: 2, cache_read_input_tokens: 'incorrecto' }]) {
+      const red = vi.fn(async () => ok(texto('Texto aparentemente válido.', { usage })))
+      const e = await llamarClaude(CLAVE, solicitud(), { fetch: red as never }).catch(x => x)
+      expect(e).toMatchObject({ codigo: 'respuesta', pudoFacturarse: true })
+      expect(costeDeError(e)).toBeNull()
+      expect(red).toHaveBeenCalledTimes(1)
+    }
+    const opcionalesNulos = vi.fn(async () => ok(texto('Texto válido.', { usage: { input_tokens: 10, output_tokens: 2,
+      cache_creation_input_tokens: null, cache_read_input_tokens: null } })))
+    expect((await llamarClaude(CLAVE, solicitud(), { fetch: opcionalesNulos as never })).texto).toBe('Texto válido.')
   })
 
   it('agotado el plazo corta la espera y avisa de que pudo facturarse', async () => {
