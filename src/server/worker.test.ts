@@ -6,7 +6,7 @@ import worker, {
 } from './worker'
 import { validarHilo, validarLectura, validarRevision } from './ia-sesion'
 import { ESTADOS_SESION } from '../lib/contexto-sesion'
-import { costeUSD, type SolicitudClaude } from './claude'
+import { costeReservaUSD, costeUSD, type SolicitudClaude } from './claude'
 import { solicitudCalificar } from './ia-chat'
 import { PLAZO_CALIFICACION_MS } from '../lib/calificacion-ia'
 import { olvidarCachePlan } from './plan'
@@ -213,6 +213,19 @@ describe('Claude desde el Durable Object', () => {
     const r = await call('lenta', { sol: solicitud({ tiempoMs: 30 }) })
     expect((await r.json()).codigo).toBe('tiempo')
     expect((await gasto(storage)).usd).toBeGreaterThan(0)
+  })
+  it('una desconexión incierta o una respuesta sin uso conservan la reserva y no reintentan', async () => {
+    for (const caso of ['conexion', 'uso'] as const) {
+      const { call, transporte, storage } = setup()
+      if (caso === 'conexion') transporte.mockRejectedValue(new TypeError('conexión perdida'))
+      else transporte.mockResolvedValue(claude(VEREDICTO, {}))
+      const sol = solicitud()
+      const r = await call(`incierta-${caso}`, { sol })
+      expect((await r.json()).codigo).toBe(caso === 'conexion' ? 'conexion' : 'respuesta')
+      expect(transporte).toHaveBeenCalledTimes(1)
+      expect((await gasto(storage)).usd).toBeCloseTo(costeReservaUSD(sol), 10)
+      expect([...(await storage.list({ prefix: 'cache:' })).keys()]).toEqual([])
+    }
   })
   it('un rechazo del modelo llega con HTTP 200: no se muestra, y se cobra lo informado', async () => {
     const { call, transporte, storage } = setup()

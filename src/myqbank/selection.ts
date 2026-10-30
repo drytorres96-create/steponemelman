@@ -24,7 +24,10 @@ export function bankItems(concepts: ConceptMetadata[], catalog: NbmeCatalog | nu
   }
   const questions: BankItem[] = (catalog?.questions ?? []).filter(q => q.status === 'ready').map(q => {
     const progress = questionProgress(nbme, q.id)
-    return { id: q.id, kind: 'nbme', revision: q.revision, systems: q.systems, form: q.form, seen: progress.seen,
+    // Missing taxonomy must not make a ready question impossible to select. This
+    // is a presentation bucket only; the source classification stays untouched.
+    const systems = q.systems.filter(system => system.trim().length > 0)
+    return { id: q.id, kind: 'nbme', revision: q.revision, systems: systems.length ? systems : ['Unclassified'], form: q.form, seen: progress.seen,
       firstCorrect: progress.firstCorrect, pools: pool('nbme', q.id, progress.seen, progress.pendingError) }
   })
   return [...questions, ...concepts.filter(c => c.calidad.estado === 'aprobado').map(c => {
