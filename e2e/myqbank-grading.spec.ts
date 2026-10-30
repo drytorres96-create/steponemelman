@@ -12,7 +12,7 @@ async function start(page:Page, mode='Tutor') {
  await page.goto(url)
  await page.getByRole('button',{name:'Mehlman Concepts',exact:true}).click()
  await page.getByText('More filters',{exact:true}).click()
- await page.getByLabel('Search concepts or ID',{exact:true}).fill('recuperacion_libre')
+ await page.getByLabel('Search topics or ID',{exact:true}).fill('recuperacion_libre')
  await page.getByRole('button',{name:mode,exact:true}).click()
  await page.getByRole('button',{name:'Start 1-question block'}).click()
  return ()=>requests

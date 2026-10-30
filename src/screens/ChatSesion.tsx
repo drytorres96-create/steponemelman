@@ -6,8 +6,8 @@ import '../components/tutor/tutor-claude.css'
 import { describirConsulta, esTematica } from '../lib/constructor-sesion'
 import { MAX_PEDIDO, type ConsultaSesion, type TurnoSesion } from '../lib/contexto-sesion'
 import type { MaterialNuevo } from '../lib/nuevo-hoy'
-import { pedirEntender } from '../lib/sesion-claude'
-import { armarDesdeConsulta, type DatosSesion } from './chat-sesion-flujo'
+import { pedirEntender, type RespuestaEntender } from '../lib/sesion-claude'
+import { armarDesdeConsulta, type DatosSesion, type ResultadoFlujo } from './chat-sesion-flujo'
 
 /**
  * «Pídele a Claude una sesión»: la persona describe con sus palabras lo que quiere estudiar.
@@ -96,7 +96,12 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, abierto: abiert
 
   const armar = async (consulta: ConsultaSesion, pedido: string) => {
     const signal = empezar()
-    const r = await armarDesdeConsulta(consulta, pedido, ultimos.current, signal, Date.now(), t => { if (vigente(signal)) setProgreso(t) })
+    let r: ResultadoFlujo
+    try {
+      r = await armarDesdeConsulta(consulta, pedido, ultimos.current, signal, Date.now(), t => { if (vigente(signal)) setProgreso(t) })
+    } catch {
+      r = { estado: 'error', motivo: 'No pude terminar de preparar la sesión. Puedes volver a intentarlo.' }
+    }
     if (!vigente(signal)) return
     terminar()
     if (r.estado === 'lista') {
@@ -117,7 +122,9 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, abierto: abiert
 
   const conversar = async () => {
     const signal = empezar()
-    const r = await pedirEntender(hilo.current.turnos, hilo.current.preguntas, signal)
+    let r: RespuestaEntender
+    try { r = await pedirEntender(hilo.current.turnos, hilo.current.preguntas, signal) }
+    catch { r = { estado: 'sin_ia', motivo: 'No pude interpretar el pedido. Puedes volver a intentarlo.' } }
     if (!vigente(signal)) return
     terminar()
     if (r.estado === 'sin_ia') { poner({ rol: 'error', motivo: r.motivo, accion: { tipo: 'entender' } }); return }
@@ -165,6 +172,7 @@ export function ChatSesion({ onNuevo, ocupado: abriendo = false, abierto: abiert
     control.current?.abort()
     ocupadoRef.current = false
     setEsperando(false)
+    setProgreso(null)
     reiniciarHilo()
     setMensajes([])
     setTexto('')

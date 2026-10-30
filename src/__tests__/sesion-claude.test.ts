@@ -200,4 +200,15 @@ describe('pedir que Claude lea el banco NBME', () => {
     expect(await pedirLectura([])).toEqual({ estado: 'ok', leidas: 0, sinFuente: 0, pendientes: 0 })
     expect(red).not.toHaveBeenCalled()
   })
+  it('los recuentos de lectura deben cubrir exactamente las preguntas enviadas', async () => {
+    for (const counts of [
+      { leidas: 2, sinFuente: 2, pendientes: 0 },
+      { leidas: 1, sinFuente: 0, pendientes: 0 },
+    ]) {
+      red.mockResolvedValue(Response.json(counts))
+      expect((await pedirLectura(refs(3))).estado).toBe('sin_ia')
+    }
+    red.mockResolvedValue(Response.json({ leidas: 1, sinFuente: 1, pendientes: 1 }))
+    expect(await pedirLectura(refs(3))).toEqual({ estado: 'ok', leidas: 1, sinFuente: 1, pendientes: 1 })
+  })
 })

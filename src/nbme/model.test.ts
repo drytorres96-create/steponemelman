@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { NbmeQuestion, NbmeState } from './types'
 import { activateNbmeSession, deriveNbmeSession, emptyNbmeState, mergeNbmeStates, parseNbmeState, questionProgress, reviewNbmeAnswer,
   setNbmeDraft, startNbmeSession, submitNbmeAnswer, summarizeNbmeState, updateNbmeFilters, updateNbmeSession,
-  discardNbmeSession, countNbmeSessionAttempts, setNbmeBankVersion, MAX_LAPIDAS, referenciasPendientesNbme } from './model'
+  discardNbmeSession, countNbmeSessionAttempts, setNbmeBankVersion, MAX_LAPIDAS, referenciasPendientesNbme, completeNbmeSession } from './model'
 
 const question = (id = 'NBME27-P0001'): NbmeQuestion => ({ id, revision: 'rev1', form: '27', section: 1, item: 1, page: 1,
   systems: ['Renal'], disciplines: ['Fisiología'], topic: 'QA', objective: null, status: 'ready', reasons: [], figureRequired: false,
@@ -13,6 +13,15 @@ const start = (qs = [q]) => startNbmeSession(emptyNbmeState(), { id: 'S1', title
 const view = (s: NbmeState) => deriveNbmeSession(s, 'S1')!
 
 describe('independent private-question state', () => {
+  it.each(['A', 'B'])('keeps the prior visible error during a Test retry answered %s, until closure', option => {
+    const failed = submitNbmeAnswer(start(), 'S1', 0, q, 'B', 100, 2000)
+    const retry = startNbmeSession(failed, { id: 'test-retry', title: 'QA Test', refs: [q], mode: 'test' }, 3000)
+    const answered = submitNbmeAnswer(retry, 'test-retry', 0, q, option, 100, 4000)
+    expect(questionProgress(answered, q.id)).toMatchObject({ seen: true, attempts: 2, firstCorrect: false, latestCorrect: false, pendingError: true })
+    expect(questionProgress(completeNbmeSession(answered, 'test-retry', 5000), q.id))
+      .toMatchObject({ firstCorrect: false, latestCorrect: option === 'A', pendingError: option !== 'A' })
+  })
+
   it('keeps first-attempt scoring unchanged across repeated corrections and exact resume', () => {
     let s = start()
     expect(view(s).pendingErrors).toBe(0)

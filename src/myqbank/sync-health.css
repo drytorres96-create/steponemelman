@@ -1,0 +1,9 @@
+.mq-sync-health{min-width:0;margin:0;padding:22px;background:var(--mq-surface);border:1px solid var(--mq-line);border-radius:16px;box-shadow:var(--mq-card-shadow)}
+.mq-sync-health h2{margin:0 0 8px;font-size:1rem}
+.mq-sync-health p{margin:0 0 12px}
+.mq-sync-health dl{margin:0;display:grid;gap:0}
+.mq-sync-health dl>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:16px;padding:10px 0;border-top:1px solid var(--mq-line)}
+.mq-sync-health dt{font-weight:600}
+.mq-sync-health dd{margin:0;overflow-wrap:anywhere}
+.mq-sync-health dd span{display:block;margin-top:4px;font-size:.875rem}
+@media(max-width:520px){.mq-sync-health dl>div{grid-template-columns:1fr;gap:4px}}

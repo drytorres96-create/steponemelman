@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../store/estado'
 import { useNbme } from '../nbme/NbmeProvider'
 import { Interaccion, usaTextoLibre, type Resultado } from '../components/interacciones'
@@ -40,6 +40,8 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
   const endTitle = useId()
   const dialog = useRef<HTMLDialogElement>(null), figureRoot = useRef<HTMLDivElement>(null), heading = useRef<HTMLHeadingElement>(null)
   const feedback = useRef<HTMLDivElement>(null)
+  const questionPane = useRef<HTMLDivElement>(null), explanationPane = useRef<HTMLElement>(null)
+  const lastFeedback = useRef<{ opportunity: string; reveal: boolean } | null>(null)
   const submitLock = useRef(false), current = useRef(block); current.current = block
   const alive = useRef(true), abort = useRef(new AbortController()), clock = useRef(new RelojActividad())
   const timerRun = useRef(crearUUID())
@@ -93,15 +95,26 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
   }, [opportunity, handled, reveal, block.reviewed[block.cursor]?.value])
   useEffect(() => { alive.current = true; const controller = new AbortController(); abort.current = controller; return () => { alive.current = false; controller.abort() } }, [])
   useEffect(() => { if (endOpen) dialog.current?.showModal(); else dialog.current?.close() }, [endOpen])
+  // React reuses these panels between items. Do not carry the end of one
+  // explanation into the next question, including navigation through answered items.
+  useLayoutEffect(() => {
+    if (questionPane.current) questionPane.current.scrollTop = 0
+    if (explanationPane.current) explanationPane.current.scrollTop = 0
+    heading.current?.focus({ preventScroll: true })
+    if (matchMedia('(max-width: 960px), (max-height: 600px)').matches) heading.current?.scrollIntoView({ block: 'start' })
+  }, [opportunity])
   useEffect(() => {
-    if (reveal && matchMedia('(max-width: 960px)').matches) {
+    const previous = lastFeedback.current
+    lastFeedback.current = { opportunity, reveal }
+    // Feedback takes focus only when it is newly revealed on this item. Opening
+    // an already-answered item starts at its stem, not halfway down the page.
+    if (reveal && previous?.opportunity === opportunity && !previous.reveal && matchMedia('(max-width: 960px), (max-height: 600px)').matches) {
       feedback.current?.focus({ preventScroll: true })
       feedback.current?.scrollIntoView({ block: 'start' })
     }
   }, [reveal, opportunity])
   useEffect(() => {
     setExpanded(null); setMessage(''); setRecovery(false); setRecovering(false); submitLock.current = false
-    heading.current?.focus()
     if (entry.kind === 'nbme' && nbme.currentSession?.id === block.id) nbme.goToQuestion(qPosition)
     nbme.setEngaged(entry.kind === 'nbme' && !closed)
     if (concept && !closed) app.registrarVistaConcepto(concept.concept_id, opportunity)
@@ -175,6 +188,10 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
     save(learnConcept(timed, block.cursor, open))
     if (!open) { heading.current?.focus(); heading.current?.scrollIntoView({ block: 'nearest' }) }
   }
+  function showQuestion() {
+    heading.current?.focus({ preventScroll: true })
+    heading.current?.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+  }
   return <>
     {nbme.error && entry.kind === 'nbme' && <p role="alert">{nbme.error}</p>}
     <div className="mq-study-tools"><div className="mq-inline"><Button aria-label="Toggle question navigator" aria-pressed={rail} onClick={() => setRail(v => !v)}><Icon name="rail"/></Button><Segmented label="Study mode" value={block.mode} disabled={busy || grading || recovering} options={[{value:'tutor',label:'Tutor'},{value:'test',label:'Test'}]} onChange={mode => { if (mode !== block.mode) { const timed = timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()); save(timed); void onModeChange(timed, mode) } }}/><span className="mq-mode-help">Changing mode starts a new block.</span><span className="mq-small mq-muted">{closed ? 'Block complete' : `${answered} answers saved${studied ? ` · ${studied} studied with help` : ''}`}</span></div>
@@ -185,7 +202,7 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
       {rail && <Card className="mq-rail" aria-label="Question navigator"><Rings used={completed} noun="completed" total={block.entries.length} correct={block.mode === 'test' && !closed ? null : correctCount} evaluated={evaluated} compact/><p className="mq-small mq-muted">{block.mode === 'test' && !closed ? 'Answers saved' : `${correctCount} correct · ${assistedCount} with help · ${states.filter(s => s === 'pending').length} pending`}</p><details className="mq-mobile-map"><summary>Question map</summary></details>
         <div className="mq-question-grid">{states.map((state, i) => <button type="button" key={i} className={`mq-question-number mq-question-number--${state}`} aria-current={i === block.cursor ? 'step' : undefined} aria-label={`Question ${i + 1}, ${state}${block.flags[i]?.value ? ', flagged' : ''}`} disabled={grading || recovering || busy} onClick={() => move(i)}>{i + 1}{block.flags[i]?.value && <Icon name="flag"/>}</button>)}</div>
       </Card>}
-      <div className="mq-question-pane">{closed && <div className="mq-complete" role="status"><strong>Block complete</strong><span>{correctCount} / {evaluated} {assistedCount ? 'unassisted' : 'graded'} correct · {block.entries.length - completed} unanswered{assistedCount > 0 && <> · {assistedCount} with help</>} · {states.filter(s => s === 'pending').length} pending</span><Button aria-label="Practice again" title="Practice again" disabled={busy} onClick={() => void onRetry(block)}><Icon name="retry"/></Button></div>}
+      <div ref={questionPane} className="mq-question-pane" role="region" aria-label="Question and answer" tabIndex={0}>{closed && <div className="mq-complete" role="status"><strong>Block complete</strong><span>{correctCount} / {evaluated} {assistedCount ? 'unassisted' : 'graded'} correct · {block.entries.length - completed} unanswered{assistedCount > 0 && <> · {assistedCount} with help</>} · {states.filter(s => s === 'pending').length} pending</span><Button aria-label="Practice again" title="Practice again" disabled={busy} onClick={() => void onRetry(block)}><Icon name="retry"/></Button></div>}
         <Card className="mq-stem"><h1 ref={heading} tabIndex={-1}>Question {block.cursor + 1}</h1>
           {question && <EditorialVariantBadge question={question}/>}
           {concept ? <><p><HighlightText text={concept.evaluacion.pregunta} source={source} region="stem"/></p>{concept.contexto && <p><HighlightText text={concept.contexto} source={source} region="context"/></p>}</>
@@ -211,12 +228,12 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
         {submitted && !reveal && <div className="mq-saved" role="status"><Icon name="check"/><div><strong>Answer saved</strong><p>Results appear when you end the block.</p></div></div>}
         {!handled && closed && <p role="status">Not answered · no grade recorded.</p>}
         {grading && <p role="status">Answer saved · checking the response…</p>}{message && reveal && <p role="status">{message}</p>}
-        <div className="mq-answer-actions"><Button disabled={grading || recovering || busy} variant={handled ? 'primary' : 'ghost'} onClick={next}>{block.cursor === block.entries.length - 1 ? closed ? 'Last question' : 'Finish block' : handled ? 'Next question' : closed ? 'Next question' : 'Skip for now'}<Icon name="arrow"/></Button></div>
+        <div className="mq-answer-actions"><Button disabled={grading || recovering || busy || closed && block.cursor === block.entries.length - 1} variant={handled ? 'primary' : 'ghost'} onClick={next}>{block.cursor === block.entries.length - 1 ? closed ? 'Last question' : 'Finish block' : handled ? 'Next question' : closed ? 'Next question' : 'Skip for now'}<Icon name="arrow"/></Button></div>
         <p className="mq-small mq-muted" role="status">{app.sincronizacion.estado === 'error' || nbme.syncStatus.state === 'error' || nbme.storageWarning ? 'Sync needs attention. Keep this page open and retry in Settings.' : app.sincronizacion.estado === 'sincronizado' && nbme.syncStatus.state === 'synced' ? 'Progress synced' : 'Saving progress…'}</p>
         <p className="mq-small mq-muted">{annotations.status} <Button onClick={() => void annotations.sync()}>Sync annotations</Button></p>
       </div>
       {labs && !labsLeft && <aside className="mq-labs-pane"><LabReference source={source} view={labView}/></aside>}
-      {reveal && <aside className="mq-explanation-pane" aria-label="Explanation"><div ref={feedback} tabIndex={-1} role="status" className={`mq-result ${learningOpen || partial || assisted && correct ? 'mq-result--assisted' : uncertain ? '' : correct ? 'mq-result--correct' : 'mq-result--incorrect'}`}><Icon name={learningOpen || partial ? 'book' : correct ? 'check' : 'close'}/><strong>{learningOpen ? 'Studied with help' : uncertain ? 'Answer pending review' : partial ? 'Partially correct' : correct ? assisted ? 'Correct with help' : 'Correct' : 'Incorrect'}</strong></div>
+      {reveal && <aside ref={explanationPane} className="mq-explanation-pane" aria-label="Explanation" tabIndex={0}><div ref={feedback} tabIndex={-1} role="status" className={`mq-result ${learningOpen || partial || assisted && correct ? 'mq-result--assisted' : uncertain ? '' : correct ? 'mq-result--correct' : 'mq-result--incorrect'}`}><Icon name={learningOpen || partial ? 'book' : correct ? 'check' : 'close'}/><strong>{learningOpen ? 'Studied with help' : uncertain ? 'Answer pending review' : partial ? 'Partially correct' : correct ? assisted ? 'Correct with help' : 'Correct' : 'Incorrect'}</strong></div>
         {conceptAttempt?.calificado_por_ia && !conceptAttempt.correccion_manual && <p className="mq-small mq-muted">AI-assisted grading.{conceptAttempt.motivo_calificacion_ia && <> <span lang="es">{conceptAttempt.motivo_calificacion_ia}</span></>}</p>}
         {conceptAttempt?.correccion_manual && <p className="mq-small mq-muted">Grade corrected. Your original answer and assistance record are preserved.</p>}
         {canRecheck && <div className="mq-learning-actions"><p>Your answer matches an accepted answer for this concept.</p><Button disabled={grading || busy} onClick={() => {
@@ -232,13 +249,13 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
         {/* Con cualquier resultado: el tutor no espera a que falles. El chat está en español; la interfaz que lo rodea sigue en inglés. */}
         {concept && conceptAttempt && !conceptAttempt.respuestas_en_conflicto && <TutorClaude key={`${opportunity}:${conceptAttempt.respuesta_dada ?? ''}`} semilla={opportunity} amplioInicial
           numero={block.cursor + 1} estado={conceptAttempt.resultado ?? 'revision'} stemKiller={pareceCasoClinico(concept)} sugerencias={sugerenciasDePregunta(concept, 2)}
-          onVerPregunta={() => heading.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })}
+          onVerPregunta={showQuestion}
           origen={{ tipo: 'concepto', resultado: conceptAttempt.resultado ?? 'revision', presentacion: { conceptId: concept.concept_id,
             answer: (conceptAttempt.respuesta_dada ?? '').slice(0, 500), questionId: opportunity, version: entry.revision, formatVersion: 3,
             variantId: concept.variante_id, index: block.cursor, route: block.mode === 'test' ? 'examen' : 'repaso', retry: false } }} />}
         {question && questionAttempt && !questionAttempt.conflict && <TutorClaude key={`${block.id}:${qPosition}:${questionAttempt.optionId}`} semilla={`${question.id}:${question.revision}`} amplioInicial
           numero={block.cursor + 1} estado={questionAttempt.correct ? 'correcta' : 'incorrecta'}
-          onVerPregunta={() => heading.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })}
+          onVerPregunta={showQuestion}
           origen={{ tipo: 'nbme', questionId: question.id, revision: question.revision, optionId: questionAttempt.optionId }} />}
         {question && questionAttempt && !questionAttempt.correct && !questionAttempt.conflict && <><Button aria-expanded={recovery} onClick={() => setRecovery(v => !v)}>Guided recovery</Button>{recovery && <RecuperacionTrasFallo pregunta={question} intento={questionAttempt} onActividad={setRecovering} onSiguiente={next}/>}</>}
         <div className="mq-explanation-actions">{learningOpen && !closed && <Button disabled={busy} onClick={() => teach(false)}><Icon name="retry"/>Hide and recall</Button>}<Button variant="primary" disabled={grading || recovering || busy} onClick={closed && block.cursor === block.entries.length - 1 ? onExit : next}>{block.cursor === block.entries.length - 1 ? closed ? 'Back to dashboard' : 'Finish block' : 'Next question'}<Icon name="arrow"/></Button></div>

@@ -7,6 +7,7 @@ import { CRITERIOS_POR_DEFECTO, dominioVigente } from '../srs/mastery'
 import type { Intento, ProgresoConcepto } from '../srs/tipos'
 import type { NbmeAttempt, NbmeQuestionMeta } from '../nbme/types'
 import type { Concepto } from '../schema/concept'
+import { instanteEstudio } from '../lib/calendario-estudio'
 
 /**
  * La visión a futuro es la meta de 43 días, no el corpus repartido. Lo que se comprueba
@@ -20,7 +21,8 @@ vi.mock('../nbme/NbmeProvider', () => ({ useNbme: mock.nbme }))
 
 import { ProgresoMeta } from '../screens/ProgresoMeta'
 
-const f = (mes: number, dia: number, h = 9) => new Date(2026, mes - 1, dia, h).getTime()
+/** Hora del plan en Nueva York, incluso cuando la máquina de pruebas está en otra zona. */
+const f = (mes: number, dia: number, h = 9) => instanteEstudio({ anio: 2026, mes, dia }, h)
 let serie = 0
 const acierto = (ts: number): Intento => ({
   attempt_id: `a-${++serie}`, session_id: `s-${serie}`, ts, calificacion: 3, resultado: 'correcta',

@@ -165,6 +165,77 @@ describe('proveedor de progreso', () => {
     expect(mocks.rpc.mock.calls.every(([name]) => name === 'sync_study_state')).toBe(true)
   })
 
+  it('does not claim changes are saved locally when both storage mechanisms fail', async () => {
+    await render()
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota exceeded') })
+    mocks.write.mockRejectedValue(new Error('IndexedDB unavailable'))
+    await act(async () => { api.iniciarSesion('M', 'repaso') })
+    expect(mocks.write).toHaveBeenLastCalledWith('cuenta:user-a', expect.anything(), { estricto: true })
+    expect(api.sincronizacion.estado).toBe('error')
+    expect(api.sincronizacion.mensaje).toContain('Mantén abierta la página')
+    failure = true
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(false) })
+    expect(api.sincronizacion.mensaje).toContain('No se pudo guardar en este dispositivo')
+    expect(api.sincronizacion.mensaje).not.toContain('están guardados')
+  })
+
+  it('can confirm cloud synchronization when the immediate backup survives an IndexedDB failure', async () => {
+    await render()
+    mocks.write.mockRejectedValue(new Error('IndexedDB unavailable'))
+    await act(async () => { api.iniciarSesion('M', 'repaso') })
+    expect(JSON.parse(localStorage.getItem('step1-respaldo:cuenta:user-a')!).state.sesiones).toHaveLength(1)
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
+    expect(api.sincronizacion.estado).toBe('sincronizado')
+  })
+
+  it('confirms an acknowledged cloud copy even when no browser storage is available', async () => {
+    await render()
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota exceeded') })
+    mocks.write.mockRejectedValue(new Error('IndexedDB unavailable'))
+    await act(async () => { api.iniciarSesion('M', 'repaso') })
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
+    expect(row?.state.sesiones).toHaveLength(1)
+    expect(api.sincronizacion.estado).toBe('error')
+    expect(api.sincronizacion.mensaje).toContain('guardado en tu cuenta')
+    expect(api.sincronizacion.mensaje).toContain('copia de este dispositivo')
+  })
+
+  it('keeps a confirmed reset and its device-storage warning without repeating the reset RPC', async () => {
+    await render()
+    await act(async () => { api.registrarIntento('A', intento('before-reset', 1000)) })
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
+    const normalRpc = mocks.rpc.getMockImplementation()!
+    let restoreStorage: (() => void) | undefined
+    mocks.rpc.mockImplementation(async (name: string, params: { p_state: EstadoApp; p_generation: string | null }) => {
+      if (name !== 'reset_study_state') return normalRpc(name, params)
+      // Only fail after the server accepts the reset, so this cannot be confused
+      // with a failed prerequisite synchronization.
+      const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota exceeded') })
+      restoreStorage = () => storage.mockRestore()
+      mocks.write.mockRejectedValue(new Error('IndexedDB unavailable'))
+      row = { ...row!, state: clone(params.p_state), generation: 'generation-after-reset', revision: row!.revision + 1 }
+      return { data: { ok: true, kind: 'saved', row: clone(row) } satisfies SyncReply, error: null }
+    })
+    await act(async () => { await expect(api.reiniciar()).resolves.toBeUndefined() })
+    expect(api.estado.progreso).toEqual({})
+    expect(row?.generation).toBe('generation-after-reset')
+    expect(row?.state.progreso).toEqual({})
+    expect(api.sincronizacion.estado).toBe('error')
+    expect(api.sincronizacion.mensaje).toContain('Progreso reiniciado en tu cuenta')
+    expect(api.sincronizacion.mensaje).toContain('copia de este dispositivo')
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
+    expect(api.sincronizacion.estado).toBe('error')
+    expect(api.sincronizacion.mensaje).toContain('copia de este dispositivo')
+    expect(api.estado.progreso).toEqual({})
+    restoreStorage!(); mocks.write.mockResolvedValue(undefined)
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
+    expect(api.sincronizacion.estado).toBe('sincronizado')
+    const saved = JSON.parse(localStorage.getItem('step1-respaldo:cuenta:user-a')!)
+    expect(saved.snapshot.generation).toBe('generation-after-reset')
+    expect(saved.state.progreso).toEqual({})
+    expect(mocks.rpc.mock.calls.filter(([name]) => name === 'reset_study_state')).toHaveLength(1)
+  })
+
   it('no escribe progreso de una petición que acaba después del desmontaje', async () => {
     const pending = deferred<{ data: CloudSnapshot | null; error: null }>()
     mocks.load.mockReturnValue(pending.promise)

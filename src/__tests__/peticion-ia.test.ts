@@ -41,6 +41,37 @@ describe('transporte acotado de IA', () => {
     expect(red).not.toHaveBeenCalled()
   })
 
+  it('el plazo termina aunque el transporte no obedezca la cancelación', async () => {
+    vi.useFakeTimers()
+    red.mockImplementation(() => new Promise(() => {}))
+    const r = solicitarIA('/api/ia/chat', {}, 1000)
+    await vi.advanceTimersByTimeAsync(1001)
+    expect(await r).toMatchObject({ estado: 'sin_ia', motivo: expect.stringContaining('tardó demasiado') })
+    expect(red).toHaveBeenCalledTimes(1)
+    expect(red.mock.calls[0][1].signal.aborted).toBe(true)
+  })
+
+  it('cancelar mientras llega el cuerpo no devuelve un éxito tardío', async () => {
+    let terminar!: (value: unknown) => void
+    const leer = vi.fn(() => new Promise(resolve => { terminar = resolve }))
+    red.mockResolvedValue({ ok: true, headers: new Headers({ 'content-type': 'application/json' }), json: leer })
+    const control = new AbortController()
+    const r = solicitarIA('/api/ia/chat', {}, 1000, control.signal)
+    await vi.waitFor(() => expect(leer).toHaveBeenCalledTimes(1))
+    control.abort()
+    expect(await r).toEqual({ estado: 'sin_ia', motivo: 'Cancelado.' })
+    terminar({ respuesta: 'Una respuesta que llegó después de cancelar.' })
+    expect(red).toHaveBeenCalledTimes(1)
+  })
+
+  it('el plazo incluye el cuerpo de una respuesta con cabeceras ya recibidas', async () => {
+    vi.useFakeTimers()
+    red.mockResolvedValue({ ok: true, headers: new Headers({ 'content-type': 'application/json' }), json: () => new Promise(() => {}) })
+    const r = solicitarIA('/api/ia/chat', {}, 1000)
+    await vi.advanceTimersByTimeAsync(1001)
+    expect(await r).toMatchObject({ estado: 'sin_ia', motivo: expect.stringContaining('tardó demasiado') })
+  })
+
   it('un error o una conexión perdida no se reintentan', async () => {
     red.mockResolvedValue(Response.json({ error: 'No verificable.' }, { status: 503, headers: { 'Retry-After': '60' } }))
     expect(await solicitarIA('/api/ia/chat', {}, 1000)).toMatchObject({ estado: 'sin_ia', motivo: expect.stringContaining('60 s') })

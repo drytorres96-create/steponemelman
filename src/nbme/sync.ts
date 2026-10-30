@@ -89,7 +89,10 @@ export class NbmeSyncEngine {
         const base = this.remote
         const local = this.callbacks.getLocal()
         const candidate = mergeNbmeStates(local, base?.state ?? emptyNbmeState(local.bankVersion))
-        if (base && stableNbmeJson(candidate) === stableNbmeJson(base.state)) return
+        if (base && stableNbmeJson(candidate) === stableNbmeJson(base.state)) {
+          if (stableNbmeJson(candidate) !== stableNbmeJson(local)) this.callbacks.setLocal(candidate)
+          return
+        }
         const response = await this.transport.save({ state: candidate,
           expectedRevision: base?.revision ?? 0, generation: base?.generation ?? null })
         if (response.kind === 'missing') throw new Error('El progreso remoto ya no existe; no se recreó con una copia antigua.')

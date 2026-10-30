@@ -62,7 +62,7 @@ export function selectUniqueItems<T extends EligibleItem>(items: readonly T[], m
   systems: readonly string[], pools: readonly Pool[]): T[] {
   const eligible = items.filter(item => (material === 'mixed' || item.kind === (material === 'nbme' ? 'nbme' : 'concept')) &&
     item.systems.some(system => systems.includes(system)) && item.pools.some(pool => pools.includes(pool)))
-  return [...new Map(eligible.map(item => [item.id, item])).values()]
+  return [...new Map(eligible.map(item => [`${item.kind}:${item.id}`, item])).values()]
 }
 export const safePercent = (part: number, total: number): number | null =>
   total > 0 ? Math.min(100, Math.max(0, Math.round(part / total * 100))) : null

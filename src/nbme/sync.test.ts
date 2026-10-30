@@ -105,6 +105,15 @@ describe('Independent NBME synchronization', () => {
     await first
     expect(server.saveCount()).toBe(1)
   })
+  it('restores already acknowledged remote evidence when no upload is needed', async () => {
+    const saved = row(session('remote-session'))
+    const server = memoryTransport(saved)
+    let local = emptyNbmeState()
+    const engine = new NbmeSyncEngine(server.transport, { getLocal: () => local, setLocal: next => { local = next } }, saved)
+    await engine.flush()
+    expect(Object.keys(local.sessions)).toEqual(['remote-session'])
+    expect(server.saveCount()).toBe(0)
+  })
   it('does not download the whole state while the cloud revision is unchanged, and still applies a reset', async () => {
     const server = memoryTransport(row(session('session-a')))
     let loads = 0

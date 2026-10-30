@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { NbmeQuestion } from './types'
 import type { NbmeSnapshot } from './sync'
+import { emptyNbmeState, startNbmeSession } from './model'
 
 const memory = vi.hoisted(() => ({ db: new Map<string, unknown>(), row: null as unknown,
   read: vi.fn<(key: string) => Promise<unknown>>(), rpc: vi.fn(), from: vi.fn(), session: vi.fn() }))
@@ -72,6 +73,21 @@ it('loads the first catalog while the initial progress request is still pending'
   expect(current.catalog?.total).toBe(questions.length)
   expect(memory.rpc).not.toHaveBeenCalled()
   await act(async () => { finish({ data: null, error: null }) })
+})
+
+it('does not resurrect sessions from a pre-reset IndexedDB copy when the backup has a newer generation', async () => {
+  const old = startNbmeSession(emptyNbmeState('test-bank'), { id: 'before-reset', title: 'Synthetic', refs: [question] }, 1)
+  const reset: NbmeSnapshot = { user_id: 'test-owner', state: emptyNbmeState('test-bank'), revision: 3,
+    generation: 'after-reset', updated_at: '2026-10-30T00:00:00Z' }
+  memory.db.set('nbme-state:test-owner', { userId: 'test-owner', state: old,
+    snapshot: { ...reset, state: old, revision: 2, generation: 'before-reset' }, savedAt: 900 })
+  localStorage.setItem('step1-backup:nbme-state:test-owner', JSON.stringify({ userId: 'test-owner', state: reset.state, snapshot: reset, savedAt: 100 }))
+  memory.row = reset
+  await mount()
+  await vi.waitFor(() => expect(current.syncStatus.state).toBe('synced'))
+  expect(current.state.sessions).toEqual({})
+  expect((memory.row as NbmeSnapshot).state.sessions).toEqual({})
+  expect(memory.rpc).not.toHaveBeenCalled()
 })
 
 it('removes a session from the library and across reload while retaining every NBME response', async () => {

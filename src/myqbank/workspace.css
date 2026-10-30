@@ -125,3 +125,31 @@
   }
   .mq-workspace .mq-study-tools > :last-child .mq-button > svg { display: none; }
 }
+
+/* The page still scrolls on dashboard/settings. Keep the block action reachable
+   while its longer filters scroll independently on a full-height desktop. */
+@media (min-width: 961px) and (min-height: 601px) {
+  .mq-root.mq-workspace .mq-builder {
+    position: sticky;
+    top: 16px;
+    align-self: start;
+    min-height: 0;
+    max-height: calc(100dvh - 132px);
+    overflow: hidden;
+  }
+  .mq-root.mq-workspace .mq-builder > .mq-section-heading { flex: none; }
+  .mq-root.mq-workspace .mq-builder-scroll {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+  }
+}
+.mq-root.mq-workspace :is(.mq-question-pane,.mq-explanation-pane,.mq-rail,.mq-lab-scroll) {
+  overscroll-behavior-y: contain;
+  scroll-padding-block: 8px;
+}
+.mq-root.mq-workspace :is(.mq-question-pane,.mq-explanation-pane,.mq-builder-scroll):focus-visible {
+  outline: 2px solid var(--mq-ok);
+  outline-offset: -2px;
+  border-radius: 10px;
+}
