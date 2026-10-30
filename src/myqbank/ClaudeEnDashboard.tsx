@@ -4,6 +4,7 @@ import { ChatSesion } from '../screens/ChatSesion'
 import { SugerenciaRecuperar } from '../screens/SugerenciaRecuperar'
 import type { DatosAsistente } from './AsistenteDashboard'
 import { Button, Card } from './components'
+import { useSuaveExperience } from './SuaveExperience'
 import './claude-dashboard.css'
 
 /**
@@ -18,6 +19,7 @@ import './claude-dashboard.css'
 const ENFOCABLES = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 export function ClaudeEnDashboard(d: DatosAsistente) {
+  const { play } = useSuaveExperience()
   const [abierto, setAbierto] = useState(false)
   const [conversando, setConversando] = useState(false)
   const entrada = useRef<HTMLDivElement>(null)
@@ -27,6 +29,7 @@ export function ClaudeEnDashboard(d: DatosAsistente) {
   // Safari no enfoca un botón al pulsarlo: si el foco está en <body>, al cerrar se vuelve al botón de la tarjeta.
   const abrir = () => { alAbrir.current = document.activeElement === document.body ? null : document.activeElement; setConversando(true); setAbierto(true) }
   const cerrar = () => {
+    play('close')
     setAbierto(false)
     // El foco vuelve a quien abrió el diálogo; si ya no está, al botón de la tarjeta.
     const destino = alAbrir.current instanceof HTMLElement && alAbrir.current.isConnected ? alAbrir.current : entrada.current?.querySelector('button')

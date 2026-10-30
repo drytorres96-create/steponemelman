@@ -1,0 +1,246 @@
+/* Suave's material and motion, adapted to MyQBank's existing semantic colors.
+   Reflections follow optional --mq-pointer-x/y values; they never move hit areas.
+   No animation loops, DOM ownership, scrolling, or reading-surface transforms. */
+.mq-root.mq-workspace {
+  --mq-motion-fast: 180ms;
+  --mq-motion-slow: 420ms;
+  --mq-motion-settle: 560ms;
+  --mq-motion-cream: cubic-bezier(.23,1,.32,1);
+  --mq-motion-spring: cubic-bezier(.22,1.12,.36,1);
+  --mq-motion-drawer: cubic-bezier(.32,.72,0,1);
+  --mq-glass-highlight: color-mix(in srgb,var(--mq-surfaceStart) 74%,transparent);
+  --mq-glass-edge: color-mix(in srgb,var(--mq-reflection) 76%,var(--mq-line));
+  --mq-shadow-1: 0 1px 2px color-mix(in srgb,var(--mq-shadow) 38%,transparent),0 4px 8px -5px var(--mq-shadow);
+  --mq-shadow-2: 0 1px 2px color-mix(in srgb,var(--mq-shadow) 26%,transparent),0 6px 14px -7px var(--mq-shadow),0 20px 40px -22px var(--mq-shadow);
+  --mq-shadow-3: 0 2px 4px color-mix(in srgb,var(--mq-shadow) 38%,transparent),0 12px 28px -12px var(--mq-shadow),0 32px 54px -26px var(--mq-shadow);
+  --mq-card-shadow: var(--mq-shadow-2);
+  --mq-control-glow: inset 0 1px 0 var(--mq-glass-highlight),0 0 0 1px var(--mq-pat-line),var(--mq-shadow-2);
+}
+.mq-root.mq-workspace[data-theme="dark"] {
+  --mq-glass-highlight: color-mix(in srgb,var(--mq-ok) 12%,transparent);
+  --mq-glass-edge: color-mix(in srgb,var(--mq-text) 9%,var(--mq-line));
+}
+
+/* The existing opaque material is the fallback. Glass is limited to navigation
+   and dashboard/support panels; clinical prose and answer-state fills stay solid. */
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  .mq-root.mq-workspace { --mq-glass: color-mix(in srgb,var(--mq-surface) 88%,transparent); }
+  .mq-root.mq-workspace[data-theme="dark"] { --mq-glass: color-mix(in srgb,var(--mq-surface) 91%,transparent); }
+  .mq-root.mq-workspace :is(.mq-header,.mq-study-tools) {
+    background: color-mix(in srgb,var(--mq-bar) 84%,transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(115%);
+    backdrop-filter: blur(20px) saturate(115%);
+  }
+  .mq-root.mq-workspace :is(.mq-dashboard .mq-card,.mq-sync-health,.mq-settings .tarjeta,.mq-progress-details,.mq-auth-card,.mq-claude .sugerencia-recuperar) {
+    -webkit-backdrop-filter: blur(16px) saturate(110%);
+    backdrop-filter: blur(16px) saturate(110%);
+  }
+}
+.mq-root.mq-workspace :is(.mq-header,.mq-study-tools) {
+  box-shadow: inset 0 1px 0 var(--mq-glass-highlight),0 3px 16px -12px var(--mq-shadow);
+}
+.mq-root.mq-workspace :is(.mq-dashboard .mq-card,.mq-sync-health,.mq-settings .tarjeta,.mq-progress-details,.mq-auth-card,.mq-claude .sugerencia-recuperar) {
+  border-color: var(--mq-glass-edge);
+  box-shadow: inset 0 1px 0 var(--mq-glass-highlight),var(--mq-shadow-2);
+  transition: box-shadow var(--mq-motion-slow) var(--mq-motion-cream),border-color var(--mq-motion-slow) var(--mq-motion-cream),background-color var(--mq-motion-slow) var(--mq-motion-cream);
+}
+
+/* An inner reflection avoids a moving or oversized overlay and cannot intercept
+   pointer events. The builder retains its existing sticky position. */
+.mq-root.mq-workspace .mq-dashboard .mq-card { isolation: isolate; }
+.mq-root.mq-workspace .mq-dashboard .mq-card:not(.mq-builder) { position: relative; }
+.mq-root.mq-workspace .mq-dashboard .mq-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at var(--mq-pointer-x,50%) var(--mq-pointer-y,0%),var(--mq-glass-highlight),transparent 64%);
+  opacity: .24;
+  transition: opacity var(--mq-motion-slow) var(--mq-motion-cream);
+}
+.mq-root.mq-workspace .mq-dashboard .mq-card:focus-within::before { opacity: .42; }
+.mq-root.mq-workspace :is(.mq-stat,.mq-summary,.mq-sync-health dl > div,.mq-stepper,.mq-segmented,.mq-tablist) {
+  box-shadow: inset 0 1px 2px color-mix(in srgb,var(--mq-shadow) 14%,transparent),inset 0 -1px 0 var(--mq-glass-highlight);
+}
+
+/* Controls settle into and out of the material; their size and layout stay fixed. */
+.mq-root.mq-workspace :is(.mq-button,.mq-chip,.mq-segmented button,.mq-tablist button,.mq-question-number,.auth-tabs button) {
+  transition: transform 360ms var(--mq-motion-spring),box-shadow var(--mq-motion-slow) var(--mq-motion-cream),background-color 300ms var(--mq-motion-cream),border-color 300ms var(--mq-motion-cream),color 240ms var(--mq-motion-cream),opacity 180ms ease;
+}
+.mq-root.mq-workspace :is(.mq-button,.mq-chip,.mq-option) { isolation: isolate; position: relative; }
+.mq-root.mq-workspace :is(.mq-button,.mq-chip,.mq-option)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(ellipse at var(--mq-pointer-x,50%) var(--mq-pointer-y,0%),var(--mq-glass-highlight),transparent 76%);
+  opacity: 0;
+  transition: opacity 360ms var(--mq-motion-cream);
+}
+.mq-root.mq-workspace .mq-button--primary::before {
+  background: radial-gradient(ellipse at var(--mq-pointer-x,50%) var(--mq-pointer-y,0%),var(--mq-actionShine),transparent 76%);
+}
+.mq-root.mq-workspace :is(.mq-button,.mq-chip):focus-visible::before,
+.mq-root.mq-workspace .mq-option:focus-within::before { opacity: .48; }
+.mq-root.mq-workspace :is(.mq-button,.mq-chip,.mq-segmented button,.mq-tablist button,.auth-tabs button):focus-visible {
+  outline: 3px solid var(--mq-ok);
+  outline-offset: 3px;
+  box-shadow: var(--mq-control-glow);
+}
+.mq-root.mq-workspace :is(.mq-segmented button[aria-pressed="true"],.mq-tablist button[aria-selected="true"],.auth-tabs button[aria-pressed="true"]) {
+  box-shadow: inset 0 1px 0 var(--mq-glass-highlight),inset 0 0 0 1px var(--mq-pat-line),0 3px 8px -4px var(--mq-shadow);
+}
+.mq-root.mq-workspace .mq-chip[aria-pressed="true"] {
+  box-shadow: inset 0 1px 0 var(--mq-glass-highlight),0 4px 10px -7px var(--mq-actionShadow);
+}
+.mq-root.mq-workspace .mq-icon { transition: transform 420ms var(--mq-motion-spring); }
+.mq-root.mq-workspace .mq-option {
+  transition: background-color 300ms var(--mq-motion-cream),border-color 300ms var(--mq-motion-cream),box-shadow 380ms var(--mq-motion-cream);
+}
+.mq-root.mq-workspace .mq-option .mq-letter {
+  transition: background-color 300ms var(--mq-motion-cream),color 240ms var(--mq-motion-cream),border-color 300ms var(--mq-motion-cream),box-shadow 380ms var(--mq-motion-cream);
+}
+.mq-root.mq-workspace :is(input,select,textarea) {
+  transition: border-color 240ms var(--mq-motion-cream),box-shadow 360ms var(--mq-motion-cream),background-color 300ms var(--mq-motion-cream);
+}
+.mq-root.mq-workspace .mq-system-row { transition: background-color 300ms var(--mq-motion-cream),box-shadow 380ms var(--mq-motion-cream); }
+.mq-root.mq-workspace .mq-rings :is(.mq-ring-outer,.mq-ring-inner) {
+  transition: stroke-dasharray 760ms var(--mq-motion-cream),stroke-dashoffset 760ms var(--mq-motion-cream);
+}
+.mq-root.mq-workspace .mq-progress > span { transition: width 620ms var(--mq-motion-cream); }
+
+@media (hover:hover) and (pointer:fine) {
+  .mq-root.mq-workspace .mq-dashboard .mq-card:hover {
+    border-color: var(--mq-hoverline);
+    box-shadow: inset 0 1px 0 var(--mq-glass-highlight),var(--mq-shadow-3);
+  }
+  .mq-root.mq-workspace .mq-dashboard .mq-card:hover::before { opacity: .68; }
+  .mq-root.mq-workspace :is(.mq-button,.mq-chip):not(:disabled):hover::before,
+  .mq-root.mq-workspace .mq-options:not(:disabled) .mq-option:hover::before { opacity: .7; }
+  .mq-root.mq-workspace .mq-button:not(:disabled):hover,
+  .mq-root.mq-workspace .mq-chip:not(:disabled):hover {
+    box-shadow: inset 0 1px 0 var(--mq-glass-highlight),0 5px 14px -7px var(--mq-shadow);
+  }
+  .mq-root.mq-workspace .mq-button--primary:not(:disabled):hover {
+    box-shadow: inset 0 1px 0 var(--mq-actionShine),0 9px 20px -9px var(--mq-actionShadow),0 3px 6px -4px var(--mq-shadow);
+  }
+  .mq-root.mq-workspace .mq-options:not(:disabled) .mq-option:hover {
+    box-shadow: inset 0 0 0 1px var(--mq-ok),0 5px 14px -10px var(--mq-shadow);
+  }
+  /* Header controls and crowded navigator targets never drift under the pointer. */
+  .mq-root.mq-workspace :is(.mq-header,.mq-study-tools) .mq-button:not(:disabled):hover,
+  .mq-root.mq-workspace .mq-question-number:not(:disabled):hover { transform: none; }
+  .mq-root.mq-workspace .mq-question-number--correct:not(:disabled):hover { background: var(--mq-ok-tint); border-color: var(--mq-ok); }
+  .mq-root.mq-workspace .mq-question-number--incorrect:not(:disabled):hover { background: var(--mq-bad-tint); border-color: var(--mq-bad-ink); }
+  .mq-root.mq-workspace :is(.mq-question-number--assisted,.mq-question-number--partial):not(:disabled):hover { background: var(--mq-inset); border-color: var(--mq-mark-ink); }
+  .mq-root.mq-workspace .mq-question-number--pending:not(:disabled):hover { border-color: var(--mq-mark-ink); }
+  .mq-root.mq-workspace .mq-question-number--saved:not(:disabled):hover { background: var(--mq-chip); }
+}
+@media (prefers-reduced-motion:no-preference) {
+  .mq-root.mq-workspace :is(.mq-button,.mq-chip,.mq-segmented button,.mq-tablist button,.mq-question-number,.auth-tabs button):not(:disabled):active {
+    transform: scale(.97);
+    transition-duration: 140ms;
+  }
+  .mq-root.mq-workspace[data-view="dashboard"] .mq-dashboard :is(.mq-resume,.mq-builder,.mq-overall,.mq-systems,.mq-activity,.mq-claude-entrada) {
+    animation: mq-material-arrive 560ms var(--mq-motion-cream) backwards;
+  }
+  .mq-root.mq-workspace[data-view="dashboard"] .mq-builder { animation-delay: 35ms; }
+  .mq-root.mq-workspace[data-view="dashboard"] .mq-overall { animation-delay: 65ms; }
+  .mq-root.mq-workspace[data-view="dashboard"] .mq-claude-entrada { animation-delay: 85ms; }
+  .mq-root.mq-workspace[data-view="dashboard"] .mq-systems { animation-delay: 100ms; }
+  .mq-root.mq-workspace[data-view="dashboard"] .mq-activity { animation-delay: 120ms; }
+  .mq-root.mq-workspace[data-view="settings"] .mq-settings {
+    animation: mq-material-fade 420ms var(--mq-motion-cream) backwards;
+  }
+  .mq-root.mq-workspace :is(.mq-result,.mq-saved,.mq-complete) {
+    animation: mq-material-arrive 420ms var(--mq-motion-cream) backwards;
+  }
+  .mq-root.mq-workspace .mq-dialog[open],
+  .mq-root.mq-workspace .mq-claude-fondo:not([hidden]) .mq-claude-dialogo {
+    animation: mq-material-sheet 560ms var(--mq-motion-spring) backwards;
+  }
+  .mq-root.mq-workspace .mq-dialog[open]::backdrop,
+  .mq-root.mq-workspace .mq-claude-fondo:not([hidden]) {
+    animation: mq-material-fade 320ms var(--mq-motion-drawer) backwards;
+  }
+}
+@keyframes mq-material-arrive {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes mq-material-sheet {
+  from { opacity: 0; transform: translateY(6px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes mq-material-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Sound is a user preference, never an automatic background effect. */
+.mq-root.mq-workspace .mq-sound-toggle {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 50%;
+}
+.mq-root.mq-workspace[data-sound="on"] .mq-sound-toggle {
+  color: var(--mq-ok-ink);
+  background: var(--mq-sel);
+  box-shadow: inset 0 0 0 1px var(--mq-pat-line),var(--mq-shadow-1);
+}
+.mq-root.mq-workspace .mq-experience-settings { display: grid; gap: 18px; padding: 22px; }
+.mq-root.mq-workspace .mq-experience-settings > p { color: var(--mq-text2); line-height: 1.6; }
+.mq-root.mq-workspace .mq-experience-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px;
+  border-radius: var(--mq-radius-md);
+  background: var(--mq-inset);
+  box-shadow: inset 0 1px 2px color-mix(in srgb,var(--mq-shadow) 12%,transparent);
+}
+.mq-root.mq-workspace .mq-experience-row > div { min-width: 0; }
+.mq-root.mq-workspace .mq-experience-row strong { display: block; font-weight: 650; }
+.mq-root.mq-workspace .mq-experience-row p { color: var(--mq-text2); font-size: 14px; line-height: 1.6; margin-top: 4px; }
+.mq-root.mq-workspace .mq-experience-row > button { flex: none; }
+@media (max-width:440px) {
+  .mq-root.mq-workspace .mq-dashboard-link > span { display: none; }
+  .mq-root.mq-workspace .mq-experience-row { gap: 14px; padding: 14px; flex-wrap: wrap; }
+}
+@media (max-width:360px) {
+  .mq-root.mq-workspace .mq-header .mq-brand span { display: none; }
+}
+/* Discrete display transitions retain the existing close/focus behavior. Older
+   browsers simply close immediately; no JS timer delays a study action. */
+@supports (transition-behavior:allow-discrete) {
+  .mq-root.mq-workspace .mq-dialog {
+    transition: opacity 180ms var(--mq-motion-drawer),transform 180ms var(--mq-motion-drawer),display 180ms allow-discrete,overlay 180ms allow-discrete;
+  }
+  .mq-root.mq-workspace .mq-dialog:not([open]) { opacity: 0; transform: translateY(6px) scale(.985); }
+  .mq-root.mq-workspace .mq-claude-fondo {
+    transition: opacity 220ms var(--mq-motion-drawer),display 220ms allow-discrete;
+  }
+  .mq-root.mq-workspace .mq-claude-fondo[hidden] { opacity: 0; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .mq-root.mq-workspace *,
+  .mq-root.mq-workspace *::before,
+  .mq-root.mq-workspace *::after,
+  .mq-root.mq-workspace .mq-dialog::backdrop {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .mq-root.mq-workspace :is(button,.mq-icon):is(:hover,:active),
+  .mq-root.mq-workspace button:hover .mq-icon { transform: none !important; }
+}
+@media (forced-colors:active) {
+  .mq-root.mq-workspace .mq-dashboard .mq-card::before,
+  .mq-root.mq-workspace :is(.mq-button,.mq-chip,.mq-option)::before { display: none; }
+}

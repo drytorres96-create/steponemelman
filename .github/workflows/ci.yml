@@ -23,16 +23,16 @@ jobs:
       - run: npm run e2e
       - name: Verify integrated My Q Bank screens
         run: node qa/myqbank-review.mjs
-      # One-time visual rollout: compare the same synthetic scenes with release 1.42.0.
+      # One-time visual rollout: compare the same synthetic scenes with release 1.43.0.
       - name: Checkout My Q Bank design baseline
-        if: github.event_name == 'pull_request' && github.head_ref == 'design/suave-myqbank-2026-10-30'
+        if: github.event_name == 'pull_request' && github.head_ref == 'design/suave-motion-2026-10-30'
         uses: actions/checkout@v4
         with:
-          ref: 3cd85c28e205ebb3e3b5ccf7d42d4ff2b67331be
+          ref: de13549b89ce361b3027a802ac42885b378c9c42
           path: work/myqbank-before
           persist-credentials: false
       - name: Capture My Q Bank design baseline with the same fixtures
-        if: github.event_name == 'pull_request' && github.head_ref == 'design/suave-myqbank-2026-10-30'
+        if: github.event_name == 'pull_request' && github.head_ref == 'design/suave-motion-2026-10-30'
         working-directory: work/myqbank-before
         env:
           MYQBANK_EVIDENCE_DIR: ${{ github.workspace }}/docs/myqbank-phases-2-4
