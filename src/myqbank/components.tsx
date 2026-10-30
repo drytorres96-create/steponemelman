@@ -5,8 +5,10 @@ import './tokens.css'
 import './components.css'
 import './interactions.css'
 
-export type IconName = 'sun' | 'moon' | 'settings' | 'arrow' | 'back' | 'flag' | 'labs' | 'rail' | 'check' | 'close' | 'play' | 'retry' | 'search' | 'external' | 'pause' | 'stop' | 'dashboard' | 'plus' | 'minus' | 'book'
+export type IconName = 'sun' | 'moon' | 'settings' | 'arrow' | 'back' | 'flag' | 'labs' | 'rail' | 'check' | 'close' | 'play' | 'retry' | 'search' | 'external' | 'pause' | 'stop' | 'dashboard' | 'plus' | 'minus' | 'book' | 'sound' | 'muted'
 const paths: Record<IconName, ReactNode> = {
+  sound: <><path d="m11 4-6 5H2v6h3l6 5Z"/><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></>,
+  muted: <><path d="m11 4-6 5H2v6h3l6 5Z"/><path d="m16 9 6 6m0-6-6 6"/></>,
   book: <><path d="M12 5v15M12 5C9 3 5 3 3 4v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-2-1-6-1-9 1Z"/></>,
   sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></>,
   moon: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/>,
@@ -29,7 +31,7 @@ export function Icon({ name }: { name: IconName }) {
   return <svg className={`mq-icon mq-icon--${name}`} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>
 }
 export function Brand() {
-  return <div className="mq-brand"><img src={logo} alt="" width="40" height="38"/><span>MyQBank</span></div>
+  return <div className="mq-brand" role="img" aria-label="MyQBank"><img src={logo} alt="" width="40" height="38"/><span>MyQBank</span></div>
 }
 export function Button({ variant = 'ghost', className = '', children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'danger' }) {
   return <button type="button" title={props['aria-label']} {...props} className={`mq-button mq-button--${variant} ${className}`}>{children}</button>

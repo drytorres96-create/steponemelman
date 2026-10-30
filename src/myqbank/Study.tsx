@@ -26,6 +26,7 @@ import { ExpectedAnswer } from './ExpectedAnswer'
 import { Highlighter, HighlightText, type HighlightSource } from './HighlightText'
 import { LabReference, useLabReference } from './LabReference'
 import { useAnnotations } from './AnnotationProvider'
+import { useSuaveExperience, useQuestionTransition } from './SuaveExperience'
 
 export function Study({ block, onExit, onRetry, onModeChange, busy = false }: { block: StudyBlock; onExit: () => void; onRetry: (block: StudyBlock) => Promise<void>; onModeChange: (block: StudyBlock, mode: StudyBlock['mode']) => Promise<void>; busy?: boolean }) {
   return <Highlighter key={block.id} selectionKey={`${block.cursor}`}><StudyBody block={block} onExit={onExit} onRetry={onRetry} onModeChange={onModeChange} busy={busy}/></Highlighter>
@@ -33,6 +34,7 @@ export function Study({ block, onExit, onRetry, onModeChange, busy = false }: { 
 function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { block: StudyBlock; onExit: () => void; onRetry: (block: StudyBlock) => Promise<void>; onModeChange: (block: StudyBlock, mode: StudyBlock['mode']) => Promise<void>; busy?: boolean }) {
   const app = useApp(), nbme = useNbme(), annotations = useAnnotations()
   const labView = useLabReference()
+  const { play } = useSuaveExperience()
   const latestApp = useRef(app); latestApp.current = app
   const [rail, setRail] = useState(true), [labs, setLabs] = useState(false), [endOpen, setEndOpen] = useState(false)
   const [expanded, setExpanded] = useState<LoadedFigure | null>(null), [grading, setGrading] = useState(false), [message, setMessage] = useState('')
@@ -65,6 +67,23 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
   const assisted = !!conceptAttempt && (conceptAttempt.explicacion_previa || conceptAttempt.fuente_consultada || conceptAttempt.pistas_usadas > 0 || !!learning)
   const correct = conceptAttempt ? ['correcta', 'ortografia'].includes(conceptAttempt.resultado ?? '') : questionAttempt?.correct
   const partial = conceptAttempt?.resultado === 'parcial'
+  const soundAction = useRef<{ opportunity: string; kind: 'answer' | 'complete' } | null>(null)
+  const soundState = useRef({ opportunity, submitted, closed })
+  useQuestionTransition(questionPane, opportunity)
+  useEffect(() => {
+    const before = soundState.current
+    soundState.current = { opportunity, submitted, closed }
+    // Only a newly completed action sounds; restored answers and navigation stay neutral.
+    // Test mode must not reveal the verdict through audio before ending the block.
+    const action = soundAction.current
+    if (before.opportunity !== opportunity) { soundAction.current = null; return }
+    if (action?.opportunity !== opportunity) return
+    if (action.kind === 'complete' && !before.closed && closed) { soundAction.current = null; play('complete') }
+    else if (action.kind === 'answer' && !before.submitted && submitted) {
+      soundAction.current = null
+      play(!reveal ? 'tap' : correct && !uncertain ? 'success' : 'review')
+    }
+  }, [opportunity, submitted, closed, reveal, correct, uncertain, play])
   const canRecheck = !!concept && !!conceptAttempt && usaTextoLibre(concept) && !!recheckAcceptedAnswer(concept, conceptAttempt, Date.now())
   const source: HighlightSource = { material: entry.kind, sourceId: entry.id, sourceRevision: entry.revision,
     variantId: concept?.variante_id ?? '', editorialVersion: '' }
@@ -165,6 +184,7 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
   }
   async function submitConcept(r: Resultado) {
     if (!concept || learningOpen || busy || submitLock.current || closed || conceptAttempt && conceptAttempt.resultado !== 'revision') return
+    soundAction.current = { opportunity, kind: 'answer' }
     submitLock.current = true; clock.current.activar(false)
     const duration = blockTime(timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()), block.cursor)
     if (usaTextoLibre(concept) && r.respuestaDada.trim() && !['correcta', 'ortografia'].includes(r.veredicto)) {
@@ -218,12 +238,12 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
             <p className="mq-small mq-muted">{learning ? 'Studied with help. Your next answer is assisted practice.' : 'Not sure yet? Read first, then try to recall it.'}</p></>
             : <><Button disabled={grading || busy} onClick={() => { const timed = timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()); save(timed); void onModeChange(timed, 'tutor') }}><Icon name="book"/>Learn in Tutor</Button><p className="mq-small mq-muted">Starts a new Tutor block. Your Test answers stay saved.</p></>}
         </div>}
-        {question && <form onSubmit={e => { e.preventDefault(); if (canSubmitNbme) { const timed = timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()); nbme.checkAnswer(blockTime(timed, block.cursor)); save(markBlock(timed, 'skipped', block.cursor, false)) } }}>
+        {question && <form onSubmit={e => { e.preventDefault(); if (canSubmitNbme) { soundAction.current = { opportunity, kind: 'answer' }; const timed = timeBlock(current.current, block.cursor, timerRun.current, clock.current.leer()); nbme.checkAnswer(blockTime(timed, block.cursor)); save(markBlock(timed, 'skipped', block.cursor, false)) } }}>
           <fieldset className="mq-options" disabled={submitted || closed || !ready || nbme.busy || busy}><legend className="mq-sr-only">Choose your answer</legend>{question.options.map(option => {
             const chosen = (questionAttempt?.optionId ?? nbme.selectedOption) === option.id
             const state = reveal && !uncertain && option.id === question.answer ? 'correct' : reveal && !uncertain && chosen ? 'incorrect' : chosen ? 'selected' : ''
             return <label className={`mq-option mq-option--${state}`} key={option.id}><input type="radio" name={opportunity} checked={chosen} onChange={() => nbme.selectAnswer(option.id)}/><span className="mq-letter">{option.id}</span><span lang="en"><HighlightText text={columns ? columns.columnas.map((c, i) => `${c}: ${columns.filas[option.id][i]}`).join(' · ') : normalizarTexto(option.text)} source={source} region={`option:${option.id}`}/></span>{state === 'correct' && <small>Correct answer</small>}{state === 'incorrect' && <small>Your answer</small>}</label>
-          })}</fieldset>{!submitted && !closed && <div className="mq-answer-actions"><Button type="submit" variant="primary" disabled={!canSubmitNbme}><Icon name="check"/>Submit answer</Button></div>}
+          })}</fieldset>{!submitted && !closed && <div className="mq-answer-actions"><Button type="submit" data-suave-cue="none" variant="primary" disabled={!canSubmitNbme}><Icon name="check"/>Submit answer</Button></div>}
         </form>}
         {submitted && !reveal && <div className="mq-saved" role="status"><Icon name="check"/><div><strong>Answer saved</strong><p>Results appear when you end the block.</p></div></div>}
         {!handled && closed && <p role="status">Not answered · no grade recorded.</p>}
@@ -261,7 +281,7 @@ function StudyBody({ block, onExit, onRetry, onModeChange, busy = false }: { blo
         <div className="mq-explanation-actions">{learningOpen && !closed && <Button disabled={busy} onClick={() => teach(false)}><Icon name="retry"/>Hide and recall</Button>}<Button variant="primary" disabled={grading || recovering || busy} onClick={closed && block.cursor === block.entries.length - 1 ? onExit : next}>{block.cursor === block.entries.length - 1 ? closed ? 'Back to dashboard' : 'Finish block' : 'Next question'}<Icon name="arrow"/></Button></div>
       </aside>}
     </main>
-    <dialog className="mq-dialog" aria-labelledby={endTitle} ref={dialog} onCancel={() => setEndOpen(false)} onClose={() => setEndOpen(false)}><h2 id={endTitle}>End this block?</h2><p>{answered} answered · {studied} studied with help · {block.entries.length - completed} unanswered. Studying without an answer records no grade.</p><div className="mq-inline"><Button onClick={() => setEndOpen(false)}>Keep studying</Button><Button variant="primary" onClick={() => { save(patchBlock(current.current, { completedAt: Date.now(), paused: true })); if (nbme.currentSession?.id === block.id) nbme.completeSession(); setEndOpen(false) }}>End and review</Button></div></dialog>
+    <dialog className="mq-dialog" aria-labelledby={endTitle} ref={dialog} onCancel={() => { play('close'); setEndOpen(false) }} onClose={() => setEndOpen(false)}><h2 id={endTitle}>End this block?</h2><p>{answered} answered · {studied} studied with help · {block.entries.length - completed} unanswered. Studying without an answer records no grade.</p><div className="mq-inline"><Button onClick={() => setEndOpen(false)}>Keep studying</Button><Button variant="primary" data-suave-cue="none" onClick={() => { soundAction.current = { opportunity, kind: 'complete' }; save(patchBlock(current.current, { completedAt: Date.now(), paused: true })); if (nbme.currentSession?.id === block.id) nbme.completeSession(); setEndOpen(false) }}>End and review</Button></div></dialog>
     {expanded && <Modal titulo="Question figure" onCerrar={() => setExpanded(null)} ancho={1100}><FigureViewer url={expanded.url} alt={expanded.alt}/></Modal>}
   </>
 }
