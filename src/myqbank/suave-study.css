@@ -206,7 +206,7 @@
   .mq-root.mq-workspace .mq-dialog[open] { animation: mq-suave-sheet 360ms var(--mq-spring-soft, ease-out) both; }
 }
 @keyframes mq-suave-feedback { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-@keyframes mq-suave-sheet { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes mq-suave-sheet { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (max-width: 960px), (max-height: 600px) {
   .mq-root.mq-workspace .mq-study { gap: 16px; }
   .mq-root.mq-workspace .mq-rail { padding: 8px 16px; border-radius: var(--mq-radius-md); }
@@ -216,6 +216,7 @@
 }
 @media (max-width: 600px) {
   .mq-root.mq-workspace .mq-study-tools { padding: 12px; }
+  .mq-root.mq-workspace .mq-study-tools .mq-button:not(:disabled):hover { transform: none; }
   .mq-root.mq-workspace .mq-study { padding-inline: 12px; }
   .mq-root.mq-workspace .mq-stem { padding: 20px; border-radius: var(--mq-radius-lg); }
   .mq-root.mq-workspace .mq-option { padding: 13px 14px; }

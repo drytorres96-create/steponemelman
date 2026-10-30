@@ -45,6 +45,9 @@ test('el dashboard de MyQBank se desplaza hacia abajo en escritorio', async ({ p
   await page.goto(url)
   await expect(page.getByRole('heading', { name: 'Build a block' })).toBeVisible()
   await sePuedeBajar(page)
+  // The larger progress ring and readable tiles make the dashboard taller.
+  // Verify actual wheel scrolling reaches the footer, without assuming a fixed page height.
+  await page.mouse.wheel(0, await page.evaluate(() => document.documentElement.scrollHeight))
   await expect(page.getByText('Detailed progress and study plan')).toBeInViewport()
 })
 
