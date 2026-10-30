@@ -1,0 +1,182 @@
+/* Suave adapted for MyQBank: the original jade/forest/coral semantics remain.
+   React retains ownership of state, focus, theme and persistence. */
+@import './suave-fonts.css';
+
+.mq-root.mq-workspace {
+  --mq-font: 'Figtree', 'Avenir Next', ui-sans-serif, system-ui, sans-serif;
+  --mq-display: 'Bricolage Grotesque', 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  --mq-radius-sm: 14px;
+  --mq-radius-md: 20px;
+  --mq-radius-lg: 28px;
+  --mq-radius-sheet: 32px;
+  --mq-radius: var(--mq-radius-lg);
+  --mq-control-radius: var(--mq-radius-sm);
+  --mq-ease-out: cubic-bezier(.23,1,.32,1);
+  --mq-spring-soft: cubic-bezier(.34,1.3,.64,1);
+  --mq-ease: var(--mq-ease-out);
+  --mq-shadow-1: 0 1px 2px color-mix(in srgb,var(--mq-shadow) 35%,transparent);
+  --mq-shadow-2: 0 2px 3px color-mix(in srgb,var(--mq-shadow) 16%,transparent), 0 6px 12px color-mix(in srgb,var(--mq-shadow) 22%,transparent), 0 16px 32px -18px var(--mq-shadow);
+  --mq-shadow-3: 0 4px 8px color-mix(in srgb,var(--mq-shadow) 20%,transparent), 0 16px 32px -12px var(--mq-shadow), 0 28px 48px -28px var(--mq-shadow);
+  --mq-glass: color-mix(in srgb,var(--mq-surface) 94%,transparent);
+  --mq-card-shadow: var(--mq-shadow-2);
+  --mq-control-glow: 0 0 0 1px var(--mq-pat-line),var(--mq-shadow-1);
+  font-family: var(--mq-font);
+  font-optical-sizing: auto;
+  font-variant-numeric: tabular-nums;
+  background: var(--mq-stage);
+}
+.mq-root.mq-workspace[data-theme="light"] {
+  --mq-bg: #F0F5F1;
+  --mq-inset: #F2F7F3;
+  --mq-faint: #536F61;
+  --mq-stage: radial-gradient(ellipse at 2% 3%,#A9D7C950,transparent 43%),radial-gradient(ellipse at 95% 60%,#F3A48D24,transparent 42%),linear-gradient(150deg,#F5F8F4,#EDF4EF 65%,#F4F3EE);
+}
+.mq-root.mq-workspace[data-theme="dark"] {
+  --mq-stage: radial-gradient(ellipse at 2% 3%,#2C7A6233,transparent 43%),radial-gradient(ellipse at 95% 60%,#D9795F14,transparent 42%),linear-gradient(150deg,#0E1413,#101A16 65%,#171A17);
+}
+.mq-root.mq-workspace :is(h1,h2,h3,.mq-brand span,.mq-rings strong,.mq-stat strong,.mq-stepper output) {
+  font-family: var(--mq-display);
+  font-optical-sizing: auto;
+}
+.mq-root.mq-workspace h1 { font-weight: 700; letter-spacing: -.035em; }
+.mq-root.mq-workspace h2 { font-size: 20px; line-height: 1.25; font-weight: 650; letter-spacing: -.025em; }
+.mq-root.mq-workspace h3 { font-weight: 650; }
+.mq-root.mq-workspace :is(button,input,select,textarea) { font-family: var(--mq-font); }
+.mq-root.mq-workspace :focus-visible { outline: 3px solid var(--mq-ok); outline-offset: 3px; }
+.mq-root.mq-workspace .mq-card {
+  border: 1px solid color-mix(in srgb,var(--mq-line) 70%,transparent);
+  border-radius: var(--mq-radius-lg);
+  background: var(--mq-glass);
+  box-shadow: inset 0 1px 0 var(--mq-reflection),var(--mq-shadow-2);
+}
+.mq-root.mq-workspace .mq-header {
+  min-height: 80px;
+  padding-block: 14px;
+  background: color-mix(in srgb,var(--mq-bar) 92%,transparent);
+  border-color: color-mix(in srgb,var(--mq-line) 65%,transparent);
+  box-shadow: inset 0 -1px 0 var(--mq-reflection);
+}
+.mq-root.mq-workspace .mq-brand { gap: 10px; }
+.mq-root.mq-workspace .mq-brand img { width: 38px; height: 38px; }
+.mq-root.mq-workspace .mq-brand span { font-size: 24px; font-weight: 700; letter-spacing: -.04em; }
+.mq-root.mq-workspace .mq-header .mq-button { border-radius: 999px; background: var(--mq-glass); box-shadow: var(--mq-shadow-1); }
+.mq-root.mq-workspace .mq-header .mq-dashboard-link[aria-current] { background: var(--mq-sel); color: var(--mq-ok-ink); }
+.mq-root.mq-workspace .mq-header-actions { gap: 8px; }
+.mq-root.mq-workspace .mq-button {
+  border-radius: var(--mq-control-radius);
+  font-weight: 600;
+  transition: transform 180ms var(--mq-spring-soft),background-color 180ms var(--mq-ease-out),box-shadow 240ms var(--mq-ease-out),border-color 180ms var(--mq-ease-out);
+}
+.mq-root.mq-workspace .mq-button--primary {
+  font-family: var(--mq-display);
+  font-size: 15px !important;
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 var(--mq-actionShine),0 5px 14px -7px var(--mq-actionShadow);
+}
+.mq-root.mq-workspace .mq-segmented {
+  gap: 4px;
+  padding: 4px;
+  border-radius: 18px;
+  border-color: var(--mq-line);
+  background: var(--mq-inset);
+  box-shadow: inset 0 1px 2px color-mix(in srgb,var(--mq-shadow) 12%,transparent);
+}
+.mq-root.mq-workspace .mq-segmented button { border-radius: 13px; font-size: 13px; }
+.mq-root.mq-workspace .mq-segmented button[aria-pressed="true"] {
+  background: var(--mq-surface);
+  color: var(--mq-ok-ink);
+  box-shadow: inset 0 0 0 1px var(--mq-pat-line),var(--mq-shadow-1);
+}
+.mq-root.mq-workspace .mq-chip { border-radius: var(--mq-radius-sm); background: color-mix(in srgb,var(--mq-surface) 65%,transparent); }
+.mq-root.mq-workspace .mq-chip[aria-pressed="true"] { background: var(--mq-sel); border-color: var(--mq-ok); color: var(--mq-ok-ink); box-shadow: var(--mq-shadow-1); }
+.mq-root.mq-workspace :is(input:not([type=checkbox]):not([type=radio]),select,textarea) { border-radius: var(--mq-radius-sm); }
+.mq-root.mq-workspace .mq-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .1em; }
+.mq-root.mq-workspace .mq-dashboard { gap: 22px; padding-top: 26px; }
+.mq-root.mq-workspace .mq-resume {
+  min-height: 148px;
+  padding: 26px;
+  border-radius: var(--mq-radius-sheet);
+  background: radial-gradient(ellipse at 100% 0%,var(--mq-ok-tint),transparent 65%),var(--mq-glass);
+}
+.mq-root.mq-workspace .mq-resume h1 { font-size: clamp(27px,2.5vw,34px); line-height: 1.1; margin-block: 10px; }
+.mq-root.mq-workspace .mq-resume p { font-size: 14px; }
+.mq-root.mq-workspace .mq-resume-actions { gap: 10px; }
+.mq-root.mq-workspace .mq-resume-progress > span { font-family: var(--mq-font); }
+.mq-root.mq-workspace .mq-resume-progress .mq-progress { height: 6px; }
+.mq-root.mq-workspace :is(.mq-builder,.mq-overall,.mq-systems,.mq-activity) { padding: 22px; }
+.mq-root.mq-workspace .mq-section-icon { width: 44px; height: 44px; border-radius: 16px; background: var(--mq-sel); box-shadow: inset 0 1px 0 var(--mq-reflection); }
+.mq-root.mq-workspace .mq-section-heading { gap: 12px; }
+.mq-root.mq-workspace .mq-section-heading h2 { font-size: 22px; }
+.mq-root.mq-workspace .mq-builder-scroll { gap: 16px; }
+.mq-root.mq-workspace .mq-field h3 { font-family: var(--mq-font); font-size: 13px; }
+.mq-root.mq-workspace .mq-suggestion { padding: 12px; border: 1px solid var(--mq-pat-line); border-radius: var(--mq-radius-md); background: var(--mq-pat); }
+.mq-root.mq-workspace .mq-suggestion p { font-size: 12px; }
+.mq-root.mq-workspace .mq-suggestion .mq-button { padding-inline: 12px; border-radius: 999px; background: var(--mq-surface); }
+.mq-root.mq-workspace .mq-stepper { border-radius: 999px; border-color: var(--mq-control-line); background: var(--mq-inset); padding: 2px; }
+.mq-root.mq-workspace .mq-stepper .mq-button { border-radius: 50%; }
+.mq-root.mq-workspace .mq-stepper output { font-size: 22px; }
+.mq-root.mq-workspace .mq-count-presets .mq-chip { border-radius: 999px; }
+.mq-root.mq-workspace .mq-summary { border-radius: var(--mq-radius-md); padding: 16px; gap: 9px; }
+.mq-root.mq-workspace .mq-builder > .mq-button { min-height: 50px; }
+.mq-root.mq-workspace .mq-overall { gap: 16px; }
+.mq-root.mq-workspace .mq-overall-summary { gap: 18px; }
+.mq-root.mq-workspace .mq-overall .mq-rings {
+  width: 152px; height: 152px; margin: 4px auto;
+  border-radius: 50%;
+  background: radial-gradient(circle,var(--mq-surface) 44%,var(--mq-ok-tint) 70%,transparent 72%);
+  box-shadow: 0 8px 28px -16px var(--mq-actionShadow);
+}
+.mq-root.mq-workspace .mq-overall .mq-rings strong { font-family: var(--mq-display); font-size: 36px; letter-spacing: -.04em; line-height: 1.1; }
+.mq-root.mq-workspace .mq-overall .mq-rings span { font-size: 12px; }
+.mq-root.mq-workspace .mq-overall .mq-stat-grid { gap: 8px; }
+.mq-root.mq-workspace .mq-stat,
+.mq-root.mq-workspace .mq-stat:nth-child(odd) { padding: 12px 10px; gap: 8px; border: 0; border-radius: 16px; background: var(--mq-inset); box-shadow: inset 0 1px 0 var(--mq-reflection); }
+.mq-root.mq-workspace .mq-stat strong { font-family: var(--mq-display); font-size: 26px; font-weight: 650; letter-spacing: -.035em; }
+.mq-root.mq-workspace .mq-stat span { font-size: 12px; line-height: 1.35; }
+.mq-root.mq-workspace .mq-pace { font-size: 12px; gap: 14px; }
+.mq-root.mq-workspace .mq-pace dd { font-family: var(--mq-font); }
+.mq-root.mq-workspace .mq-system-row { border-radius: var(--mq-radius-sm); padding: 8px; margin-block: 2px; border-bottom-color: transparent; }
+.mq-root.mq-workspace .mq-system-row:nth-child(odd) { background: color-mix(in srgb,var(--mq-inset) 65%,transparent); }
+.mq-root.mq-workspace .mq-system-row:has(input:checked) { background: var(--mq-inset); }
+.mq-root.mq-workspace .mq-system-row:focus-within { outline: 3px solid var(--mq-ok); outline-offset: -3px; }
+.mq-root.mq-workspace .mq-system-row :is(small,strong) { font-family: var(--mq-font); }
+.mq-root.mq-workspace .mq-system-row strong { font-size: 13px; }
+.mq-root.mq-workspace .mq-system-row input { border-radius: 6px; }
+.mq-root.mq-workspace .mq-system-toolbar .mq-button { border-radius: 999px; background: var(--mq-inset); }
+.mq-root.mq-workspace .mq-block-open { border-radius: 16px; background: var(--mq-inset); border-color: var(--mq-line); }
+.mq-root.mq-workspace .mq-week span { border-radius: 999px; }
+.mq-root.mq-workspace .mq-activity-goal { border-top-style: dashed; }
+.mq-root.mq-workspace .mq-state { padding: 32px 22px; border-radius: var(--mq-radius-lg); background: var(--mq-glass); }
+
+/* Forms and prose stay still; only deliberate controls respond to the pointer. */
+@media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference) {
+  .mq-root.mq-workspace .mq-button:not(:disabled):hover { transform: translateY(-2px); box-shadow: var(--mq-shadow-1); }
+  .mq-root.mq-workspace .mq-button--primary:not(:disabled):hover { box-shadow: inset 0 1px 0 var(--mq-actionShine),0 10px 22px -10px var(--mq-actionShadow); }
+}
+.mq-root.mq-workspace .mq-button:not(:disabled):active { transform: scale(.98); }
+@media (max-width:960px),(max-height:600px) {
+  .mq-root.mq-workspace .mq-dashboard { gap: 18px; }
+  .mq-root.mq-workspace .mq-overall .mq-stat-grid { gap: 10px; }
+}
+@media (max-width:600px) {
+  .mq-root.mq-workspace .mq-header { min-height: 72px; padding: 10px 12px; gap: 7px; }
+  .mq-root.mq-workspace .mq-brand { gap: 5px; }
+  .mq-root.mq-workspace .mq-brand img { width: 30px; height: 30px; }
+  .mq-root.mq-workspace .mq-brand span { font-size: 21px; }
+  .mq-root.mq-workspace .mq-header-actions { gap: 4px; }
+  .mq-root.mq-workspace .mq-header-actions .mq-button { padding-inline: 10px; }
+  .mq-root.mq-workspace .mq-dashboard-link { padding-inline: 10px; }
+  .mq-root.mq-workspace .mq-dashboard { padding: 18px 12px; gap: 16px; }
+  .mq-root.mq-workspace .mq-resume { padding: 24px 20px; min-height: 0; border-radius: 28px; }
+  .mq-root.mq-workspace .mq-resume h1 { font-size: 28px; }
+  .mq-root.mq-workspace :is(.mq-builder,.mq-overall,.mq-systems,.mq-activity) { padding: 20px; }
+  .mq-root.mq-workspace .mq-overall .mq-rings { width: 160px; height: 160px; }
+  .mq-root.mq-workspace .mq-overall .mq-stat-grid { flex-basis: 100%; }
+}
+@media (max-width:380px) {
+  .mq-root.mq-workspace .mq-dashboard-link > span { display: none; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .mq-root.mq-workspace *, .mq-root.mq-workspace *::before, .mq-root.mq-workspace *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .mq-root.mq-workspace :is(button,.mq-icon):is(:hover,:active) { transform: none !important; }
+}
