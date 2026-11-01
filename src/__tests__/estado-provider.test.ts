@@ -17,6 +17,7 @@ import { ProveedorEstado, useApp, AVISO_COPIA_APARTADA } from '../store/estado'
 import { nuevoProgreso, programar } from '../srs/fsrs'
 import { leerEstadoDesconocido } from '../store/model'
 import { evaluarDominio } from '../srs/mastery'
+import { createBlock } from '../myqbank/blocks'
 
 let root: Root
 let host: HTMLDivElement
@@ -186,6 +187,96 @@ describe('proveedor de progreso', () => {
     expect(JSON.parse(localStorage.getItem('step1-respaldo:cuenta:user-a')!).state.sesiones).toHaveLength(1)
     await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
     expect(api.sincronizacion.estado).toBe('sincronizado')
+  })
+
+  it('preserves the initial offline copy separately when only the backup received a confirmed reset', async () => {
+    const db = new Map<string, unknown>()
+    mocks.read.mockImplementation(async key => db.get(key) ?? null)
+    mocks.write.mockImplementation(async (key, value) => { db.set(key, clone(value)) })
+    failure = true
+    await render()
+    await act(async () => {
+      api.registrarIntento('OLD', intento('before-reset', 1000))
+      api.guardarBloque(createBlock('before-reset', [{ kind: 'nbme', id: 'QA', revision: 'r1' }], 'tutor', 1000))
+    })
+    const offline = clone(db.get('cuenta:user-a'))
+    expect(offline).toMatchObject({ snapshot: null, state: { progreso: { OLD: expect.anything() } } })
+    mocks.write.mockRejectedValue(new Error('IndexedDB unavailable'))
+    failure = false
+    await act(async () => { expect(await api.sincronizarAhora()).toBe(true) })
+    const normalRpc = mocks.rpc.getMockImplementation()!
+    mocks.rpc.mockImplementation(async (name, params) => {
+      if (name !== 'reset_study_state') return normalRpc(name, params)
+      row = { ...row!, state: clone(params.p_state), generation: 'after-reset', revision: row!.revision + 1 }
+      return { data: { ok: true, kind: 'saved', row: clone(row) }, error: null }
+    })
+    await act(async () => { await api.reiniciar() })
+    expect(db.get('cuenta:user-a')).toEqual(offline)
+    expect(JSON.parse(localStorage.getItem('step1-respaldo:cuenta:user-a')!).snapshot.generation).toBe('after-reset')
+    await act(async () => root.unmount())
+    root = createRoot(host)
+    mocks.rpc.mockClear()
+    await render()
+    expect(api.errorCarga).toBeNull()
+    expect(api.estado.progreso).toEqual({})
+    expect(api.estado.myqbankBlocks ?? {}).toEqual({})
+    expect(api.estado.sesiones).toEqual([])
+    expect(row!.generation).toBe('after-reset')
+    expect(row!.state.progreso).toEqual({})
+    expect(row!.state.myqbankBlocks ?? {}).toEqual({})
+    expect(mocks.rpc.mock.calls.every(([, { p_state }]) => Object.keys(p_state.progreso).length === 0
+      && Object.keys(p_state.myqbankBlocks ?? {}).length === 0 && p_state.sesiones.length === 0)).toBe(true)
+    const archiveKey = Object.keys(localStorage).find(key => key.startsWith('step1-progreso:apartada:cuenta:user-a:'))
+    expect(JSON.parse(localStorage.getItem(archiveKey!)!)).toMatchObject({ copia: offline, motivo: 'sin-version' })
+    await act(async () => {
+      api.registrarIntento('NEW', intento('after-reset', 2000))
+      expect(await api.sincronizarAhora()).toBe(true)
+    })
+    expect(Object.keys(row!.state.progreso)).toEqual(['NEW'])
+    expect(row!.generation).toBe('after-reset')
+    expect(JSON.parse(localStorage.getItem(archiveKey!)!)).toMatchObject({ copia: offline })
+  })
+
+  it.each([true, false])('archives unversioned concepts before using the known generation (unversioned primary=%s)', async primary => {
+    const offline = { state: conIntento(ESTADO_INICIAL, 'OLD', 'before-reset'), snapshot: null, savedAt: 900 }
+    row = { state: conIntento(ESTADO_INICIAL, 'NEW', 'after-reset'), generation: 'after-reset', revision: 3,
+      user_id: 'user-a', updated_at: '2026-11-01T00:00:00Z' }
+    const known = { state: row.state, snapshot: clone(row), savedAt: 100 }
+    mocks.read.mockResolvedValue(primary ? offline : known)
+    localStorage.setItem('step1-respaldo:cuenta:user-a', JSON.stringify(primary ? known : offline))
+    const archive = deferred<void>()
+    mocks.write.mockImplementation(async key => { if (key.startsWith('apartada:')) await archive.promise })
+    await render()
+    expect(api.listo).toBe(false)
+    expect(mocks.load).not.toHaveBeenCalled()
+    expect(mocks.rpc).not.toHaveBeenCalled()
+    await act(async () => window.dispatchEvent(new Event('pagehide')))
+    expect(mocks.write.mock.calls.every(([key]) => key.startsWith('apartada:'))).toBe(true)
+    await act(async () => archive.resolve())
+    expect(api.errorCarga).toBeNull()
+    expect(Object.keys(api.estado.progreso)).toEqual(['NEW'])
+    expect(api.avisoLocal).toContain('por separado')
+    expect(mocks.write.mock.calls[0][1]).toMatchObject({ copia: offline, motivo: 'sin-version' })
+    expect(mocks.remove).not.toHaveBeenCalled()
+  })
+
+  it('keeps both original concept slots untouched if the unversioned copy cannot be archived, including on pagehide', async () => {
+    const offline = { state: conIntento(ESTADO_INICIAL, 'OLD', 'before-reset'), snapshot: null, savedAt: 900 }
+    row = { state: ESTADO_INICIAL, generation: 'after-reset', revision: 3,
+      user_id: 'user-a', updated_at: '2026-11-01T00:00:00Z' }
+    const backup = JSON.stringify({ state: row.state, snapshot: row, savedAt: 100 })
+    mocks.read.mockResolvedValue(offline)
+    localStorage.setItem('step1-respaldo:cuenta:user-a', backup)
+    mocks.write.mockRejectedValue(new Error('IndexedDB unavailable'))
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota exceeded') })
+    await render()
+    expect(api.errorCarga).not.toBeNull()
+    await act(async () => window.dispatchEvent(new Event('pagehide')))
+    expect(mocks.load).not.toHaveBeenCalled()
+    expect(mocks.rpc).not.toHaveBeenCalled()
+    expect(mocks.remove).not.toHaveBeenCalled()
+    expect(mocks.write.mock.calls.every(([key]) => key.startsWith('apartada:'))).toBe(true)
+    expect(localStorage.getItem('step1-respaldo:cuenta:user-a')).toBe(backup)
   })
 
   it('confirms an acknowledged cloud copy even when no browser storage is available', async () => {

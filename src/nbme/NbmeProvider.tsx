@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { leer, escribir } from '../store/db'
-import { apartarCopia } from '../store/apartar'
+import { apartarCopia, conservarCopiaSinVersion, AVISO_COPIA_SIN_VERSION } from '../store/apartar'
 import { recoverSavedCopies } from '../store/recovery'
 import { crearUUID } from '../store/model'
 import { createNbmeApi, parseNbmeCatalog, parseNbmeQuestion, questionRefKey, NbmeAccessError } from './api'
@@ -345,9 +345,13 @@ export function NbmeProvider({ userId, children }: { userId: string; children: R
       if (discarded && !await apartarCopia(key, `step1-backup:${key}`, { copia: stored, respaldo: corruptBackup ? rawBackup : backup })) {
         throw new Error('La copia local de preguntas no es válida y no pudo apartarse.')
       }
-      const saved = recoverSavedCopies(principal, fallback, mergeNbmeStates)
+      const { saved, unversioned } = recoverSavedCopies(principal, fallback, mergeNbmeStates)
+      if (unversioned && !await conservarCopiaSinVersion(key, unversioned)) {
+        throw new Error('La copia local de preguntas sin versión no pudo conservarse por separado.')
+      }
       if (!isCurrent()) return
       if (discarded) setLocalNotice('La copia de preguntas NBME de este dispositivo estaba dañada. Se apartó sin borrarla y tus preguntas se recuperaron de tu cuenta.')
+      if (unversioned) setLocalNotice(AVISO_COPIA_SIN_VERSION)
       if (readFailure) setStorageWarning('No se pudo leer uno de los respaldos locales. Sincroniza para recuperar el progreso de tu cuenta.')
       actual.current = saved?.state ?? emptyNbmeState()
       setState(actual.current)
