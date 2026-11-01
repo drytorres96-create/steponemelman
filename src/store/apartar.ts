@@ -1,10 +1,11 @@
 import { borrar, escribir } from './db'
+import { crearUUID } from './model'
 
 export const AVISO_COPIA_SIN_VERSION = 'Se conservó por separado una copia local cuyo historial podría ser anterior a un reinicio. No se añadió a tu progreso actual.'
 
 /** Preserve an unversioned copy without removing either active storage slot. */
 export async function conservarCopiaSinVersion(clave: string, copia: unknown): Promise<boolean> {
-  const archivo = `apartada:${clave}:${Date.now()}:${crypto.randomUUID()}`
+  const archivo = `apartada:${clave}:${Date.now()}:${crearUUID()}`
   const registro = { copia, motivo: 'sin-version', apartadaEn: new Date().toISOString() }
   try {
     await escribir(archivo, registro, { estricto: true })
