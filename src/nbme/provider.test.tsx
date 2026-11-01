@@ -3,12 +3,12 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { NbmeQuestion } from './types'
 import type { NbmeSnapshot } from './sync'
-import { emptyNbmeState, startNbmeSession } from './model'
+import { emptyNbmeState, startNbmeSession, submitNbmeAnswer } from './model'
 
 const memory = vi.hoisted(() => ({ db: new Map<string, unknown>(), row: null as unknown,
-  read: vi.fn<(key: string) => Promise<unknown>>(), rpc: vi.fn(), from: vi.fn(), session: vi.fn() }))
+  read: vi.fn<(key: string) => Promise<unknown>>(), write: vi.fn(), rpc: vi.fn(), from: vi.fn(), session: vi.fn() }))
 vi.mock('../store/db', () => ({ leer: (key: string) => memory.read(key),
-  escribir: async (key: string, value: unknown) => { memory.db.set(key, structuredClone(value)) },
+  escribir: (key: string, value: unknown) => memory.write(key, value),
   borrar: async (keys: string[]) => { for (const key of keys) memory.db.delete(key) } }))
 vi.mock('../lib/supabase', () => ({ supabase: { from: memory.from, rpc: memory.rpc, auth: { getSession: memory.session } } }))
 import { NbmeProvider, useNbme } from './NbmeProvider'
@@ -40,6 +40,7 @@ beforeEach(() => {
   denied = false; withdrawn = false; revised = false; assetFailure = null; replacedAsset = false
   memory.db.clear(); memory.row = null; localStorage.clear(); vi.clearAllMocks()
   memory.read.mockImplementation(async key => memory.db.get(key) ?? null)
+  memory.write.mockImplementation(async (key, value) => { memory.db.set(key, structuredClone(value)) })
   memory.session.mockResolvedValue({ data: { session: { user: { id: 'test-owner' }, access_token: 'synthetic-token' } }, error: null })
   memory.from.mockImplementation(() => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: structuredClone(memory.row), error: null }) }) }) }))
   memory.rpc.mockImplementation(async (_name, args) => {
@@ -63,7 +64,7 @@ beforeEach(() => {
     }) })
   }))
 })
-afterEach(async () => { if (root) await unmount(); vi.unstubAllGlobals() })
+afterEach(async () => { if (root) await unmount(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 it('loads the first catalog while the initial progress request is still pending', async () => {
   let finish!: (value: { data: null; error: null }) => void
@@ -88,6 +89,63 @@ it('does not resurrect sessions from a pre-reset IndexedDB copy when the backup 
   expect(current.state.sessions).toEqual({})
   expect((memory.row as NbmeSnapshot).state.sessions).toEqual({})
   expect(memory.rpc).not.toHaveBeenCalled()
+})
+
+it.each([
+  { primary: true, dbFailure: false }, { primary: false, dbFailure: false },
+  { primary: true, dbFailure: true }, { primary: false, dbFailure: true },
+])('preserves unversioned NBME sessions and answers outside the reset generation ($primary, $dbFailure)', async ({ primary, dbFailure }) => {
+  const state = submitNbmeAnswer(startNbmeSession(emptyNbmeState('test-bank'), {
+    id: 'before-reset', title: 'Synthetic', refs: [question],
+  }, 1), 'before-reset', 0, question, 'A', 100, 2)
+  const offline = { userId: 'test-owner', state, snapshot: null, savedAt: 900 }
+  const reset: NbmeSnapshot = { user_id: 'test-owner', state: emptyNbmeState('test-bank'), revision: 3,
+    generation: 'after-reset', updated_at: '2026-11-01T00:00:00Z' }
+  const known = { userId: 'test-owner', state: reset.state, snapshot: reset, savedAt: 100 }
+  memory.db.set('nbme-state:test-owner', primary ? offline : known)
+  localStorage.setItem('step1-backup:nbme-state:test-owner', JSON.stringify(primary ? known : offline))
+  memory.row = reset
+  if (dbFailure) memory.write.mockRejectedValue(new Error('IndexedDB unavailable'))
+  await mount()
+  await vi.waitFor(() => expect(current.syncStatus.state).toBe('synced'))
+  expect(current.state.sessions).toEqual({})
+  expect(current.state.attempts).toEqual({})
+  expect(memory.row).toEqual(reset)
+  expect(memory.rpc).not.toHaveBeenCalled()
+  expect(current.localNotice).toContain('por separado')
+  const archiveKey = dbFailure
+    ? Object.keys(localStorage).find(key => key.startsWith('step1-progreso:apartada:nbme-state:test-owner:'))
+    : [...memory.db.keys()].find(key => key.startsWith('apartada:nbme-state:test-owner:'))
+  const archived = () => dbFailure ? JSON.parse(localStorage.getItem(archiveKey!)!) : memory.db.get(archiveKey!)
+  expect(archived()).toMatchObject({ copia: offline, motivo: 'sin-version' })
+  await unmount()
+  await mount()
+  await vi.waitFor(() => expect(current.syncStatus.state).toBe('synced'))
+  expect(current.state.sessions).toEqual({})
+  expect(current.state.attempts).toEqual({})
+  expect(memory.rpc).not.toHaveBeenCalled()
+  expect(archived()).toMatchObject({ copia: offline })
+})
+
+it('leaves NBME storage and cloud untouched if the unversioned copy cannot be preserved', async () => {
+  const offline = { userId: 'test-owner', state: startNbmeSession(emptyNbmeState('test-bank'), {
+    id: 'before-reset', title: 'Synthetic', refs: [question],
+  }, 1), snapshot: null, savedAt: 900 }
+  const reset: NbmeSnapshot = { user_id: 'test-owner', state: emptyNbmeState('test-bank'), revision: 3,
+    generation: 'after-reset', updated_at: '2026-11-01T00:00:00Z' }
+  const backup = JSON.stringify({ userId: 'test-owner', state: reset.state, snapshot: reset, savedAt: 100 })
+  memory.db.set('nbme-state:test-owner', offline)
+  localStorage.setItem('step1-backup:nbme-state:test-owner', backup)
+  memory.row = reset
+  memory.write.mockRejectedValue(new Error('IndexedDB unavailable'))
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota exceeded') })
+  await mount()
+  expect(current.error).toContain('no pudo conservarse')
+  await act(async () => window.dispatchEvent(new Event('pagehide')))
+  expect(memory.rpc).not.toHaveBeenCalled()
+  expect(memory.from).not.toHaveBeenCalled()
+  expect(memory.db.get('nbme-state:test-owner')).toEqual(offline)
+  expect(localStorage.getItem('step1-backup:nbme-state:test-owner')).toBe(backup)
 })
 
 it('removes a session from the library and across reload while retaining every NBME response', async () => {

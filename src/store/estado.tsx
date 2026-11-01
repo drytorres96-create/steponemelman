@@ -8,7 +8,7 @@ import { nuevoProgreso } from '../srs/fsrs'
 import { calcularEstado, evaluarDominio, type CriteriosDominio } from '../srs/mastery'
 import { supabase } from '../lib/supabase'
 import { leer, escribir } from './db'
-import { apartarCopia } from './apartar'
+import { apartarCopia, conservarCopiaSinVersion, AVISO_COPIA_SIN_VERSION } from './apartar'
 import { recoverSavedCopies } from './recovery'
 import { ESTADO_INICIAL, crearUUID, leerEstadoDesconocido, migrarConceptIds, combinarEstados, reconstruirProgreso, registrarVistaConceptoEstado, serializarEstable, type EstadoApp, type Reanudable } from './model'
 import { StudySyncEngine, leerSnapshot, diagnosticoSync, type CloudSnapshot, type SyncReply, type CodigoSync } from './sync'
@@ -153,7 +153,10 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
         respaldoCrudo = JSON.parse(localStorage.getItem(`step1-respaldo:${clave}`) || 'null')
         respaldo = leerGuardado(respaldoCrudo, userId)
       } catch { /* Un respaldo malformado no reemplaza IndexedDB. */ }
-      const guardado = recoverSavedCopies(principal, respaldo, combinarEstados)
+      const { saved: guardado, unversioned } = recoverSavedCopies(principal, respaldo, combinarEstados)
+      if (unversioned && !await conservarCopiaSinVersion(clave, unversioned)) {
+        throw new Error('La copia local sin versión no pudo conservarse por separado.')
+      }
       // Una copia ilegible no bloquea el estudio, pero tampoco se aprovecha a medias: mezclar
       // un progreso sin su revisión con el de la nube podría revivir un reinicio. Se aparta
       // entera y se empieza de cero, sin revisión, para que la primera sincronización traiga
@@ -165,6 +168,7 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
       const [idx, migraciones] = await Promise.all([cargarIndice(), cargarMigraciones()])
       if (cancelado) return
       if (apartada) setAvisoLocal(AVISO_COPIA_APARTADA)
+      if (unversioned) setAvisoLocal(AVISO_COPIA_SIN_VERSION)
       mapa.current = migraciones
       actual.current = migrarConceptIds(leerEstadoDesconocido(guardado?.state) ?? ESTADO_INICIAL, migraciones)
       setEstado(actual.current)
@@ -217,7 +221,7 @@ export function ProveedorEstado({ children, userId }: { children: ReactNode; use
   }, [listo, edicion, sincronizarAhora])
   useEffect(() => {
     const activar = () => { if (document.visibilityState === 'visible') void sincronizarAhora() }
-    const salida = () => { if (listo) void persistir().catch(() => undefined) }
+    const salida = () => { if (motor.current) void persistir().catch(() => undefined) }
     window.addEventListener('online', activar)
     window.addEventListener('focus', activar)
     document.addEventListener('visibilitychange', activar)
